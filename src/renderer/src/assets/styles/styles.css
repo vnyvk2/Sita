@@ -855,6 +855,9 @@ body.dark,
   -webkit-user-select: none;
 }
 
+.app-region-no-drag,
+.workspace-toolbar-restore-btn,
+.toggleSidebarBtn,
 :is(.previousPageBtn, .forwardPageBtn, .goToHomePageBtn).app-region-no-drag,
 .mini-player-title-bar .special-controls-container,
 .special-controls-and-indicators-container :is(.indicators-container, .special-controls-container),

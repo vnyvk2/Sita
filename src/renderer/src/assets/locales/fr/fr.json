@@ -915,6 +915,14 @@
     "selectPrevLyricsLine": "Sélectionner la ligne précédente",
     "selectCustomLyricsLine": "Sélectionner une ligne personnalisée",
 
+    "panels": "Workspace panels",
+    "toggleQueuePanel": "Toggle Queue panel",
+    "toggleLyricsPanel": "Toggle Lyrics panel",
+    "togglePlaylistsPanel": "Toggle Playlists panel",
+    "toggleVisualizerPanel": "Toggle Visualizer panel",
+    "toggleNowPlayingPanel": "Toggle Now Playing panel",
+    "saveWorkspaceLayout": "Save workspace layout",
+
     "otherShortcuts": "Autres",
     "toggleTheme": "Changer le thème",
     "toggleMiniPlayerAlwaysOnTop": "Mini-lecteur toujours au-dessus",

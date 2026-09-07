@@ -187,7 +187,7 @@ function PlaylistInfoPage() {
     (state) => state.localStorage.sortingStates?.playlistDetailPage || 'customOrder'
   );
   const preferences = useStore(store, (state) => state.localStorage.preferences);
-  const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue } =
+  const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue, playSong } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
   const {
@@ -575,16 +575,29 @@ function PlaylistInfoPage() {
       });
 
       if (existingQueueIndex !== -1) {
+        const targetQueue = manager.queues[existingQueueIndex];
+        if (targetQueue) {
+          targetQueue.replaceQueue(queueSongIds, targetIndex, false);
+        }
         manager.switchQueue(existingQueueIndex);
-        updateQueueData(targetIndex, queueSongIds, false, true);
+        if (queueSongIds[targetIndex] !== undefined) {
+          playSong(queueSongIds[targetIndex], true);
+        }
         return;
       }
 
       // Otherwise create a new queue for this playlist
-      createQueue(queueSongIds, 'playlist', false, playlistData.id, false, playlistData.name);
-      updateQueueData(targetIndex, undefined, false, true);
+      createQueue(
+        queueSongIds,
+        'playlist',
+        false,
+        playlistData.id,
+        true,
+        playlistData.name,
+        targetIndex
+      );
     },
-    [createQueue, updateQueueData, playlistData.id, playlistData.name, filteredSongs]
+    [createQueue, updateQueueData, playSong, playlistData.id, playlistData.name, filteredSongs]
   );
 
   const clearSongHistory = useCallback(() => {

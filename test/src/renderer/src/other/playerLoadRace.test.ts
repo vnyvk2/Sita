@@ -281,4 +281,36 @@ describe('AudioPlayer Race & Lifecycle Deterministic Regression Tests', () => {
       vi.useRealTimers();
     }
   });
+
+  it('P1: coalesces concurrent load requests for the same songId and preserves store update', async () => {
+    let getSongCallCount = 0;
+    window.api = {
+      audioLibraryControls: {
+        getSong: vi.fn().mockImplementation((songId: number) => {
+          getSongCallCount++;
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                songId,
+                title: `Song ${songId}`,
+                duration: 180,
+                path: `nora://music/song_${songId}.flac`
+              });
+            }, 30);
+          });
+        })
+      }
+    } as any;
+
+    // Simulate concurrent triggers for the same songId (e.g. activeQueueChanged + positionChange + playSongById)
+    const p1 = player.playSongById(99, { autoPlay: false });
+    const p2 = player.playSongById(99, { autoPlay: true });
+
+    await Promise.all([p1, p2]);
+
+    expect(getSongCallCount).toBe(1);
+    expect(player.audio.src).toBe('nora://music/song_99.flac');
+    expect(store.state.currentSongData?.songId).toBe(99);
+    expect(store.state.currentSongData?.title).toBe('Song 99');
+  });
 });

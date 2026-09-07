@@ -13,6 +13,7 @@ import { render, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import storage from '../../utils/localStorage';
+import { workspaceActions } from '@renderer/workspace/store';
 import { useKeyboardShortcuts } from '../useKeyboardShortcuts';
 
 vi.mock('../useOverlayNavigation', () => ({
@@ -58,13 +59,14 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
    */
   const setupShortcuts = async () => {
     const rootRoute = createRootRoute();
+    const ShortcutWrapper = () => {
+      useKeyboardShortcuts(defaultProps);
+      return null;
+    };
     const indexRoute = createRoute({
       getParentRoute: () => rootRoute,
       path: '/',
-      component: () => {
-        useKeyboardShortcuts(defaultProps);
-        return null;
-      }
+      component: ShortcutWrapper
     });
     const history = createMemoryHistory({ initialEntries: ['/'] });
     const router = createRouter({
@@ -162,6 +164,7 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     setPlayerType('normal');
   });
 
@@ -368,6 +371,156 @@ describe('useKeyboardShortcuts - Library Resync & Guard Tests', () => {
       fireKey('Q', { ctrlKey: true });
 
       expect(toggleMiniPlayerQueue).toHaveBeenCalledWith(true);
+    });
+  });
+
+  describe('Workspace Panel Shortcuts', () => {
+    beforeEach(() => {
+      act(() => {
+        storage.preferences.setPreferences('isExperimentalWorkspaceEnabled', true);
+      });
+    });
+
+    afterEach(() => {
+      act(() => {
+        storage.preferences.setPreferences('isExperimentalWorkspaceEnabled', false);
+      });
+    });
+
+    it('does not trigger workspace panel shortcuts when experimental workspace is OFF', async () => {
+      act(() => {
+        storage.preferences.setPreferences('isExperimentalWorkspaceEnabled', false);
+      });
+      const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
+      await setupShortcuts();
+
+      fireKey('q', { altKey: true, code: 'KeyQ' });
+      fireKey('l', { altKey: true, code: 'KeyL' });
+      fireKey('p', { altKey: true, code: 'KeyP' });
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('triggers toggleOrOpenPanel with queue on Alt+Q', async () => {
+      const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
+      await setupShortcuts();
+
+      fireKey('q', { altKey: true, code: 'KeyQ' });
+
+      await vi.waitFor(() => {
+        expect(spy).toHaveBeenCalledWith('queue');
+      });
+    });
+
+    it('triggers toggleOrOpenPanel with lyrics on Alt+L', async () => {
+      const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
+      await setupShortcuts();
+
+      fireKey('l', { altKey: true, code: 'KeyL' });
+
+      await vi.waitFor(() => {
+        expect(spy).toHaveBeenCalledWith('lyrics');
+      });
+    });
+
+    it('triggers toggleOrOpenPanel with playlists on Alt+P', async () => {
+      const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
+      await setupShortcuts();
+
+      fireKey('p', { altKey: true, code: 'KeyP' });
+
+      await vi.waitFor(() => {
+        expect(spy).toHaveBeenCalledWith('playlists');
+      });
+    });
+
+    it('triggers toggleOrOpenPanel with visualizer on Alt+V', async () => {
+      const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
+      await setupShortcuts();
+
+      fireKey('v', { altKey: true, code: 'KeyV' });
+
+      await vi.waitFor(() => {
+        expect(spy).toHaveBeenCalledWith('visualizer');
+      });
+    });
+
+    it('triggers toggleOrOpenPanel with now-playing on Alt+N', async () => {
+      const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
+      await setupShortcuts();
+
+      fireKey('n', { altKey: true, code: 'KeyN' });
+
+      await vi.waitFor(() => {
+        expect(spy).toHaveBeenCalledWith('now-playing');
+      });
+    });
+
+    it('triggers openSaveLayoutModal on Alt+S', async () => {
+      const spy = vi.spyOn(workspaceActions, 'openSaveLayoutModal').mockImplementation(() => {});
+      await setupShortcuts();
+
+      fireKey('s', { altKey: true, code: 'KeyS' });
+
+      await vi.waitFor(() => {
+        expect(spy).toHaveBeenCalledWith('save');
+      });
+    });
+
+    it('supports macOS Option key unicode characters via e.code', async () => {
+      const panelSpy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
+      const saveSpy = vi.spyOn(workspaceActions, 'openSaveLayoutModal').mockImplementation(() => {});
+      await setupShortcuts();
+
+      // macOS Option+Q produces 'œ' with code 'KeyQ'
+      fireKey('œ', { altKey: true, code: 'KeyQ' });
+      await vi.waitFor(() => {
+        expect(panelSpy).toHaveBeenCalledWith('queue');
+      });
+
+      // macOS Option+S produces 'ß' with code 'KeyS'
+      fireKey('ß', { altKey: true, code: 'KeyS' });
+      await vi.waitFor(() => {
+        expect(saveSpy).toHaveBeenCalledWith('save');
+      });
+
+      // macOS Option+L produces '¬' with code 'KeyL'
+      fireKey('¬', { altKey: true, code: 'KeyL' });
+      await vi.waitFor(() => {
+        expect(panelSpy).toHaveBeenCalledWith('lyrics');
+      });
+    });
+
+    it('respects custom shortcut rebinding for workspace panels', async () => {
+      const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
+      await setupShortcuts();
+
+      // Rebind toggleQueuePanel to Ctrl+Shift+Q
+      storage.keyboardShortcuts.setKeyboardShortcuts('appShortcutsPrompt.toggleQueuePanel', [
+        'Ctrl',
+        'Shift',
+        'Q'
+      ]);
+
+      // Alt+Q should no longer trigger queue panel
+      fireKey('q', { altKey: true, code: 'KeyQ' });
+      expect(spy).not.toHaveBeenCalled();
+
+      // Ctrl+Shift+Q should trigger queue panel
+      fireKey('q', { ctrlKey: true, shiftKey: true, code: 'KeyQ' });
+      await vi.waitFor(() => {
+        expect(spy).toHaveBeenCalledWith('queue');
+      });
+    });
+
+    it('blocks workspace panel shortcuts while in mini player mode', async () => {
+      setPlayerType('mini');
+      const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
+      await setupShortcuts();
+
+      fireKey('q', { altKey: true, code: 'KeyQ' });
+
+      expect(spy).not.toHaveBeenCalled();
     });
   });
 });

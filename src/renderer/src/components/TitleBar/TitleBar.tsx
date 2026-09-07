@@ -1,11 +1,9 @@
 import { useLocation } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { memo } from 'react';
+import { lazy, memo, Suspense } from 'react';
 
-import { version } from '../../../../../package.json';
 import LightModeLogo from '../../assets/images/webp/logo_light_mode.webp';
 import { store } from '../../store/store';
-import { getVersionInfoFromString } from '../../utils/isLatestVersion';
 import Img from '../Img';
 import CurrentLocationContainer from './CurrentLocationContainer';
 import NetworkIndicator from './indicators/NetworkIndicator';
@@ -15,11 +13,16 @@ import ChangeThemeBtn from './special_controls/ChangeThemeBtn';
 import GoToMainPlayerBtn from './special_controls/GoToMainPlayerBtn';
 import WindowControlsContainer from './WindowControlsContainer';
 
-const appReleasePhase = getVersionInfoFromString(version)?.releasePhase || 'stable';
+const LazyWorkspaceToolbarRestoreBtn = lazy(() => import('./WorkspaceToolbarRestoreBtn'));
 
 const TitleBar = memo(() => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
   const isFullScreenPlayer = useStore(store, (state) => state.playerType === 'full');
+  const isExperimentalWorkspace = useStore(
+    store,
+    (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
+  );
+
   const location = useLocation();
   const isDarwin = window.api.properties.platform === 'darwin';
 
@@ -42,7 +45,7 @@ const TitleBar = memo(() => {
               alt="Nora Logo"
             />
           </span>
-          <span className="app-name-container" title={`Sita v${version}`}>
+          <span className="app-name-container" title="Nora">
             <span className="font-medium tracking-wide">Sita</span>
           </span>
         </div>
@@ -55,6 +58,11 @@ const TitleBar = memo(() => {
       )}
       <div className="window-controls-and-special-controls-and-indicators-container flex h-full flex-row">
         <div className="special-controls-and-indicators-container mr-2 flex items-center justify-between py-1">
+          {isExperimentalWorkspace && !isFullScreenPlayer && (
+            <Suspense fallback={null}>
+              <LazyWorkspaceToolbarRestoreBtn />
+            </Suspense>
+          )}
           <div className="indicators-container flex flex-row">
             {/* <ThrottlingIndicator /> */}
             <NewUpdateIndicator />

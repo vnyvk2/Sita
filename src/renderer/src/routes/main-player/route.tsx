@@ -8,6 +8,9 @@ import { useEffectiveAppearance } from '@renderer/hooks/useEffectiveAppearance';
 import { store } from '@renderer/store/store';
 import { createFileRoute } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
+import { lazy, Suspense } from 'react';
+
+const LazyWorkspaceFrame = lazy(() => import('@renderer/workspace/engine/WorkspaceFrame'));
 
 export const Route = createFileRoute('/main-player')({
   component: RouteComponent
@@ -30,6 +33,10 @@ function RouteComponent() {
   );
   const { isDark } = useEffectiveAppearance();
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
+  const isExperimentalWorkspace = useStore(
+    store,
+    (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
+  );
 
   return (
     <div
@@ -60,7 +67,13 @@ function RouteComponent() {
       <ContextMenu />
       <PromptMenu />
       <TitleBar />
-      <BodyAndSideBarContainer />
+      {isExperimentalWorkspace ? (
+        <Suspense fallback={null}>
+          <LazyWorkspaceFrame />
+        </Suspense>
+      ) : (
+        <BodyAndSideBarContainer />
+      )}
       <SongControlsContainer />
     </div>
   );

@@ -1,3 +1,5 @@
+import { store } from '@renderer/store/store';
+import { useStore } from '@tanstack/react-store';
 import React, { Fragment, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +11,10 @@ import ShortcutButton from './ShortcutButton';
 
 const AppShortcutsPrompt = () => {
   const { t } = useTranslation();
+  const isExperimentalWorkspaceEnabled = useStore(
+    store,
+    (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
+  );
   const [shortcuts, setShortcuts] = React.useState(
     storage.keyboardShortcuts.getKeyboardShortcuts()
   );
@@ -31,8 +37,16 @@ const AppShortcutsPrompt = () => {
       if (e.shiftKey) keys.push('Shift');
 
       const key = e.key;
-      if (!['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) {
-        keys.push(key === ' ' ? 'Space' : key);
+      if (!['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key.toUpperCase())) {
+        if (e.altKey && e.code?.startsWith('Key')) {
+          keys.push(e.code.slice(3));
+        } else if (key === ' ') {
+          keys.push('Space');
+        } else if (key.length === 1) {
+          keys.push(key.toUpperCase());
+        } else {
+          keys.push(key);
+        }
       }
 
       const new_shortcut: Shortcut = {
@@ -107,74 +121,76 @@ const AppShortcutsPrompt = () => {
   // switches can never desynchronize shortcut matching. The strict i18n key union cannot express
   // dynamically persisted keys, so widen through an explicit string-keyed translator.
   const translateShortcutKey = (key: string): string => (t as (k: string) => string)(key);
-  const shortcutCategoryComponents = useMemo(
-    () =>
-      shortcuts.map((category, categoryIndex) => (
-        <li key={categoryIndex} className="shortcut-category mt-8">
-          <div className="shortcut-category-title text-font-color-highlight dark:text-dark-font-color-highlight text-2xl">
-            {translateShortcutKey(category.shortcutCategoryTitle)}
-          </div>
-          <div className="shortcuts-container ml-4 flex flex-row flex-wrap justify-between">
-            {category.shortcuts.map((shortcut, shortcutIndex) => {
-              const isEditing = editingShortcut === shortcut.label;
-              // const elementId = `${categoryIndex}-${shortcutIndex}`;
+  const shortcutCategoryComponents = useMemo(() => {
+    const categoriesToShow = isExperimentalWorkspaceEnabled
+      ? shortcuts
+      : shortcuts.filter((c) => c.shortcutCategoryTitle !== 'appShortcutsPrompt.panels');
 
-              return (
-                <div
-                  key={shortcutIndex}
-                  className={`shortcut mb-4 flex w-[45%] items-center justify-between p-2 ${
-                    isEditing && editingShortcut === shortcut.label
-                      ? 'editing bg-dark-background-color-3/75 dark:bg-dark-background-color-3/15 rounded-md'
-                      : ''
-                  }`}
-                >
-                  <div className="shortcut-label opacity-75">
-                    {translateShortcutKey(shortcut.label)}
-                  </div>
-                  <div className="shortcut-keys flex items-center">
-                    {isEditing ? (
-                      <div className="flex items-center">
-                        {newKeys.map((key, i) => (
-                          <Fragment key={i}>
-                            <ShortcutButton shortcutKey={key} />
-                            {i !== newKeys.length - 1 && <span className="mx-2">+</span>}
-                          </Fragment>
-                        ))}
-                        {!newKeys.length && (
-                          <span className="text-font-color-dimmed">{'Press New Shortcut'}</span>
-                        )}
-                      </div>
-                    ) : (
-                      <>
-                        {shortcut.keys.map((key, i) => (
-                          <Fragment key={i}>
-                            <ShortcutButton shortcutKey={key} />
-                            {i !== shortcut.keys.length - 1 && (
-                              <span className="text-font-color-dimmed mx-2">+</span>
-                            )}
-                          </Fragment>
-                        ))}
-                        <Button
-                          className="m-0 ml-4 p-2"
-                          clickHandler={() => {
-                            setEditingShortcut(shortcut.label);
-                            setNewKeys(shortcut.keys);
-                          }}
-                          isDisabled={!!editingShortcut}
-                          iconName="edit"
-                          iconClassName="material-icons-round-outlined"
-                        />
-                      </>
-                    )}
-                  </div>
+    return categoriesToShow.map((category, categoryIndex) => (
+      <li key={categoryIndex} className="shortcut-category mt-8">
+        <div className="shortcut-category-title text-font-color-highlight dark:text-dark-font-color-highlight text-2xl">
+          {translateShortcutKey(category.shortcutCategoryTitle)}
+        </div>
+        <div className="shortcuts-container ml-4 flex flex-row flex-wrap justify-between">
+          {category.shortcuts.map((shortcut, shortcutIndex) => {
+            const isEditing = editingShortcut === shortcut.label;
+            // const elementId = `${categoryIndex}-${shortcutIndex}`;
+
+            return (
+              <div
+                key={shortcutIndex}
+                className={`shortcut mb-4 flex w-[45%] items-center justify-between p-2 ${
+                  isEditing && editingShortcut === shortcut.label
+                    ? 'editing bg-dark-background-color-3/75 dark:bg-dark-background-color-3/15 rounded-md'
+                    : ''
+                }`}
+              >
+                <div className="shortcut-label opacity-75">
+                  {translateShortcutKey(shortcut.label)}
                 </div>
-              );
-            })}
-          </div>
-        </li>
-      )),
-    [shortcuts, editingShortcut, newKeys]
-  );
+                <div className="shortcut-keys flex items-center">
+                  {isEditing ? (
+                    <div className="flex items-center">
+                      {newKeys.map((key, i) => (
+                        <Fragment key={i}>
+                          <ShortcutButton shortcutKey={key} />
+                          {i !== newKeys.length - 1 && <span className="mx-2">+</span>}
+                        </Fragment>
+                      ))}
+                      {!newKeys.length && (
+                        <span className="text-font-color-dimmed">{'Press New Shortcut'}</span>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {shortcut.keys.map((key, i) => (
+                        <Fragment key={i}>
+                          <ShortcutButton shortcutKey={key} />
+                          {i !== shortcut.keys.length - 1 && (
+                            <span className="text-font-color-dimmed mx-2">+</span>
+                          )}
+                        </Fragment>
+                      ))}
+                      <Button
+                        className="m-0 ml-4 p-2"
+                        clickHandler={() => {
+                          setEditingShortcut(shortcut.label);
+                          setNewKeys(shortcut.keys);
+                        }}
+                        isDisabled={!!editingShortcut}
+                        iconName="edit"
+                        iconClassName="material-icons-round-outlined"
+                      />
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </li>
+    ));
+  }, [shortcuts, editingShortcut, newKeys, isExperimentalWorkspaceEnabled]);
 
   return (
     <div>

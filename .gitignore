@@ -77,3 +77,15 @@ scripts/step0-*.json
 scripts/step05-attribution*
 scripts/audit-home-images-and-allocators.mjs
 scripts/mem-profile/
+
+# Excluded app icons (kept locally, not committed)
+src/renderer/src/assets/app_icons/icon_06.svg
+src/renderer/src/assets/app_icons/icon_07.svg
+src/renderer/src/assets/app_icons/icon_09.svg
+src/renderer/src/assets/app_icons/icon_11.svg
+src/renderer/src/assets/app_icons/icon_12.svg
+src/renderer/src/assets/app_icons/icon_14.svg
+src/renderer/src/assets/app_icons/icon_16.svg
+src/renderer/src/assets/app_icons/icon_17.svg
+src/renderer/src/assets/app_icons/icon_20.svg
+

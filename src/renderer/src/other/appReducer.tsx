@@ -449,6 +449,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     reduceVisualEffectsOnBattery: false,
     ambientParticles: false,
     isWaveformSeekbarEnabled: true,
+    isExperimentalWorkspaceEnabled: false,
     customThemeOverrides: {}
   },
   playback: {
@@ -671,6 +672,35 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
         {
           label: 'appShortcutsPrompt.resyncLibrary',
           keys: [normalizedKeys.insertKey]
+        }
+      ]
+    },
+    {
+      shortcutCategoryTitle: 'appShortcutsPrompt.panels',
+      shortcuts: [
+        {
+          label: 'appShortcutsPrompt.toggleQueuePanel',
+          keys: [normalizedKeys.altKey, 'Q']
+        },
+        {
+          label: 'appShortcutsPrompt.toggleLyricsPanel',
+          keys: [normalizedKeys.altKey, 'L']
+        },
+        {
+          label: 'appShortcutsPrompt.togglePlaylistsPanel',
+          keys: [normalizedKeys.altKey, 'P']
+        },
+        {
+          label: 'appShortcutsPrompt.toggleVisualizerPanel',
+          keys: [normalizedKeys.altKey, 'V']
+        },
+        {
+          label: 'appShortcutsPrompt.toggleNowPlayingPanel',
+          keys: [normalizedKeys.altKey, 'N']
+        },
+        {
+          label: 'appShortcutsPrompt.saveWorkspaceLayout',
+          keys: [normalizedKeys.altKey, 'S']
         }
       ]
     }

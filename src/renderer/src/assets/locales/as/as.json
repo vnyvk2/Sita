@@ -898,6 +898,14 @@
     "selectPrevLyricsLine": "পূৰ্বৱৰ্তী গীতৰ কথাৰ লাইন বাছনি কৰক",
     "selectCustomLyricsLine": "এটা কাষ্টম গীতৰ কথাৰ লাইন বাছনি কৰক",
 
+    "panels": "Workspace panels",
+    "toggleQueuePanel": "Toggle Queue panel",
+    "toggleLyricsPanel": "Toggle Lyrics panel",
+    "togglePlaylistsPanel": "Toggle Playlists panel",
+    "toggleVisualizerPanel": "Toggle Visualizer panel",
+    "toggleNowPlayingPanel": "Toggle Now Playing panel",
+    "saveWorkspaceLayout": "Save workspace layout",
+
     "otherShortcuts": "অন্যান্য চৰ্টকাট",
     "toggleTheme": "এপৰ থীম টগল কৰক",
     "toggleMiniPlayerAlwaysOnTop": "মিনি প্লেয়াৰ সদায় ওপৰত টগল কৰক",

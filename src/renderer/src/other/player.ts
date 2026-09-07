@@ -65,6 +65,13 @@ class AudioPlayer {
   private pendingAutoPlay: boolean = false;
   private queueEventsUnsubscribe: (() => void)[] = [];
   private loadRequestId: number = 0;
+  private inFlightLoad: {
+    songId: number;
+    requestId: number;
+    promise: Promise<AudioPlayerData | null>;
+    autoPlay: boolean;
+    updateStore: boolean;
+  } | null = null;
   private pendingCanPlayHandler: (() => void) | null = null;
   private activeFade: {
     type: 'in' | 'out';
@@ -148,7 +155,9 @@ class AudioPlayer {
       bindToQueue();
       const songId = this.queue.currentSongId;
       if (songId) {
-        this.loadSong(songId, { autoPlay: true }).catch((err) => {
+        const shouldAutoPlay = this.pendingAutoPlay || !this.audio.paused;
+        this.pendingAutoPlay = false;
+        this.loadSong(songId, { autoPlay: shouldAutoPlay }).catch((err) => {
           console.error('[AudioPlayer.activeQueueChanged] Failed to load song:', err);
         });
       } else {
@@ -234,9 +243,49 @@ class AudioPlayer {
     songIdOrData: number | AudioPlayerData,
     options?: { autoPlay?: boolean; updateStore?: boolean }
   ): Promise<AudioPlayerData | null> {
+    const songId = typeof songIdOrData === 'number' ? songIdOrData : songIdOrData.songId;
+
+    // 1. Coalesce into existing in-flight load for the exact same song
+    if (this.inFlightLoad && this.inFlightLoad.songId === songId) {
+      logPlayer('[AudioPerf] loadSong_coalescing', {
+        songId,
+        requestId: this.inFlightLoad.requestId,
+        autoPlay: options?.autoPlay,
+        updateStore: options?.updateStore
+      });
+      if (options?.autoPlay) {
+        this.inFlightLoad.autoPlay = true;
+      }
+      if (options?.updateStore !== false) {
+        this.inFlightLoad.updateStore = true;
+      }
+      return this.inFlightLoad.promise;
+    }
+
+    // 2. Fast-path: if exact song is already loaded, audio src is set, and no load is in-flight
+    if (
+      this.currentSongData?.songId === songId &&
+      this.audio.src &&
+      !this.inFlightLoad
+    ) {
+      logPlayer('[AudioPerf] loadSong_already_loaded', {
+        songId,
+        autoPlay: options?.autoPlay
+      });
+      if (options?.updateStore !== false) {
+        dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: this.currentSongData });
+        storage.playback.setCurrentSongOptions('songId', this.currentSongData.songId);
+      }
+      if (options?.autoPlay && this.audio.paused) {
+        this.play().catch((err) =>
+          console.error('[AudioPlayer] Fast-path auto-play failed:', err)
+        );
+      }
+      return this.currentSongData;
+    }
+
     const currentRequestId = ++this.loadRequestId;
     const tStart = performance.now();
-    const songId = typeof songIdOrData === 'number' ? songIdOrData : songIdOrData.songId;
 
     logPlayer('[AudioPerf] loadSong_start', {
       songId,
@@ -250,133 +299,155 @@ class AudioPlayer {
       this.pendingCanPlayHandler = null;
     }
 
-    try {
-      let songData: AudioPlayerData;
+    const loadPromise = (async (): Promise<AudioPlayerData | null> => {
+      try {
+        let songData: AudioPlayerData;
 
-      if (typeof songIdOrData === 'number') {
-        // Fetch song data if ID provided
-        songData = await window.api.audioLibraryControls.getSong(
-          songIdOrData,
-          options?.autoPlay ?? true
-        );
-      } else {
-        // Use provided song data
-        songData = songIdOrData;
-      }
-
-      const tIpc = performance.now();
-
-      // Discard stale out-of-order resolution if user skipped again during in-flight fetch
-      if (currentRequestId !== this.loadRequestId) {
-        logPlayer('[AudioPerf] loadSong_discarded_stale', {
-          songId: songData.songId,
-          currentRequestId,
-          latestRequestId: this.loadRequestId,
-          ipcDurationMs: tIpc - tStart
-        });
-        return null;
-      }
-
-      logPlayer('[AudioPerf] ipc_resolved', {
-        songId: songData.songId,
-        requestId: currentRequestId,
-        ipcDurationMs: tIpc - tStart
-      });
-
-      logPlayer('[AudioPlayer.loadSong]', {
-        songId: songData.songId,
-        options
-      });
-
-      this.currentSongData = songData;
-      this.applyReplayGain();
-
-      // 1. Set audio source (clean protocol path without cache-busting)
-      this.audio.src = songData.path;
-
-      // 2. Load media pipeline
-      this.audio.load();
-
-      // 3. Set up auto-play with generation guard and explicit listener tracking
-      if (options?.autoPlay) {
-        if (this.audio.readyState >= 3) {
-          // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA - ready to play immediately
-          this.play().catch((err) =>
-            console.error('[AudioPlayer] Immediate auto-play failed:', err)
+        if (typeof songIdOrData === 'number') {
+          // Fetch song data if ID provided
+          songData = await window.api.audioLibraryControls.getSong(
+            songIdOrData,
+            options?.autoPlay ?? true
           );
         } else {
-          // Wait for canplay event with generation guard
-          const autoPlayHandler = () => {
-            if (currentRequestId === this.loadRequestId) {
-              const tCanPlay = performance.now();
-              logPlayer('[AudioPerf] canplay_fired', {
-                songId: songData.songId,
-                requestId: currentRequestId,
-                bufferDurationMs: tCanPlay - tIpc
-              });
+          // Use provided song data
+          songData = songIdOrData;
+        }
 
-              this.play().catch((err) =>
-                console.error('[AudioPlayer] Auto-play on canplay failed:', err)
-              );
-            }
-            if (this.pendingCanPlayHandler === autoPlayHandler) {
-              this.pendingCanPlayHandler = null;
-            }
-            this.audio.removeEventListener('canplay', autoPlayHandler);
-          };
+        const tIpc = performance.now();
 
-          this.pendingCanPlayHandler = autoPlayHandler;
-          this.audio.addEventListener('canplay', autoPlayHandler);
+        // Discard stale out-of-order resolution if user skipped again during in-flight fetch
+        if (currentRequestId !== this.loadRequestId) {
+          logPlayer('[AudioPerf] loadSong_discarded_stale', {
+            songId: songData.songId,
+            currentRequestId,
+            latestRequestId: this.loadRequestId,
+            ipcDurationMs: tIpc - tStart
+          });
+          return null;
+        }
+
+        logPlayer('[AudioPerf] ipc_resolved', {
+          songId: songData.songId,
+          requestId: currentRequestId,
+          ipcDurationMs: tIpc - tStart
+        });
+
+        const effectiveAutoPlay =
+          this.inFlightLoad?.songId === songId
+            ? this.inFlightLoad.autoPlay
+            : (options?.autoPlay ?? false);
+
+        const effectiveUpdateStore =
+          this.inFlightLoad?.songId === songId
+            ? this.inFlightLoad.updateStore
+            : (options?.updateStore !== false);
+
+        this.currentSongData = songData;
+        this.applyReplayGain();
+
+        // 1. Set audio source (clean protocol path without cache-busting)
+        this.audio.src = songData.path;
+
+        // 2. Load media pipeline
+        this.audio.load();
+
+        // 3. Set up auto-play with generation guard and explicit listener tracking
+        if (effectiveAutoPlay) {
+          if (this.audio.readyState >= 3) {
+            // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA - ready to play immediately
+            this.play().catch((err) =>
+              console.error('[AudioPlayer] Immediate auto-play failed:', err)
+            );
+          } else {
+            // Wait for canplay event with generation guard
+            const autoPlayHandler = () => {
+              if (currentRequestId === this.loadRequestId) {
+                const tCanPlay = performance.now();
+                logPlayer('[AudioPerf] canplay_fired', {
+                  songId: songData.songId,
+                  requestId: currentRequestId,
+                  bufferDurationMs: tCanPlay - tIpc
+                });
+
+                this.play().catch((err) =>
+                  console.error('[AudioPlayer] Auto-play on canplay failed:', err)
+                );
+              }
+              if (this.pendingCanPlayHandler === autoPlayHandler) {
+                this.pendingCanPlayHandler = null;
+              }
+              this.audio.removeEventListener('canplay', autoPlayHandler);
+            };
+
+            this.pendingCanPlayHandler = autoPlayHandler;
+            this.audio.addEventListener('canplay', autoPlayHandler);
+          }
+        }
+
+        // 4. Update store with current song data if requested
+        if (effectiveUpdateStore) {
+          dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: songData });
+
+          // Update localStorage
+          storage.playback.setCurrentSongOptions('songId', songData.songId);
+        }
+
+        // 5. Dispatch custom track change event
+        const trackChangeEvent = new CustomEvent('player/trackchange', {
+          detail: songData.songId
+        });
+        this.audio.dispatchEvent(trackChangeEvent);
+
+        // 6. Emit songLoaded event
+        this.emit('songLoaded', songData);
+
+        logPlayer('[AudioPerf] loadSong_completed', {
+          songId: songData.songId,
+          totalDurationMs: performance.now() - tStart
+        });
+
+        return songData;
+      } catch (error) {
+        // Discard stale rejections / errors from superseded in-flight requests
+        if (currentRequestId !== this.loadRequestId) {
+          logPlayer('[AudioPerf] loadSong_discarded_stale_error', {
+            songId,
+            currentRequestId,
+            latestRequestId: this.loadRequestId,
+            error
+          });
+          return null;
+        }
+
+        console.error(
+          `Failed to load song (ID: ${songId}):`,
+          error instanceof Error ? error.message : error
+        );
+        this.emit('loadError', { songId, error });
+        throw error;
+      } finally {
+        if (this.inFlightLoad?.requestId === currentRequestId) {
+          this.inFlightLoad = null;
         }
       }
+    })();
 
-      // 4. Update store with current song data if requested
-      if (options?.updateStore !== false) {
-        dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: songData });
+    this.inFlightLoad = {
+      songId,
+      requestId: currentRequestId,
+      promise: loadPromise,
+      autoPlay: options?.autoPlay ?? false,
+      updateStore: options?.updateStore !== false
+    };
 
-        // Update localStorage
-        storage.playback.setCurrentSongOptions('songId', songData.songId);
-      }
-
-      // 5. Dispatch custom track change event
-      const trackChangeEvent = new CustomEvent('player/trackchange', {
-        detail: songData.songId
-      });
-      this.audio.dispatchEvent(trackChangeEvent);
-
-      // 6. Emit songLoaded event
-      this.emit('songLoaded', songData);
-
-      logPlayer('[AudioPerf] loadSong_completed', {
-        songId: songData.songId,
-        totalDurationMs: performance.now() - tStart
-      });
-
-      return songData;
-    } catch (error) {
-      // Discard stale rejections / errors from superseded in-flight requests
-      if (currentRequestId !== this.loadRequestId) {
-        logPlayer('[AudioPerf] loadSong_discarded_stale_error', {
-          songId,
-          currentRequestId,
-          latestRequestId: this.loadRequestId,
-          error
-        });
-        return null;
-      }
-
-      console.error(
-        `Failed to load song (ID: ${songId}):`,
-        error instanceof Error ? error.message : error
-      );
-      this.emit('loadError', { songId, error });
-      throw error;
-    }
+    return loadPromise;
   }
 
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
     this.cancelActiveFade();
+    this.inFlightLoad = null;
     if (this.unsubscribeFunc) this.unsubscribeFunc.unsubscribe();
     if (this.pendingCanPlayHandler) {
       this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);

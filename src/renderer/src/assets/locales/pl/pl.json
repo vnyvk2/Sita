@@ -908,6 +908,14 @@
     "selectPrevLyricsLine": "Zaznacz poprzednią linię tekstu",
     "selectCustomLyricsLine": "Zaznacz własną linię tektsu",
 
+    "panels": "Workspace panels",
+    "toggleQueuePanel": "Toggle Queue panel",
+    "toggleLyricsPanel": "Toggle Lyrics panel",
+    "togglePlaylistsPanel": "Toggle Playlists panel",
+    "toggleVisualizerPanel": "Toggle Visualizer panel",
+    "toggleNowPlayingPanel": "Toggle Now Playing panel",
+    "saveWorkspaceLayout": "Save workspace layout",
+
     "otherShortcuts": "Inne skróty",
     "toggleTheme": "Przełącz motyw aplikacji",
     "toggleMiniPlayerAlwaysOnTop": "Przełącz bycie Mini Odtwarzacza zawsze na wierzchu",

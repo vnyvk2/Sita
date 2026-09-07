@@ -50,7 +50,8 @@ export interface AppUpdateContextType {
     isShuffleQueue?: boolean,
     queueId?: string | number,
     startPlaying?: boolean,
-    queueTitle?: string
+    queueTitle?: string,
+    initialPosition?: number
   ) => void;
   playAllSongs: (options: {
     songIds?: number[];

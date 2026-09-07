@@ -27,7 +27,8 @@ export function useQueueManagement(dependencies: QueueManagementDependencies) {
       isShuffleQueue = false,
       queueId?: string | number,
       startPlaying = true,
-      queueTitle?: string
+      queueTitle?: string,
+      initialPosition = 0
     ) => {
       if (newQueue.length === 0) {
         return console.error('Cannot create an empty queue.');
@@ -42,6 +43,10 @@ export function useQueueManagement(dependencies: QueueManagementDependencies) {
 
       if (isShuffleQueue) {
         playerQueue.shuffle();
+      }
+
+      if (initialPosition > 0 && initialPosition < playerQueue.length) {
+        playerQueue.moveToPosition(initialPosition);
       }
 
       manager.switchQueue(manager.queues.length - 1);
