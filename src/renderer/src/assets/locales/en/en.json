@@ -1055,6 +1055,14 @@
     "selectPrevLyricsLine": "Select the previous lyrics line",
     "selectCustomLyricsLine": "Select a custom lyrics line",
 
+    "panels": "Workspace panels",
+    "toggleQueuePanel": "Toggle Queue panel",
+    "toggleLyricsPanel": "Toggle Lyrics panel",
+    "togglePlaylistsPanel": "Toggle Playlists panel",
+    "toggleVisualizerPanel": "Toggle Visualizer panel",
+    "toggleNowPlayingPanel": "Toggle Now Playing panel",
+    "saveWorkspaceLayout": "Save workspace layout",
+
     "otherShortcuts": "Other shortcuts",
     "toggleTheme": "Toggle app theme",
     "toggleMiniPlayerAlwaysOnTop": "Toggle Mini Player always on top",

@@ -296,24 +296,63 @@ const getSortingStates = <Type extends keyof SortingStates>(type: Type) =>
 export const normalizeShortcutLabelsToKeys = (storageData: LocalStorage): LocalStorage => {
   const templateShortcuts = LOCAL_STORAGE_DEFAULT_TEMPLATE.keyboardShortcuts;
   const persisted = storageData?.keyboardShortcuts;
-  if (!Array.isArray(persisted)) return storageData;
+  if (!Array.isArray(persisted) || persisted.length === 0) return storageData;
 
   let changed = false;
-  const normalized = persisted.map((category, categoryIndex) => {
-    const templateCategory = templateShortcuts[categoryIndex];
+  const normalized: ShortcutCategoryList = persisted.map((category, categoryIndex) => {
+    const templateCategory =
+      templateShortcuts.find((tc) => tc.shortcutCategoryTitle === category.shortcutCategoryTitle) ||
+      templateShortcuts[categoryIndex];
     if (!templateCategory) return category;
+
+    if (category.shortcutCategoryTitle !== templateCategory.shortcutCategoryTitle) {
+      changed = true;
+    }
+
+    const currentShortcuts = Array.isArray(category.shortcuts) ? category.shortcuts : [];
+    const normalizedShortcuts = currentShortcuts.map((shortcut, shortcutIndex) => {
+      const templateShortcut = templateCategory.shortcuts[shortcutIndex];
+      if (templateShortcut && shortcut.label === templateShortcut.label) return shortcut;
+      if (templateCategory.shortcuts.some((ts) => ts.label === shortcut.label)) return shortcut;
+
+      if (templateShortcut) {
+        changed = true;
+        return { ...shortcut, label: templateShortcut.label };
+      }
+      return shortcut;
+    });
+
+    const presentLabels = new Set(normalizedShortcuts.map((s) => s.label));
+    for (const templateShortcut of templateCategory.shortcuts) {
+      if (!presentLabels.has(templateShortcut.label)) {
+        normalizedShortcuts.push({
+          label: templateShortcut.label,
+          keys: [...templateShortcut.keys]
+        });
+        changed = true;
+      }
+    }
 
     return {
       ...category,
       shortcutCategoryTitle: templateCategory.shortcutCategoryTitle,
-      shortcuts: category.shortcuts.map((shortcut, shortcutIndex) => {
-        const templateShortcut = templateCategory.shortcuts[shortcutIndex];
-        if (!templateShortcut || shortcut.label === templateShortcut.label) return shortcut;
-        changed = true;
-        return { ...shortcut, label: templateShortcut.label };
-      })
+      shortcuts: normalizedShortcuts
     };
   });
+
+  const presentCategoryTitles = new Set(normalized.map((c) => c.shortcutCategoryTitle));
+  for (const templateCategory of templateShortcuts) {
+    if (!presentCategoryTitles.has(templateCategory.shortcutCategoryTitle)) {
+      normalized.push({
+        shortcutCategoryTitle: templateCategory.shortcutCategoryTitle,
+        shortcuts: templateCategory.shortcuts.map((s) => ({
+          label: s.label,
+          keys: [...s.keys]
+        }))
+      });
+      changed = true;
+    }
+  }
 
   return changed ? { ...storageData, keyboardShortcuts: normalized } : storageData;
 };

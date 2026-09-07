@@ -1,11 +1,14 @@
 import { Store } from '@tanstack/store';
 
-import { applyLayoutOp } from './ops';
+import { applyLayoutOp, findAllTabGroups, findTabGroupContainingPanel, generateRandomId } from './ops';
 import { loadWorkspaceState, saveWorkspaceStateDebounced } from './persistence';
+import { DEFAULT_PRESET } from './presets/default';
+import { MUSICBEE_PRESET } from './presets/musicbee';
 import type {
   LayoutOp,
   NodeId,
   PanelInstanceId,
+  PanelType,
   VisualDropTarget,
   Workspace,
   WorkspaceState
@@ -43,6 +46,9 @@ export interface TransientWorkspaceState {
   maximizedPanelId: PanelInstanceId | null;
   isToolbarCollapsed: boolean;
   sidebarMode: SidebarMode;
+  isSaveLayoutModalOpen: boolean;
+  saveLayoutModalMode: 'save' | 'rename';
+  targetWorkspaceId: string | null;
 }
 
 export const workspaceStore = new Store<WorkspaceState>(loadWorkspaceState());
@@ -53,7 +59,10 @@ export const dndStore = new Store<TransientWorkspaceState>({
   hoveredDropTarget: null,
   maximizedPanelId: null,
   isToolbarCollapsed: initialToolbarCollapsed,
-  sidebarMode: initialSidebarMode
+  sidebarMode: initialSidebarMode,
+  isSaveLayoutModalOpen: false,
+  saveLayoutModalMode: 'save',
+  targetWorkspaceId: null
 });
 
 // Auto-persist workspace changes to localStorage
@@ -201,5 +210,228 @@ export const workspaceActions = {
     const current = dndStore.state.sidebarMode;
     const next: SidebarMode = current === 'hidden' ? 'expanded' : 'hidden';
     workspaceActions.setSidebarMode(next);
+  },
+
+  saveCurrentLayoutAs(name: string): string {
+    let newId = '';
+    workspaceStore.setState((state) => {
+      const activeWs = state.workspaces[state.active];
+      if (!activeWs) return state;
+
+      newId = generateRandomId('ws');
+      const newWs: Workspace = {
+        ...activeWs,
+        id: newId,
+        name: name.trim() || activeWs.name,
+        root: JSON.parse(JSON.stringify(activeWs.root)),
+        panels: JSON.parse(JSON.stringify(activeWs.panels)),
+        frame: { ...activeWs.frame }
+      };
+
+      return {
+        ...state,
+        workspaces: {
+          ...state.workspaces,
+          [newWs.id]: newWs
+        },
+        active: newWs.id
+      };
+    });
+    return newId;
+  },
+
+  deleteWorkspace(id: string): boolean {
+    if (id === DEFAULT_PRESET.id || id === MUSICBEE_PRESET.id) {
+      return false;
+    }
+    if (!workspaceStore.state.workspaces[id]) {
+      return false;
+    }
+    const isActiveDeleted = workspaceStore.state.active === id;
+    const isTargetRenamingDeleted = dndStore.state.targetWorkspaceId === id;
+    workspaceStore.setState((state) => {
+      const { [id]: _, ...restWorkspaces } = state.workspaces;
+      return {
+        ...state,
+        workspaces: restWorkspaces,
+        active: state.active === id ? DEFAULT_PRESET.id : state.active
+      };
+    });
+    dndStore.setState((s) => ({
+      ...s,
+      maximizedPanelId: isActiveDeleted ? null : s.maximizedPanelId,
+      targetWorkspaceId: isTargetRenamingDeleted ? null : s.targetWorkspaceId,
+      isSaveLayoutModalOpen: isTargetRenamingDeleted ? false : s.isSaveLayoutModalOpen,
+      saveLayoutModalMode: isTargetRenamingDeleted ? 'save' : s.saveLayoutModalMode
+    }));
+    return true;
+  },
+
+  renameWorkspace(id: string, newName: string): boolean {
+    if (id === DEFAULT_PRESET.id || id === MUSICBEE_PRESET.id) {
+      return false;
+    }
+    const trimmed = newName.trim();
+    if (!trimmed || !workspaceStore.state.workspaces[id]) {
+      return false;
+    }
+    workspaceStore.setState((state) => {
+      const target = state.workspaces[id];
+      if (!target) return state;
+      return {
+        ...state,
+        workspaces: {
+          ...state.workspaces,
+          [id]: {
+            ...target,
+            name: trimmed
+          }
+        }
+      };
+    });
+    return true;
+  },
+
+  duplicateWorkspace(id: string, newName?: string): string {
+    let newId = '';
+    workspaceStore.setState((state) => {
+      const sourceWs = state.workspaces[id];
+      if (!sourceWs) return state;
+
+      newId = generateRandomId('ws');
+      const finalName = newName?.trim() || `${sourceWs.name} (Copy)`;
+      const duplicatedWs: Workspace = {
+        ...sourceWs,
+        id: newId,
+        name: finalName,
+        root: JSON.parse(JSON.stringify(sourceWs.root)),
+        panels: JSON.parse(JSON.stringify(sourceWs.panels)),
+        frame: { ...sourceWs.frame }
+      };
+
+      return {
+        ...state,
+        workspaces: {
+          ...state.workspaces,
+          [newId]: duplicatedWs
+        },
+        active: newId
+      };
+    });
+    return newId;
+  },
+
+  toggleOrOpenPanel(type: PanelType): void {
+    const activeWs = workspaceStore.state.workspaces[workspaceStore.state.active];
+    if (!activeWs) return;
+
+    const existing = Object.values(activeWs.panels).find((p) => p.type === type);
+
+    if (existing) {
+      const tabGroup = findTabGroupContainingPanel(activeWs.root, existing.id);
+      if (tabGroup) {
+        if (tabGroup.active !== existing.id) {
+          workspaceActions.dispatchOp({
+            t: 'tabs.activate',
+            tabsId: tabGroup.id,
+            panelId: existing.id
+          });
+        } else if (existing.type !== 'router-view') {
+          if (dndStore.state.maximizedPanelId === existing.id) {
+            workspaceActions.setMaximizedPanel(null);
+          }
+          workspaceActions.dispatchOp({
+            t: 'panel.close',
+            panelId: existing.id
+          });
+        }
+      } else if (existing.type !== 'router-view') {
+        if (dndStore.state.maximizedPanelId === existing.id) {
+          workspaceActions.setMaximizedPanel(null);
+        }
+        workspaceActions.dispatchOp({
+          t: 'panel.close',
+          panelId: existing.id
+        });
+      }
+    } else {
+      const routerPanel = Object.values(activeWs.panels).find((p) => p.type === 'router-view');
+      const routerViewId = routerPanel ? routerPanel.id : Object.keys(activeWs.panels)[0];
+      if (!routerViewId) return;
+
+      if (type === 'playlists') {
+        workspaceActions.dispatchOp({
+          t: 'panel.insert',
+          type,
+          at: {
+            k: 'split-into',
+            targetPanelId: routerViewId,
+            axis: 'x',
+            before: true
+          }
+        });
+      } else {
+        const tabGroups = findAllTabGroups(activeWs.root);
+        const targetTabGroup =
+          tabGroups.find(
+            (tg) => !tg.tabs.some((tabId) => activeWs.panels[tabId]?.type === 'playlists')
+          ) ?? tabGroups[0];
+
+        if (targetTabGroup) {
+          workspaceActions.dispatchOp({
+            t: 'panel.insert',
+            type,
+            at: {
+              k: 'tab-into',
+              tabsId: targetTabGroup.id
+            }
+          });
+        } else {
+          const secondaryPanel = Object.values(activeWs.panels).find(
+            (p) => p.type !== 'router-view' && p.type !== 'playlists'
+          );
+
+          if (secondaryPanel) {
+            workspaceActions.dispatchOp({
+              t: 'panel.insert',
+              type,
+              at: {
+                k: 'tab-into',
+                tabsId: secondaryPanel.id
+              }
+            });
+          } else {
+            workspaceActions.dispatchOp({
+              t: 'panel.insert',
+              type,
+              at: {
+                k: 'split-into',
+                targetPanelId: routerViewId,
+                axis: 'x',
+                before: false
+              }
+            });
+          }
+        }
+      }
+    }
+  },
+
+  openSaveLayoutModal(mode: 'save' | 'rename' = 'save', targetWorkspaceId?: string): void {
+    dndStore.setState((state) => ({
+      ...state,
+      isSaveLayoutModalOpen: true,
+      saveLayoutModalMode: mode,
+      targetWorkspaceId: targetWorkspaceId ?? null
+    }));
+  },
+
+  closeSaveLayoutModal(): void {
+    dndStore.setState((state) => ({
+      ...state,
+      isSaveLayoutModalOpen: false,
+      saveLayoutModalMode: 'save',
+      targetWorkspaceId: null
+    }));
   }
 };

@@ -20,7 +20,7 @@ const NavigationControlsContainer = (props: Props) => {
 
   const isExperimentalWorkspace = useStore(
     store,
-    (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
+    (state) => state.localStorage?.preferences?.isExperimentalWorkspaceEnabled ?? false
   );
   const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
 

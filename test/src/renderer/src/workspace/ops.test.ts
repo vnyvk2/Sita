@@ -1,6 +1,7 @@
 import {
   applyLayoutOp,
   assertWorkspaceInvariants,
+  findTabGroupContainingPanel,
   normalizeWeights,
   WorkspaceInvariantError
 } from '@renderer/workspace/ops';
@@ -534,6 +535,209 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
         expect(collapsedWs.root.collapsed).toBe(0);
       }
       expect(() => assertWorkspaceInvariants(collapsedWs)).not.toThrow();
+    });
+
+    it('allows adding more than 2 panels on the right side without invariant errors or depth explosion', () => {
+      // Start with MusicBee preset: playlists, router-view (p_main_mb), and right tabs
+      let ws: Workspace = MUSICBEE_PRESET;
+
+      // 1. Add now-playing to the right of router-view
+      ws = applyLayoutOp(ws, {
+        t: 'panel.insert',
+        type: 'now-playing',
+        at: { k: 'split-into', targetPanelId: 'p_main_mb', axis: 'x', before: false }
+      });
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      expect(Object.values(ws.panels).some((p) => p.type === 'now-playing')).toBe(true);
+
+      // 2. Add track-info to the right of router-view (panel 2 on right)
+      ws = applyLayoutOp(ws, {
+        t: 'panel.insert',
+        type: 'track-info',
+        at: { k: 'split-into', targetPanelId: 'p_main_mb', axis: 'x', before: false }
+      });
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      expect(Object.values(ws.panels).some((p) => p.type === 'track-info')).toBe(true);
+
+      // 3. Add visualizer to the right of router-view (panel 3 on right - previously failed with depth > 3)
+      ws = applyLayoutOp(ws, {
+        t: 'panel.insert',
+        type: 'visualizer',
+        at: { k: 'split-into', targetPanelId: 'p_main_mb', axis: 'x', before: false }
+      });
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      expect(Object.values(ws.panels).some((p) => p.type === 'visualizer')).toBe(true);
+
+      // 4. Add another visualizer (duplicate allowed) to the right of router-view (panel 4 on right)
+      ws = applyLayoutOp(ws, {
+        t: 'panel.insert',
+        type: 'visualizer',
+        at: { k: 'split-into', targetPanelId: 'p_main_mb', axis: 'x', before: false }
+      });
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      const visualizerCount = Object.values(ws.panels).filter((p) => p.type === 'visualizer').length;
+      expect(visualizerCount).toBe(2);
+    });
+
+    it('halves default width for playlists when added to the left of router-view', () => {
+      const ws = applyLayoutOp(DEFAULT_PRESET, {
+        t: 'panel.insert',
+        type: 'playlists',
+        at: { k: 'split-into', targetPanelId: 'p_main_default', axis: 'x', before: true }
+      });
+
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      expect(ws.root.kind).toBe('split');
+      if (ws.root.kind === 'split') {
+        expect(ws.root.children).toHaveLength(2);
+        // Left child should have default weight approximately 0.11 (halved from 0.22)
+        expect(ws.root.weights[0]).toBeCloseTo(0.11, 2);
+        expect(ws.root.weights[1]).toBeCloseTo(0.89, 2);
+      }
+    });
+
+    it('handles edge insertion gracefully when split already has 4 children', () => {
+      // Build a 4-child split
+      let ws = applyLayoutOp(MUSICBEE_PRESET, {
+        t: 'panel.insert',
+        type: 'visualizer',
+        at: { k: 'edge', splitId: 's_root_musicbee', index: 3 }
+      });
+      if (ws.root.kind === 'split') {
+        expect(ws.root.children).toHaveLength(4);
+      }
+
+      // Try inserting at edge of split with 4 children - should gracefully sub-split instead of throwing
+      ws = applyLayoutOp(ws, {
+        t: 'panel.insert',
+        type: 'visualizer',
+        at: { k: 'edge', splitId: 's_root_musicbee', index: 4 }
+      });
+
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      const visualizers = Object.values(ws.panels).filter((p) => p.type === 'visualizer');
+      expect(visualizers.length).toBe(2);
+    });
+
+    it('collapses 1-tab TabGroup to PanelRefNode when closing a tab in a 2-tab TabGroup', () => {
+      // In MUSICBEE_PRESET, t_right_mb has 2 tabs: p_lyrics_mb and p_queue_mb
+      const ws = applyLayoutOp(MUSICBEE_PRESET, {
+        t: 'panel.close',
+        panelId: 'p_lyrics_mb'
+      });
+
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      expect(ws.panels.p_lyrics_mb).toBeUndefined();
+      expect(ws.panels.p_queue_mb).toBeDefined();
+
+      // Right column should now be a panel, not a 1-tab TabGroup
+      const rightCol = (ws.root as SplitNode).children[2];
+      expect(rightCol.kind).toBe('panel');
+      if (rightCol.kind === 'panel') {
+        expect(rightCol.panel).toBe('p_queue_mb');
+      }
+    });
+
+    it('collapses remaining tab to PanelRefNode in tabs.extract on a 2-tab TabGroup', () => {
+      // Extract lyrics from t_right_mb (which has 2 tabs)
+      const ws = applyLayoutOp(MUSICBEE_PRESET, {
+        t: 'tabs.extract',
+        panelId: 'p_lyrics_mb',
+        axis: 'y'
+      });
+
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      const rightSplit = (ws.root as SplitNode).children[2] as SplitNode;
+      expect(rightSplit.kind).toBe('split');
+      expect(rightSplit.axis).toBe('y');
+      // First child should be a PanelRefNode for queue, not an invalid 1-tab TabGroup
+      expect(rightSplit.children[0].kind).toBe('panel');
+      if (rightSplit.children[0].kind === 'panel') {
+        expect(rightSplit.children[0].panel).toBe('p_queue_mb');
+      }
+      expect(rightSplit.children[1].kind).toBe('panel');
+      if (rightSplit.children[1].kind === 'panel') {
+        expect(rightSplit.children[1].panel).toBe('p_lyrics_mb');
+      }
+    });
+
+    it('inserts directly into a SplitNode when targetPanelId matches the split ID', () => {
+      const ws = applyLayoutOp(DEFAULT_PRESET, {
+        t: 'panel.insert',
+        type: 'queue',
+        at: { k: 'split-into', targetPanelId: 'p_main_default', axis: 'x', before: false }
+      });
+      expect(ws.root.kind).toBe('split');
+      const rootSplit = ws.root as SplitNode;
+      expect(rootSplit.children).toHaveLength(2);
+
+      // Now insert targeting rootSplit.id directly
+      const nextWs = applyLayoutOp(ws, {
+        t: 'panel.insert',
+        type: 'visualizer',
+        at: { k: 'split-into', targetPanelId: rootSplit.id, axis: 'x', before: false }
+      });
+
+      expect(() => assertWorkspaceInvariants(nextWs)).not.toThrow();
+      expect(nextWs.root.kind).toBe('split');
+      const nextRootSplit = nextWs.root as SplitNode;
+      // Should be directly inserted into root split without nesting
+      expect(nextRootSplit.children).toHaveLength(3);
+    });
+
+    it('gracefully converts to TabGroup when split-into would exceed maximum nesting depth 3', () => {
+      // Build a tree at depth 3
+      // Depth 1: root split x
+      // Depth 2: child split y
+      // Depth 3: grandchild split x
+      let ws = applyLayoutOp(DEFAULT_PRESET, {
+        t: 'panel.insert',
+        type: 'queue',
+        at: { k: 'split-into', targetPanelId: 'p_main_default', axis: 'y', before: false }
+      });
+      const queuePanel = Object.values(ws.panels).find((p) => p.type === 'queue')!;
+      ws = applyLayoutOp(ws, {
+        t: 'panel.insert',
+        type: 'lyrics',
+        at: { k: 'split-into', targetPanelId: queuePanel.id, axis: 'x', before: false }
+      });
+      const lyricsPanel = Object.values(ws.panels).find((p) => p.type === 'lyrics')!;
+
+      // At this point, lyrics is inside a depth-3 SplitNode
+      // Splitting perpendicular to depth-3 would create depth 4
+      ws = applyLayoutOp(ws, {
+        t: 'panel.insert',
+        type: 'visualizer',
+        at: { k: 'split-into', targetPanelId: lyricsPanel.id, axis: 'y', before: false }
+      });
+
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      const visualizerPanel = Object.values(ws.panels).find((p) => p.type === 'visualizer')!;
+      expect(visualizerPanel).toBeDefined();
+
+      // Should have converted into a TabGroup instead of throwing depth > 3 error
+      const tabGroup = findTabGroupContainingPanel(ws.root, visualizerPanel.id);
+      expect(tabGroup).toBeDefined();
+      expect(tabGroup?.tabs).toContain(lyricsPanel.id);
+      expect(tabGroup?.tabs).toContain(visualizerPanel.id);
+    });
+
+    it('halves default width for any non-playlist panel added to the left (before: true)', () => {
+      // Add queue (defaultWeight = 0.25) to the left of router-view
+      const ws = applyLayoutOp(DEFAULT_PRESET, {
+        t: 'panel.insert',
+        type: 'queue',
+        at: { k: 'split-into', targetPanelId: 'p_main_default', axis: 'x', before: true }
+      });
+
+      expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
+      expect(ws.root.kind).toBe('split');
+      if (ws.root.kind === 'split') {
+        expect(ws.root.children).toHaveLength(2);
+        // Left child should have halved default weight (0.125 instead of 0.25)
+        expect(ws.root.weights[0]).toBeCloseTo(0.125, 2);
+        expect(ws.root.weights[1]).toBeCloseTo(0.875, 2);
+      }
     });
   });
 

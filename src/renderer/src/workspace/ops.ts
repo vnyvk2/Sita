@@ -172,11 +172,23 @@ export function normalizeWeights(weights: number[]): number[] {
   const rounded = raw.map((w) => Math.round(w * 10000) / 10000);
   const roundedSum = rounded.reduce((acc, w) => acc + w, 0);
   const diff = Math.round((1.0 - roundedSum) * 10000) / 10000;
-  rounded[rounded.length - 1] = Math.round((rounded[rounded.length - 1] + diff) * 10000) / 10000;
+
+  const lastIdx = rounded.length - 1;
+  if (rounded[lastIdx] + diff >= 0.001) {
+    rounded[lastIdx] = Math.round((rounded[lastIdx] + diff) * 10000) / 10000;
+  } else {
+    let maxIdx = 0;
+    for (let i = 1; i < rounded.length; i++) {
+      if (rounded[i] > rounded[maxIdx]) {
+        maxIdx = i;
+      }
+    }
+    rounded[maxIdx] = Math.round((rounded[maxIdx] + diff) * 10000) / 10000;
+  }
   return rounded;
 }
 
-function generateRandomId(prefix: string): string {
+export function generateRandomId(prefix: string): string {
   const rand = Math.random().toString(36).substring(2, 8);
   return `${prefix}_${rand}`;
 }
@@ -231,8 +243,58 @@ export function findTabGroupContainingPanel(root: LayoutNode, panelId: string): 
   return null;
 }
 
+export function findAllTabGroups(root: LayoutNode, out: TabGroupNode[] = []): TabGroupNode[] {
+  if (root.kind === 'tabs') {
+    out.push(root);
+  } else if (root.kind === 'split') {
+    for (const child of root.children) {
+      findAllTabGroups(child, out);
+    }
+  }
+  return out;
+}
+
+export function getNodeDepth(
+  root: LayoutNode,
+  matcher: (node: LayoutNode) => boolean,
+  currentDepth = 1
+): number {
+  if (matcher(root)) {
+    return currentDepth;
+  }
+  if (root.kind === 'split') {
+    for (const child of root.children) {
+      const d = getNodeDepth(child, matcher, currentDepth + 1);
+      if (d !== -1) return d;
+    }
+  }
+  return -1;
+}
+
+export function getMaxSplitDepth(node: LayoutNode, currentDepth: number): number {
+  if (node.kind !== 'split') {
+    return 0;
+  }
+  let maxD = currentDepth;
+  for (const child of node.children) {
+    const childMax = getMaxSplitDepth(child, currentDepth + 1);
+    if (childMax > maxD) maxD = childMax;
+  }
+  return maxD;
+}
+
 export function simplifyTree(node: LayoutNode): LayoutNode {
-  if (node.kind === 'panel' || node.kind === 'tabs') {
+  if (node.kind === 'panel') {
+    return node;
+  }
+
+  if (node.kind === 'tabs') {
+    if (node.tabs.length === 1) {
+      return {
+        kind: 'panel',
+        panel: node.tabs[0]
+      };
+    }
     return node;
   }
 
@@ -254,10 +316,37 @@ export function simplifyTree(node: LayoutNode): LayoutNode {
       return simplifiedChildren[0];
     }
 
+    // Flatten child splits that have the same axis as this node,
+    // provided the resulting number of children does not exceed 4.
+    const flattenedChildren: LayoutNode[] = [];
+    const flattenedWeights: number[] = [];
+    let runningCount = simplifiedChildren.length;
+
+    for (let i = 0; i < simplifiedChildren.length; i++) {
+      const child = simplifiedChildren[i];
+      const parentWeight = simplifiedWeights[i] ?? 1;
+
+      if (
+        child.kind === 'split' &&
+        child.axis === node.axis &&
+        runningCount - 1 + child.children.length <= 4
+      ) {
+        runningCount = runningCount - 1 + child.children.length;
+        for (let j = 0; j < child.children.length; j++) {
+          flattenedChildren.push(child.children[j]);
+          const childWeight = child.weights[j] ?? 1 / child.children.length;
+          flattenedWeights.push(parentWeight * childWeight);
+        }
+      } else {
+        flattenedChildren.push(child);
+        flattenedWeights.push(parentWeight);
+      }
+    }
+
     return {
       ...node,
-      children: simplifiedChildren,
-      weights: normalizeWeights(simplifiedWeights)
+      children: flattenedChildren,
+      weights: normalizeWeights(flattenedWeights)
     };
   }
 
@@ -319,6 +408,15 @@ function removePanelFromTree(
     if (nextTabs.length === 0) {
       return { nextRoot: null, removed: true };
     }
+    if (nextTabs.length === 1 && simplify) {
+      return {
+        nextRoot: {
+          kind: 'panel',
+          panel: nextTabs[0]
+        },
+        removed: true
+      };
+    }
     const nextActive = root.active === panelId ? nextTabs[0] : root.active;
     return {
       nextRoot: { ...root, tabs: nextTabs, active: nextActive },
@@ -379,29 +477,93 @@ function insertNodeAtTarget(
   target: DropTarget,
   defaultWeight = 0.25
 ): LayoutNode {
+  const clampedWeight = Math.max(0.05, Math.min(0.9, defaultWeight));
+  // Halve default width for left panels by default
+  const effectiveWeight =
+    target.k === 'split-into' && target.before
+      ? Math.min(clampedWeight, clampedWeight <= 0.15 ? clampedWeight : clampedWeight * 0.5)
+      : clampedWeight;
+
   if (target.k === 'edge') {
     return updateNodeRecursively(
       root,
       (n) => n.kind === 'split' && (n as SplitNode).id === target.splitId,
       (node) => {
         const split = node as SplitNode;
-        if (split.children.length >= 4) {
-          throw new WorkspaceInvariantError(
-            `SplitNode '${split.id}' already has maximum of 4 children.`
-          );
-        }
-        const insertIdx = Math.max(0, Math.min(target.index, split.children.length));
-        const newChildren = [...split.children];
-        newChildren.splice(insertIdx, 0, newNode);
+        if (split.children.length < 4) {
+          const insertIdx = Math.max(0, Math.min(target.index, split.children.length));
+          const newChildren = [...split.children];
+          newChildren.splice(insertIdx, 0, newNode);
 
-        // Distribute weight
-        const curWeights = split.weights.map((w) => w * (1 - defaultWeight));
-        curWeights.splice(insertIdx, 0, defaultWeight);
+          // Distribute weight
+          const curWeights = split.weights.map((w) => w * (1 - effectiveWeight));
+          curWeights.splice(insertIdx, 0, effectiveWeight);
+
+          return {
+            ...split,
+            children: newChildren,
+            weights: normalizeWeights(curWeights)
+          };
+        }
+
+        // Graceful fallback if split already has maximum 4 children:
+        // Sub-split the nearest edge child instead of throwing an invariant error
+        const insertIdx = Math.max(0, Math.min(target.index, split.children.length));
+        const edgeChildIdx =
+          insertIdx === 0
+            ? 0
+            : insertIdx >= split.children.length
+              ? split.children.length - 1
+              : insertIdx;
+        const edgeChild = split.children[edgeChildIdx];
+        const isBefore = insertIdx <= edgeChildIdx;
+
+        const splitDepth = getNodeDepth(root, (n) => n === split);
+        // If split is already at depth >= 3, creating a subSplit would exceed max depth 3.
+        // Fall back to converting the edge child to / adding to a TabGroup!
+        if (splitDepth >= 3 && newNode.kind === 'panel') {
+          const newChildren = [...split.children];
+          if (edgeChild.kind === 'tabs') {
+            if (!edgeChild.tabs.includes(newNode.panel)) {
+              newChildren[edgeChildIdx] = {
+                ...edgeChild,
+                tabs: [...edgeChild.tabs, newNode.panel],
+                active: newNode.panel
+              };
+            }
+          } else if (edgeChild.kind === 'panel') {
+            newChildren[edgeChildIdx] = {
+              kind: 'tabs',
+              id: generateRandomId('tabs'),
+              tabs: [edgeChild.panel, newNode.panel],
+              active: newNode.panel
+            };
+          }
+          return {
+            ...split,
+            children: newChildren
+          };
+        }
+
+        const subSplit: SplitNode = {
+          kind: 'split',
+          id: generateRandomId('split'),
+          axis: split.axis,
+          children: isBefore ? [newNode, edgeChild] : [edgeChild, newNode],
+          weights: normalizeWeights(
+            isBefore
+              ? [effectiveWeight, 1 - effectiveWeight]
+              : [1 - effectiveWeight, effectiveWeight]
+          )
+        };
+
+        const newChildren = [...split.children];
+        newChildren[edgeChildIdx] = subSplit;
 
         return {
           ...split,
           children: newChildren,
-          weights: normalizeWeights(curWeights)
+          weights: [...split.weights]
         };
       }
     );
@@ -421,6 +583,75 @@ function insertNodeAtTarget(
       return false;
     };
 
+    // Optimization to avoid unnecessary split nesting:
+    // If a SplitNode directly contains the target child along the SAME axis and has room (< 4 children),
+    // insert newNode directly as a sibling in that split!
+    let insertedIntoParentSplit = false;
+
+    const tryInsertIntoParentSplit = (node: LayoutNode): LayoutNode => {
+      if (node.kind === 'split') {
+        // Direct match on split node itself
+        if (
+          node.id === target.targetPanelId &&
+          node.axis === target.axis &&
+          node.children.length < 4
+        ) {
+          insertedIntoParentSplit = true;
+          const insertIdx = target.before ? 0 : node.children.length;
+          const newChildren = [...node.children];
+          newChildren.splice(insertIdx, 0, newNode);
+
+          const curWeights = node.weights.map((w) => w * (1 - effectiveWeight));
+          curWeights.splice(insertIdx, 0, effectiveWeight);
+
+          return {
+            ...node,
+            children: newChildren,
+            weights: normalizeWeights(curWeights)
+          };
+        }
+
+        const childIdx = node.children.findIndex(matchesTarget);
+        if (childIdx !== -1 && node.axis === target.axis && node.children.length < 4) {
+          insertedIntoParentSplit = true;
+          const insertIdx = target.before ? childIdx : childIdx + 1;
+          const newChildren = [...node.children];
+          newChildren.splice(insertIdx, 0, newNode);
+
+          const targetChildWeight = node.weights[childIdx] ?? 1 / node.children.length;
+          const newWeight = Math.min(effectiveWeight, targetChildWeight * 0.5);
+          const remainingChildWeight = targetChildWeight - newWeight;
+
+          const newWeights = [...node.weights];
+          newWeights[childIdx] = remainingChildWeight;
+          newWeights.splice(insertIdx, 0, newWeight);
+
+          return {
+            ...node,
+            children: newChildren,
+            weights: normalizeWeights(newWeights)
+          };
+        }
+
+        const updatedChildren = node.children.map(tryInsertIntoParentSplit);
+        if (insertedIntoParentSplit) {
+          return {
+            ...node,
+            children: updatedChildren
+          };
+        }
+      }
+      return node;
+    };
+
+    const updatedTree = tryInsertIntoParentSplit(root);
+    if (insertedIntoParentSplit) {
+      return updatedTree;
+    }
+
+    const targetDepth = getNodeDepth(root, matchesTarget);
+
+    // Fallback: wrap the matched node in a new SplitNode (or tab-into if depth would exceed 3)
     return updateNodeRecursively(root, matchesTarget, (node) => {
       if (
         newNode.kind === 'panel' &&
@@ -430,13 +661,66 @@ function insertNodeAtTarget(
         return node;
       }
 
+      // If wrapping in a new SplitNode would exceed maximum depth 3, convert to TabGroup instead
+      const maxSplitD = getMaxSplitDepth(node, targetDepth);
+      if ((targetDepth >= 3 || maxSplitD >= 3) && newNode.kind === 'panel') {
+        if (node.kind === 'tabs') {
+          if (!node.tabs.includes(newNode.panel)) {
+            return {
+              ...node,
+              tabs: [...node.tabs, newNode.panel],
+              active: newNode.panel
+            };
+          }
+          return node;
+        }
+        if (node.kind === 'panel') {
+          return {
+            kind: 'tabs',
+            id: generateRandomId('tabs'),
+            tabs: [node.panel, newNode.panel],
+            active: newNode.panel
+          };
+        }
+        if (node.kind === 'split') {
+          const edgeIndex = target.before ? 0 : node.children.length - 1;
+          const edgeChild = node.children[edgeIndex];
+          if (edgeChild.kind === 'tabs') {
+            if (!edgeChild.tabs.includes(newNode.panel)) {
+              const newChildren = [...node.children];
+              newChildren[edgeIndex] = {
+                ...edgeChild,
+                tabs: [...edgeChild.tabs, newNode.panel],
+                active: newNode.panel
+              };
+              return { ...node, children: newChildren };
+            }
+            return node;
+          }
+          if (edgeChild.kind === 'panel') {
+            const newChildren = [...node.children];
+            newChildren[edgeIndex] = {
+              kind: 'tabs',
+              id: generateRandomId('tabs'),
+              tabs: [edgeChild.panel, newNode.panel],
+              active: newNode.panel
+            };
+            return { ...node, children: newChildren };
+          }
+        }
+      }
+
       const children = target.before ? [newNode, node] : [node, newNode];
+      const weights = target.before
+        ? [effectiveWeight, 1 - effectiveWeight]
+        : [1 - effectiveWeight, effectiveWeight];
+
       return {
         kind: 'split',
         id: generateRandomId('split'),
         axis: target.axis,
         children,
-        weights: [0.5, 0.5]
+        weights: normalizeWeights(weights)
       };
     });
   }
@@ -488,7 +772,9 @@ function insertNodeAtTarget(
       return n.kind === 'panel' && (n as PanelRefNode).panel === target.tabsId;
     };
 
-    return updateNodeRecursively(root, matchesPanel, (node) => {
+    let panelConverted = false;
+    const updatedWithPanel = updateNodeRecursively(root, matchesPanel, (node) => {
+      panelConverted = true;
       const existingPanel = (node as PanelRefNode).panel;
       if (existingPanel === panelToAdd) {
         return node;
@@ -500,6 +786,31 @@ function insertNodeAtTarget(
         active: panelToAdd
       };
     });
+
+    if (panelConverted) {
+      return updatedWithPanel;
+    }
+
+    // 3. Fallback: If neither matched (e.g. invalid or stale tabsId),
+    // tab into the first available TabGroup if one exists in the tree
+    const firstTabGroup = findAllTabGroups(root)[0];
+    if (firstTabGroup) {
+      return updateNodeRecursively(
+        root,
+        (n) => n.kind === 'tabs' && (n as TabGroupNode).id === firstTabGroup.id,
+        (node) => {
+          const tabsNode = node as TabGroupNode;
+          if (tabsNode.tabs.includes(panelToAdd)) {
+            return { ...tabsNode, active: panelToAdd };
+          }
+          return {
+            ...tabsNode,
+            tabs: [...tabsNode.tabs, panelToAdd],
+            active: panelToAdd
+          };
+        }
+      );
+    }
   }
 
   return root;
@@ -785,11 +1096,17 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
             if (nextTabs.length === 0) return node; // Cannot extract the sole tab
 
             const nextActive = tabGroup.active === op.panelId ? nextTabs[0] : tabGroup.active;
-            const updatedTabGroup: TabGroupNode = {
-              ...tabGroup,
-              tabs: nextTabs,
-              active: nextActive
-            };
+            const remainingNode: LayoutNode =
+              nextTabs.length === 1
+                ? {
+                    kind: 'panel',
+                    panel: nextTabs[0]
+                  }
+                : {
+                    ...tabGroup,
+                    tabs: nextTabs,
+                    active: nextActive
+                  };
             const extractedPanel: PanelRefNode = {
               kind: 'panel',
               panel: op.panelId
@@ -799,7 +1116,7 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
               kind: 'split',
               id: generateRandomId('split'),
               axis: op.axis,
-              children: [updatedTabGroup, extractedPanel],
+              children: [remainingNode, extractedPanel],
               weights: [0.5, 0.5]
             };
           }

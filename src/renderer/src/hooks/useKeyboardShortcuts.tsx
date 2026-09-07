@@ -192,11 +192,16 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
         }
       };
 
+      let rawKey = e.key;
+      if (e.altKey && e.code?.startsWith('Key')) {
+        rawKey = e.code.slice(3);
+      }
+
       const pressedKeys = [
         e.ctrlKey ? 'Ctrl' : null,
         e.shiftKey ? 'Shift' : null,
         e.altKey ? 'Alt' : null,
-        formatKey(e.key)
+        formatKey(rawKey)
       ].filter(Boolean);
 
       const matchedShortcut = shortcuts.find((shortcut) => {
@@ -391,6 +396,48 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             break;
           case 'appShortcutsPrompt.resyncLibrary':
             window.api.audioLibraryControls.resyncSongsLibrary();
+            break;
+          case 'appShortcutsPrompt.toggleQueuePanel':
+            if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
+              import('@renderer/workspace/store').then(({ workspaceActions }) => {
+                workspaceActions.toggleOrOpenPanel('queue');
+              });
+            }
+            break;
+          case 'appShortcutsPrompt.toggleLyricsPanel':
+            if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
+              import('@renderer/workspace/store').then(({ workspaceActions }) => {
+                workspaceActions.toggleOrOpenPanel('lyrics');
+              });
+            }
+            break;
+          case 'appShortcutsPrompt.togglePlaylistsPanel':
+            if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
+              import('@renderer/workspace/store').then(({ workspaceActions }) => {
+                workspaceActions.toggleOrOpenPanel('playlists');
+              });
+            }
+            break;
+          case 'appShortcutsPrompt.toggleVisualizerPanel':
+            if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
+              import('@renderer/workspace/store').then(({ workspaceActions }) => {
+                workspaceActions.toggleOrOpenPanel('visualizer');
+              });
+            }
+            break;
+          case 'appShortcutsPrompt.toggleNowPlayingPanel':
+            if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
+              import('@renderer/workspace/store').then(({ workspaceActions }) => {
+                workspaceActions.toggleOrOpenPanel('now-playing');
+              });
+            }
+            break;
+          case 'appShortcutsPrompt.saveWorkspaceLayout':
+            if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
+              import('@renderer/workspace/store').then(({ workspaceActions }) => {
+                workspaceActions.openSaveLayoutModal('save');
+              });
+            }
             break;
           default:
             console.warn(`Unhandled shortcut action: ${matchedShortcut.label}`);

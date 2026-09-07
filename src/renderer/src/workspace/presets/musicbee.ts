@@ -12,7 +12,7 @@ export const MUSICBEE_PRESET: Workspace = {
     kind: 'split',
     id: 's_root_musicbee',
     axis: 'x',
-    weights: [0.22, 0.53, 0.25],
+    weights: [0.11, 0.64, 0.25],
     children: [
       {
         kind: 'panel',

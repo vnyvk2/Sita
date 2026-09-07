@@ -1,28 +1,17 @@
 import { useStore } from '@tanstack/react-store';
-import { memo, useEffect, type FC } from 'react';
+import { memo, type FC } from 'react';
 
-import { dndStore, workspaceActions, workspaceStore } from '../store';
+import { dndStore, workspaceStore } from '../store';
 import { NodeView } from './NodeView';
 import { PanelHost } from './PanelHost';
+import { useWorkspaceShortcuts } from './useWorkspaceShortcuts';
 
 export const WorkspaceController: FC = memo(() => {
+  useWorkspaceShortcuts();
+
   const activeWorkspace = useStore(workspaceStore, (state) => state.workspaces[state.active]);
 
   const maximizedPanelId = useStore(dndStore, (state) => state.maximizedPanelId);
-
-  // Esc key restores from maximized panel
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape' && maximizedPanelId) {
-        workspaceActions.setMaximizedPanel(null);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [maximizedPanelId]);
 
   if (!activeWorkspace) {
     return (

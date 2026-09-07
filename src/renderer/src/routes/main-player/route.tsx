@@ -6,9 +6,11 @@ import SongControlsContainer from '@renderer/components/SongsControlsContainer/S
 import TitleBar from '@renderer/components/TitleBar/TitleBar';
 import { useEffectiveAppearance } from '@renderer/hooks/useEffectiveAppearance';
 import { store } from '@renderer/store/store';
-import WorkspaceFrame from '@renderer/workspace/engine/WorkspaceFrame';
 import { createFileRoute } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
+import { lazy, Suspense } from 'react';
+
+const LazyWorkspaceFrame = lazy(() => import('@renderer/workspace/engine/WorkspaceFrame'));
 
 export const Route = createFileRoute('/main-player')({
   component: RouteComponent
@@ -65,7 +67,13 @@ function RouteComponent() {
       <ContextMenu />
       <PromptMenu />
       <TitleBar />
-      {isExperimentalWorkspace ? <WorkspaceFrame /> : <BodyAndSideBarContainer />}
+      {isExperimentalWorkspace ? (
+        <Suspense fallback={null}>
+          <LazyWorkspaceFrame />
+        </Suspense>
+      ) : (
+        <BodyAndSideBarContainer />
+      )}
       <SongControlsContainer />
     </div>
   );

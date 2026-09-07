@@ -896,6 +896,14 @@
     "selectPrevLyricsLine": "Chọn dòng lời trước đó",
     "selectCustomLyricsLine": "Chọn một dòng lời tùy chỉnh",
 
+    "panels": "Workspace panels",
+    "toggleQueuePanel": "Toggle Queue panel",
+    "toggleLyricsPanel": "Toggle Lyrics panel",
+    "togglePlaylistsPanel": "Toggle Playlists panel",
+    "toggleVisualizerPanel": "Toggle Visualizer panel",
+    "toggleNowPlayingPanel": "Toggle Now Playing panel",
+    "saveWorkspaceLayout": "Save workspace layout",
+
     "otherShortcuts": "Phím tắt khác",
     "toggleTheme": "Đổi chủ đề ứng dụng",
     "toggleMiniPlayerAlwaysOnTop": "Bật / Tắt Trình phát thu nhỏ luôn trên cùng",
