@@ -22,6 +22,7 @@ import { appPreferences } from '../../../../../package.json';
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
+import { useSongPreferences } from '../../contexts/SongPreferencesContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
 import { useQueueOperations } from '../../hooks/useQueueOperations';
 import { songCacheKeys, songQuery } from '../../queries/songs';
@@ -114,35 +115,14 @@ const Song = memo(
     const currentSongFavorite = useStore(store, (state) =>
       state.currentSongData?.songId === songId ? state.currentSongData.isAFavorite : undefined
     );
-    // When the parent provides hasBodyBackgroundImage, skip the per-row store subscription
-    // to avoid N redundant subscriptions in the hot scrolling path.
-    const bodyBackgroundImageFromStore = useStore(
-      store,
-      hasBodyBackgroundImage !== undefined
-        ? () => false // no-op selector; prop takes precedence
-        : (state) => Boolean(state.bodyBackgroundImage)
-    );
-    const bodyBackgroundImage = hasBodyBackgroundImage ?? bodyBackgroundImageFromStore;
+    const preferences = useSongPreferences();
+    const bodyBackgroundImage = hasBodyBackgroundImage ?? preferences.bodyBackgroundImage;
     const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
       useSongSelection(songId);
-    const showTrackNumberAsSongIndex = useStore(store, (state) =>
-      Boolean(state.localStorage?.preferences?.showTrackNumberAsSongIndex)
-    );
-    const showEqualizerOnTracklist = useStore(
-      store,
-      (state) => state.localStorage?.preferences?.showEqualizerOnTracklist ?? true
-    );
-    const isAnimationDisabled = useStore(
-      store,
-      (state) =>
-        Boolean(state.localStorage?.preferences?.isReducedMotion) ||
-        Boolean(
-          state.isOnBatteryPower && state.localStorage?.preferences?.removeAnimationsOnBatteryPower
-        )
-    );
-    const doNotShowBlacklistSongConfirm = useStore(store, (state) =>
-      Boolean(state.localStorage?.preferences?.doNotShowBlacklistSongConfirm)
-    );
+    const showTrackNumberAsSongIndex = preferences.showTrackNumberAsSongIndex;
+    const showEqualizerOnTracklist = preferences.showEqualizerOnTracklist;
+    const isAnimationDisabled = preferences.isAnimationDisabled;
+    const doNotShowBlacklistSongConfirm = preferences.doNotShowBlacklistSongConfirm;
 
     const {
       playSong,
@@ -884,7 +864,12 @@ const Song = memo(
               />
             </div>
             <Img
-              src={artworkPaths?.optimizedArtworkPath || DefaultSongCover}
+              src={
+                artworkPaths?.optimizedArtworkPath ||
+                artworkPaths?.artworkPath ||
+                DefaultSongCover
+              }
+              thumbnail={!artworkPaths?.optimizedArtworkPath && Boolean(artworkPaths?.artworkPath)}
               loading="lazy"
               decoding="async"
               alt="Song cover"

@@ -6,6 +6,7 @@ import SongControlsContainer from '@renderer/components/SongsControlsContainer/S
 import TitleBar from '@renderer/components/TitleBar/TitleBar';
 import { useEffectiveAppearance } from '@renderer/hooks/useEffectiveAppearance';
 import { store } from '@renderer/store/store';
+import { SongPreferencesProvider } from '@renderer/contexts/SongPreferencesContext';
 import { createFileRoute } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { lazy, Suspense } from 'react';
@@ -39,42 +40,44 @@ function RouteComponent() {
   );
 
   return (
-    <div
-      data-fx-paused={isFxPausedBySystem || undefined}
-      className={`App relative select-none ${
-        isDark ? 'dark bg-dark-background-color-1' : 'bg-background-color-1'
-      } ${
-        isReducedMotion
-          ? 'reduced-motion animate-none transition-none delay-0! duration-0! [&.dialog-menu]:backdrop-blur-none!'
-          : 'transition-colors duration-200'
-      } after:text-font-color-white dark:after:text-font-color-white [&.song-drop]:after:border-font-color-dimmed dark:[&.song-drop]:after:border-font-color-dimmed grid !h-screen min-h-screen w-full grid-rows-[auto_1fr_auto] items-center overflow-y-hidden after:invisible after:absolute after:-z-10 after:grid after:h-full after:w-full after:place-items-center after:bg-[rgba(0,0,0,0)] after:text-4xl after:font-medium after:content-["Drop_your_song_here"] dark:after:bg-[rgba(0,0,0,0)] [&.blurred_#title-bar]:opacity-40 [&.fullscreen_#window-controls-container]:hidden [&.song-drop]:after:visible [&.song-drop]:after:z-20 [&.song-drop]:after:border-4 [&.song-drop]:after:border-dashed [&.song-drop]:after:bg-[rgba(0,0,0,0.7)] [&.song-drop]:after:transition-[background,visibility,color] dark:[&.song-drop]:after:bg-[rgba(0,0,0,0.7)]`}
-    >
-      {bodyBackgroundImage && (
-        <div
-          className={`body-background-image-container bg-dark-background-color-1! absolute h-full w-full overflow-hidden bg-center`}
-        >
-          <Img
-            className={`blur-0 w-full bg-cover opacity-100 brightness-100 transition-[filter,opacity] duration-500 ${
-              bodyBackgroundImage &&
-              'opacity-100! blur-[1.5rem]! brightness-[.75]! dark:brightness-[.5]!'
-            }`}
-            loading="eager"
-            src={bodyBackgroundImage}
-            alt=""
-          />
-        </div>
-      )}
-      <ContextMenu />
-      <PromptMenu />
-      <TitleBar />
-      {isExperimentalWorkspace ? (
-        <Suspense fallback={null}>
-          <LazyWorkspaceFrame />
-        </Suspense>
-      ) : (
-        <BodyAndSideBarContainer />
-      )}
-      <SongControlsContainer />
-    </div>
+    <SongPreferencesProvider>
+      <div
+        data-fx-paused={isFxPausedBySystem || undefined}
+        className={`App relative select-none ${
+          isDark ? 'dark bg-dark-background-color-1' : 'bg-background-color-1'
+        } ${
+          isReducedMotion
+            ? 'reduced-motion animate-none transition-none delay-0! duration-0! [&.dialog-menu]:backdrop-blur-none!'
+            : 'transition-colors duration-200'
+        } after:text-font-color-white dark:after:text-font-color-white [&.song-drop]:after:border-font-color-dimmed dark:[&.song-drop]:after:border-font-color-dimmed grid !h-screen min-h-screen w-full grid-rows-[auto_1fr_auto] items-center overflow-y-hidden after:invisible after:absolute after:-z-10 after:grid after:h-full after:w-full after:place-items-center after:bg-[rgba(0,0,0,0)] after:text-4xl after:font-medium after:content-["Drop_your_song_here"] dark:after:bg-[rgba(0,0,0,0)] [&.blurred_#title-bar]:opacity-40 [&.fullscreen_#window-controls-container]:hidden [&.song-drop]:after:visible [&.song-drop]:after:z-20 [&.song-drop]:after:border-4 [&.song-drop]:after:border-dashed [&.song-drop]:after:bg-[rgba(0,0,0,0.7)] [&.song-drop]:after:transition-[background,visibility,color] dark:[&.song-drop]:after:bg-[rgba(0,0,0,0.7)]`}
+      >
+        {bodyBackgroundImage && (
+          <div
+            className={`body-background-image-container bg-dark-background-color-1! absolute h-full w-full overflow-hidden bg-center`}
+          >
+            <Img
+              className={`blur-0 w-full bg-cover opacity-100 brightness-100 transition-[filter,opacity] duration-500 ${
+                bodyBackgroundImage &&
+                'opacity-100! blur-[1.5rem]! brightness-[.75]! dark:brightness-[.5]!'
+              }`}
+              loading="eager"
+              src={bodyBackgroundImage}
+              alt=""
+            />
+          </div>
+        )}
+        <ContextMenu />
+        <PromptMenu />
+        <TitleBar />
+        {isExperimentalWorkspace ? (
+          <Suspense fallback={null}>
+            <LazyWorkspaceFrame />
+          </Suspense>
+        ) : (
+          <BodyAndSideBarContainer />
+        )}
+        <SongControlsContainer />
+      </div>
+    </SongPreferencesProvider>
   );
 }

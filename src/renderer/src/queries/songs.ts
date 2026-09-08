@@ -3,8 +3,8 @@ import { createQueryKeys } from '@lukemorales/query-key-factory';
 import { SEARCH_LIMITS } from '../../../common/search/MatchTier';
 
 export const SONG_WINDOW_SIZE = 200;
-export const SONG_WINDOW_STALE_TIME = 10 * 60 * 1000;
-export const SONG_WINDOW_GC_TIME = 12 * 60 * 1000;
+export const SONG_WINDOW_STALE_TIME = 60 * 1000;
+export const SONG_WINDOW_GC_TIME = 90 * 1000;
 export const SONG_IDS_STALE_TIME = 5 * 60 * 1000;
 export const SONG_IDS_GC_TIME = 30 * 60 * 1000;
 
