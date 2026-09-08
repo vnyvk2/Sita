@@ -512,7 +512,16 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         if (!options || options.generationToken === undefined) {
           const tStart = performance.now();
           const results = await memProfiler.wrapHandler('app/getSongInfo', () =>
-            getSongInfo(songIds, sortType, filterType, limit, preserveIdOrder)
+            getSongInfo(
+              songIds,
+              sortType,
+              filterType,
+              limit,
+              preserveIdOrder,
+              false,
+              undefined,
+              options?.compact ? { compact: true } : undefined
+            )
           );
           const tSqlEnd = performance.now();
 
@@ -526,7 +535,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
           if (songIds && songIds.length >= 50) {
             logger.info(
-              `[TRACE:Main:getSongInfo] count=${results?.length ?? 0} requestedIds=${songIds.length} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
+              `[TRACE:Main:getSongInfo] count=${results?.length ?? 0} requestedIds=${songIds.length} compact=${Boolean(options?.compact)} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
             );
           }
 
@@ -537,7 +546,16 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         return hydrationCoordinator.schedule(options, async () => {
           const tStart = performance.now();
           const results = await memProfiler.wrapHandler('app/getSongInfo', () =>
-            getSongInfo(songIds, sortType, filterType, limit, preserveIdOrder)
+            getSongInfo(
+              songIds,
+              sortType,
+              filterType,
+              limit,
+              preserveIdOrder,
+              false,
+              undefined,
+              options?.compact ? { compact: true } : undefined
+            )
           );
           const tSqlEnd = performance.now();
 
@@ -550,7 +568,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
           if (songIds && songIds.length >= 50) {
             logger.info(
-              `[TRACE:Main:getSongInfo:coordinated] count=${results?.length ?? 0} requestedIds=${songIds.length} token=${options.generationToken} priority=${options.priority} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
+              `[TRACE:Main:getSongInfo:coordinated] count=${results?.length ?? 0} requestedIds=${songIds.length} token=${options.generationToken} priority=${options.priority} compact=${Boolean(options.compact)} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
             );
           }
 

@@ -4,6 +4,7 @@ export interface WindowHydrationOptions {
   generationToken?: number;
   priority?: 'target' | 'lookahead';
   listIdentity?: string;
+  compact?: boolean;
 }
 
 export interface CancelledHydrationResponse {

@@ -175,10 +175,107 @@ export const mapRawFlatRowToSongData = (row: RawFlatSongRow): SongData => {
   };
 };
 
+export interface RawCompactSongRow {
+  id: number;
+  title: string;
+  duration: number | string;
+  path: string;
+  year: number | null;
+  trackNo: number | null;
+  discNo: number | null;
+  isAFavorite: number;
+  isBlacklisted: number;
+  album_json: string | null;
+  artists_json: string | null;
+  artworks_json: string | null;
+}
+
+export const mapRawCompactRowToSongData = (row: RawCompactSongRow): SongData => {
+  let artists: { artistId: number; name: string }[] | undefined = undefined;
+  if (typeof row.artists_json === 'string' && row.artists_json.trim() !== '') {
+    try {
+      const parsed = JSON.parse(row.artists_json);
+      if (Array.isArray(parsed)) {
+        artists = parsed.filter(
+          (a) => a && typeof a.artistId === 'number' && typeof a.name === 'string'
+        );
+      }
+    } catch {
+      // Ignore invalid json string
+    }
+  }
+
+  let album: { albumId: number; name: string; isAFavorite?: boolean } | undefined = undefined;
+  if (typeof row.album_json === 'string' && row.album_json.trim() !== '') {
+    try {
+      const parsed = JSON.parse(row.album_json);
+      if (parsed && typeof parsed.albumId === 'number' && typeof parsed.name === 'string') {
+        album = {
+          albumId: parsed.albumId,
+          name: parsed.name,
+          isAFavorite: Boolean(parsed.isAFavorite)
+        };
+      }
+    } catch {
+      // Ignore invalid json string
+    }
+  }
+
+  let artworkList: { path: string; isOptimized?: boolean }[] = [];
+  if (typeof row.artworks_json === 'string' && row.artworks_json.trim() !== '') {
+    try {
+      const parsed = JSON.parse(row.artworks_json);
+      if (Array.isArray(parsed)) {
+        artworkList = parsed
+          .filter((a) => a && typeof a.path === 'string')
+          .map((a) => ({
+            path: a.path,
+            isOptimized: Boolean(a.isOptimized)
+          }));
+      }
+    } catch {
+      // Ignore invalid json string
+    }
+  }
+
+  const artworkPaths = parseSongArtworks(artworkList);
+  const isArtworkAvailable = artworkList.length > 0;
+
+  return {
+    songId: Number(row.id),
+    title: String(row.title ?? ''),
+    duration: Number(row.duration ?? 0),
+    path: String(row.path ?? ''),
+    artists,
+    album,
+    artworkPaths,
+    isArtworkAvailable,
+    isAFavorite: Boolean(row.isAFavorite),
+    isBlacklisted: Boolean(row.isBlacklisted),
+    addedDate: 0,
+    year: row.year != null ? Number(row.year) : undefined,
+    trackNo: row.trackNo != null ? Number(row.trackNo) : undefined,
+    discNo: row.discNo != null ? Number(row.discNo) : undefined,
+    albumArtists: undefined,
+    genres: undefined,
+    paletteData: undefined,
+    bitrate: undefined,
+    sampleRate: undefined,
+    noOfChannels: undefined,
+    language: undefined,
+    musicBrainzId: undefined
+  };
+};
+
+export interface FlatSongsOptions {
+  compact?: boolean;
+}
+
 export const getFlatSongsByIds = async (
   songIds: number[],
   preserveIdOrder = false,
-  trx?: DB | DBTransaction
+  trx?: DB | DBTransaction,
+  options?: FlatSongsOptions
 ): Promise<SongData[]> => {
   if (!songIds || songIds.length === 0) return [];
 
@@ -190,6 +287,88 @@ export const getFlatSongsByIds = async (
 
   const CHUNK_SIZE = 500;
   const uniqueIds = Array.from(new Set(songIds));
+  const isCompact = Boolean(options?.compact);
+
+  if (isCompact) {
+    const rawRows: RawCompactSongRow[] = [];
+
+    for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {
+      const chunk = uniqueIds.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => '?').join(',');
+      const sqlText = `
+        SELECT
+          s.id,
+          s.title,
+          s.duration,
+          s.path,
+          s.year,
+          s.track_number AS trackNo,
+          s.disk_number AS discNo,
+          s.is_favorite AS isAFavorite,
+          s.is_blacklisted AS isBlacklisted,
+          (
+            SELECT json_object(
+              'albumId', al.id,
+              'name', al.title,
+              'isAFavorite', CAST(al.is_favorite AS INTEGER)
+            )
+            FROM album_songs als
+            JOIN albums al ON al.id = als.album_id
+            WHERE als.song_id = s.id
+            LIMIT 1
+          ) AS album_json,
+          (
+            SELECT json_group_array(
+              json_object('artistId', id, 'name', name)
+            )
+            FROM (
+              SELECT ar.id AS id, ar.name AS name
+              FROM artists_songs asg
+              JOIN artists ar ON ar.id = asg.artist_id
+              WHERE asg.song_id = s.id
+              ORDER BY asg.rowid ASC
+            )
+          ) AS artists_json,
+          (
+            SELECT json_group_array(
+              json_object('id', id, 'path', path, 'isOptimized', is_optimized)
+            )
+            FROM (
+              SELECT art.id AS id, art.path AS path, art.is_optimized AS is_optimized
+              FROM artworks_songs arts
+              JOIN artworks art ON art.id = arts.artwork_id
+              WHERE arts.song_id = s.id
+              ORDER BY arts.rowid ASC
+            )
+          ) AS artworks_json
+        FROM songs s
+        WHERE s.id IN (${placeholders});
+      `;
+
+      const rows = engine.all(sqlText, chunk) as unknown as RawCompactSongRow[];
+      if (rows && rows.length > 0) {
+        rawRows.push(...rows);
+      }
+    }
+
+    const convertedSongs = rawRows.map(mapRawCompactRowToSongData);
+
+    if (preserveIdOrder) {
+      const songsById = new Map<number, SongData>();
+      for (let i = 0; i < convertedSongs.length; i += 1) {
+        songsById.set(convertedSongs[i].songId, convertedSongs[i]);
+      }
+      const orderedSongs: SongData[] = [];
+      for (let i = 0; i < songIds.length; i += 1) {
+        const s = songsById.get(songIds[i]);
+        if (s) orderedSongs.push(s);
+      }
+      return orderedSongs;
+    }
+
+    return convertedSongs;
+  }
+
   const rawRows: RawFlatSongRow[] = [];
 
   for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {

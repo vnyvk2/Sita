@@ -170,11 +170,11 @@ const audioLibraryControls = {
     )) as {
     (
       songIds: number[],
-      sortType?: SongSortTypes,
-      filterType?: SongFilterTypes,
-      limit?: number,
-      preserveIdOrder?: boolean,
-      options?: { generationToken: number; priority?: 'target' | 'lookahead'; listIdentity?: string }
+      sortType: SongSortTypes | undefined,
+      filterType: SongFilterTypes | undefined,
+      limit: number | undefined,
+      preserveIdOrder: boolean | undefined,
+      options: { generationToken: number; priority?: 'target' | 'lookahead'; listIdentity?: string; compact?: boolean }
     ): Promise<SongData[] | CancelledHydrationResponse | undefined>;
     (
       songIds: number[],
@@ -182,7 +182,7 @@ const audioLibraryControls = {
       filterType?: SongFilterTypes,
       limit?: number,
       preserveIdOrder?: boolean,
-      options?: { generationToken?: undefined; priority?: 'target' | 'lookahead'; listIdentity?: string }
+      options?: { generationToken?: undefined; priority?: 'target' | 'lookahead'; listIdentity?: string; compact?: boolean }
     ): Promise<SongData[] | undefined>;
   },
   getAllHistorySongs: (

@@ -534,6 +534,7 @@ declare global {
     generationToken?: number;
     priority?: 'target' | 'lookahead';
     listIdentity?: string;
+    compact?: boolean;
   }
 
   interface CancelledHydrationResponse {

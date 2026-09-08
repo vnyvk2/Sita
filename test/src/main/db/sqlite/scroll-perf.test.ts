@@ -161,4 +161,41 @@ describe('scroll hydration performance @50k', { timeout: 60000 }, () => {
     console.log(`[scroll] hydration during write txs: ${ms.toFixed(1)}ms`);
     expect(ms).toBeLessThan(5000);
   });
+
+  it('compact projection returns valid lightweight SongData without subquery overhead', async () => {
+    const ids = Array.from({ length: 200 }, (_, k) => k + 1);
+
+    // Fetch full
+    const fullSongs = await getSongInfo(ids, undefined, undefined, undefined, true);
+    // Fetch compact
+    const compactSongs = await getSongInfo(
+      ids,
+      undefined,
+      undefined,
+      undefined,
+      true,
+      false,
+      undefined,
+      { compact: true }
+    );
+
+    expect(fullSongs.length).toBe(200);
+    expect(compactSongs.length).toBe(200);
+
+    // Verify key fields match identically
+    for (let i = 0; i < 200; i++) {
+      expect(compactSongs[i].songId).toBe(fullSongs[i].songId);
+      expect(compactSongs[i].title).toBe(fullSongs[i].title);
+      expect(compactSongs[i].duration).toBe(fullSongs[i].duration);
+      expect(compactSongs[i].path).toBe(fullSongs[i].path);
+      expect(compactSongs[i].isAFavorite).toBe(fullSongs[i].isAFavorite);
+      expect(compactSongs[i].isBlacklisted).toBe(fullSongs[i].isBlacklisted);
+
+      // Heavy relational fields are omitted in compact projection
+      expect(compactSongs[i].genres).toBeUndefined();
+      expect(compactSongs[i].albumArtists).toBeUndefined();
+      expect(compactSongs[i].paletteData).toBeUndefined();
+    }
+  });
 });
+

@@ -1,5 +1,5 @@
 import { db } from '@main/db/db';
-import { getFlatSongsByIds } from '@main/db/queries/songs';
+import { type FlatSongsOptions, getFlatSongsByIds } from '@main/db/queries/songs';
 
 import logger from '../logger';
 
@@ -10,7 +10,8 @@ const getSongInfo = async (
   limit = songIds.length,
   preserveIdOrder = false,
   noBlacklistedSongs = false,
-  trx: DB | DBTransaction = db
+  trx: DB | DBTransaction = db,
+  options?: FlatSongsOptions
 ): Promise<SongData[]> => {
   logger.debug(`Fetching song data from getSongInfo`, {
     songIdsLength: songIds?.length,
@@ -18,7 +19,8 @@ const getSongInfo = async (
     filterType,
     limit,
     preserveIdOrder,
-    noBlacklistedSongs
+    noBlacklistedSongs,
+    compact: options?.compact
   });
 
   if (!songIds || songIds.length === 0) {
@@ -32,7 +34,7 @@ const getSongInfo = async (
   }
 
   // Stateless high-performance direct SQL projection (0 RAM retention, sub-15ms)
-  let results = await getFlatSongsByIds(normalizedIds, preserveIdOrder || !sortType, trx);
+  let results = await getFlatSongsByIds(normalizedIds, preserveIdOrder || !sortType, trx, options);
 
   if (sortType && !preserveIdOrder) {
     if (sortType === 'aToZ') {

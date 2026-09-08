@@ -314,4 +314,36 @@ describe('useWindowHydration - Query Identity & Cache Key Separation', () => {
       })
     );
   });
+
+  it('passes compact: true in hydration options by default to getSongInfo', async () => {
+    const timestamp = 1700000000000;
+    const ids = [1, 2, 3];
+    const getSongInfoSpy = (window as any).api.audioLibraryControls.getSongInfo;
+
+    const { result } = renderHook(
+      () =>
+        useWindowHydration(ids, timestamp, {
+          listIdentity: 'default',
+          keyPrefix: 'songs'
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.getItem(0)).toBeDefined();
+    });
+
+    expect(getSongInfoSpy).toHaveBeenCalledWith(
+      [1, 2, 3],
+      undefined,
+      undefined,
+      undefined,
+      true,
+      expect.objectContaining({
+        compact: true,
+        priority: 'target'
+      })
+    );
+  });
 });
+

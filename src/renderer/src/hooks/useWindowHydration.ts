@@ -45,6 +45,8 @@ export function useWindowHydration(
     listIdentity?: string;
     /** Initial visible item index when restoring scroll position */
     initialIndex?: number;
+    /** When true (default), fetches lightweight compact row projection optimized for table scrolling */
+    compact?: boolean;
   }
 ) {
   const {
@@ -53,7 +55,8 @@ export function useWindowHydration(
     extraRowsAfter = 150,
     keyPrefix = 'songs',
     listIdentity = 'default',
-    initialIndex = 0
+    initialIndex = 0,
+    compact = true
   } = options ?? {};
 
   const queryClient = useQueryClient();
@@ -106,7 +109,8 @@ export function useWindowHydration(
                   {
                     generationToken: token,
                     priority: 'lookahead',
-                    listIdentity: coordListIdentity
+                    listIdentity: coordListIdentity,
+                    compact
                   }
                 );
                 if (res && 'cancelled' in res && res.cancelled) {
@@ -114,8 +118,9 @@ export function useWindowHydration(
                   err.name = 'AbortError';
                   throw err;
                 }
-                scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, res?.length ?? 0);
-                return res as SongData[];
+                const songs = res && Array.isArray(res) ? res : [];
+                scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, songs.length);
+                return songs;
               } catch (e) {
                 scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, 0);
                 throw e;
@@ -149,7 +154,8 @@ export function useWindowHydration(
                   {
                     generationToken: token,
                     priority: 'lookahead',
-                    listIdentity: coordListIdentity
+                    listIdentity: coordListIdentity,
+                    compact
                   }
                 );
                 if (res && 'cancelled' in res && res.cancelled) {
@@ -157,8 +163,9 @@ export function useWindowHydration(
                   err.name = 'AbortError';
                   throw err;
                 }
-                scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, res?.length ?? 0);
-                return res as SongData[];
+                const songs = res && Array.isArray(res) ? res : [];
+                scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, songs.length);
+                return songs;
               } catch (e) {
                 scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, 0);
                 throw e;
@@ -170,7 +177,7 @@ export function useWindowHydration(
         }
       }
     },
-    [enabled, ids.length, idsVersion, queryClient, keyPrefix, listIdentity, coordListIdentity]
+    [enabled, ids.length, idsVersion, queryClient, keyPrefix, listIdentity, coordListIdentity, compact]
   );
 
   const handleRangeChange = useCallback(
@@ -261,7 +268,8 @@ export function useWindowHydration(
             {
               generationToken: token,
               priority: 'target',
-              listIdentity: coordListIdentity
+              listIdentity: coordListIdentity,
+              compact
             }
           );
           if (res && 'cancelled' in res && res.cancelled) {
@@ -269,8 +277,9 @@ export function useWindowHydration(
             err.name = 'AbortError';
             throw err;
           }
-          scrollTrace.onRequestResolved(win.startIndex, performance.now() - t0, res?.length ?? 0);
-          return res as SongData[];
+          const songs = res && Array.isArray(res) ? res : [];
+          scrollTrace.onRequestResolved(win.startIndex, performance.now() - t0, songs.length);
+          return songs;
         } catch (e) {
           scrollTrace.onRequestResolved(win.startIndex, performance.now() - t0, 0);
           throw e;
