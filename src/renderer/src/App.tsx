@@ -3,7 +3,9 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 
 import './assets/styles/styles.css';
 import 'material-symbols/rounded.css';
+import { GenreStyleDialog } from './components/autotag/GenreStyleDialog';
 import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
+import { TrackIdentifyDialog } from './components/autotag/TrackIdentifyDialog';
 import ContextMenu from './components/ContextMenu/ContextMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import FullScreenPlayer from './components/FullScreenPlayer/FullScreenPlayer';
@@ -455,13 +457,53 @@ export default function App() {
     setAutoTagState((prev) => ({ ...prev, isOpen: false }));
   }, []);
 
+  const [trackIdentifyState, setTrackIdentifyState] = useState<{
+    isOpen: boolean;
+    songs: import('./utils/autoTagUtils').SongDataForAutoTag[];
+  }>({ isOpen: false, songs: [] });
+
+  const openTrackIdentifyDialog = useCallback(
+    (songs: import('./utils/autoTagUtils').SongDataForAutoTag[]) => {
+      setTrackIdentifyState({ isOpen: true, songs });
+    },
+    []
+  );
+
+  const closeTrackIdentifyDialog = useCallback(() => {
+    setTrackIdentifyState((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const [genreStyleState, setGenreStyleState] = useState<{
+    isOpen: boolean;
+    songs: import('./utils/autoTagUtils').SongDataForAutoTag[];
+  }>({ isOpen: false, songs: [] });
+
+  const openGenreStyleDialog = useCallback(
+    (songs: import('./utils/autoTagUtils').SongDataForAutoTag[]) => {
+      setGenreStyleState({ isOpen: true, songs });
+    },
+    []
+  );
+
+  const closeGenreStyleDialog = useCallback(() => {
+    setGenreStyleState((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
   const extendedAppUpdateContextValues = useMemo(
     () => ({
       ...appUpdateContextValues,
       openAutoTagDialog,
-      closeAutoTagDialog
+      closeAutoTagDialog,
+      openTrackIdentifyDialog,
+      openGenreStyleDialog
     }),
-    [appUpdateContextValues, openAutoTagDialog, closeAutoTagDialog]
+    [
+      appUpdateContextValues,
+      openAutoTagDialog,
+      closeAutoTagDialog,
+      openTrackIdentifyDialog,
+      openGenreStyleDialog
+    ]
   );
 
   return (
@@ -503,6 +545,20 @@ export default function App() {
               initialArtistName={autoTagState.artistName}
               initialWorkflow={autoTagState.workflow ?? 'album'}
               onClose={closeAutoTagDialog}
+            />
+          )}
+          {trackIdentifyState.isOpen && (
+            <TrackIdentifyDialog
+              isOpen={trackIdentifyState.isOpen}
+              songs={trackIdentifyState.songs}
+              onClose={closeTrackIdentifyDialog}
+            />
+          )}
+          {genreStyleState.isOpen && (
+            <GenreStyleDialog
+              isOpen={genreStyleState.isOpen}
+              songs={genreStyleState.songs}
+              onClose={closeGenreStyleDialog}
             />
           )}
         </div>
