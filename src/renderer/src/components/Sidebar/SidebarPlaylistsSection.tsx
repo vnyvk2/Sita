@@ -18,7 +18,9 @@ interface SidebarPlaylistsSectionProps {
 export const SidebarPlaylistsSection = memo(({ className = '' }: SidebarPlaylistsSectionProps) => {
   const { t } = useTranslation();
   const { changePromptMenuData } = useContext(AppUpdateContext);
-  const { pathname } = useLocation();
+  const activePlaylistPath = useLocation({
+    select: (loc) => (loc.pathname.startsWith('/main-player/playlists/') ? loc.pathname : null)
+  });
 
   const { data: playlists = [] } = useRootCollections();
 
@@ -33,7 +35,7 @@ export const SidebarPlaylistsSection = memo(({ className = '' }: SidebarPlaylist
   const renderPlaylistItem = useCallback(
     (playlist: PlaylistDto) => {
       const targetPath = `/main-player/playlists/${playlist.id}`;
-      const isActive = pathname === targetPath;
+      const isActive = activePlaylistPath === targetPath;
 
       return (
         <Link
@@ -79,7 +81,7 @@ export const SidebarPlaylistsSection = memo(({ className = '' }: SidebarPlaylist
         </Link>
       );
     },
-    [pathname, t]
+    [activePlaylistPath, t]
   );
 
   return (

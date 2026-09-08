@@ -23,7 +23,9 @@ const TitleBar = memo(() => {
     (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
   );
 
-  const location = useLocation();
+  const devLocationHref = useLocation({
+    select: (loc) => (window.api.properties.isInDevelopment ? loc.href : undefined)
+  });
   const isDarwin = window.api.properties.platform === 'darwin';
 
   return (
@@ -51,8 +53,8 @@ const TitleBar = memo(() => {
         </div>
         {!isFullScreenPlayer ? <NavigationControlsContainer /> : <div />}
       </div>
-      {window.api.properties.isInDevelopment ? (
-        <CurrentLocationContainer href={location.href} className={`${isDarwin ? 'pl-4' : ''}`} />
+      {window.api.properties.isInDevelopment && devLocationHref ? (
+        <CurrentLocationContainer href={devLocationHref} className={`${isDarwin ? 'pl-4' : ''}`} />
       ) : (
         <div />
       )}

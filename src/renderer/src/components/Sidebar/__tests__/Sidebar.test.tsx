@@ -27,7 +27,10 @@ vi.mock('../../NavLink', () => ({
 
 // Mock @tanstack/react-router
 vi.mock('@tanstack/react-router', () => ({
-  useLocation: () => ({ pathname: '/main-player/home' }),
+  useLocation: (opts?: { select?: (loc: any) => any }) => {
+    const loc = { pathname: '/main-player/home', href: 'http://localhost/main-player/home' };
+    return opts?.select ? opts.select(loc) : loc;
+  },
   linkOptions: <T,>(opts: T): T => opts,
   Link: ({ children, to, ...props }: { children?: React.ReactNode; to?: string; [key: string]: unknown }) => (
     <a href={to} {...props}>

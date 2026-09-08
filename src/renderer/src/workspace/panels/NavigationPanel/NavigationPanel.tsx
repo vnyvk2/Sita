@@ -19,15 +19,12 @@ export const NavigationPanel: FC<PanelProps> = memo(() => {
   );
 
   const { t } = useTranslation();
-  const { pathname } = useLocation();
-
-  const isPlaylistOpened = useMemo(() => {
-    return (
-      pathname.startsWith('/main-player/playlists/') &&
-      pathname !== '/main-player/playlists' &&
-      pathname !== '/main-player/playlists/'
-    );
-  }, [pathname]);
+  const isPlaylistOpened = useLocation({
+    select: (loc) =>
+      loc.pathname.startsWith('/main-player/playlists/') &&
+      loc.pathname !== '/main-player/playlists' &&
+      loc.pathname !== '/main-player/playlists/'
+  });
 
   const [splitRatio, setSplitRatio] = useState<number>(() => {
     try {

@@ -1,4 +1,4 @@
-import { useLocation, useRouter } from '@tanstack/react-router';
+import { useRouter } from '@tanstack/react-router';
 import { useCallback } from 'react';
 
 /**
@@ -8,18 +8,17 @@ import { useCallback } from 'react';
  * navigates to the overlay.
  */
 export function useOverlayNavigation() {
-  const { history, navigate } = useRouter();
-  const location = useLocation();
+  const router = useRouter();
 
   const toggleOverlay = useCallback(
     (path: string) => {
-      if (location.pathname.startsWith(path)) {
-        history.back();
+      if (router.state.location.pathname.startsWith(path)) {
+        router.history.back();
       } else {
-        navigate({ to: path });
+        router.navigate({ to: path });
       }
     },
-    [history, location.pathname, navigate]
+    [router]
   );
 
   return { toggleOverlay };

@@ -2,7 +2,7 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useMemo } from 'react';
+import { memo, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultGenreCover from '../../assets/images/webp/genre-cover-default.webp';
@@ -23,17 +23,26 @@ interface GenreProp {
   selectAllHandler?: (_upToId?: number) => void;
 }
 
-const Genre = (props: GenreProp) => {
+const Genre = memo((props: GenreProp) => {
   const { genreId, songIds, title, artworkPaths, paletteData, className, selectAllHandler } = props;
   const isMultipleSelectionEnabled = useStore(
     store,
-    (state) => state.multipleSelectionsData.isEnabled
+    (state) =>
+      state.multipleSelectionsData.isEnabled && state.multipleSelectionsData.selectionType === 'genre'
   );
-  const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
+  const isAMultipleSelection = useStore(
+    store,
+    useCallback(
+      (state) =>
+        state.multipleSelectionsData.isEnabled &&
+        state.multipleSelectionsData.selectionType === 'genre' &&
+        state.multipleSelectionsData.multipleSelections.includes(genreId),
+      [genreId]
+    )
+  );
 
   const {
     createQueue,
-    updateQueueData,
     addNewNotifications,
     updateContextMenuData,
     toggleMultipleSelections,
@@ -83,7 +92,7 @@ const Genre = (props: GenreProp) => {
 
   const playGenreSongsForMultipleSelections = useCallback(
     (isShuffle = false) => {
-      const { multipleSelections: genreIds } = multipleSelectionsData;
+      const { multipleSelections: genreIds } = store.state.multipleSelectionsData;
       window.api.genresData
         .getGenresData(genreIds)
         .then((genres) => {
@@ -115,11 +124,11 @@ const Genre = (props: GenreProp) => {
         })
         .catch((err) => console.error(err));
     },
-    [createQueue, multipleSelectionsData]
+    [createQueue]
   );
 
   const addToQueueForMultipleSelections = useCallback(() => {
-    const { multipleSelections: genreIds } = multipleSelectionsData;
+    const { multipleSelections: genreIds } = store.state.multipleSelectionsData;
     window.api.genresData
       .getGenresData(genreIds)
       .then((genres) => {
@@ -157,139 +166,119 @@ const Genre = (props: GenreProp) => {
         return undefined;
       })
       .catch((err) => console.error(err));
-  }, [addNewNotifications, multipleSelectionsData, t]);
+  }, [addNewNotifications, t]);
 
-  const isAMultipleSelection = useMemo(() => {
-    if (!multipleSelectionsData.isEnabled) return false;
-    if (multipleSelectionsData.selectionType !== 'genre') return false;
-    if (multipleSelectionsData.multipleSelections.length <= 0) return false;
-    if (multipleSelectionsData.multipleSelections.some((selectionId) => selectionId === genreId))
-      return true;
-    return false;
-  }, [multipleSelectionsData, genreId]);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      const { multipleSelectionsData } = store.state;
+      const isMultipleSelectionsActive =
+        multipleSelectionsData.selectionType === 'genre' &&
+        multipleSelectionsData.multipleSelections.length !== 1 &&
+        isAMultipleSelection;
 
-  const contextMenuItems: ContextMenuItem[] = useMemo(() => {
-    const isMultipleSelectionsEnabled =
-      multipleSelectionsData.selectionType === 'genre' &&
-      multipleSelectionsData.multipleSelections.length !== 1 &&
-      isAMultipleSelection;
-
-    return [
-      {
-        label: t(`common.${isMultipleSelectionsEnabled ? 'playAll' : 'play'}`),
-        iconName: 'play_arrow',
-        handlerFunction: () => {
-          if (isMultipleSelectionsEnabled) playGenreSongsForMultipleSelections();
-          else playGenreSongs();
-          toggleMultipleSelections(false);
-        }
-      },
-      {
-        label: isMultipleSelectionsEnabled
-          ? t(`common.shuffleAndPlayAll`)
-          : t(`common.shuffleAndPlay`),
-        iconName: 'shuffle',
-        handlerFunction: () => {
-          if (isMultipleSelectionsEnabled) playGenreSongsForMultipleSelections(true);
-          else playGenreSongs(true);
-          toggleMultipleSelections(false);
-        }
-      },
-      {
-        label: t(`common.addToQueue`),
-        iconName: 'queue',
-        handlerFunction: () => {
-          if (isMultipleSelectionsEnabled) addToQueueForMultipleSelections();
-          else {
-            getQueuesManager().getActiveQueue().addSongIdsToEnd(songIds);
-            addNewNotifications([
-              {
-                id: 'newSongsToQueue',
-                duration: 5000,
-                content: t(`notifications.addedToQueue`, {
-                  count: songIds.length
-                })
-              }
-            ]);
+      const items: ContextMenuItem[] = [
+        {
+          label: t(`common.${isMultipleSelectionsActive ? 'playAll' : 'play'}`),
+          iconName: 'play_arrow',
+          handlerFunction: () => {
+            if (isMultipleSelectionsActive) playGenreSongsForMultipleSelections();
+            else playGenreSongs();
+            toggleMultipleSelections(false);
           }
-          toggleMultipleSelections(false);
-        }
-      },
-      {
-        label: 'Hr',
-        isContextMenuItemSeperator: true,
-        handlerFunction: () => true
-      },
-      {
-        label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
-        iconName: 'checklist',
-        handlerFunction: () => {
-          if (isMultipleSelectionEnabled) {
-            return updateMultipleSelections(
-              genreId,
-              'genre',
-              isAMultipleSelection ? 'remove' : 'add'
-            );
+        },
+        {
+          label: isMultipleSelectionsActive
+            ? t(`common.shuffleAndPlayAll`)
+            : t(`common.shuffleAndPlay`),
+          iconName: 'shuffle',
+          handlerFunction: () => {
+            if (isMultipleSelectionsActive) playGenreSongsForMultipleSelections(true);
+            else playGenreSongs(true);
+            toggleMultipleSelections(false);
           }
-          return toggleMultipleSelections(!isAMultipleSelection, 'genre', [genreId]);
+        },
+        {
+          label: t(`common.addToQueue`),
+          iconName: 'queue',
+          handlerFunction: () => {
+            if (isMultipleSelectionsActive) addToQueueForMultipleSelections();
+            else {
+              getQueuesManager().getActiveQueue().addSongIdsToEnd(songIds);
+              addNewNotifications([
+                {
+                  id: 'newSongsToQueue',
+                  duration: 5000,
+                  content: t(`notifications.addedToQueue`, {
+                    count: songIds.length
+                  })
+                }
+              ]);
+            }
+            toggleMultipleSelections(false);
+          }
+        },
+        {
+          label: 'Hr',
+          isContextMenuItemSeperator: true,
+          handlerFunction: () => true
+        },
+        {
+          label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
+          iconName: 'checklist',
+          handlerFunction: () => {
+            if (isMultipleSelectionEnabled) {
+              return updateMultipleSelections(
+                genreId,
+                'genre',
+                isAMultipleSelection ? 'remove' : 'add'
+              );
+            }
+            return toggleMultipleSelections(!isAMultipleSelection, 'genre', [genreId]);
+          }
+        },
+        {
+          label: t(`common.info`),
+          iconName: 'info',
+          iconClassName: 'material-icons-round-outlined',
+          handlerFunction: goToGenreInfoPage,
+          isDisabled: isMultipleSelectionsActive
         }
-      },
-      // {
-      //   label: 'Select/Unselect All',
-      //   iconName: 'checklist',
-      //   isDisabled: !selectAllHandler,
-      //   handlerFunction: () => selectAllHandler && selectAllHandler(),
-      // },
-      {
-        label: t(`common.info`),
-        iconName: 'info',
-        iconClassName: 'material-icons-round-outlined',
-        handlerFunction: goToGenreInfoPage,
-        isDisabled: isMultipleSelectionsEnabled
-      }
-    ];
-  }, [
-    multipleSelectionsData.selectionType,
-    multipleSelectionsData.multipleSelections.length,
-    isAMultipleSelection,
-    t,
-    goToGenreInfoPage,
-    playGenreSongsForMultipleSelections,
-    playGenreSongs,
-    toggleMultipleSelections,
-    addToQueueForMultipleSelections,
-    songIds,
-    addNewNotifications,
-    isMultipleSelectionEnabled,
-    genreId,
-    updateMultipleSelections
-  ]);
+      ];
 
-  const contextMenuItemData = useMemo(
-    () =>
-      isMultipleSelectionEnabled &&
-      multipleSelectionsData.selectionType === 'genre' &&
-      isAMultipleSelection
-        ? {
-            title: t(`genre.selectedGenreCount`, {
-              count: multipleSelectionsData.multipleSelections.length
-            }),
-            artworkPath: DefaultGenreCover
-          }
-        : {
-            title,
-            artworkPath: artworkPaths?.optimizedArtworkPath,
-            subTitle: t('common.songWithCount', { count: songIds.length })
-          },
+      const itemData: ContextMenuAdditionalData =
+        isMultipleSelectionEnabled &&
+        multipleSelectionsData.selectionType === 'genre' &&
+        isAMultipleSelection
+          ? {
+              title: t(`genre.selectedGenreCount`, {
+                count: multipleSelectionsData.multipleSelections.length
+              }),
+              artworkPath: DefaultGenreCover
+            }
+          : {
+              title,
+              artworkPath: artworkPaths?.optimizedArtworkPath,
+              subTitle: t('common.songWithCount', { count: songIds.length })
+            };
+
+      updateContextMenuData(true, items, e.pageX, e.pageY, itemData);
+    },
     [
+      addNewNotifications,
+      addToQueueForMultipleSelections,
       artworkPaths?.optimizedArtworkPath,
+      genreId,
+      goToGenreInfoPage,
       isAMultipleSelection,
       isMultipleSelectionEnabled,
-      multipleSelectionsData.multipleSelections.length,
-      multipleSelectionsData.selectionType,
-      songIds.length,
+      playGenreSongs,
+      playGenreSongsForMultipleSelections,
+      songIds,
       t,
-      title
+      title,
+      toggleMultipleSelections,
+      updateContextMenuData,
+      updateMultipleSelections
     ]
   );
 
@@ -299,25 +288,22 @@ const Genre = (props: GenreProp) => {
       params={{ genreId: String(genreId) }}
       preload={isMultipleSelectionEnabled ? false : undefined}
       className={`genre fx-rise group bg-background-color-2/70 hover:bg-background-color-2! dark:bg-dark-background-color-2/70 dark:hover:bg-dark-background-color-2! text-background-color-2 dark:text-dark-background-color-2 relative mr-10 mb-6 flex h-36 w-72 cursor-pointer items-center gap-4 overflow-hidden rounded-2xl p-4 backdrop-blur-md transition-[border,border-color,translate] duration-200 ease-out hover:-translate-y-0.5 focus-visible:-translate-y-0.5 ${className} ${
-        isMultipleSelectionEnabled &&
-        multipleSelectionsData.selectionType === 'genre' &&
-        'border-4 border-transparent'
+        isMultipleSelectionEnabled && 'border-4 border-transparent'
       } ${isAMultipleSelection && 'border-font-color-highlight! dark:border-dark-font-color-highlight!'}`}
       style={{
         backgroundColor
       }}
       onClick={(e) => {
         e.preventDefault();
+        const currentSelections = store.state.multipleSelectionsData;
         if (e.getModifierState('Shift') === true && selectAllHandler) selectAllHandler(genreId);
         else if (e.getModifierState('Control') === true && !isMultipleSelectionEnabled)
           toggleMultipleSelections(!isAMultipleSelection, 'genre', [genreId]);
-        else if (isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'genre')
+        else if (isMultipleSelectionEnabled && currentSelections.selectionType === 'genre')
           updateMultipleSelections(genreId, 'genre', isAMultipleSelection ? 'remove' : 'add');
         else goToGenreInfoPage();
       }}
-      onContextMenu={(e) =>
-        updateContextMenuData(true, contextMenuItems, e.pageX, e.pageY, contextMenuItemData)
-      }
+      onContextMenu={handleContextMenu}
     >
       <div className="genre-artwork-container w-2/5 max-w-[100px]">
         <Img
@@ -338,12 +324,15 @@ const Genre = (props: GenreProp) => {
             count: songIds.length
           })}
         </div>
-        {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'genre' && (
+        {isMultipleSelectionEnabled && (
           <MultipleSelectionCheckbox id={genreId} selectionType="genre" className="z-10 mt-2!" />
         )}
       </div>
     </NavLink>
   );
-};
+});
+
+Genre.displayName = 'Genre';
 
 export default Genre;
+

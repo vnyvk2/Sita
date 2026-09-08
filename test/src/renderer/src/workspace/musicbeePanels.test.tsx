@@ -22,7 +22,10 @@ vi.mock('react-i18next', async (importOriginal) => {
 // Mock router navigation
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
-  useLocation: () => ({ pathname: '/main-player' }),
+  useLocation: (opts?: { select?: (loc: any) => any }) => {
+    const loc = { pathname: '/main-player' };
+    return opts?.select ? opts.select(loc) : loc;
+  },
   Outlet: () => <div data-testid="router-outlet">Mock Outlet Content</div>
 }));
 

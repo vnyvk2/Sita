@@ -20,7 +20,9 @@ const NewPlaylistPrompt = lazy(
 export const PlaylistsPanel: FC<PanelProps> = memo(() => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const location = useLocation();
+  const activePlaylistPath = useLocation({
+    select: (loc) => (loc.pathname.startsWith('/main-player/playlists/') ? loc.pathname : null)
+  });
 
   const { createQueue, changePromptMenuData } = useContext(AppUpdateContext);
   const { data: playlists = [], isLoading } = useRootCollections();
@@ -88,7 +90,7 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
   );
 
   const renderPlaylistItem = (playlist: PlaylistDto) => {
-    const isCurrentRoute = location.pathname === `/main-player/playlists/${playlist.id}`;
+    const isCurrentRoute = activePlaylistPath === `/main-player/playlists/${playlist.id}`;
 
     return (
       <li

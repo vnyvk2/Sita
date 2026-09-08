@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { lazy, useCallback, useContext, useMemo } from 'react';
+import { lazy, memo, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import FolderImg from '../../assets/images/webp/empty-folder.webp';
@@ -26,7 +26,7 @@ type FolderProps = {
   selectAllHandler: (upToId?: number) => void;
 };
 
-const Folder = (props: FolderProps) => {
+const Folder = memo((props: FolderProps) => {
   const { updateContextMenuData, changePromptMenuData } = useContext(AppUpdateContext);
 
   const {
@@ -60,10 +60,7 @@ const Folder = (props: FolderProps) => {
     return { prevDir: undefined, folderName: undefined };
   }, [folderPath]);
 
-  const isAMultipleSelection = useMemo(() => {
-    // Folders don't support numeric-based multiple selections (no numeric IDs)
-    return false;
-  }, []);
+  const isAMultipleSelection = false;
 
   const openMusicFolderInfoPage = useCallback(() => {
     if (folderPath) {
@@ -71,78 +68,90 @@ const Folder = (props: FolderProps) => {
     }
   }, [folderPath, navigate]);
 
-  const contextMenuItems = useMemo((): ContextMenuItem[] => {
-    return [
-      {
-        label: t('common.select'),
-        iconName: 'checklist',
-        isDisabled: true, // Folders don't support numeric-based multiple selections
-        handlerFunction: () => {
-          // Selection not supported for folders (no numeric IDs)
-        }
-      },
-      {
-        label: t('common.info'),
-        iconName: 'info',
-        handlerFunction: openMusicFolderInfoPage,
-        isDisabled: false
-      },
-      {
-        label: t('song.showInFileExplorer'),
-        class: 'reveal-file-explorer',
-        iconName: 'folder_open',
-        handlerFunction: () => window.api.folderData.revealFolderInFileExplorer(folderPath)
-      },
-      {
-        label: 'Hr',
-        isContextMenuItemSeperator: true,
-        handlerFunction: null
-      },
-      {
-        label: t(isBlacklisted ? 'song.deblacklist' : 'folder.blacklistFolder'),
-        iconName: isBlacklisted ? 'settings_backup_restore' : 'block',
-        handlerFunction: () => {
-          if (isBlacklisted)
-            window.api.folderData
-              .restoreBlacklistedFolders([folderPath])
-              .catch((err) => console.error(err));
-          else
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      const items: ContextMenuItem[] = [
+        {
+          label: t('common.select'),
+          iconName: 'checklist',
+          isDisabled: true, // Folders don't support numeric-based multiple selections
+          handlerFunction: () => {
+            // Selection not supported for folders (no numeric IDs)
+          }
+        },
+        {
+          label: t('common.info'),
+          iconName: 'info',
+          handlerFunction: openMusicFolderInfoPage,
+          isDisabled: false
+        },
+        {
+          label: t('song.showInFileExplorer'),
+          class: 'reveal-file-explorer',
+          iconName: 'folder_open',
+          handlerFunction: () => window.api.folderData.revealFolderInFileExplorer(folderPath)
+        },
+        {
+          label: 'Hr',
+          isContextMenuItemSeperator: true,
+          handlerFunction: null
+        },
+        {
+          label: t(isBlacklisted ? 'song.deblacklist' : 'folder.blacklistFolder'),
+          iconName: isBlacklisted ? 'settings_backup_restore' : 'block',
+          handlerFunction: () => {
+            if (isBlacklisted)
+              window.api.folderData
+                .restoreBlacklistedFolders([folderPath])
+                .catch((err) => console.error(err));
+            else
+              changePromptMenuData(
+                true,
+                <BlacklistFolderConfrimPrompt folderName={folderName} folderPaths={[folderPath]} />
+              );
+          }
+        },
+        {
+          label: 'Remove Folder',
+          iconName: 'delete',
+          iconClassName: 'material-icons-round-outlined',
+          handlerFunction: () =>
             changePromptMenuData(
               true,
-              <BlacklistFolderConfrimPrompt folderName={folderName} folderPaths={[folderPath]} />
-            );
+              <RemoveFolderConfirmationPrompt
+                folderName={folderName || folderPath}
+                absolutePath={folderPath}
+              />,
+              'delete-folder-confirmation-prompt'
+            ),
+          isDisabled: false
         }
-      },
-      {
-        label: 'Remove Folder',
-        iconName: 'delete',
-        iconClassName: 'material-icons-round-outlined',
-        handlerFunction: () =>
-          changePromptMenuData(
-            true,
-            <RemoveFolderConfirmationPrompt
-              folderName={folderName || folderPath}
-              absolutePath={folderPath}
-            />,
-            'delete-folder-confirmation-prompt'
-          ),
-        isDisabled: false
-      }
-    ];
-  }, [changePromptMenuData, folderName, folderPath, isBlacklisted, openMusicFolderInfoPage, t]);
+      ];
 
-  const contextMenuItemData = useMemo(
-    (): ContextMenuAdditionalData => ({
-      title: folderName || 'Unknown Folder',
-      artworkPath: FolderImg,
-      artworkClassName: 'w-6!',
-      subTitle: t('common.songWithCount', { count: totalSongCount }),
-      subTitle2:
-        directFolderCount > 0
-          ? t('common.subFolderWithCount', { count: directFolderCount })
-          : undefined
-    }),
-    [directFolderCount, folderName, t, totalSongCount]
+      const itemData: ContextMenuAdditionalData = {
+        title: folderName || 'Unknown Folder',
+        artworkPath: FolderImg,
+        artworkClassName: 'w-6!',
+        subTitle: t('common.songWithCount', { count: totalSongCount }),
+        subTitle2:
+          directFolderCount > 0
+            ? t('common.subFolderWithCount', { count: directFolderCount })
+            : undefined
+      };
+
+      updateContextMenuData(true, items, e.pageX, e.pageY, itemData);
+    },
+    [
+      changePromptMenuData,
+      directFolderCount,
+      folderName,
+      folderPath,
+      isBlacklisted,
+      openMusicFolderInfoPage,
+      t,
+      totalSongCount,
+      updateContextMenuData
+    ]
   );
 
   return (
@@ -176,9 +185,7 @@ const Folder = (props: FolderProps) => {
         title={
           isBlacklisted ? t('notifications.songBlacklisted', { title: folderName }) : undefined
         }
-        onContextMenu={(e) =>
-          updateContextMenuData(true, contextMenuItems, e.pageX, e.pageY, contextMenuItemData)
-        }
+        onContextMenu={handleContextMenu}
       >
         <div className="folder-img-and-info-container flex items-center">
           <div className="bg-background-color-1 text-font-color-highlight group-even:bg-background-color-2/75 group-hover:bg-background-color-1 dark:bg-dark-background-color-1 dark:text-dark-background-color-3 dark:group-even:bg-dark-background-color-2/50 dark:group-hover:bg-dark-background-color-1 relative mr-4 ml-1 h-fit rounded-2xl px-3">
@@ -254,6 +261,8 @@ const Folder = (props: FolderProps) => {
       </div>
     </div>
   );
-};
+});
+
+Folder.displayName = 'Folder';
 
 export default Folder;

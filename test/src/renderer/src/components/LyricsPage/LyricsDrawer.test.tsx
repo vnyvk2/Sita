@@ -16,10 +16,21 @@ let mockPathname = '/main-player/songs';
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => mockNavigate,
-  useLocation: () => ({
-    pathname: mockPathname,
-    searchStr: 'sortBy=title'
-  })
+  useRouter: () => ({
+    state: {
+      location: {
+        pathname: mockPathname,
+        searchStr: 'sortBy=title'
+      }
+    }
+  }),
+  useLocation: (opts?: { select?: (loc: any) => any }) => {
+    const loc = {
+      pathname: mockPathname,
+      searchStr: 'sortBy=title'
+    };
+    return opts?.select ? opts.select(loc) : loc;
+  }
 }));
 
 describe('LyricsDrawer', () => {

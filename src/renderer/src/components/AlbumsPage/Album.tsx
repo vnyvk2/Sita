@@ -2,7 +2,7 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultAlbumCover from '../../assets/images/webp/album_cover_default.webp';
@@ -33,12 +33,22 @@ interface AlbumProp {
   selectAllHandler?: (_upToId?: number) => void;
 }
 
-export const Album = (props: AlbumProp) => {
+export const Album = memo((props: AlbumProp) => {
   const isMultipleSelectionEnabled = useStore(
     store,
-    (state) => state.multipleSelectionsData.isEnabled
+    (state) =>
+      state.multipleSelectionsData.isEnabled && state.multipleSelectionsData.selectionType === 'album'
   );
-  const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
+  const isAMultipleSelection = useStore(
+    store,
+    useCallback(
+      (state) =>
+        state.multipleSelectionsData.isEnabled &&
+        state.multipleSelectionsData.selectionType === 'album' &&
+        state.multipleSelectionsData.multipleSelections.includes(props.albumId),
+      [props.albumId]
+    )
+  );
 
   const {
     createQueue,
@@ -101,7 +111,7 @@ export const Album = (props: AlbumProp) => {
 
   const playAlbumSongsForMultipleSelections = useCallback(
     (isShuffle = false) => {
-      const { multipleSelections: albumIds } = multipleSelectionsData;
+      const { multipleSelections: albumIds } = store.state.multipleSelectionsData;
 
       window.api.albumsData
         .getAlbumData(albumIds)
@@ -135,11 +145,11 @@ export const Album = (props: AlbumProp) => {
         })
         .catch((err) => console.error(err));
     },
-    [createQueue, multipleSelectionsData, t]
+    [createQueue, t]
   );
 
   const addToQueueForMultipleSelections = useCallback(() => {
-    const { multipleSelections: albumIds } = multipleSelectionsData;
+    const { multipleSelections: albumIds } = store.state.multipleSelectionsData;
     window.api.albumsData
       .getAlbumData(albumIds)
       .then((albums) => {
@@ -175,7 +185,7 @@ export const Album = (props: AlbumProp) => {
         return undefined;
       })
       .catch((err) => console.error(err));
-  }, [addNewNotifications, multipleSelectionsData, t]);
+  }, [addNewNotifications, t]);
 
   const showAlbumInfoPage = useCallback(
     () =>
@@ -198,17 +208,6 @@ export const Album = (props: AlbumProp) => {
       setIsFavorite(!nextValue);
     }
   }, [isFavorite, props.albumId, triggerBurst]);
-
-  const isAMultipleSelection = useMemo(() => {
-    if (!multipleSelectionsData.isEnabled) return false;
-    if (multipleSelectionsData.selectionType !== 'album') return false;
-    if (multipleSelectionsData.multipleSelections.length <= 0) return false;
-    if (
-      multipleSelectionsData.multipleSelections.some((selectionId) => selectionId === props.albumId)
-    )
-      return true;
-    return false;
-  }, [multipleSelectionsData, props.albumId]);
 
   const albumArtists = useMemo(() => {
     const { artists } = props;
@@ -240,155 +239,145 @@ export const Album = (props: AlbumProp) => {
     return <span className="text-xs font-normal">{t('common.unknownArtist')}</span>;
   }, [isAMultipleSelection, props, t]);
 
-  const contextMenuItems: ContextMenuItem[] = useMemo(() => {
-    const isMultipleSelectionsEnabled =
-      multipleSelectionsData.selectionType === 'album' &&
-      multipleSelectionsData.multipleSelections.length !== 1 &&
-      isAMultipleSelection;
-    return [
-      {
-        label: t(`common.${isMultipleSelectionsEnabled ? 'playAll' : 'play'}`),
-        iconName: 'play_arrow',
-        handlerFunction: () => {
-          if (isMultipleSelectionsEnabled) playAlbumSongsForMultipleSelections();
-          else playAlbumSongs();
-          toggleMultipleSelections(false);
-        }
-      },
-      {
-        label: isMultipleSelectionsEnabled
-          ? t(`common.shuffleAndPlayAll`)
-          : t(`common.shuffleAndPlay`),
-        iconName: 'shuffle',
-        handlerFunction: () => {
-          if (isMultipleSelectionsEnabled) playAlbumSongsForMultipleSelections(true);
-          else playAlbumSongs(true);
-          toggleMultipleSelections(false);
-        }
-      },
-      {
-        label: t(`common.addToQueue`),
-        iconName: 'queue',
-        handlerFunction: () => {
-          if (isMultipleSelectionsEnabled) addToQueueForMultipleSelections();
-          else {
-            void resolveSongIds().then((songIdsToAdd) => {
-              getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
-              addNewNotifications([
-                {
-                  id: 'newSongsToQueue',
-                  duration: 5000,
-                  content: t(`notifications.addedToQueue`, {
-                    count: songIdsToAdd.length
-                  })
-                }
-              ]);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      const { multipleSelectionsData } = store.state;
+      const isMultipleSelectionsActive =
+        multipleSelectionsData.selectionType === 'album' &&
+        multipleSelectionsData.multipleSelections.length !== 1 &&
+        isAMultipleSelection;
+
+      const items: ContextMenuItem[] = [
+        {
+          label: t(`common.${isMultipleSelectionsActive ? 'playAll' : 'play'}`),
+          iconName: 'play_arrow',
+          handlerFunction: () => {
+            if (isMultipleSelectionsActive) playAlbumSongsForMultipleSelections();
+            else playAlbumSongs();
+            toggleMultipleSelections(false);
+          }
+        },
+        {
+          label: isMultipleSelectionsActive
+            ? t(`common.shuffleAndPlayAll`)
+            : t(`common.shuffleAndPlay`),
+          iconName: 'shuffle',
+          handlerFunction: () => {
+            if (isMultipleSelectionsActive) playAlbumSongsForMultipleSelections(true);
+            else playAlbumSongs(true);
+            toggleMultipleSelections(false);
+          }
+        },
+        {
+          label: t(`common.addToQueue`),
+          iconName: 'queue',
+          handlerFunction: () => {
+            if (isMultipleSelectionsActive) addToQueueForMultipleSelections();
+            else {
+              void resolveSongIds().then((songIdsToAdd) => {
+                getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
+                addNewNotifications([
+                  {
+                    id: 'newSongsToQueue',
+                    duration: 5000,
+                    content: t(`notifications.addedToQueue`, {
+                      count: songIdsToAdd.length
+                    })
+                  }
+                ]);
+              });
+            }
+            toggleMultipleSelections(false);
+          }
+        },
+        {
+          label: 'Hr',
+          isContextMenuItemSeperator: true,
+          handlerFunction: null
+        },
+        {
+          label: t(`common.info`),
+          iconName: 'info',
+          handlerFunction: showAlbumInfoPage
+        },
+        {
+          label: t(`common.${isFavorite ? 'dislike' : 'like'}`),
+          iconName: 'favorite',
+          iconClassName: isFavorite
+            ? 'material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight'
+            : 'material-icons-round',
+          handlerFunction: toggleLikeAlbum
+        },
+        {
+          label: 'Auto Tag Album',
+          iconName: 'auto_awesome',
+          handlerFunction: () => {
+            if (!openAutoTagDialog) return;
+            void resolveSongTitles().then((albumSongs) => {
+              if (albumSongs.length > 0) {
+                openAutoTagDialog(albumSongs, props.title, props.artists?.[0]?.name);
+              }
             });
           }
-          toggleMultipleSelections(false);
-        }
-      },
-      {
-        label: 'Hr',
-        isContextMenuItemSeperator: true,
-        handlerFunction: null
-      },
-      {
-        label: t(`common.info`),
-        iconName: 'info',
-        handlerFunction: showAlbumInfoPage
-      },
-      {
-        label: t(`common.${isFavorite ? 'dislike' : 'like'}`),
-        iconName: 'favorite',
-        iconClassName: isFavorite
-          ? 'material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight'
-          : 'material-icons-round',
-        handlerFunction: toggleLikeAlbum
-      },
-      {
-        label: 'Auto Tag Album',
-        iconName: 'auto_awesome',
-        handlerFunction: () => {
-          if (!openAutoTagDialog) return;
-          void resolveSongTitles().then((albumSongs) => {
-            if (albumSongs.length > 0) {
-              openAutoTagDialog(albumSongs, props.title, props.artists?.[0]?.name);
+        },
+        {
+          label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
+          iconName: 'checklist',
+          handlerFunction: () => {
+            if (isMultipleSelectionEnabled) {
+              return updateMultipleSelections(
+                props.albumId,
+                'album',
+                isAMultipleSelection ? 'remove' : 'add'
+              );
             }
-          });
-        }
-      },
-      {
-        label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
-        iconName: 'checklist',
-        handlerFunction: () => {
-          if (isMultipleSelectionEnabled) {
-            return updateMultipleSelections(
-              props.albumId,
-              'album',
-              isAMultipleSelection ? 'remove' : 'add'
-            );
+            return toggleMultipleSelections(!isAMultipleSelection, 'album', [props.albumId]);
           }
-          return toggleMultipleSelections(!isAMultipleSelection, 'album', [props.albumId]);
         }
-      }
-      // {
-      //   label: 'Select/Unselect All',
-      //   iconName: 'checklist',
-      //   isDisabled: !props.selectAllHandler,
-      //   handlerFunction: () =>
-      //     props.selectAllHandler && props.selectAllHandler(),
-      // },
-    ];
-  }, [
-    addNewNotifications,
-    addToQueueForMultipleSelections,
-    isAMultipleSelection,
-    isFavorite,
-    isMultipleSelectionEnabled,
-    multipleSelectionsData.multipleSelections.length,
-    multipleSelectionsData.selectionType,
-    playAlbumSongs,
-    playAlbumSongsForMultipleSelections,
-    props.albumId,
-    resolveSongIds,
-    resolveSongTitles,
-    songCount,
-    showAlbumInfoPage,
-    t,
-    toggleLikeAlbum,
-    toggleMultipleSelections,
-    updateMultipleSelections
-  ]);
+      ];
 
-  const contextMenuItemData = useMemo(
-    (): ContextMenuAdditionalData =>
-      isMultipleSelectionEnabled &&
-      multipleSelectionsData.selectionType === 'album' &&
-      isAMultipleSelection
-        ? {
-            title: t('album.selectedAlbumCount', {
-              count: multipleSelectionsData.multipleSelections.length
-            }),
-            artworkPath: DefaultAlbumCover
-          }
-        : {
-            title: props.title,
-            artworkPath: props?.artworkPaths?.optimizedArtworkPath,
-            subTitle: t('common.songWithCount', { count: songCount }),
-            subTitle2:
-              props.artists?.map((artist) => artist.name).join(', ') || t('common.unknownArtist')
-          },
+      const itemData: ContextMenuAdditionalData =
+        isMultipleSelectionEnabled &&
+        multipleSelectionsData.selectionType === 'album' &&
+        isAMultipleSelection
+          ? {
+              title: t('album.selectedAlbumCount', {
+                count: multipleSelectionsData.multipleSelections.length
+              }),
+              artworkPath: DefaultAlbumCover
+            }
+          : {
+              title: props.title,
+              artworkPath: props?.artworkPaths?.optimizedArtworkPath,
+              subTitle: t('common.songWithCount', { count: songCount }),
+              subTitle2:
+                props.artists?.map((artist) => artist.name).join(', ') || t('common.unknownArtist')
+            };
+
+      updateContextMenuData(true, items, e.pageX, e.pageY, itemData);
+    },
     [
+      addNewNotifications,
+      addToQueueForMultipleSelections,
       isAMultipleSelection,
+      isFavorite,
       isMultipleSelectionEnabled,
-      multipleSelectionsData.multipleSelections.length,
-      multipleSelectionsData.selectionType,
+      openAutoTagDialog,
+      playAlbumSongs,
+      playAlbumSongsForMultipleSelections,
+      props.albumId,
       props.artists,
       props?.artworkPaths?.optimizedArtworkPath,
-      songCount,
       props.title,
-      t
+      resolveSongIds,
+      resolveSongTitles,
+      showAlbumInfoPage,
+      songCount,
+      t,
+      toggleLikeAlbum,
+      toggleMultipleSelections,
+      updateContextMenuData,
+      updateMultipleSelections
     ]
   );
 
@@ -403,22 +392,28 @@ export const Album = (props: AlbumProp) => {
           ? 'bg-background-color-3 text-font-color-black! dark:bg-dark-background-color-3 dark:text-font-color-black!'
           : 'hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/50'
       }`}
-      onContextMenu={(e) =>
-        updateContextMenuData(true, contextMenuItems, e.pageX, e.pageY, contextMenuItemData)
-      }
+      onContextMenu={handleContextMenu}
       onClick={(e) => {
         e.preventDefault();
         if (e.getModifierState('Shift') === true && props.selectAllHandler)
           props.selectAllHandler(props.albumId);
         else if (e.getModifierState('Control') === true && !isMultipleSelectionEnabled)
           toggleMultipleSelections(!isAMultipleSelection, 'album', [props.albumId]);
-        else if (isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album')
+        else if (isMultipleSelectionEnabled)
           updateMultipleSelections(props.albumId, 'album', isAMultipleSelection ? 'remove' : 'add');
         else showAlbumInfoPage();
       }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (isMultipleSelectionEnabled)
+            updateMultipleSelections(props.albumId, 'album', isAMultipleSelection ? 'remove' : 'add');
+          else showAlbumInfoPage();
+        }
+      }}
     >
       <div className="album-cover-and-play-btn-container relative h-[70%] cursor-pointer">
-        {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'album' ? (
+        {isMultipleSelectionEnabled ? (
           <MultipleSelectionCheckbox
             id={props.albumId}
             selectionType="album"
@@ -496,4 +491,6 @@ export const Album = (props: AlbumProp) => {
       </div>
     </div>
   );
-};
+});
+
+Album.displayName = 'Album';

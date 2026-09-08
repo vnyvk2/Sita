@@ -6,15 +6,15 @@ import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
-import { useOverlayNavigation } from '../../hooks/useOverlayNavigation';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
 import LyricsIcon from '../Icons/LyricsIcon';
 import SeekBarContainer from './SeekBarContainer';
 
 const SongControlsAndSeekbarContainer = () => {
-  const { toggleOverlay } = useOverlayNavigation();
-  const location = useLocation();
+  const isLyricsPath = useLocation({
+    select: (loc) => loc.pathname.startsWith('/main-player/lyrics')
+  });
   const { history } = useRouter();
   const isLyricsDrawerOpen = useStore(store, (state) => state.isLyricsDrawerOpen);
   const isAFavorite = useStore(store, (state) => state.currentSongData.isAFavorite);
@@ -133,13 +133,13 @@ const SongControlsAndSeekbarContainer = () => {
         <button
           type="button"
           className={`lyrics-btn group after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight !m-0 flex items-center justify-center !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent ${
-            isLyricsDrawerOpen || location.pathname.startsWith('/main-player/lyrics')
+            isLyricsDrawerOpen || isLyricsPath
               ? 'active after:opacity-100'
               : 'after:opacity-0'
           }`}
           title={t('player.lyrics')}
           onClick={() => {
-            if (location.pathname.startsWith('/main-player/lyrics')) {
+            if (isLyricsPath) {
               history.back();
             } else {
               toggleLyricsDrawer();
@@ -148,7 +148,7 @@ const SongControlsAndSeekbarContainer = () => {
         >
           <LyricsIcon
             className={`h-6 w-6 transition-opacity hover:opacity-80 ${
-              isLyricsDrawerOpen || location.pathname.startsWith('/main-player/lyrics')
+              isLyricsDrawerOpen || isLyricsPath
                 ? 'text-font-color-highlight dark:text-dark-font-color-highlight opacity-100'
                 : 'opacity-60'
             }`}

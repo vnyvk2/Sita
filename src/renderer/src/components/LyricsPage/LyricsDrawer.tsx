@@ -3,7 +3,7 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSkipLyricsLines from '@renderer/hooks/useSkipLyricsLines';
 import { useLyricsQuery } from '@renderer/queries/lyrics';
 import { store } from '@renderer/store/store';
-import { useLocation, useNavigate } from '@tanstack/react-router';
+import { useLocation, useNavigate, useRouter } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,9 +22,11 @@ const LyricsDrawer = () => {
   const { toggleLyricsDrawer } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
 
-  const isLyricsPage = location.pathname.startsWith('/main-player/lyrics');
+  const isLyricsPage = useLocation({
+    select: (loc) => loc.pathname.startsWith('/main-player/lyrics')
+  });
 
   const { data: lyrics, isPending: isLoadingLyrics } = useLyricsQuery({
     enabled: isLyricsDrawerOpen && !isLyricsPage
@@ -39,7 +41,8 @@ const LyricsDrawer = () => {
   }, [currentSongData.duration, lyrics, activeLineIndex]);
 
   const handleExpandClick = () => {
-    const fromPath = location.pathname + (location.searchStr ? `?${location.searchStr}` : '');
+    const loc = router.state.location;
+    const fromPath = loc.pathname + (loc.searchStr ? `?${loc.searchStr}` : '');
     toggleLyricsDrawer(false);
     navigate({
       to: '/main-player/lyrics',

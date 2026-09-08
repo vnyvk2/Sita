@@ -2,7 +2,7 @@ import { normalizedKeys } from '@renderer/other/appShortcuts';
 import { settingsQuery } from '@renderer/queries/settings';
 import { queryClient } from '@renderer/queryClient';
 import { dispatch, store } from '@renderer/store/store';
-import { useLocation, useNavigate, useRouter } from '@tanstack/react-router';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { lazy, useCallback, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -117,7 +117,6 @@ export interface KeyboardShortcutDependencies {
  */
 export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies): void {
   const navigate = useNavigate();
-  const location = useLocation();
   const { history } = useRouter();
   const { toggleOverlay } = useOverlayNavigation();
   const { t } = useTranslation();
@@ -399,44 +398,56 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             break;
           case 'appShortcutsPrompt.toggleQueuePanel':
             if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
-              import('@renderer/workspace/store').then(({ workspaceActions }) => {
-                workspaceActions.toggleOrOpenPanel('queue');
-              });
+              import('@renderer/workspace/store')
+                .then(({ workspaceActions }) => {
+                  workspaceActions.toggleOrOpenPanel('queue');
+                })
+                .catch((err) => console.error(err));
             }
             break;
           case 'appShortcutsPrompt.toggleLyricsPanel':
             if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
-              import('@renderer/workspace/store').then(({ workspaceActions }) => {
-                workspaceActions.toggleOrOpenPanel('lyrics');
-              });
+              import('@renderer/workspace/store')
+                .then(({ workspaceActions }) => {
+                  workspaceActions.toggleOrOpenPanel('lyrics');
+                })
+                .catch((err) => console.error(err));
             }
             break;
           case 'appShortcutsPrompt.togglePlaylistsPanel':
             if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
-              import('@renderer/workspace/store').then(({ workspaceActions }) => {
-                workspaceActions.toggleOrOpenPanel('playlists');
-              });
+              import('@renderer/workspace/store')
+                .then(({ workspaceActions }) => {
+                  workspaceActions.toggleOrOpenPanel('playlists');
+                })
+                .catch((err) => console.error(err));
             }
             break;
           case 'appShortcutsPrompt.toggleVisualizerPanel':
             if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
-              import('@renderer/workspace/store').then(({ workspaceActions }) => {
-                workspaceActions.toggleOrOpenPanel('visualizer');
-              });
+              import('@renderer/workspace/store')
+                .then(({ workspaceActions }) => {
+                  workspaceActions.toggleOrOpenPanel('visualizer');
+                })
+                .catch((err) => console.error(err));
             }
             break;
           case 'appShortcutsPrompt.toggleNowPlayingPanel':
             if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
-              import('@renderer/workspace/store').then(({ workspaceActions }) => {
-                workspaceActions.toggleOrOpenPanel('now-playing');
-              });
+              import('@renderer/workspace/store')
+                .then(({ workspaceActions }) => {
+                  workspaceActions.toggleOrOpenPanel('now-playing');
+                })
+                .catch((err) => console.error(err));
             }
             break;
           case 'appShortcutsPrompt.saveWorkspaceLayout':
             if (store.state.localStorage.preferences?.isExperimentalWorkspaceEnabled) {
-              import('@renderer/workspace/store').then(({ workspaceActions }) => {
-                workspaceActions.openSaveLayoutModal('save');
-              });
+              import('@renderer/workspace/store')
+                .then(({ workspaceActions }) => {
+                  workspaceActions.openSaveLayoutModal('save');
+                })
+                .catch((err) => console.error(err));
             }
             break;
           default:
@@ -461,7 +472,6 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
       toggleMultipleSelections,
       changePromptMenuData,
       player,
-      location.pathname,
       history
     ]
   );

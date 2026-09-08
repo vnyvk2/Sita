@@ -2,7 +2,7 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useContext, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultArtistCover from '../../assets/images/webp/artist_cover_default.webp';
@@ -29,12 +29,22 @@ interface ArtistProp {
   appearFromBottom?: boolean;
 }
 
-export const Artist = (props: ArtistProp) => {
+export const Artist = memo((props: ArtistProp) => {
   const isMultipleSelectionEnabled = useStore(
     store,
-    (state) => state.multipleSelectionsData.isEnabled
+    (state) =>
+      state.multipleSelectionsData.isEnabled && state.multipleSelectionsData.selectionType === 'artist'
   );
-  const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
+  const isAMultipleSelection = useStore(
+    store,
+    useCallback(
+      (state) =>
+        state.multipleSelectionsData.isEnabled &&
+        state.multipleSelectionsData.selectionType === 'artist' &&
+        state.multipleSelectionsData.multipleSelections.includes(props.artistId),
+      [props.artistId]
+    )
+  );
 
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -86,7 +96,7 @@ export const Artist = (props: ArtistProp) => {
 
   const playArtistSongsForMultipleSelections = useCallback(
     (isShuffling = false) => {
-      const { multipleSelections: artistIds } = multipleSelectionsData;
+      const { multipleSelections: artistIds } = store.state.multipleSelectionsData;
 
       return window.api.artistsData
         .getArtistData(artistIds)
@@ -113,7 +123,7 @@ export const Artist = (props: ArtistProp) => {
           return undefined;
         });
     },
-    [createQueue, multipleSelectionsData, props.artistId, t]
+    [createQueue, props.artistId, t]
   );
 
   const toggleLikeArtist = useCallback(async () => {
@@ -129,193 +139,170 @@ export const Artist = (props: ArtistProp) => {
     }
   }, [isAFavorite, props.artistId, triggerBurst]);
 
-  const isAMultipleSelection = useMemo(() => {
-    if (!multipleSelectionsData.isEnabled) return false;
-    if (multipleSelectionsData.selectionType !== 'artist') return false;
-    if (multipleSelectionsData.multipleSelections.length <= 0) return false;
-    if (
-      multipleSelectionsData.multipleSelections.some(
-        (selectionId) => selectionId === props.artistId
-      )
-    )
-      return true;
-    return false;
-  }, [multipleSelectionsData, props.artistId]);
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const { multipleSelectionsData } = store.state;
+      const isMultipleSelectionsActive =
+        multipleSelectionsData.selectionType === 'artist' &&
+        multipleSelectionsData.multipleSelections.length !== 1 &&
+        isAMultipleSelection;
 
-  const artistContextMenus: ContextMenuItem[] = useMemo(() => {
-    const isMultipleSelectionsEnabled =
-      multipleSelectionsData.selectionType === 'artist' &&
-      multipleSelectionsData.multipleSelections.length !== 1 &&
-      isAMultipleSelection;
-
-    return [
-      {
-        label: isMultipleSelectionsEnabled ? t(`artist.playAllSongs`) : t(`common.playAll`),
-        iconName: 'play_arrow',
-        handlerFunction: () => {
-          if (isMultipleSelectionsEnabled) return playArtistSongsForMultipleSelections();
-          return playArtistSongs();
-        }
-      },
-      {
-        label: isMultipleSelectionsEnabled
-          ? t(`common.shuffleAndPlayAll`)
-          : t(`common.shuffleAndPlay`),
-        iconName: 'shuffle',
-        handlerFunction: () => {
-          if (isMultipleSelectionsEnabled) return playArtistSongsForMultipleSelections(true);
-          return playArtistSongs(true);
-        }
-      },
-      {
-        label: isMultipleSelectionsEnabled ? t(`common.addSongsToQueue`) : t(`common.addToQueue`),
-        iconName: 'queue',
-        handlerFunction: () => {
-          if (isMultipleSelectionsEnabled) {
-            const { multipleSelections: artistIds } = multipleSelectionsData;
-            return window.api.artistsData.getArtistData(artistIds).then((artists) => {
-              const songIds = artists.data
-                .map((artist) => artist.songs.map((song) => song.songId))
-                .flat();
-              const uniqueSongIds = [...new Set(songIds)];
-              getQueuesManager().getActiveQueue().addSongIdsToEnd(uniqueSongIds);
-              return addNewNotifications([
-                {
-                  id: `${uniqueSongIds.length}AddedToQueueFromMultiSelection`,
-                  duration: 5000,
-                  content: t(`notifications.addedToQueue`, {
-                    count: uniqueSongIds.length
-                  })
-                }
-              ]);
-            });
+      const items: ContextMenuItem[] = [
+        {
+          label: isMultipleSelectionsActive ? t(`artist.playAllSongs`) : t(`common.playAll`),
+          iconName: 'play_arrow',
+          handlerFunction: () => {
+            if (isMultipleSelectionsActive) return playArtistSongsForMultipleSelections();
+            return playArtistSongs();
           }
-          getQueuesManager().getActiveQueue().addSongIdsToEnd(props.songIds);
-          return addNewNotifications([
-            {
-              id: 'addSongsToQueue',
-              duration: 5000,
-              content: t(`notifications.addedToQueue`, {
+        },
+        {
+          label: isMultipleSelectionsActive
+            ? t(`common.shuffleAndPlayAll`)
+            : t(`common.shuffleAndPlay`),
+          iconName: 'shuffle',
+          handlerFunction: () => {
+            if (isMultipleSelectionsActive) return playArtistSongsForMultipleSelections(true);
+            return playArtistSongs(true);
+          }
+        },
+        {
+          label: isMultipleSelectionsActive ? t(`common.addSongsToQueue`) : t(`common.addToQueue`),
+          iconName: 'queue',
+          handlerFunction: () => {
+            if (isMultipleSelectionsActive) {
+              const { multipleSelections: artistIds } = multipleSelectionsData;
+              return window.api.artistsData.getArtistData(artistIds).then((artists) => {
+                const songIds = artists.data
+                  .map((artist) => artist.songs.map((song) => song.songId))
+                  .flat();
+                const uniqueSongIds = [...new Set(songIds)];
+                getQueuesManager().getActiveQueue().addSongIdsToEnd(uniqueSongIds);
+                return addNewNotifications([
+                  {
+                    id: `${uniqueSongIds.length}AddedToQueueFromMultiSelection`,
+                    duration: 5000,
+                    content: t(`notifications.addedToQueue`, {
+                      count: uniqueSongIds.length
+                    })
+                  }
+                ]);
+              });
+            }
+            getQueuesManager().getActiveQueue().addSongIdsToEnd(props.songIds);
+            return addNewNotifications([
+              {
+                id: 'addSongsToQueue',
+                duration: 5000,
+                content: t(`notifications.addedToQueue`, {
+                  count: props.songIds.length
+                })
+              }
+            ]);
+          }
+        },
+        {
+          label: 'Hr',
+          isContextMenuItemSeperator: true,
+          handlerFunction: () => true,
+          isDisabled: isMultipleSelectionsActive
+        },
+        {
+          label: t(
+            `artist.${isMultipleSelectionEnabled ? 'toggleLikeArtists' : isAFavorite ? 'dislikeArtist' : 'likeArtist'}`
+          ),
+          iconName: 'favorite',
+          iconClassName: isMultipleSelectionEnabled
+            ? 'material-icons-round-outlined mr-4 text-xl'
+            : isAFavorite
+              ? 'material-icons-round mr-4 text-xl text-font-color-favorite!'
+              : 'material-icons-round-outlined mr-4 text-xl',
+          handlerFunction: () => {
+            if (isMultipleSelectionEnabled) {
+              const { multipleSelections: artistIds } = multipleSelectionsData;
+
+              return window.api.artistsData
+                .toggleLikeArtists(artistIds)
+                .then((res) => {
+                  if (res && res.likes.length + res.dislikes.length > 0) {
+                    return setIsAFavorite((prevState) => {
+                      const isLiked = res.likes.includes(props.artistId);
+                      const isDisliked = res.dislikes.includes(props.artistId);
+
+                      return isLiked ? true : isDisliked ? false : prevState;
+                    });
+                  }
+                  return undefined;
+                })
+                .catch((err) => console.error(err));
+            }
+            return toggleLikeArtist();
+          }
+        },
+        {
+          label: t(`common.info`),
+          iconName: 'info',
+          iconClassName: 'material-icons-round-outlined',
+          handlerFunction: goToArtistInfoPage,
+          isDisabled: isMultipleSelectionsActive
+        },
+        {
+          label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
+          iconName: 'checklist',
+          handlerFunction: () => {
+            if (isMultipleSelectionEnabled) {
+              return updateMultipleSelections(
+                props.artistId,
+                'artist',
+                isAMultipleSelection ? 'remove' : 'add'
+              );
+            }
+            return toggleMultipleSelections(!isAMultipleSelection, 'artist', [props.artistId]);
+          }
+        }
+      ];
+
+      const itemData: ContextMenuAdditionalData =
+        isMultipleSelectionEnabled &&
+        multipleSelectionsData.selectionType === 'artist' &&
+        isAMultipleSelection
+          ? {
+              title: t(`artist.selectedArtistCount`, {
+                count: multipleSelectionsData.multipleSelections.length
+              }),
+              artworkPath: DefaultArtistCover
+            }
+          : {
+              title: props.name,
+              artworkPath:
+                props?.onlineArtworkPaths?.picture_small || props?.artworkPaths?.optimizedArtworkPath,
+              artworkClassName: 'rounded-full!',
+              subTitle: t(`common.songWithCount`, {
                 count: props.songIds.length
               })
-            }
-          ]);
-        }
-      },
-      {
-        label: 'Hr',
-        isContextMenuItemSeperator: true,
-        handlerFunction: () => true,
-        isDisabled: isMultipleSelectionsEnabled
-      },
-      {
-        label: t(
-          `artist.${isMultipleSelectionEnabled ? 'toggleLikeArtists' : isAFavorite ? 'dislikeArtist' : 'likeArtist'}`
-        ),
-        iconName: 'favorite',
-        iconClassName: isMultipleSelectionsEnabled
-          ? 'material-icons-round-outlined mr-4 text-xl'
-          : isAFavorite
-            ? 'material-icons-round mr-4 text-xl text-font-color-favorite!'
-            : 'material-icons-round-outlined mr-4 text-xl',
-        handlerFunction: () => {
-          if (isMultipleSelectionEnabled) {
-            const { multipleSelections: artistIds } = multipleSelectionsData;
+            };
 
-            return window.api.artistsData
-              .toggleLikeArtists(artistIds)
-              .then((res) => {
-                if (res && res.likes.length + res.dislikes.length > 0) {
-                  return setIsAFavorite((prevState) => {
-                    const isLiked = res.likes.includes(props.artistId);
-                    const isDisliked = res.dislikes.includes(props.artistId);
-
-                    return isLiked ? true : isDisliked ? false : prevState;
-                  });
-                }
-                return undefined;
-              })
-              .catch((err) => console.error(err));
-          }
-          return toggleLikeArtist();
-        }
-      },
-      {
-        label: t(`common.info`),
-        iconName: 'info',
-        iconClassName: 'material-icons-round-outlined',
-        handlerFunction: goToArtistInfoPage,
-        isDisabled: isMultipleSelectionsEnabled
-      },
-      {
-        label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
-        iconName: 'checklist',
-        handlerFunction: () => {
-          if (isMultipleSelectionEnabled) {
-            return updateMultipleSelections(
-              props.artistId,
-              'artist',
-              isAMultipleSelection ? 'remove' : 'add'
-            );
-          }
-          return toggleMultipleSelections(!isAMultipleSelection, 'artist', [props.artistId]);
-        }
-      }
-      // {
-      //   label: 'Select/Unselect All',
-      //   iconName: 'checklist',
-      //   isDisabled: !props.selectAllHandler,
-      //   handlerFunction: () =>
-      //     props.selectAllHandler && props.selectAllHandler(),
-      // },
-    ] satisfies ContextMenuItem[];
-  }, [
-    multipleSelectionsData,
-    isAMultipleSelection,
-    t,
-    isMultipleSelectionEnabled,
-    isAFavorite,
-    goToArtistInfoPage,
-    playArtistSongsForMultipleSelections,
-    playArtistSongs,
-    props.songIds,
-    props.artistId,
-    addNewNotifications,
-    toggleMultipleSelections,
-    updateMultipleSelections,
-    toggleLikeArtist
-  ]);
-
-  const contextMenuItemData = useMemo(
-    (): ContextMenuAdditionalData =>
-      isMultipleSelectionEnabled &&
-      multipleSelectionsData.selectionType === 'artist' &&
-      isAMultipleSelection
-        ? {
-            title: t(`artist.selectedArtistCount`, {
-              count: multipleSelectionsData.multipleSelections.length
-            }),
-            artworkPath: DefaultArtistCover
-          }
-        : {
-            title: props.name,
-            artworkPath:
-              props?.onlineArtworkPaths?.picture_small || props?.artworkPaths?.optimizedArtworkPath,
-            artworkClassName: 'rounded-full!',
-            subTitle: t(`common.songWithCount`, {
-              count: props.songIds.length
-            })
-          },
+      updateContextMenuData(true, items, e.pageX, e.pageY, itemData);
+    },
     [
+      addNewNotifications,
+      goToArtistInfoPage,
+      isAFavorite,
       isAMultipleSelection,
       isMultipleSelectionEnabled,
-      multipleSelectionsData.multipleSelections.length,
-      multipleSelectionsData.selectionType,
+      playArtistSongs,
+      playArtistSongsForMultipleSelections,
+      props.artistId,
       props?.artworkPaths?.optimizedArtworkPath,
       props.name,
       props?.onlineArtworkPaths?.picture_small,
-      props.songIds.length,
-      t
+      props.songIds,
+      t,
+      toggleLikeArtist,
+      toggleMultipleSelections,
+      updateContextMenuData,
+      updateMultipleSelections
     ]
   );
 
@@ -326,17 +313,14 @@ export const Artist = (props: ArtistProp) => {
       className={`artist ${appearFromBottom && 'appear-from-bottom'} fx-rise fx-spotlight group hover:bg-background-color-2/50 dark:hover:bg-dark-background-color-2/50 mr-2 flex h-44 w-40 cursor-pointer flex-col justify-between overflow-hidden rounded-lg p-4 transition-transform duration-200 ease-out hover:-translate-y-0.5 focus-visible:-translate-y-0.5 ${
         props.className ?? ''
       } ${isAMultipleSelection ? 'bg-background-color-3! dark:bg-dark-background-color-3!' : ''}`}
-      onContextMenu={(e) => {
-        e.stopPropagation();
-        updateContextMenuData(true, artistContextMenus, e.pageX, e.pageY, contextMenuItemData);
-      }}
+      onContextMenu={handleContextMenu}
       onClick={(e) => {
         e.preventDefault();
         if (e.getModifierState('Shift') === true && props.selectAllHandler)
           props.selectAllHandler(props.artistId);
         else if (e.getModifierState('Control') === true && !isMultipleSelectionEnabled)
           toggleMultipleSelections(!isAMultipleSelection, 'artist', [props.artistId]);
-        else if (isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist')
+        else if (isMultipleSelectionEnabled)
           updateMultipleSelections(
             props.artistId,
             'artist',
@@ -344,9 +328,21 @@ export const Artist = (props: ArtistProp) => {
           );
         else goToArtistInfoPage();
       }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (isMultipleSelectionEnabled)
+            updateMultipleSelections(
+              props.artistId,
+              'artist',
+              isAMultipleSelection ? 'remove' : 'add'
+            );
+          else goToArtistInfoPage();
+        }
+      }}
     >
       <div className="artist-img-container relative flex h-3/4 items-center justify-center">
-        {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'artist' ? (
+        {isMultipleSelectionEnabled ? (
           <MultipleSelectionCheckbox
             id={props.artistId}
             selectionType="artist"
@@ -408,4 +404,6 @@ export const Artist = (props: ArtistProp) => {
       </div>
     </div>
   );
-};
+});
+
+Artist.displayName = 'Artist';

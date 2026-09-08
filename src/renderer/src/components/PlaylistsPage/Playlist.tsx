@@ -5,7 +5,7 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Suspense, lazy, useCallback, useContext, useMemo, useState } from 'react';
+import { Suspense, lazy, memo, useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
@@ -36,18 +36,27 @@ interface PlaylistProp extends PlaylistDto {
   selectAllHandler?: (_upToId?: number) => void;
 }
 
-export const Playlist = (props: PlaylistProp) => {
+export const Playlist = memo((props: PlaylistProp) => {
   const isMultipleSelectionEnabled = useStore(
     store,
-    (state) => state.multipleSelectionsData.isEnabled
+    (state) =>
+      state.multipleSelectionsData.isEnabled && state.multipleSelectionsData.selectionType === 'playlist'
   );
-  const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
+  const isAMultipleSelection = useStore(
+    store,
+    useCallback(
+      (state) =>
+        state.multipleSelectionsData.isEnabled &&
+        state.multipleSelectionsData.selectionType === 'playlist' &&
+        state.multipleSelectionsData.multipleSelections.includes(props.id),
+      [props.id]
+    )
+  );
 
   const {
-    updateQueueData,
+    createQueue,
     updateContextMenuData,
     changePromptMenuData,
-    createQueue,
     toggleMultipleSelections,
     updateMultipleSelections,
     addNewNotifications
@@ -68,15 +77,6 @@ export const Playlist = (props: PlaylistProp) => {
       }),
     [navigate, props.id]
   );
-
-  const isAMultipleSelection = useMemo(() => {
-    if (!multipleSelectionsData.isEnabled) return false;
-    if (multipleSelectionsData.selectionType !== 'playlist') return false;
-    if (multipleSelectionsData.multipleSelections.length <= 0) return false;
-    if (multipleSelectionsData.multipleSelections.some((selectionId) => selectionId === props.id))
-      return true;
-    return false;
-  }, [multipleSelectionsData, props.id]);
 
   const playAllSongs = useCallback(
     (isShuffling = false) => {
@@ -109,7 +109,7 @@ export const Playlist = (props: PlaylistProp) => {
 
   const playAllSongsForMultipleSelections = useCallback(
     (isShuffling = false) => {
-      const { multipleSelections: playlistIds } = multipleSelectionsData;
+      const { multipleSelections: playlistIds } = store.state.multipleSelectionsData;
 
       Promise.all(playlistIds.map((id) => getPlaylistSongIds(id)))
         .then((results) => {
@@ -132,11 +132,11 @@ export const Playlist = (props: PlaylistProp) => {
         })
         .catch((err) => console.error(err));
     },
-    [createQueue, multipleSelectionsData]
+    [createQueue]
   );
 
   const addToQueueForMultipleSelections = useCallback(() => {
-    const { multipleSelections: playlistIds } = multipleSelectionsData;
+    const { multipleSelections: playlistIds } = store.state.multipleSelectionsData;
 
     Promise.all(playlistIds.map((id) => getPlaylistSongIds(id)))
       .then((results) => {
@@ -160,259 +160,258 @@ export const Playlist = (props: PlaylistProp) => {
         }
       })
       .catch((err) => console.error(err));
-  }, [addNewNotifications, multipleSelectionsData, t]);
+  }, [addNewNotifications, t]);
 
-  const contextMenus: ContextMenuItem[] = useMemo(() => {
-    const { multipleSelections: playlistIds } = multipleSelectionsData;
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    return [
-      {
-        label: t('common.play'),
-        iconName: 'play_arrow',
-        handlerFunction: () => {
-          if (isMultipleSelectionEnabled) playAllSongsForMultipleSelections();
-          else playAllSongs();
+      const { multipleSelectionsData } = store.state;
+      const { multipleSelections: playlistIds } = multipleSelectionsData;
+
+      const items: ContextMenuItem[] = [
+        {
+          label: t('common.play'),
+          iconName: 'play_arrow',
+          handlerFunction: () => {
+            if (isMultipleSelectionEnabled) playAllSongsForMultipleSelections();
+            else playAllSongs();
+          },
+          isDisabled: isMultipleSelectionEnabled
+            ? false
+            : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
         },
-        isDisabled: isMultipleSelectionEnabled
-          ? false
-          : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
-      },
-      {
-        label: t('common.shuffleAndPlay'),
-        iconName: 'shuffle',
-        handlerFunction: () => {
-          if (isMultipleSelectionEnabled) playAllSongsForMultipleSelections(true);
-          else playAllSongs(true);
+        {
+          label: t('common.shuffleAndPlay'),
+          iconName: 'shuffle',
+          handlerFunction: () => {
+            if (isMultipleSelectionEnabled) playAllSongsForMultipleSelections(true);
+            else playAllSongs(true);
+          },
+          isDisabled: isMultipleSelectionEnabled
+            ? false
+            : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
         },
-        isDisabled: isMultipleSelectionEnabled
-          ? false
-          : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
-      },
-      {
-        label: t('common.addToQueue'),
-        iconName: 'queue_music',
-        handlerFunction: () => {
-          if (isMultipleSelectionEnabled) addToQueueForMultipleSelections();
-          else {
-            getPlaylistSongIds(props.id)
-              .then((songIds) => {
-                getQueuesManager().getActiveQueue().addSongIdsToEnd(songIds);
-                addNewNotifications([
+        {
+          label: t('common.addToQueue'),
+          iconName: 'queue_music',
+          handlerFunction: () => {
+            if (isMultipleSelectionEnabled) addToQueueForMultipleSelections();
+            else {
+              getPlaylistSongIds(props.id)
+                .then((songIds) => {
+                  getQueuesManager().getActiveQueue().addSongIdsToEnd(songIds);
+                  addNewNotifications([
+                    {
+                      id: 'newSongsToQueue',
+                      content: t('notifications.addedToQueue', {
+                        count: songIds.length
+                      })
+                    }
+                  ]);
+                })
+                .catch(console.error);
+            }
+          },
+          isDisabled: isMultipleSelectionEnabled
+            ? false
+            : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
+        },
+        {
+          label: 'Hr',
+          isContextMenuItemSeperator: true,
+          handlerFunction: () => true,
+          isDisabled: isMultipleSelectionEnabled
+            ? false
+            : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
+        },
+        {
+          label: t(`playlist.${props.artworkPath ? 'changeArtwork' : 'addArtwork'}`),
+          iconName: 'photo_camera',
+          handlerFunction: () => {
+            window.api.songUpdates
+              .getImgFileLocation()
+              .then((artworkPath) => {
+                if (artworkPath) {
+                  return CollectionClient.setArtwork(props.id, artworkPath);
+                }
+                return undefined;
+              })
+              .then(() => {
+                return addNewNotifications([
                   {
-                    id: 'newSongsToQueue',
-                    content: t('notifications.addedToQueue', {
-                      count: songIds.length
-                    })
+                    content: t('playlist.playlistArtworkUpdateSuccess'),
+                    icon: <span className="material-icons-round">done</span>,
+                    duration: 5000,
+                    id: 'PlaylistArtworkUpdateSuccessful'
                   }
                 ]);
               })
-              .catch(console.error);
-          }
-        },
-        isDisabled: isMultipleSelectionEnabled
-          ? false
-          : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
-      },
-      {
-        label: 'Hr',
-        isContextMenuItemSeperator: true,
-        handlerFunction: () => true,
-        isDisabled: isMultipleSelectionEnabled
-          ? false
-          : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
-      },
-      {
-        label: t(`playlist.${props.artworkPath ? 'changeArtwork' : 'addArtwork'}`),
-        iconName: 'photo_camera',
-        handlerFunction: () => {
-          window.api.songUpdates
-            .getImgFileLocation()
-            .then((artworkPath) => {
-              if (artworkPath) {
-                return CollectionClient.setArtwork(props.id, artworkPath);
-              }
-              return undefined;
-            })
-            .then(() => {
-              return addNewNotifications([
-                {
-                  content: t('playlist.playlistArtworkUpdateSuccess'),
-                  icon: <span className="material-icons-round">done</span>,
-                  duration: 5000,
-                  id: 'PlaylistArtworkUpdateSuccessful'
-                }
-              ]);
-            })
-            .catch((err) => console.error(err));
-        },
-        isDisabled: isMultipleSelectionEnabled
-          ? false
-          : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
-      },
-      {
-        label: t('playlist.renamePlaylist'),
-        iconName: 'edit',
-        handlerFunction: () => {
-          changePromptMenuData(true, <RenamePlaylistPrompt playlistData={props} />);
-        },
-        isDisabled: isMultipleSelectionEnabled
-          ? false
-          : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
-      },
-      {
-        label: t('playlistsPage.editCover', 'Edit Cover'),
-        iconName: 'grid_view',
-        handlerFunction: () => {
-          CollectionClient.getEntries(props.id)
-            .then((entries) => {
-              const ids = (entries || []).map((e) => e.songId);
-              if (ids.length === 0) return [];
-              return window.api.audioLibraryControls.getSongInfo(ids);
-            })
-            .then((songs) => {
-              changePromptMenuData(
-                true,
-                <PlaylistCoverSettingsPrompt playlist={props} playlistSongs={songs || []} />,
-                'max-w-5xl w-full min-w-0',
-                { mode: 'workspace', scrollBehavior: 'content' }
-              );
-            })
-            .catch((err) => console.error(err));
-        },
-        isDisabled: isMultipleSelectionEnabled
-          ? false
-          : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
-      },
-      {
-        label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
-        iconName: 'checklist',
-        handlerFunction: () => {
-          if (isMultipleSelectionEnabled) {
-            updateMultipleSelections(props.id, 'playlist', isAMultipleSelection ? 'remove' : 'add');
-          } else toggleMultipleSelections(!isAMultipleSelection, 'playlist', [props.id]);
-        }
-      },
-      {
-        label: t('playlist.exportPlaylist'),
-        iconName: 'upload',
-        handlerFunction: () => {
-          changePromptMenuData(
-            true,
-            <Suspense fallback={null}>
-              <PlaylistExportSettingsPrompt playlistId={props.id} />
-            </Suspense>
-          );
-        },
-        isDisabled: isMultipleSelectionEnabled
-      },
-      {
-        label: t(
-          props.isPinned ? 'playlist.unpinPlaylist' : 'playlist.pinPlaylist',
-          props.isPinned ? 'Unpin Playlist' : 'Pin Playlist'
-        ),
-        iconName: 'push_pin',
-        handlerFunction: () => {
-          if (props.isPinned) {
-            unpinMutation.mutate({ playlistId: props.id });
-          } else {
-            pinMutation.mutate({ playlistId: props.id });
-          }
-        },
-        isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
-      },
-      {
-        label: t('playlist.importIntoPlaylist', 'Import M3U into Playlist'),
-        iconName: 'publish',
-        handlerFunction: () => window.api.collections.import({ targetPlaylistId: props.id }),
-        isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
-      },
-      {
-        label: 'Export to Spotify',
-        iconName: 'ios_share',
-        handlerFunction: () => setIsSpotifyExportModalOpen(true),
-        isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
-      },
-      {
-        label: 'Sync with Spotify',
-        iconName: 'sync_alt',
-        handlerFunction: () => setIsSpotifySyncModalOpen(true),
-        isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
-      },
-      {
-        label: t('common.info'),
-        iconName: 'info',
-        handlerFunction: openPlaylistInfoPage,
-        isDisabled: isMultipleSelectionEnabled
-      },
-      {
-        label: 'Hr',
-        isContextMenuItemSeperator: true,
-        handlerFunction: () => true,
-        isDisabled: isMultipleSelectionEnabled
-          ? false
-          : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
-      },
-      {
-        label: t(
-          `playlist.${isMultipleSelectionEnabled ? 'deleteSelectedPlaylists' : 'deletePlaylist_one'}`
-        ),
-        iconName: 'delete_outline',
-        handlerFunction: () => {
-          changePromptMenuData(
-            true,
-            <ConfirmDeletePlaylistsPrompt
-              playlistIds={isMultipleSelectionEnabled ? playlistIds : [props.id]}
-              playlistName={props.name}
-            />
-          );
-          toggleMultipleSelections(false);
-        },
-        isDisabled: isMultipleSelectionEnabled
-          ? false
-          : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
-      }
-    ];
-  }, [
-    addNewNotifications,
-    addToQueueForMultipleSelections,
-    changePromptMenuData,
-    isAMultipleSelection,
-    isMultipleSelectionEnabled,
-    multipleSelectionsData,
-    openPlaylistInfoPage,
-    playAllSongs,
-    playAllSongsForMultipleSelections,
-    props,
-    t,
-    toggleMultipleSelections,
-    updateMultipleSelections
-  ]);
-
-  const contextMenuItemData = useMemo(
-    (): ContextMenuAdditionalData =>
-      isMultipleSelectionEnabled &&
-      multipleSelectionsData.selectionType === 'playlist' &&
-      isAMultipleSelection
-        ? {
-            title: t('playlist.selectedPlaylistCount', {
-              count: multipleSelectionsData.multipleSelections.length
-            }),
-            artworkPath: DefaultPlaylistCover
-          }
-        : {
-            title: props.name,
-            artworkPath: props.artworkPath || DefaultPlaylistCover,
-            subTitle: t('common.songWithCount', { count: props.itemCount })
+              .catch((err) => console.error(err));
           },
+          isDisabled: isMultipleSelectionEnabled
+            ? false
+            : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
+        },
+        {
+          label: t('playlist.renamePlaylist'),
+          iconName: 'edit',
+          handlerFunction: () => {
+            changePromptMenuData(true, <RenamePlaylistPrompt playlistData={props} />);
+          },
+          isDisabled: isMultipleSelectionEnabled
+            ? false
+            : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
+        },
+        {
+          label: t('playlistsPage.editCover', 'Edit Cover'),
+          iconName: 'grid_view',
+          handlerFunction: () => {
+            CollectionClient.getEntries(props.id)
+              .then((entries) => {
+                const ids = (entries || []).map((e) => e.songId);
+                if (ids.length === 0) return [];
+                return window.api.audioLibraryControls.getSongInfo(ids);
+              })
+              .then((songs) => {
+                changePromptMenuData(
+                  true,
+                  <PlaylistCoverSettingsPrompt playlist={props} playlistSongs={songs || []} />,
+                  'max-w-5xl w-full min-w-0',
+                  { mode: 'workspace', scrollBehavior: 'content' }
+                );
+              })
+              .catch((err) => console.error(err));
+          },
+          isDisabled: isMultipleSelectionEnabled
+            ? false
+            : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
+        },
+        {
+          label: t(`common.${isAMultipleSelection ? 'unselect' : 'select'}`),
+          iconName: 'checklist',
+          handlerFunction: () => {
+            if (isMultipleSelectionEnabled) {
+              updateMultipleSelections(props.id, 'playlist', isAMultipleSelection ? 'remove' : 'add');
+            } else toggleMultipleSelections(!isAMultipleSelection, 'playlist', [props.id]);
+          }
+        },
+        {
+          label: t('playlist.exportPlaylist'),
+          iconName: 'upload',
+          handlerFunction: () => {
+            changePromptMenuData(
+              true,
+              <Suspense fallback={null}>
+                <PlaylistExportSettingsPrompt playlistId={props.id} />
+              </Suspense>
+            );
+          },
+          isDisabled: isMultipleSelectionEnabled
+        },
+        {
+          label: t(
+            props.isPinned ? 'playlist.unpinPlaylist' : 'playlist.pinPlaylist',
+            props.isPinned ? 'Unpin Playlist' : 'Pin Playlist'
+          ),
+          iconName: 'push_pin',
+          handlerFunction: () => {
+            if (props.isPinned) {
+              unpinMutation.mutate({ playlistId: props.id });
+            } else {
+              pinMutation.mutate({ playlistId: props.id });
+            }
+          },
+          isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
+        },
+        {
+          label: t('playlist.importIntoPlaylist', 'Import M3U into Playlist'),
+          iconName: 'publish',
+          handlerFunction: () => window.api.collections.import({ targetPlaylistId: props.id }),
+          isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
+        },
+        {
+          label: 'Export to Spotify',
+          iconName: 'ios_share',
+          handlerFunction: () => setIsSpotifyExportModalOpen(true),
+          isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
+        },
+        {
+          label: 'Sync with Spotify',
+          iconName: 'sync_alt',
+          handlerFunction: () => setIsSpotifySyncModalOpen(true),
+          isDisabled: isMultipleSelectionEnabled || SpecialPlaylists.isSpecialPlaylistId(props.id)
+        },
+        {
+          label: t('common.info'),
+          iconName: 'info',
+          handlerFunction: openPlaylistInfoPage,
+          isDisabled: isMultipleSelectionEnabled
+        },
+        {
+          label: 'Hr',
+          isContextMenuItemSeperator: true,
+          handlerFunction: () => true,
+          isDisabled: isMultipleSelectionEnabled
+            ? false
+            : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
+        },
+        {
+          label: t(
+            `playlist.${isMultipleSelectionEnabled ? 'deleteSelectedPlaylists' : 'deletePlaylist_one'}`
+          ),
+          iconName: 'delete_outline',
+          handlerFunction: () => {
+            changePromptMenuData(
+              true,
+              <ConfirmDeletePlaylistsPrompt
+                playlistIds={isMultipleSelectionEnabled ? playlistIds : [props.id]}
+                playlistName={props.name}
+              />
+            );
+            toggleMultipleSelections(false);
+          },
+          isDisabled: isMultipleSelectionEnabled
+            ? false
+            : props.id === SpecialPlaylists.Favorites || props.id === SpecialPlaylists.History
+        }
+      ];
+
+      const itemData: ContextMenuAdditionalData =
+        isMultipleSelectionEnabled &&
+        multipleSelectionsData.selectionType === 'playlist' &&
+        isAMultipleSelection
+          ? {
+              title: t('playlist.selectedPlaylistCount', {
+                count: multipleSelectionsData.multipleSelections.length
+              }),
+              artworkPath: DefaultPlaylistCover
+            }
+          : {
+              title: props.name,
+              artworkPath: props.artworkPath || DefaultPlaylistCover,
+              subTitle: t('common.songWithCount', { count: props.itemCount })
+            };
+
+      updateContextMenuData(true, items, e.pageX, e.pageY, itemData);
+    },
     [
+      addNewNotifications,
+      addToQueueForMultipleSelections,
+      changePromptMenuData,
       isAMultipleSelection,
       isMultipleSelectionEnabled,
-      multipleSelectionsData.multipleSelections.length,
-      multipleSelectionsData.selectionType,
-      props.artworkPath,
-      props.name,
-      props.itemCount,
-      t
+      openPlaylistInfoPage,
+      pinMutation,
+      playAllSongs,
+      playAllSongsForMultipleSelections,
+      props,
+      t,
+      toggleMultipleSelections,
+      unpinMutation,
+      updateContextMenuData,
+      updateMultipleSelections
     ]
   );
 
@@ -430,21 +429,15 @@ export const Playlist = (props: PlaylistProp) => {
             : ''
         }`}
         data-playlist-id={props.id}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          updateContextMenuData(true, contextMenus, e.pageX, e.pageY, contextMenuItemData);
-        }}
+        onContextMenu={handleContextMenu}
         onClick={(e) => {
           e.preventDefault();
+          const { multipleSelectionsData } = store.state;
           if (e.getModifierState('Shift') === true && props.selectAllHandler)
             props.selectAllHandler(props.id);
           else if (e.getModifierState('Control') === true && !isMultipleSelectionEnabled)
             toggleMultipleSelections(!isAMultipleSelection, 'playlist', [props.id]);
-          else if (
-            isMultipleSelectionEnabled &&
-            multipleSelectionsData.selectionType === 'playlist'
-          )
+          else if (isMultipleSelectionEnabled)
             updateMultipleSelections(props.id, 'playlist', isAMultipleSelection ? 'remove' : 'add');
           else openPlaylistInfoPage();
         }}
@@ -459,7 +452,7 @@ export const Playlist = (props: PlaylistProp) => {
               <span className="material-icons-round text-sm">push_pin</span>
             </div>
           )}
-          {isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'playlist' ? (
+          {isMultipleSelectionEnabled ? (
             <MultipleSelectionCheckbox
               id={props.id}
               selectionType="playlist"
@@ -488,10 +481,7 @@ export const Playlist = (props: PlaylistProp) => {
             }`}
             tooltipLabel={props.name}
             clickHandler={() => {
-              if (
-                isMultipleSelectionEnabled &&
-                multipleSelectionsData.selectionType === 'playlist'
-              ) {
+              if (isMultipleSelectionEnabled) {
                 updateMultipleSelections(
                   props.id,
                   'playlist',
@@ -524,5 +514,8 @@ export const Playlist = (props: PlaylistProp) => {
       />
     </>
   );
-};
+});
+
+Playlist.displayName = 'Playlist';
+
 export default Playlist;
