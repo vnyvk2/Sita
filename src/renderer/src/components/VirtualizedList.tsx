@@ -49,9 +49,14 @@ const PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT = 5;
 const DefaultScrollSeekPlaceholder = (props: ScrollSeekPlaceholderProps) => (
   <div
     style={{ height: `${props.height}px` }}
-    className="relative w-full items-center overflow-hidden opacity-40 select-none"
+    className="relative w-full overflow-hidden select-none"
     aria-hidden="true"
-  />
+  >
+    <div className="bg-background-color-1! dark:bg-dark-background-color-1! mx-3 my-1 flex h-[calc(100%-8px)] items-center gap-2 rounded-lg px-2">
+      <div className="bg-background-color-2! dark:bg-dark-background-color-2! aspect-square h-[85%] shrink-0 rounded-md opacity-60" />
+      <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-3.5 w-[40%] rounded-full opacity-60" />
+    </div>
+  </div>
 );
 
 const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<VirtuosoHandle>) => {
