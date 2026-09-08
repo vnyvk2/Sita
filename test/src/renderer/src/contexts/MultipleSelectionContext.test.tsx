@@ -3,6 +3,7 @@ import { renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import {
+  getSelectedIdSet,
   getSelectedSongsSet,
   useSongSelection
 } from '../../../../../src/renderer/src/contexts/MultipleSelectionContext';
@@ -10,16 +11,18 @@ import { dispatch } from '../../../../../src/renderer/src/store/store';
 
 describe('MultipleSelectionContext', () => {
   it('constructs Set once per array reference and performs O(1) lookups', () => {
+    expect(getSelectedIdSet).toBe(getSelectedSongsSet);
+
     const array1 = [10, 20, 30];
-    const set1 = getSelectedSongsSet(array1);
-    const set2 = getSelectedSongsSet(array1);
+    const set1 = getSelectedIdSet(array1);
+    const set2 = getSelectedIdSet(array1);
 
     expect(set1).toBe(set2); // Stable cached reference
     expect(set1.has(10)).toBe(true);
     expect(set1.has(99)).toBe(false);
 
     const array2 = [10, 20, 30, 40];
-    const set3 = getSelectedSongsSet(array2);
+    const set3 = getSelectedIdSet(array2);
     expect(set3).not.toBe(set1);
     expect(set3.has(40)).toBe(true);
   });

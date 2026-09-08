@@ -6,8 +6,11 @@ const selectionSetCache = new WeakMap<number[], Set<number>>();
 /**
  * Returns a memoized Set<number> derived from the canonical multipleSelections array reference.
  * Garbage-collected automatically when the array reference is replaced.
+ * Generic over all selection types (songs, albums, artists, genres, playlists):
+ * every card selector shares one Set build per array identity instead of
+ * each running an O(N) Array.includes scan per store dispatch.
  */
-export function getSelectedSongsSet(selections: number[]): Set<number> {
+export function getSelectedIdSet(selections: number[]): Set<number> {
   let set = selectionSetCache.get(selections);
   if (!set) {
     set = new Set(selections);
@@ -15,6 +18,9 @@ export function getSelectedSongsSet(selections: number[]): Set<number> {
   }
   return set;
 }
+
+/** Alias kept for existing song-row callers. */
+export const getSelectedSongsSet = getSelectedIdSet;
 
 /**
  * Hook to check if a specific song is selected in constant O(1) time. Automatically bails out of

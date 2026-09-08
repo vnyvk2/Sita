@@ -117,7 +117,8 @@ export interface KeyboardShortcutDependencies {
  */
 export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies): void {
   const navigate = useNavigate();
-  const { history } = useRouter();
+  const router = useRouter();
+  const { history } = router;
   const { toggleOverlay } = useOverlayNavigation();
   const { t } = useTranslation();
   const player = useAudioPlayer();
@@ -306,7 +307,7 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             }
             break;
           case 'appShortcutsPrompt.goToLyrics':
-            if (location.pathname.startsWith('/main-player/lyrics')) {
+            if (router.state.location.pathname.startsWith('/main-player/lyrics')) {
               history.back();
             } else {
               dispatch({ type: 'TOGGLE_LYRICS_DRAWER' });
@@ -472,7 +473,8 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
       toggleMultipleSelections,
       changePromptMenuData,
       player,
-      history
+      history,
+      router
     ]
   );
 

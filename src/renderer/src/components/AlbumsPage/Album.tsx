@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import DefaultAlbumCover from '../../assets/images/webp/album_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { getSelectedIdSet } from '../../contexts/MultipleSelectionContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
@@ -45,7 +46,7 @@ export const Album = memo((props: AlbumProp) => {
       (state) =>
         state.multipleSelectionsData.isEnabled &&
         state.multipleSelectionsData.selectionType === 'album' &&
-        state.multipleSelectionsData.multipleSelections.includes(props.albumId),
+        getSelectedIdSet(state.multipleSelectionsData.multipleSelections).has(props.albumId),
       [props.albumId]
     )
   );

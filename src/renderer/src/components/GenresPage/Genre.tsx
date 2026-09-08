@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import DefaultGenreCover from '../../assets/images/webp/genre-cover-default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { getSelectedIdSet } from '../../contexts/MultipleSelectionContext';
 import Button from '../Button';
 import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
@@ -36,7 +37,7 @@ const Genre = memo((props: GenreProp) => {
       (state) =>
         state.multipleSelectionsData.isEnabled &&
         state.multipleSelectionsData.selectionType === 'genre' &&
-        state.multipleSelectionsData.multipleSelections.includes(genreId),
+        getSelectedIdSet(state.multipleSelectionsData.multipleSelections).has(genreId),
       [genreId]
     )
   );

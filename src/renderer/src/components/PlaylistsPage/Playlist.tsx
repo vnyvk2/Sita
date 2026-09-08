@@ -5,11 +5,12 @@ import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Suspense, lazy, memo, useCallback, useContext, useMemo, useState } from 'react';
+import { Suspense, lazy, memo, useCallback, useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultPlaylistCover from '../../assets/images/webp/playlist_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { getSelectedIdSet } from '../../contexts/MultipleSelectionContext';
 import {
   usePinCollection,
   useUnpinCollection
@@ -48,7 +49,7 @@ export const Playlist = memo((props: PlaylistProp) => {
       (state) =>
         state.multipleSelectionsData.isEnabled &&
         state.multipleSelectionsData.selectionType === 'playlist' &&
-        state.multipleSelectionsData.multipleSelections.includes(props.id),
+        getSelectedIdSet(state.multipleSelectionsData.multipleSelections).has(props.id),
       [props.id]
     )
   );
@@ -432,7 +433,6 @@ export const Playlist = memo((props: PlaylistProp) => {
         onContextMenu={handleContextMenu}
         onClick={(e) => {
           e.preventDefault();
-          const { multipleSelectionsData } = store.state;
           if (e.getModifierState('Shift') === true && props.selectAllHandler)
             props.selectAllHandler(props.id);
           else if (e.getModifierState('Control') === true && !isMultipleSelectionEnabled)

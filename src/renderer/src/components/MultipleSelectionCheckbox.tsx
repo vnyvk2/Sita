@@ -2,6 +2,7 @@ import { useStore } from '@tanstack/react-store';
 import { memo, useContext } from 'react';
 
 import { AppUpdateContext } from '../contexts/AppUpdateContext';
+import { getSelectedIdSet } from '../contexts/MultipleSelectionContext';
 import { store } from '../store/store';
 import Checkbox from './Checkbox';
 
@@ -18,7 +19,7 @@ const MultipleSelectionCheckbox = memo(function MultipleSelectionCheckbox(props:
     store,
     (state) =>
       state.multipleSelectionsData.selectionType === selectionType &&
-      state.multipleSelectionsData.multipleSelections.includes(id)
+      getSelectedIdSet(state.multipleSelectionsData.multipleSelections).has(id)
   );
   const isEnabled = useStore(store, (state) => state.multipleSelectionsData.isEnabled);
 
