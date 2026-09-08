@@ -22,7 +22,9 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
     let stat: Stats;
     try {
       stat = await fsp.stat(filePath);
-    } catch {
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code && code !== 'ENOENT') throw err;
       logger.warn('File not found via nora:// protocol', { url: req.url, filePath });
       return new Response('File not found', { status: 404 });
     }

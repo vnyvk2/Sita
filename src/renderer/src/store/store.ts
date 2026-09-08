@@ -57,6 +57,15 @@ export const flushPendingLocalStorage = () => {
   }
 };
 
+export const __resetPersistenceForTesting = () => {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  pendingLocalStorage = null;
+  prevLocalStorage = store.state?.localStorage;
+};
+
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', flushPendingLocalStorage);
 }
@@ -84,8 +93,14 @@ store.subscribe((state) => {
   prevLocalStorage = currentLocal;
 
   if (queueChanged) {
-    // Immediate persist on critical queue updates to ensure restart/crash recovery
-    flushPendingLocalStorage();
+    // Immediate persist on critical queue updates to ensure restart/crash recovery.
+    // Discard any debounced prefs snapshot: currentLocal already supersedes it
+    // (state is cumulative), so writing both would be a redundant double-write.
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    pendingLocalStorage = null;
     storage.setLocalStorage(currentLocal);
   } else {
     // Debounce non-critical preferences, appearance, sorting changes (250ms)

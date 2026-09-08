@@ -17,28 +17,30 @@ function useSelectAllHandler(
 ): (upToId?: number) => void;
 
 // Overload 2: Array of objects with an ID property
-function useSelectAllHandler<Obj extends Record<string, unknown>>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function useSelectAllHandler<Obj extends Record<string, any>>(
   arr: Obj[],
   selectionType: QueueTypes,
   idProperty: keyof Obj
 ): (upToId?: number) => void;
 
 // Implementation
-function useSelectAllHandler<Obj extends Record<string, unknown>>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function useSelectAllHandler<Obj extends Record<string, any>>(
   arr: Obj[] | number[],
   selectionType: QueueTypes,
   idProperty?: keyof Obj
 ) {
   const { toggleMultipleSelections } = useContext(AppUpdateContext);
 
-  // Extract flat ID array and build O(1) index map
+  // Extract flat ID array and build O(1) index map.
+  // Branch on overload shape (idProperty presence), not on arr[0] inspection,
+  // so empty number[] correctly resolves to [] instead of falling through.
   const { idList, indexById } = useMemo(() => {
-    const isNumberArray = arr.length > 0 && typeof arr[0] === 'number';
-    const ids: number[] = isNumberArray
-      ? (arr as number[])
-      : idProperty
-        ? (arr as Obj[]).map((prop) => prop[idProperty] as number)
-        : [];
+    const ids: number[] =
+      idProperty === undefined
+        ? (arr as number[])
+        : (arr as Obj[]).map((prop) => prop[idProperty] as number);
 
     const map = new Map<number, number>();
     for (let i = 0; i < ids.length; i += 1) {

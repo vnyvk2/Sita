@@ -186,4 +186,66 @@ describe('useSelectAllHandler Hook', () => {
     expect(toggleMultipleSelectionsMock).toHaveBeenCalledTimes(1);
     expect(toggleMultipleSelectionsMock).toHaveBeenCalledWith(true, 'songs', [5], true);
   });
+
+  it('Flat number[] overload: selects all items and supports shift-click range selection', () => {
+    const flatIds = [101, 102, 103, 104, 105];
+    const { result } = renderHook(() => useSelectAllHandler(flatIds, 'songs'), {
+      wrapper: createWrapper()
+    });
+
+    // Shift click to select range up to 103 starting with 101 selected
+    act(() => {
+      dispatch({
+        type: 'UPDATE_MULTIPLE_SELECTIONS_DATA',
+        data: {
+          isEnabled: true,
+          selectionType: 'songs',
+          multipleSelections: [101]
+        }
+      });
+    });
+
+    act(() => {
+      result.current(103);
+    });
+
+    expect(toggleMultipleSelectionsMock).toHaveBeenCalledTimes(1);
+    expect(toggleMultipleSelectionsMock).toHaveBeenCalledWith(
+      true,
+      'songs',
+      [101, 102, 103],
+      true
+    );
+
+    // Ctrl-A: Select all
+    act(() => {
+      result.current();
+    });
+
+    expect(toggleMultipleSelectionsMock).toHaveBeenCalledTimes(2);
+    expect(toggleMultipleSelectionsMock.mock.calls[1][2]).toEqual([101, 102, 103, 104, 105]);
+  });
+
+  it('Empty number[] array: handles empty array cleanly without crashing or unexpected selections', () => {
+    const emptyIds: number[] = [];
+    const { result } = renderHook(() => useSelectAllHandler(emptyIds, 'songs'), {
+      wrapper: createWrapper()
+    });
+
+    // Calling select all on empty list
+    act(() => {
+      result.current();
+    });
+
+    expect(toggleMultipleSelectionsMock).toHaveBeenCalledTimes(1);
+    expect(toggleMultipleSelectionsMock).toHaveBeenCalledWith(true, 'songs', [], true);
+
+    // Shift click on an ID when list is empty
+    act(() => {
+      result.current(42);
+    });
+
+    expect(toggleMultipleSelectionsMock).toHaveBeenCalledTimes(2);
+    expect(toggleMultipleSelectionsMock).toHaveBeenCalledWith(true, 'songs', [42], true);
+  });
 });

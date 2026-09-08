@@ -21,6 +21,8 @@ export const DEFAULT_SCROLL_SEEK_CONFIG: ScrollSeekConfiguration = {
 
 export const DEFAULT_LIST_OVERSCAN = { main: 300, reverse: 150 };
 
+const EMPTY_COMPONENTS = {};
+
 type Props<T, C = unknown> = {
   data: readonly T[];
   fixedItemHeight: number;
@@ -60,7 +62,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
     scrollTopOffset,
     initialItemCount,
     itemContent,
-    components = {},
+    components = EMPTY_COMPONENTS as Components<T, C>,
     scrollerRef,
     useWindowScroll = false,
     style,

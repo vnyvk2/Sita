@@ -153,4 +153,20 @@ describe('Production handleFileProtocol Deterministic Tests', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('ETag')).toBeDefined();
   });
+
+  it('rethrows non-ENOENT filesystem errors (e.g. EACCES) resulting in 500 Internal Server Error', async () => {
+    const fileUrl = addDefaultAppProtocolToFilePath(sampleFilePath);
+    const req = new Request(fileUrl);
+
+    // Mock fsp.stat to reject with EACCES
+    const statSpy = vi.spyOn(fs.promises, 'stat').mockRejectedValueOnce(
+      Object.assign(new Error('Permission denied'), { code: 'EACCES' })
+    );
+
+    const res = await handleFileProtocol(req as any);
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe('Internal Server Error');
+
+    statSpy.mockRestore();
+  });
 });
