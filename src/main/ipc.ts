@@ -56,6 +56,8 @@ import toggleLikeArtists from './core/toggleLikeArtists';
 import toggleLikeSongs from './core/toggleLikeSongs';
 import updateSongListeningData from './core/updateSongListeningData';
 import { getAlbumSummaries, getAlbumSongIds } from './db/queries/albums';
+import { getArtistSummaries, getArtistSongIds } from './db/queries/artists';
+import { getGenreSummaries, getGenreSongIds } from './db/queries/genres';
 import {
   getListeningAnalytics,
   getLibraryAudioStats,
@@ -590,10 +592,31 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     );
 
     ipcMain.handle(
+      'app/getArtistSummaries',
+      (
+        _,
+        sortType?: ArtistSortTypes,
+        filterType?: ArtistFilterTypes,
+        start?: number,
+        end?: number
+      ) => getArtistSummaries({ sortType, filterType, start, end })
+    );
+
+    ipcMain.handle('app/getArtistSongIds', (_, artistId: number) => getArtistSongIds(artistId));
+
+    ipcMain.handle(
       'app/getGenresData',
       (_, genreNamesOrIds?: string[], sortType?: GenreSortTypes, start?: number, end?: number) =>
         getGenresInfo(genreNamesOrIds, sortType, start, end)
     );
+
+    ipcMain.handle(
+      'app/getGenreSummaries',
+      (_, sortType?: GenreSortTypes, start?: number, end?: number) =>
+        getGenreSummaries({ sortType, start, end })
+    );
+
+    ipcMain.handle('app/getGenreSongIds', (_, genreId: number) => getGenreSongIds(genreId));
 
     ipcMain.handle(
       'app/getAlbumData',

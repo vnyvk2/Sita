@@ -13,16 +13,22 @@ import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { artistQuery } from '@renderer/queries/artists';
+import {
+  ARTIST_SUMMARY_PAGE_SIZE,
+  artistSummariesQuery,
+  artistSummariesQueryKey,
+  fetchArtistSummariesPage
+} from '@renderer/queries/artists';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { artistSearchSchema } from '@renderer/utils/zod/artistSchema';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect, useMemo } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ListRange } from 'react-virtuoso';
 
 export const Route = createFileRoute('/main-player/artists/')({
   validateSearch: artistSearchSchema,
@@ -34,13 +40,12 @@ export const Route = createFileRoute('/main-player/artists/')({
   }),
   loader: async ({ deps }) => {
     const sortingState = store.state.localStorage.sortingStates.artistsPage;
-    await queryClient.ensureQueryData(
-      artistQuery.all({
+    await queryClient.fetchQuery(
+      artistSummariesQuery({
         sortType: deps.sortingOrder || sortingState || 'aToZ',
         filterType: deps.filteringOrder || 'notSelected',
         keyword: deps.keyword ?? '',
-        start: 0,
-        end: 0
+        start: 0
       })
     );
   }
@@ -72,16 +77,46 @@ function ArtistPage() {
     [sortingOrder, filteringOrder, keyword]
   );
 
-  const {
-    data: { data: artistsData }
-  } = useSuspenseQuery(
-    artistQuery.all({
+  const summariesQuery = useInfiniteQuery({
+    queryKey: artistSummariesQueryKey({
       sortType: sortingOrder,
       filterType: filteringOrder,
-      start: 0,
-      end: 0,
       keyword: keyword ?? ''
-    })
+    }),
+    queryFn: ({ pageParam }) =>
+      fetchArtistSummariesPage(
+        { sortType: sortingOrder, filterType: filteringOrder, keyword: keyword ?? '' },
+        pageParam as number
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      if (keyword?.trim()) return undefined;
+      const fetched = lastPage.end;
+      return lastPage.data.length < ARTIST_SUMMARY_PAGE_SIZE ? undefined : fetched;
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000
+  });
+
+  const artistsData = useMemo(
+    () => summariesQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [summariesQuery.data]
+  );
+
+  const latestRangeRef = useRef<ListRange | null>(null);
+  const handleGridRangeChange = useCallback(
+    (range: ListRange) => {
+      latestRangeRef.current = range;
+      if (
+        summariesQuery.hasNextPage &&
+        !summariesQuery.isFetchingNextPage &&
+        range.endIndex >= artistsData.length - 24
+      ) {
+        summariesQuery.fetchNextPage();
+      }
+    },
+    [artistsData.length, summariesQuery]
   );
 
   const search = usePageSearch({
@@ -241,13 +276,14 @@ function ArtistPage() {
               fixedItemWidth={MIN_ITEM_WIDTH}
               fixedItemHeight={MIN_ITEM_HEIGHT}
               scrollKey={scrollKey}
+              onRangeChange={handleGridRangeChange}
               itemContent={(index, artist) => {
                 return (
                   <Artist
                     index={index}
                     key={artist.artistId}
                     className="mb-4"
-                    songIds={artist.songs.map((song) => song.songId)}
+                    songCount={artist.songCount}
                     selectAllHandler={selectAllHandler}
                     appearFromBottom={false}
                     {...artist}

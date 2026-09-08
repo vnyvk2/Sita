@@ -506,6 +506,15 @@ const artistsData = {
       limit
     );
   },
+  getArtistSummaries: (
+    sortType?: ArtistSortTypes,
+    filterType?: ArtistFilterTypes,
+    start?: number,
+    end?: number
+  ): Promise<PaginatedResult<ArtistSummary, ArtistSortTypes>> =>
+    ipcRenderer.invoke('app/getArtistSummaries', sortType, filterType, start, end),
+  getArtistSongIds: (artistId: number): Promise<number[]> =>
+    ipcRenderer.invoke('app/getArtistSongIds', artistId),
   toggleLikeArtists: (
     artistIds: number[],
     likeArtist?: boolean
@@ -534,7 +543,15 @@ const genresData = {
   ): Promise<PaginatedResult<Genre, GenreSortTypes>> => {
     const stringIds = genreNamesOrIds?.map(String);
     return ipcRenderer.invoke('app/getGenresData', stringIds, sortType, start, end);
-  }
+  },
+  getGenreSummaries: (
+    sortType?: GenreSortTypes,
+    start?: number,
+    end?: number
+  ): Promise<PaginatedResult<GenreSummary, GenreSortTypes>> =>
+    ipcRenderer.invoke('app/getGenreSummaries', sortType, start, end),
+  getGenreSongIds: (genreId: number): Promise<number[]> =>
+    ipcRenderer.invoke('app/getGenreSongIds', genreId)
 };
 
 // $ ALBUMS DATA

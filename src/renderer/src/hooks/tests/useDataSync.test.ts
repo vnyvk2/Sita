@@ -1,9 +1,13 @@
+import { ALBUM_SUMMARIES_ROOT, albumQuery } from '@renderer/queries/albums';
+import { ARTIST_SUMMARIES_ROOT, artistQuery } from '@renderer/queries/artists';
+import { GENRE_SUMMARIES_ROOT, genreQuery } from '@renderer/queries/genres';
 import type { QueryClient } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
 import {
   DataSyncBatcher,
   getInvalidationTargetsForEvent,
+  invalidateTarget,
   invalidateWindowsContainingIds
 } from '../useDataSync';
 
@@ -141,9 +145,12 @@ describe('useDataSync - Query Invalidation & Batching', () => {
       // Flush the scheduled frame
       scheduledCallback!();
 
-      // After flush: exactly 5 unique invalidation targets called (1 time each)
-      // targets: songs:all, songs:allInfo, songs:singleInfo, albums:all, albums:single
-      expect(mockClient.invalidateQueries).toHaveBeenCalledTimes(5);
+      // After flush: 5 unique invalidation targets called:
+      // songs:all, songs:allInfo, songs:singleInfo, albums:single (1 call each)
+      // albums:all (2 calls: albumQuery.all._def + ALBUM_SUMMARIES_ROOT)
+      expect(mockClient.invalidateQueries).toHaveBeenCalledTimes(6);
+      const albumCalls = (mockClient.invalidateQueries as Mock).mock.calls.map((c) => c[0]?.queryKey);
+      expect(albumCalls).toContainEqual(ALBUM_SUMMARIES_ROOT);
     });
 
     it('should merge disparate event types into the minimal deduplicated union of targets', () => {
@@ -160,9 +167,11 @@ describe('useDataSync - Query Invalidation & Batching', () => {
       // Flush the scheduled frame
       scheduledCallback!();
 
-      // Minimal union: artists:all, artists:single, home:recentSongArtists, search:query,
-      // analytics:listening (5 unique targets)
-      expect(mockClient.invalidateQueries).toHaveBeenCalledTimes(5);
+      // Minimal union: artists:all, artists:single, home:recentSongArtists, search:query, analytics:listening
+      // artists:all invalidates both artistQuery.all._def and ARTIST_SUMMARIES_ROOT (6 calls total)
+      expect(mockClient.invalidateQueries).toHaveBeenCalledTimes(6);
+      const artistCalls = (mockClient.invalidateQueries as Mock).mock.calls.map((c) => c[0]?.queryKey);
+      expect(artistCalls).toContainEqual(ARTIST_SUMMARIES_ROOT);
     });
 
     it('should surgically invalidate only the hydration windows containing changed song ids', () => {
@@ -289,6 +298,40 @@ describe('useDataSync - Query Invalidation & Batching', () => {
       const bulkChanged = new Set(Array.from({ length: 35 }, (_, i) => 10000 + i));
       invalidateWindowsContainingIds(mockClient, bulkChanged);
       expect(invalidateQueries).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('invalidateTarget dual summaries invalidation', () => {
+    let mockClient: QueryClient;
+
+    beforeEach(() => {
+      mockClient = {
+        invalidateQueries: vi.fn()
+      } as unknown as QueryClient;
+    });
+
+    it('should invalidate both factory _def and summaries root for artists:all', () => {
+      invalidateTarget('artists:all', mockClient);
+      const calls = (mockClient.invalidateQueries as Mock).mock.calls.map((c) => c[0]?.queryKey);
+      expect(calls).toContainEqual(artistQuery.all._def);
+      expect(calls).toContainEqual(ARTIST_SUMMARIES_ROOT);
+      expect(mockClient.invalidateQueries).toHaveBeenCalledTimes(2);
+    });
+
+    it('should invalidate both factory _def and summaries root for albums:all', () => {
+      invalidateTarget('albums:all', mockClient);
+      const calls = (mockClient.invalidateQueries as Mock).mock.calls.map((c) => c[0]?.queryKey);
+      expect(calls).toContainEqual(albumQuery.all._def);
+      expect(calls).toContainEqual(ALBUM_SUMMARIES_ROOT);
+      expect(mockClient.invalidateQueries).toHaveBeenCalledTimes(2);
+    });
+
+    it('should invalidate both factory _def and summaries root for genres:all', () => {
+      invalidateTarget('genres:all', mockClient);
+      const calls = (mockClient.invalidateQueries as Mock).mock.calls.map((c) => c[0]?.queryKey);
+      expect(calls).toContainEqual(genreQuery.all._def);
+      expect(calls).toContainEqual(GENRE_SUMMARIES_ROOT);
+      expect(mockClient.invalidateQueries).toHaveBeenCalledTimes(2);
     });
   });
 });

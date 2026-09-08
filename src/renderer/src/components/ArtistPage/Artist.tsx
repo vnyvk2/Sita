@@ -20,7 +20,8 @@ interface ArtistProp {
   artistId: number;
   name: string;
   artworkPaths: ArtworkPaths;
-  songIds: number[];
+  songIds?: number[];
+  songCount?: number;
   onlineArtworkPaths?: {
     picture_small: string;
     picture_medium: string;
@@ -76,10 +77,18 @@ export const Artist = memo((props: ArtistProp) => {
     [navigate, props.artistId]
   );
 
+  const songCount = props.songCount ?? props.songIds?.length ?? 0;
+
+  const resolveSongIds = useCallback(async (): Promise<number[]> => {
+    if (props.songIds) return props.songIds;
+    return window.api.artistsData.getArtistSongIds(props.artistId);
+  }, [props.artistId, props.songIds]);
+
   const playArtistSongs = useCallback(
-    (isShuffle = false) =>
-      window.api.audioLibraryControls
-        .getSongInfo(props.songIds, undefined, undefined, undefined, true)
+    async (isShuffle = false) => {
+      const resolvedSongIds = await resolveSongIds();
+      return window.api.audioLibraryControls
+        .getSongInfo(resolvedSongIds, undefined, undefined, undefined, true)
         .then((songs) => {
           if (Array.isArray(songs))
             return createQueue(
@@ -91,8 +100,9 @@ export const Artist = memo((props: ArtistProp) => {
               props.name
             );
           return undefined;
-        }),
-    [createQueue, props.artistId, props.songIds, props.name]
+        });
+    },
+    [createQueue, props.artistId, props.name, resolveSongIds]
   );
 
   const playArtistSongsForMultipleSelections = useCallback(
@@ -191,16 +201,18 @@ export const Artist = memo((props: ArtistProp) => {
                 ]);
               });
             }
-            getQueuesManager().getActiveQueue().addSongIdsToEnd(props.songIds);
-            return addNewNotifications([
-              {
-                id: 'addSongsToQueue',
-                duration: 5000,
-                content: t(`notifications.addedToQueue`, {
-                  count: props.songIds.length
-                })
-              }
-            ]);
+            return resolveSongIds().then((resolvedIds) => {
+              getQueuesManager().getActiveQueue().addSongIdsToEnd(resolvedIds);
+              return addNewNotifications([
+                {
+                  id: 'addSongsToQueue',
+                  duration: 5000,
+                  content: t(`notifications.addedToQueue`, {
+                    count: resolvedIds.length
+                  })
+                }
+              ]);
+            });
           }
         },
         {
@@ -280,7 +292,7 @@ export const Artist = memo((props: ArtistProp) => {
                 props?.onlineArtworkPaths?.picture_small || props?.artworkPaths?.optimizedArtworkPath,
               artworkClassName: 'rounded-full!',
               subTitle: t(`common.songWithCount`, {
-                count: props.songIds.length
+                count: songCount
               })
             };
 
@@ -298,7 +310,8 @@ export const Artist = memo((props: ArtistProp) => {
       props?.artworkPaths?.optimizedArtworkPath,
       props.name,
       props?.onlineArtworkPaths?.picture_small,
-      props.songIds,
+      resolveSongIds,
+      songCount,
       t,
       toggleLikeArtist,
       toggleMultipleSelections,

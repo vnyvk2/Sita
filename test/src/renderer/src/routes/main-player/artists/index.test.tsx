@@ -1,5 +1,5 @@
 import { AppUpdateContext, type AppUpdateContextType } from '@renderer/contexts/AppUpdateContext';
-import { artistQuery } from '@renderer/queries/artists';
+import { artistSummariesQueryKey } from '@renderer/queries/artists';
 import { Route } from '@renderer/routes/main-player/artists/index';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // @vitest-environment jsdom
@@ -93,14 +93,15 @@ describe('ArtistPage Search & Navigation State Split', () => {
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(
-      artistQuery.all({
+      artistSummariesQueryKey({
         sortType: 'aToZ',
         filterType: 'notSelected',
-        start: 0,
-        end: 0,
         keyword: 'nonexistent_artist'
-      }).queryKey,
-      { data: [] }
+      }),
+      {
+        pages: [{ data: [], end: 0, total: 0 }],
+        pageParams: [0]
+      }
     );
 
     const ArtistPageComponent = Route.options.component!;
@@ -143,14 +144,15 @@ describe('ArtistPage Search & Navigation State Split', () => {
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(
-      artistQuery.all({
+      artistSummariesQueryKey({
         sortType: 'aToZ',
         filterType: 'notSelected',
-        start: 0,
-        end: 0,
         keyword: 'nonexistent_artist'
-      }).queryKey,
-      { data: [] }
+      }),
+      {
+        pages: [{ data: [], end: 0, total: 0 }],
+        pageParams: [0]
+      }
     );
 
     const ArtistPageComponent = Route.options.component!;
@@ -188,14 +190,15 @@ describe('ArtistPage Search & Navigation State Split', () => {
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(
-      artistQuery.all({
+      artistSummariesQueryKey({
         sortType: 'aToZ',
         filterType: 'notSelected',
-        start: 0,
-        end: 0,
         keyword: ''
-      }).queryKey,
-      { data: [] }
+      }),
+      {
+        pages: [{ data: [], end: 0, total: 0 }],
+        pageParams: [0]
+      }
     );
 
     const ArtistPageComponent = Route.options.component!;
@@ -234,21 +237,23 @@ describe('ArtistPage Search & Navigation State Split', () => {
       {
         artistId: 1,
         name: 'Queen',
-        songs: [],
+        isAFavorite: false,
+        songCount: 0,
         artworkPaths: { default: '' }
       }
     ];
 
     const queryClient = new QueryClient();
     queryClient.setQueryData(
-      artistQuery.all({
+      artistSummariesQueryKey({
         sortType: 'aToZ',
         filterType: 'notSelected',
-        start: 0,
-        end: 0,
         keyword: 'Queen'
-      }).queryKey,
-      { data: sampleArtists }
+      }),
+      {
+        pages: [{ data: sampleArtists, end: 1, total: 1 }],
+        pageParams: [0]
+      }
     );
 
     const ArtistPageComponent = Route.options.component!;

@@ -1,6 +1,8 @@
 import { db } from '@db/db';
 import { albumsArtists, artists, artistsSongs } from '@db/schema';
-import { and, asc, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
+
+import { parseArtistArtworks, parseArtistOnlineArtworks } from '../../fs/resolveFilePaths';
 
 export const isArtistWithNameAvailable = async (name: string, trx: DB | DBTransaction = db) => {
   const data = await trx.select({}).from(artists).where(eq(artists.name, name)).limit(1);
@@ -210,6 +212,90 @@ export const getAllArtists = async (
   };
 };
 
+export type GetAllArtistSummariesReturnType = Awaited<ReturnType<typeof getArtistSummaries>>['data'];
+
+export const getArtistSummaries = async (
+  options: GetAllArtistsOptions = {},
+  trx: DB | DBTransaction = db
+): Promise<{
+  data: ArtistSummary[];
+  sortType: ArtistSortTypes;
+  start: number;
+  end: number;
+}> => {
+  const {
+    artistIds = [],
+    start = 0,
+    end = 0,
+    filterType = 'notSelected',
+    sortType = 'aToZ'
+  } = options;
+
+  const limit = end - start === 0 ? undefined : end - start;
+
+  const page = await trx.query.artists.findMany({
+    columns: { id: true, name: true, isFavorite: true },
+    where: (s) => {
+      const filters: SQL[] = [];
+
+      if (artistIds && artistIds.length > 0) {
+        filters.push(inArray(s.id, artistIds));
+      }
+
+      if (filterType === 'favorites') filters.push(eq(s.isFavorite, true));
+
+      return and(...filters);
+    },
+    with: {
+      artworks: {
+        with: {
+          artwork: {}
+        }
+      }
+    },
+    limit,
+    offset: start,
+    orderBy: (artists) => {
+      if (sortType === 'aToZ') return [asc(artists.name)];
+      if (sortType === 'zToA') return [desc(artists.name)];
+
+      return [];
+    }
+  });
+
+  const pageIds = page.map((a) => a.id);
+  const countMap = new Map<number, number>();
+  if (pageIds.length > 0) {
+    const counts = await trx
+      .select({ artistId: artistsSongs.artistId, songCount: count() })
+      .from(artistsSongs)
+      .where(inArray(artistsSongs.artistId, pageIds))
+      .groupBy(artistsSongs.artistId);
+    for (const row of counts) {
+      countMap.set(row.artistId, Number(row.songCount));
+    }
+  }
+
+  const data: ArtistSummary[] = page.map((artist) => {
+    const artworks = artist.artworks.map((entry) => entry.artwork);
+    return {
+      artistId: artist.id,
+      name: artist.name,
+      isAFavorite: artist.isFavorite ?? false,
+      artworkPaths: parseArtistArtworks(artworks),
+      onlineArtworkPaths: parseArtistOnlineArtworks(artworks),
+      songCount: countMap.get(artist.id) ?? 0
+    };
+  });
+
+  return {
+    data,
+    sortType,
+    start,
+    end
+  };
+};
+
 export const getArtistFavoriteStatus = (artistIds: number[], trx: DB | DBTransaction = db) => {
   return trx
     .select({ id: artists.id, isFavorite: artists.isFavorite })
@@ -271,13 +357,16 @@ export const getArtistsByName = async (names: string[], trx: DB | DBTransaction 
   return data;
 };
 
-export const getArtistSongIds = async (artistId: number, trx: DB | DBTransaction = db) => {
+export const getArtistSongIds = async (
+  artistId: number,
+  trx: DB | DBTransaction = db
+): Promise<number[]> => {
   const data = await trx
     .select({ songId: artistsSongs.songId })
     .from(artistsSongs)
     .where(eq(artistsSongs.artistId, artistId));
 
-  return data;
+  return data.map((row) => row.songId);
 };
 
 /**

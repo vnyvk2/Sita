@@ -8,16 +8,22 @@ import MainContainer from '@renderer/components/MainContainer';
 import VirtualizedGrid from '@renderer/components/VirtualizedGrid';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
-import { genreQuery } from '@renderer/queries/genres';
+import {
+  GENRE_SUMMARY_PAGE_SIZE,
+  genreSummariesQuery,
+  genreSummariesQueryKey,
+  fetchGenreSummariesPage
+} from '@renderer/queries/genres';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { genreSearchSchema } from '@renderer/utils/zod/genreSchema';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useEffect, useMemo } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ListRange } from 'react-virtuoso';
 
 export const Route = createFileRoute('/main-player/genres/')({
   validateSearch: genreSearchSchema,
@@ -26,9 +32,11 @@ export const Route = createFileRoute('/main-player/genres/')({
     sortingOrder: search.sortingOrder
   }),
   loader: async ({ deps }) => {
-    await queryClient.ensureQueryData(
-      genreQuery.all({
-        sortType: deps.sortingOrder || 'aToZ'
+    const sortingState = store.state.localStorage.sortingStates.genresPage;
+    await queryClient.fetchQuery(
+      genreSummariesQuery({
+        sortType: deps.sortingOrder || sortingState || 'aToZ',
+        start: 0
       })
     );
   }
@@ -55,33 +63,52 @@ function GenresPage() {
 
   const scrollKey = useMemo(() => `genres-grid:${sortingOrder}`, [sortingOrder]);
 
-  const {
-    data: { data: genresData }
-  } = useSuspenseQuery(genreQuery.all({ sortType: sortingOrder }));
+  const summariesQuery = useInfiniteQuery({
+    queryKey: genreSummariesQueryKey({
+      sortType: sortingOrder
+    }),
+    queryFn: ({ pageParam }) =>
+      fetchGenreSummariesPage(
+        { sortType: sortingOrder },
+        pageParam as number
+      ),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const fetched = lastPage.end;
+      return lastPage.data.length < GENRE_SUMMARY_PAGE_SIZE ? undefined : fetched;
+    },
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000
+  });
 
-  // useEffect(() => {
-  //   fetchGenresData();
-  //   const manageGenreDataUpdatesInGenresPage = (e: Event) => {
-  //     if ('detail' in e) {
-  //       const dataEvents = (e as DetailAvailableEvent<DataUpdateEvent[]>).detail;
-  //       for (let i = 0; i < dataEvents.length; i += 1) {
-  //         const event = dataEvents[i];
-  //         if (event.dataType === 'genres') fetchGenresData();
-  //       }
-  //     }
-  //   };
-  //   document.addEventListener('app/dataUpdates', manageGenreDataUpdatesInGenresPage);
-  //   return () => {
-  //     document.removeEventListener('app/dataUpdates', manageGenreDataUpdatesInGenresPage);
-  //   };
-  // }, [fetchGenresData]);
+  const genresData = useMemo(
+    () => summariesQuery.data?.pages.flatMap((page) => page.data) ?? [],
+    [summariesQuery.data]
+  );
+
+  const latestRangeRef = useRef<ListRange | null>(null);
+  const handleGridRangeChange = useCallback(
+    (range: ListRange) => {
+      latestRangeRef.current = range;
+      if (
+        summariesQuery.hasNextPage &&
+        !summariesQuery.isFetchingNextPage &&
+        range.endIndex >= genresData.length - 24
+      ) {
+        summariesQuery.fetchNextPage();
+      }
+    },
+    [genresData.length, summariesQuery]
+  );
 
   useEffect(
     () => storage.sortingStates.setSortingStates('genresPage', sortingOrder),
     [sortingOrder]
   );
 
-  const selectAllHandler = useSelectAllHandler(genresData as Genre[], 'genre', 'genreId');
+  const selectAllHandler = useSelectAllHandler(genresData, 'genre', 'genreId');
+  const isLibraryEmpty = genresData.length === 0;
 
   return (
     <MainContainer
@@ -131,6 +158,7 @@ function GenresPage() {
                 className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
                 iconName={isMultipleSelectionEnabled ? 'remove_done' : 'checklist'}
                 clickHandler={() => toggleMultipleSelections(!isMultipleSelectionEnabled, 'genre')}
+                isDisabled={genresData.length === 0}
               />
               <Dropdown
                 name="genreSortDropdown"
@@ -157,21 +185,23 @@ function GenresPage() {
               fixedItemWidth={MIN_ITEM_WIDTH}
               fixedItemHeight={MIN_ITEM_HEIGHT}
               scrollKey={scrollKey}
+              onRangeChange={handleGridRangeChange}
               itemContent={(index, genre) => {
                 return (
                   <Genre
                     index={index}
+                    genreId={genre.genreId}
                     title={genre.name}
-                    songIds={genre.songs.map((song) => song.songId)}
+                    songCount={genre.songCount}
+                    artworkPaths={genre.artworkPaths}
                     selectAllHandler={selectAllHandler}
-                    {...genre}
                   />
                 );
               }}
             />
           )}
         </div>
-        {genresData === null && (
+        {isLibraryEmpty && (
           <div className="no-songs-container text-font-color-black dark:text-font-color-white my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
             <Img src={NoSongsImage} alt="No songs available." className="mb-8 w-60" />
             <span>{t('genresPage.empty')}</span>

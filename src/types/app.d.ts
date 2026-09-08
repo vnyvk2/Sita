@@ -36,6 +36,10 @@ declare global {
     | 'app/getSongDurations'
     | 'app/getAlbumSummaries'
     | 'app/getAlbumSongIds'
+    | 'app/getArtistSummaries'
+    | 'app/getArtistSongIds'
+    | 'app/getGenreSummaries'
+    | 'app/getGenreSongIds'
     | 'library/getChangeState'
     | 'library/resetChangeState'
     | 'library/diskChanged'
@@ -849,6 +853,15 @@ declare global {
     paletteData?: PaletteData;
   }
 
+  interface GenreSummary {
+    genreId: number;
+    name: string;
+    artworkPaths: ArtworkPaths;
+    songCount: number;
+  }
+
+  type GenreLike = Genre | GenreSummary;
+
   // ? Albums related types
 
   interface SavableAlbum {
@@ -907,6 +920,17 @@ declare global {
   interface Artist extends SavableArtist {
     artworkPaths: ArtworkPaths;
   }
+
+  interface ArtistSummary {
+    artistId: number;
+    name: string;
+    isAFavorite: boolean;
+    artworkPaths: ArtworkPaths;
+    onlineArtworkPaths?: OnlineArtistArtworks;
+    songCount: number;
+  }
+
+  type ArtistLike = Artist | ArtistSummary;
 
   interface ArtistInfo extends Artist {
     artistPalette?: NodeVibrantPalette;

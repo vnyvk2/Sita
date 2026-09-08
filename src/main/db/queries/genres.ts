@@ -1,6 +1,8 @@
 import { db } from '@db/db';
 import { genres, genresSongs } from '@db/schema';
-import { and, asc, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
+
+import { parseGenreArtworks } from '../../fs/resolveFilePaths';
 
 import { parseGenreList } from '../../../common/genreUtils';
 import { linkArtworksToGenre } from './artworks';
@@ -78,6 +80,80 @@ export const getAllGenres = async (options: GetAllGenresOptions, trx: DB | DBTra
 
       return [];
     }
+  });
+
+  return {
+    data,
+    sortType,
+    start,
+    end
+  };
+};
+
+export type GetAllGenreSummariesReturnType = Awaited<ReturnType<typeof getGenreSummaries>>['data'];
+
+export const getGenreSummaries = async (
+  options: GetAllGenresOptions = {},
+  trx: DB | DBTransaction = db
+): Promise<{
+  data: GenreSummary[];
+  sortType: GenreSortTypes;
+  start: number;
+  end: number;
+}> => {
+  const { genreIds = [], start = 0, end = 0, sortType = 'aToZ' } = options;
+
+  const limit = end - start === 0 ? undefined : end - start;
+
+  const page = await trx.query.genres.findMany({
+    columns: { id: true, name: true },
+    where: (s) => {
+      const filters: SQL[] = [];
+
+      if (genreIds && genreIds.length > 0) {
+        filters.push(inArray(s.id, genreIds));
+      }
+
+      return and(...filters);
+    },
+    with: {
+      artworks: {
+        with: {
+          artwork: {}
+        }
+      }
+    },
+    limit,
+    offset: start,
+    orderBy: (genres) => {
+      if (sortType === 'aToZ') return [asc(genres.name)];
+      if (sortType === 'zToA') return [desc(genres.name)];
+
+      return [];
+    }
+  });
+
+  const pageIds = page.map((g) => g.id);
+  const countMap = new Map<number, number>();
+  if (pageIds.length > 0) {
+    const counts = await trx
+      .select({ genreId: genresSongs.genreId, songCount: count() })
+      .from(genresSongs)
+      .where(inArray(genresSongs.genreId, pageIds))
+      .groupBy(genresSongs.genreId);
+    for (const row of counts) {
+      countMap.set(row.genreId, Number(row.songCount));
+    }
+  }
+
+  const data: GenreSummary[] = page.map((genre) => {
+    const artworks = genre.artworks.map((entry) => entry.artwork);
+    return {
+      genreId: genre.id,
+      name: genre.name,
+      artworkPaths: parseGenreArtworks(artworks),
+      songCount: countMap.get(genre.id) ?? 0
+    };
   });
 
   return {

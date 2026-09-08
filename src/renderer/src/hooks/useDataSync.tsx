@@ -1,9 +1,9 @@
 import { collectionKeys } from '@renderer/api/collectionKeys';
 import { notifyLibraryStructureChanged } from '@renderer/other/libraryVersion';
-import { albumQuery } from '@renderer/queries/albums';
+import { ALBUM_SUMMARIES_ROOT, albumQuery } from '@renderer/queries/albums';
 import { analyticsQuery } from '@renderer/queries/analytics';
-import { artistQuery } from '@renderer/queries/artists';
-import { genreQuery } from '@renderer/queries/genres';
+import { ARTIST_SUMMARIES_ROOT, artistQuery } from '@renderer/queries/artists';
+import { GENRE_SUMMARIES_ROOT, genreQuery } from '@renderer/queries/genres';
 import { homeQuery } from '@renderer/queries/home';
 import { searchQuery } from '@renderer/queries/search';
 import { settingsQuery } from '@renderer/queries/settings';
@@ -201,18 +201,21 @@ export function invalidateTarget(target: InvalidationTargetKey, client = queryCl
       break;
     case 'artists:all':
       client.invalidateQueries({ queryKey: artistQuery.all._def });
+      client.invalidateQueries({ queryKey: ARTIST_SUMMARIES_ROOT });
       break;
     case 'artists:single':
       client.invalidateQueries({ queryKey: artistQuery.single._def });
       break;
     case 'albums:all':
       client.invalidateQueries({ queryKey: albumQuery.all._def });
+      client.invalidateQueries({ queryKey: ALBUM_SUMMARIES_ROOT });
       break;
     case 'albums:single':
       client.invalidateQueries({ queryKey: albumQuery.single._def });
       break;
     case 'genres:all':
       client.invalidateQueries({ queryKey: genreQuery.all._def });
+      client.invalidateQueries({ queryKey: GENRE_SUMMARIES_ROOT });
       break;
     case 'genres:single':
       client.invalidateQueries({ queryKey: genreQuery.single._def });

@@ -17,7 +17,8 @@ interface GenreProp {
   index: number;
   genreId: number;
   title: string;
-  songIds: number[];
+  songIds?: number[];
+  songCount?: number;
   artworkPaths: ArtworkPaths;
   paletteData?: PaletteData;
   className?: string;
@@ -71,10 +72,18 @@ const Genre = memo((props: GenreProp) => {
     return undefined;
   }, [paletteData?.DarkVibrant]);
 
+  const resolvedSongCount = props.songCount ?? songIds?.length ?? 0;
+
+  const resolveSongIds = useCallback(async (): Promise<number[]> => {
+    if (songIds) return songIds;
+    return window.api.genresData.getGenreSongIds(genreId);
+  }, [genreId, songIds]);
+
   const playGenreSongs = useCallback(
-    (isShuffle = false) => {
+    async (isShuffle = false) => {
+      const resolvedSongIds = await resolveSongIds();
       return window.api.audioLibraryControls
-        .getSongInfo(songIds, undefined, undefined, undefined, true)
+        .getSongInfo(resolvedSongIds, undefined, undefined, undefined, true)
         .then((songs) => {
           if (Array.isArray(songs))
             return createQueue(
@@ -88,7 +97,7 @@ const Genre = memo((props: GenreProp) => {
           return undefined;
         });
     },
-    [createQueue, genreId, songIds, title]
+    [createQueue, genreId, resolveSongIds, title]
   );
 
   const playGenreSongsForMultipleSelections = useCallback(
@@ -204,18 +213,23 @@ const Genre = memo((props: GenreProp) => {
           handlerFunction: () => {
             if (isMultipleSelectionsActive) addToQueueForMultipleSelections();
             else {
-              getQueuesManager().getActiveQueue().addSongIdsToEnd(songIds);
-              addNewNotifications([
-                {
-                  id: 'newSongsToQueue',
-                  duration: 5000,
-                  content: t(`notifications.addedToQueue`, {
-                    count: songIds.length
-                  })
-                }
-              ]);
+              return resolveSongIds().then((resolvedSongIds) => {
+                getQueuesManager().getActiveQueue().addSongIdsToEnd(resolvedSongIds);
+                addNewNotifications([
+                  {
+                    id: 'newSongsToQueue',
+                    duration: 5000,
+                    content: t(`notifications.addedToQueue`, {
+                      count: resolvedSongIds.length
+                    })
+                  }
+                ]);
+                toggleMultipleSelections(false);
+                return undefined;
+              });
             }
             toggleMultipleSelections(false);
+            return undefined;
           }
         },
         {
@@ -259,7 +273,7 @@ const Genre = memo((props: GenreProp) => {
           : {
               title,
               artworkPath: artworkPaths?.optimizedArtworkPath,
-              subTitle: t('common.songWithCount', { count: songIds.length })
+              subTitle: t('common.songWithCount', { count: resolvedSongCount })
             };
 
       updateContextMenuData(true, items, e.pageX, e.pageY, itemData);
@@ -274,7 +288,8 @@ const Genre = memo((props: GenreProp) => {
       isMultipleSelectionEnabled,
       playGenreSongs,
       playGenreSongsForMultipleSelections,
-      songIds,
+      resolveSongIds,
+      resolvedSongCount,
       t,
       title,
       toggleMultipleSelections,
