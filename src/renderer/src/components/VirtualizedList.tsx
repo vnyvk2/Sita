@@ -17,7 +17,7 @@ export const MIN_HOLD_MS = 400;
 
 export const DEFAULT_SCROLL_SEEK_CONFIG: ScrollSeekConfiguration = {
   enter: (velocity) => {
-    const shouldEnter = Math.abs(velocity) > 800;
+    const shouldEnter = Math.abs(velocity) > 2500;
     if (shouldEnter) {
       scrollTrace.onSeek('enter', velocity);
     }
@@ -87,7 +87,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
     onChange,
     onDebouncedScroll,
     onScrollingStateChange,
-    scrollSeekConfiguration = DEFAULT_SCROLL_SEEK_CONFIG,
+    scrollSeekConfiguration,
     context,
     increaseViewportBy,
     computeItemKey

@@ -1,6 +1,10 @@
 name: Run Tests
 
 on:
+  push:
+    branches:
+      - master
+
   # Trigger on pull requests
   pull_request:
 

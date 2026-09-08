@@ -4,7 +4,7 @@ import type React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { scrollRegistry } from '../../utils/scrollStore';
-import VirtualizedList from '../VirtualizedList';
+import VirtualizedList, { DEFAULT_SCROLL_SEEK_CONFIG } from '../VirtualizedList';
 
 // Mock react-virtuoso to simulate rangeChanged, ref handle, and initialTopMostItemIndex behavior
 let lastVirtuosoProps: Record<string, unknown> = {};
@@ -409,6 +409,14 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
         ScrollSeekPlaceholder?: React.ComponentType<{ height: number; index: number }>;
       };
       expect(components.ScrollSeekPlaceholder).toBeDefined();
+    });
+
+    it('DEFAULT_SCROLL_SEEK_CONFIG should only enter on high-velocity flings (> 2500px/s)', () => {
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(2600)).toBe(true);
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(2400)).toBe(false);
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(-2800)).toBe(true);
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(200)).toBe(true);
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(400)).toBe(false);
     });
   });
 });
