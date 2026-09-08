@@ -38,6 +38,52 @@ describe('store.ts dual-class persistence', () => {
     expect(storage.setLocalStorage).not.toHaveBeenCalled();
   });
 
+  it('skips setLocalStorage on high-frequency UPDATE_SONG_POSITION dispatches', () => {
+    // Simulate high-frequency (100ms) playback position ticks
+    for (let pos = 1; pos <= 10; pos += 1) {
+      dispatch({
+        type: 'UPDATE_SONG_POSITION',
+        data: pos * 0.5
+      });
+    }
+
+    vi.advanceTimersByTime(1000);
+    expect(storage.setLocalStorage).not.toHaveBeenCalled();
+  });
+
+  it('coalesces multiple rapid preference updates within the 250ms window into a single write', () => {
+    const prev = store.state.localStorage;
+    const update1 = {
+      ...prev,
+      preferences: { ...prev.preferences, theme: 'dark' as const }
+    };
+    const update2 = {
+      ...prev,
+      preferences: { ...prev.preferences, theme: 'light' as const }
+    };
+    const update3 = {
+      ...prev,
+      preferences: { ...prev.preferences, theme: 'system' as const }
+    };
+
+    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: update1 });
+    vi.advanceTimersByTime(100);
+    expect(storage.setLocalStorage).not.toHaveBeenCalled();
+
+    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: update2 });
+    vi.advanceTimersByTime(100);
+    expect(storage.setLocalStorage).not.toHaveBeenCalled();
+
+    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: update3 });
+    vi.advanceTimersByTime(200);
+    expect(storage.setLocalStorage).not.toHaveBeenCalled();
+
+    // Advance past the final 250ms debounce window
+    vi.advanceTimersByTime(60);
+    expect(storage.setLocalStorage).toHaveBeenCalledTimes(1);
+    expect(storage.setLocalStorage).toHaveBeenCalledWith(update3);
+  });
+
   it('debounces non-queue preference changes by 250ms', () => {
     const prev = store.state.localStorage;
     const updated = {

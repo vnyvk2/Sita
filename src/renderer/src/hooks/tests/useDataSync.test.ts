@@ -1,7 +1,11 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
-import { DataSyncBatcher, getInvalidationTargetsForEvent } from '../useDataSync';
+import {
+  DataSyncBatcher,
+  getInvalidationTargetsForEvent,
+  invalidateWindowsContainingIds
+} from '../useDataSync';
 
 describe('useDataSync - Query Invalidation & Batching', () => {
   describe('getInvalidationTargetsForEvent mapping', () => {
@@ -199,6 +203,92 @@ describe('useDataSync - Query Invalidation & Batching', () => {
 
       batcher.cleanup();
       expect(cancelScheduledFn).toHaveBeenCalled();
+    });
+  });
+
+  describe('invalidateWindowsContainingIds fast-path vs fallback', () => {
+    const libraryIds = Array.from({ length: 600 }, (_, i) => i + 1);
+    const mockCache = {
+      findAll: () => [
+        {
+          queryKey: ['songs', 'ids', undefined],
+          state: {
+            dataUpdatedAt: 1234,
+            data: { ids: libraryIds, total: 600, blacklistedIds: [] }
+          }
+        }
+      ]
+    };
+
+    it('should do nothing when changedIds is empty', () => {
+      const invalidateQueries = vi.fn();
+      const mockClient = {
+        invalidateQueries,
+        getQueryCache: () => mockCache
+      } as unknown as QueryClient;
+
+      invalidateWindowsContainingIds(mockClient, new Set());
+      expect(invalidateQueries).not.toHaveBeenCalled();
+    });
+
+    it('should use fast-path (<= 32 IDs) with early-exit and correct window offset calculation', () => {
+      const invalidateQueries = vi.fn();
+      const mockClient = {
+        invalidateQueries,
+        getQueryCache: () => mockCache
+      } as unknown as QueryClient;
+
+      // 3 IDs: id 5 (index 4 -> window 0), id 250 (index 249 -> window 200), id 405 (index 404 -> window 400)
+      const changed = new Set([5, 250, 405]);
+      invalidateWindowsContainingIds(mockClient, changed);
+
+      expect(invalidateQueries).toHaveBeenCalledTimes(3);
+      const invalidatedKeys = invalidateQueries.mock.calls.map((c) => c[0]?.queryKey);
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1234, 0]);
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1234, 200]);
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1234, 400]);
+    });
+
+    it('should use fallback path (> 32 IDs) via Map lookup across multiple windows', () => {
+      const invalidateQueries = vi.fn();
+      const mockClient = {
+        invalidateQueries,
+        getQueryCache: () => mockCache
+      } as unknown as QueryClient;
+
+      // 35 IDs (> 32): 20 in window 0 (ids 1..20), 10 in window 200 (ids 201..210), 5 in window 400 (ids 401..405)
+      const changed = new Set<number>();
+      for (let i = 1; i <= 20; i += 1) changed.add(i);
+      for (let i = 201; i <= 210; i += 1) changed.add(i);
+      for (let i = 401; i <= 405; i += 1) changed.add(i);
+      expect(changed.size).toBe(35);
+
+      invalidateWindowsContainingIds(mockClient, changed);
+
+      // Invalidation is called per ID in changedIds matching an index
+      expect(invalidateQueries).toHaveBeenCalledTimes(35);
+      const invalidatedKeys = invalidateQueries.mock.calls.map((c) => c[0]?.queryKey);
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1234, 0]);
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1234, 200]);
+      expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1234, 400]);
+    });
+
+    it('should safely skip unknown IDs not present in cached list', () => {
+      const invalidateQueries = vi.fn();
+      const mockClient = {
+        invalidateQueries,
+        getQueryCache: () => mockCache
+      } as unknown as QueryClient;
+
+      // IDs 9999, 8888 don't exist in libraryIds
+      const changed = new Set([9999, 8888]);
+      invalidateWindowsContainingIds(mockClient, changed);
+      expect(invalidateQueries).not.toHaveBeenCalled();
+
+      // In fallback (> 32)
+      const bulkChanged = new Set(Array.from({ length: 35 }, (_, i) => 10000 + i));
+      invalidateWindowsContainingIds(mockClient, bulkChanged);
+      expect(invalidateQueries).not.toHaveBeenCalled();
     });
   });
 });
