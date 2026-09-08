@@ -80,8 +80,6 @@ window.addEventListener('offline', updateNetworkStatus);
 // console.log('Command line args', window.api.properties.commandLineArgs);
 
 export default function App() {
-  useDynamicTheme();
-
   useEffect(() => {
     initializeQueuesManager();
   }, []);

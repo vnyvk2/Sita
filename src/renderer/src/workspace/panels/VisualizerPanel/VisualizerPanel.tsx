@@ -116,11 +116,16 @@ export const VisualizerPanel: FC<PanelProps> = memo(({ api }) => {
       return;
     }
 
-    let animId: number;
+    let animId: number | null = null;
     const values = new Array(barCount).fill(0.05);
     const peaks = new Array(barCount).fill(0.05);
 
     const renderFrame = () => {
+      if (document.hidden) {
+        animId = null;
+        return;
+      }
+
       // Generate animated pseudo-frequency data
       for (let i = 0; i < barCount; i++) {
         const target =
@@ -139,10 +144,31 @@ export const VisualizerPanel: FC<PanelProps> = memo(({ api }) => {
       animId = requestAnimationFrame(renderFrame);
     };
 
-    animId = requestAnimationFrame(renderFrame);
+    const startAnimation = () => {
+      if (animId === null && !document.hidden) {
+        animId = requestAnimationFrame(renderFrame);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (animId !== null) {
+          cancelAnimationFrame(animId);
+          animId = null;
+        }
+      } else {
+        startAnimation();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    startAnimation();
 
     return () => {
-      cancelAnimationFrame(animId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (animId !== null) {
+        cancelAnimationFrame(animId);
+      }
     };
   }, [isCurrentSongPlaying, currentSongData?.songId, mode]);
 

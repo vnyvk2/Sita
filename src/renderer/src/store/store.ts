@@ -41,6 +41,33 @@ dispatch({
   data: storage.getLocalStorage()
 });
 
+let prevLocalStorage: LocalStorage | undefined = store.state?.localStorage;
+let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingLocalStorage: LocalStorage | null = null;
+
+export const flushPendingLocalStorage = () => {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+  }
+  if (pendingLocalStorage) {
+    const toWrite = pendingLocalStorage;
+    pendingLocalStorage = null;
+    storage.setLocalStorage(toWrite);
+  }
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', flushPendingLocalStorage);
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      flushPendingLocalStorage();
+    }
+  });
+}
+
 store.subscribe((state) => {
   const currentState = getCurrentStoreState(state as StoreSubscriptionState);
 
@@ -48,5 +75,31 @@ store.subscribe((state) => {
     return;
   }
 
-  storage.setLocalStorage(currentState.localStorage);
+  const currentLocal = currentState.localStorage;
+  if (currentLocal === prevLocalStorage) {
+    return;
+  }
+
+  const queueChanged = currentLocal.queue !== prevLocalStorage?.queue;
+  prevLocalStorage = currentLocal;
+
+  if (queueChanged) {
+    // Immediate persist on critical queue updates to ensure restart/crash recovery
+    flushPendingLocalStorage();
+    storage.setLocalStorage(currentLocal);
+  } else {
+    // Debounce non-critical preferences, appearance, sorting changes (250ms)
+    pendingLocalStorage = currentLocal;
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      if (pendingLocalStorage) {
+        const toWrite = pendingLocalStorage;
+        pendingLocalStorage = null;
+        storage.setLocalStorage(toWrite);
+      }
+    }, 250);
+  }
 });

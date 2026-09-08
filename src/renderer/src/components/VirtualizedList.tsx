@@ -1,5 +1,5 @@
 import { useDebouncedCallback } from '@tanstack/react-pacer';
-import { type CSSProperties, type ReactNode, forwardRef, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type ReactNode, forwardRef, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Virtuoso,
   type Components,
@@ -18,6 +18,8 @@ export const DEFAULT_SCROLL_SEEK_CONFIG: ScrollSeekConfiguration = {
   enter: (velocity) => Math.abs(velocity) > 800,
   exit: (velocity) => Math.abs(velocity) < 300
 };
+
+export const DEFAULT_LIST_OVERSCAN = { main: 300, reverse: 150 };
 
 type Props<T, C = unknown> = {
   data: readonly T[];
@@ -204,10 +206,22 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
     }
   };
 
-  const resolvedComponents = {
-    ...(scrollSeekConfiguration ? { ScrollSeekPlaceholder: DefaultScrollSeekPlaceholder } : {}),
-    ...components
-  };
+  const resolvedComponents = useMemo(
+    () => ({
+      ...(scrollSeekConfiguration ? { ScrollSeekPlaceholder: DefaultScrollSeekPlaceholder } : {}),
+      ...components
+    }),
+    [scrollSeekConfiguration, components]
+  );
+
+  const effectiveIncreaseViewportBy = useMemo(
+    () =>
+      increaseViewportBy ?? {
+        top: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT,
+        bottom: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT
+      },
+    [increaseViewportBy, fixedItemHeight]
+  );
 
   return (
     <Virtuoso
@@ -221,7 +235,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
             }
       }
       data={data}
-      overscan={{ main: 300, reverse: 150 }}
+      overscan={DEFAULT_LIST_OVERSCAN}
       useWindowScroll={useWindowScroll}
       fixedItemHeight={fixedItemHeight}
       components={resolvedComponents}
@@ -243,12 +257,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
           setScrollerElement(null);
         }
       }}
-      increaseViewportBy={
-        increaseViewportBy ?? {
-          top: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT,
-          bottom: fixedItemHeight * PRELOADED_ITEM_THROUGH_VIEWPORT_COUNT
-        }
-      }
+      increaseViewportBy={effectiveIncreaseViewportBy}
       rangeChanged={(range) => {
         // Guard scroll registry updates while restoring so transient ranges don't overwrite saved position
         if (restorationStateRef.current === 'RESTORING') {

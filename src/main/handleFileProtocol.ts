@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, statSync, promises as fsp } from 'fs';
+import { createReadStream, promises as fsp, type Stats } from 'fs';
 import { pathToFileURL } from 'url';
 
 import { net } from 'electron';
@@ -19,7 +19,10 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
   try {
     const { filePath, host } = decodeNoraFilePath(req.url);
 
-    if (!existsSync(filePath)) {
+    let stat: Stats;
+    try {
+      stat = await fsp.stat(filePath);
+    } catch {
       logger.warn('File not found via nora:// protocol', { url: req.url, filePath });
       return new Response('File not found', { status: 404 });
     }
@@ -56,7 +59,6 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
     }
 
     const mimeType = mime.getType(filePath) || 'application/octet-stream';
-    const stat = statSync(filePath);
     const fileSize = stat.size;
     const mtimeMs = Math.trunc(stat.mtimeMs);
     const etag = `"${fileSize}-${mtimeMs}"`;

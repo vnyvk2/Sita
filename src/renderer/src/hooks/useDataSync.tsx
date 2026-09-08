@@ -277,18 +277,37 @@ export function invalidateWindowsContainingIds(
     const params = listQuery.queryKey?.[2];
     const listIdentity = getSongListIdentity(params);
     const version = Math.floor(dataUpdatedAt);
-    const indexById = new Map<number, number>();
-    for (let i = 0; i < data.ids.length; i += 1) {
-      indexById.set(data.ids[i], i);
-    }
 
-    for (const id of changedIds) {
-      const index = indexById.get(id);
-      if (index === undefined) continue;
-      const windowStart = Math.floor(index / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
-      client.invalidateQueries({
-        queryKey: songCacheKeys.window(listIdentity, version, windowStart)
-      });
+    if (changedIds.size <= 32) {
+      // Fast path: early-exit linear scan terminates as soon as all changed IDs are found.
+      // Avoids allocating 50k-entry Map on single-song/small-batch mutations.
+      const remaining = new Set(changedIds);
+      for (let i = 0; i < data.ids.length; i += 1) {
+        const id = data.ids[i];
+        if (remaining.has(id)) {
+          const windowStart = Math.floor(i / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
+          client.invalidateQueries({
+            queryKey: songCacheKeys.window(listIdentity, version, windowStart)
+          });
+          remaining.delete(id);
+          if (remaining.size === 0) break;
+        }
+      }
+    } else {
+      // Fallback path for bulk mutations (> 32 IDs)
+      const indexById = new Map<number, number>();
+      for (let i = 0; i < data.ids.length; i += 1) {
+        indexById.set(data.ids[i], i);
+      }
+
+      for (const id of changedIds) {
+        const index = indexById.get(id);
+        if (index === undefined) continue;
+        const windowStart = Math.floor(index / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
+        client.invalidateQueries({
+          queryKey: songCacheKeys.window(listIdentity, version, windowStart)
+        });
+      }
     }
   }
 }

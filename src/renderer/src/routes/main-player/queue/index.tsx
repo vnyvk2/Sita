@@ -210,8 +210,7 @@ function RouteComponent() {
   //   };
   // }, [fetchAllSongsData]);
 
-  const selectAllStubs = useMemo(() => currentQueue.map((id) => ({ songId: id })), [currentQueue]);
-  const selectAllHandler = useSelectAllHandler(selectAllStubs, 'songs', 'songId');
+  const selectAllHandler = useSelectAllHandler(currentQueue, 'songs');
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return undefined;

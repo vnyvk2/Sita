@@ -28,9 +28,7 @@ export const Route = createFileRoute('/main-player/genres/')({
   loader: async ({ deps }) => {
     await queryClient.ensureQueryData(
       genreQuery.all({
-        sortType: deps.sortingOrder || 'aToZ',
-        start: 0,
-        end: 30
+        sortType: deps.sortingOrder || 'aToZ'
       })
     );
   }

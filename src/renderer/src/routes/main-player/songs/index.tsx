@@ -183,11 +183,6 @@ function SongsPage() {
   const playableSongIdsRef = useRef(playableSongIds);
   playableSongIdsRef.current = playableSongIds;
 
-  const selectAllStubs = useMemo(
-    () => filteredSongIds.map((id) => ({ songId: id })),
-    [filteredSongIds]
-  );
-
   const {
     data: { languages: availableLanguages, genres: availableGenres }
   } = useSuspenseQuery(songQuery.facets());
@@ -329,7 +324,7 @@ function SongsPage() {
     []
   );
 
-  const selectAllHandler = useSelectAllHandler(selectAllStubs, 'songs', 'songId');
+  const selectAllHandler = useSelectAllHandler(filteredSongIds, 'songs');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
@@ -360,9 +355,10 @@ function SongsPage() {
   );
 
   const savedPosition = scrollKey ? scrollRegistry.get(scrollKey) : undefined;
+  const searchParams = Route.useSearch();
   const initialScrollIndex =
-    typeof Route.useSearch().scrollTopOffset === 'number'
-      ? Route.useSearch().scrollTopOffset
+    typeof searchParams.scrollTopOffset === 'number'
+      ? searchParams.scrollTopOffset
       : (savedPosition?.index ?? 0);
 
   const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
