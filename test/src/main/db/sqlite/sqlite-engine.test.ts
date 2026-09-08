@@ -389,4 +389,57 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
 
     fs.rmSync(freshTmp, { recursive: true, force: true });
   });
+
+  it('C13: migrates from v3 to v4, picking idx_songs_title_covering for default title sort', async () => {
+    const v3Tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nora-v3-migration-'));
+    const v3DbPath = path.join(v3Tmp, 'v3-test.db');
+
+    // Simulate an existing v3 database with user_version = 3 and without idx_songs_title_covering
+    const { DatabaseSync } = await import('node:sqlite');
+    const rawDb = new DatabaseSync(v3DbPath);
+    // Create base tables via BASELINE_TABLE_DDL
+    const { BASELINE_TABLE_DDL } = await import('@main/db/sqlite/ddl');
+    rawDb.exec(BASELINE_TABLE_DDL);
+    rawDb.exec('DROP INDEX IF EXISTS idx_songs_title_covering;');
+    rawDb.exec('PRAGMA user_version = 3;');
+    rawDb.close();
+
+    // Open via openSqliteEngine -> should trigger v3 -> v4 migration
+    const engineV4 = openSqliteEngine(v3DbPath);
+    const versionRow = engineV4.get('PRAGMA user_version') as { user_version: number };
+    expect(versionRow.user_version).toBe(4);
+
+    // Verify index exists
+    const idx = engineV4.get(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_songs_title_covering'"
+    ) as { name: string } | undefined;
+    expect(idx?.name).toBe('idx_songs_title_covering');
+
+    // Verify query planner picks covering index for title sort
+    const planDefault = engineV4.all(
+      'EXPLAIN QUERY PLAN SELECT id, is_blacklisted FROM songs ORDER BY title ASC, id ASC'
+    ) as { detail: string }[];
+    const defaultDetail = planDefault.map((p) => p.detail).join(' ');
+    expect(defaultDetail).toContain('COVERING INDEX idx_songs_title_covering');
+
+    // Verify favorite query uses existing favorite index
+    const planFav = engineV4.all(
+      'EXPLAIN QUERY PLAN SELECT id, is_blacklisted FROM songs WHERE is_favorite = 1 ORDER BY title ASC, id ASC'
+    ) as { detail: string }[];
+    const favDetail = planFav.map((p) => p.detail).join(' ');
+    expect(favDetail).toContain('idx_songs_favorite_title');
+
+    // Test self-heal: drop index, reset user_version to 4, re-open
+    engineV4.exec('DROP INDEX idx_songs_title_covering;');
+    await engineV4.close();
+
+    const repairedEngine = openSqliteEngine(v3DbPath);
+    const repairedIdx = repairedEngine.get(
+      "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_songs_title_covering'"
+    ) as { name: string } | undefined;
+    expect(repairedIdx?.name).toBe('idx_songs_title_covering');
+
+    await repairedEngine.close();
+    fs.rmSync(v3Tmp, { recursive: true, force: true });
+  });
 });

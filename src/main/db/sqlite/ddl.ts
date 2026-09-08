@@ -117,6 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_songs_created_title ON songs (created_at DESC, ti
 CREATE INDEX IF NOT EXISTS idx_songs_modified_title ON songs (file_modified_at DESC, title);
 CREATE INDEX IF NOT EXISTS idx_songs_favorite_title ON songs (is_favorite, title);
 CREATE INDEX IF NOT EXISTS idx_songs_folder_title ON songs (folder_id, title);
+CREATE INDEX IF NOT EXISTS idx_songs_title_covering ON songs (title, id, is_blacklisted);
 
 CREATE TABLE IF NOT EXISTS artworks (
   id INTEGER PRIMARY KEY,
@@ -577,5 +578,5 @@ END;`;
   .join('\n');
 
 export const BASELINE_DDL = BASELINE_TABLE_DDL + '\n' + ftsDDL;
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 void searchable;

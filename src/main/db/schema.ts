@@ -180,7 +180,8 @@ export const songs = sqliteTable(
     index('idx_songs_created_title').on(t.createdAt, t.title),
     index('idx_songs_modified_title').on(t.fileModifiedAt, t.title),
     index('idx_songs_favorite_title').on(t.isFavorite, t.title),
-    index('idx_songs_folder_title').on(t.folderId, t.title)
+    index('idx_songs_folder_title').on(t.folderId, t.title),
+    index('idx_songs_title_covering').on(t.title, t.id, t.isBlacklisted)
   ]
 );
 

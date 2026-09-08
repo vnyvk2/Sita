@@ -108,7 +108,7 @@ function buildDrizzle(db: DatabaseSync) {
   const withTxLock = async <T>(fn: () => Promise<T>): Promise<T> => {
     const prev = txLock;
     let release!: () => void;
-    const lock = new Promise<void>((r) => (release = r));
+    const lock = new Promise<void>((resolve) => (release = resolve));
     txLock = lock;
     try {
       if (prev) await prev;
@@ -245,6 +245,19 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
       );
     }
 
+    if (currentVersion === 3) {
+      db.exec(`
+        BEGIN IMMEDIATE;
+        CREATE INDEX IF NOT EXISTS idx_songs_title_covering ON songs (title, id, is_blacklisted);
+        PRAGMA user_version = 4;
+        COMMIT;
+      `);
+      currentVersion = 4;
+      logger.info(
+        `SQLite incremental schema migration applied (v3 -> v4) in ${Math.round(performance.now() - tDdl)}ms`
+      );
+    }
+
     // Defensive check: ensure all required v2 and v3 columns exist on user_settings
     const userSettingsCols = new Set(
       (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
@@ -270,6 +283,32 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
         BEGIN IMMEDIATE;
         ALTER TABLE user_settings ADD COLUMN is_mini_player_taskbar_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_taskbar_hidden IN (0,1));
         PRAGMA user_version = 3;
+        COMMIT;
+      `);
+    }
+
+    // Defensive self-heal check for C13 covering index
+    const songsCols = new Set(
+      (db.prepare('PRAGMA table_info(songs)').all() as { name: string }[]).map((c) => c.name)
+    );
+    const songsIndexes = new Set(
+      (
+        db
+          .prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='songs'")
+          .all() as { name: string }[]
+      ).map((i) => i.name)
+    );
+    if (
+      songsCols.has('title') &&
+      songsCols.has('id') &&
+      songsCols.has('is_blacklisted') &&
+      !songsIndexes.has('idx_songs_title_covering')
+    ) {
+      logger.warn('Detected missing idx_songs_title_covering index on songs; applying schema repair');
+      db.exec(`
+        BEGIN IMMEDIATE;
+        CREATE INDEX IF NOT EXISTS idx_songs_title_covering ON songs (title, id, is_blacklisted);
+        PRAGMA user_version = 4;
         COMMIT;
       `);
     }
