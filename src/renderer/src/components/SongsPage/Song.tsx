@@ -37,6 +37,12 @@ import HighlightedText from '../SearchPage/HighlightedText';
 import SoundBarsIndicator from '../SoundBarsIndicator';
 import SongArtist from './SongArtist';
 import { buildSongPlaylistMenuItem } from './songPlaylistMenu';
+import {
+  resolveAutoTagSongs,
+  updateMissingArtworkForSongs,
+  updateMissingLyricsForSongs,
+  type SongDataForAutoTag
+} from '../../utils/autoTagUtils';
 
 const BlacklistSongConfrimPrompt = lazy(() => import('./BlacklistSongConfirmPrompt'));
 const DeleteSongsFromSystemConfrimPrompt = lazy(
@@ -133,7 +139,9 @@ const Song = memo(
       toggleMultipleSelections,
       updateMultipleSelections,
       createQueue,
-      openAutoTagDialog
+      openAutoTagDialog,
+      openTrackIdentifyDialog,
+      openGenreStyleDialog
     } = useContext(AppUpdateContext);
     const { t } = useTranslation();
     const navigate = useNavigate();
@@ -584,34 +592,192 @@ const Song = memo(
           }
         },
         {
-          label: 'Auto Tag Track',
-          class: 'auto-tag-track',
-          iconName: 'audiotrack',
-          handlerFunction: () => {
+          label: 'Auto Tag Album',
+          class: 'auto-tag-album',
+          iconName: 'album',
+          handlerFunction: async () => {
             if (openAutoTagDialog) {
+              let targetSongs: SongDataForAutoTag[] = [
+                {
+                  songId,
+                  title,
+                  artists,
+                  album,
+                  genres,
+                  trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+                  discNo,
+                  year,
+                  path,
+                  duration
+                }
+              ];
+              if (isMultiSelectionActive) {
+                const resolved = await resolveAutoTagSongs(songIds);
+                if (resolved.length > 0) targetSongs = resolved;
+              }
               openAutoTagDialog(
-                [{ songId, title, artists, album, genres, trackNo, discNo, year, path }],
-                title,
-                artists?.[0]?.name,
-                'track'
+                targetSongs,
+                album?.name ?? targetSongs[0]?.album?.name ?? title,
+                artists?.[0]?.name ?? targetSongs[0]?.artists?.[0]?.name,
+                'album'
               );
             }
           }
         },
         {
-          label: 'Auto Tag Album',
-          class: 'auto-tag-album',
-          iconName: 'album',
-          handlerFunction: () => {
-            if (openAutoTagDialog) {
-              openAutoTagDialog(
-                [{ songId, title, artists, album, genres, trackNo, discNo, year, path }],
-                album?.name ?? title,
-                artists?.[0]?.name,
-                'album'
-              );
+          label: 'Auto Tag Track',
+          class: 'auto-tag-track',
+          iconName: 'audiotrack',
+          handlerFunction: null,
+          innerContextMenus: [
+            {
+              label: 'Identify Track and Update Tags',
+              iconName: 'fingerprint',
+              handlerFunction: async () => {
+                if (openTrackIdentifyDialog) {
+                  let targetSongs: SongDataForAutoTag[] = [
+                    {
+                      songId,
+                      title,
+                      artists,
+                      album,
+                      genres,
+                      trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+                      discNo,
+                      year,
+                      path,
+                      duration
+                    }
+                  ];
+                  if (isMultiSelectionActive) {
+                    const resolved = await resolveAutoTagSongs(songIds);
+                    if (resolved.length > 0) targetSongs = resolved;
+                  }
+                  openTrackIdentifyDialog(targetSongs);
+                }
+              }
+            },
+            {
+              label: 'Update Only Genres & Styles',
+              iconName: 'label',
+              handlerFunction: async () => {
+                if (openGenreStyleDialog) {
+                  let targetSongs: SongDataForAutoTag[] = [
+                    {
+                      songId,
+                      title,
+                      artists,
+                      album,
+                      genres,
+                      trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+                      discNo,
+                      year,
+                      path,
+                      duration
+                    }
+                  ];
+                  if (isMultiSelectionActive) {
+                    const resolved = await resolveAutoTagSongs(songIds);
+                    if (resolved.length > 0) targetSongs = resolved;
+                  }
+                  openGenreStyleDialog(targetSongs);
+                }
+              }
+            },
+            {
+              label: 'Update Missing Artwork',
+              iconName: 'image',
+              handlerFunction: async () => {
+                let targetSongs: SongDataForAutoTag[] = [
+                  {
+                    songId,
+                    title,
+                    artists,
+                    album,
+                    genres,
+                    trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+                    discNo,
+                    year,
+                    path,
+                    duration
+                  }
+                ];
+                if (isMultiSelectionActive) {
+                  const resolved = await resolveAutoTagSongs(songIds);
+                  if (resolved.length > 0) targetSongs = resolved;
+                }
+                addNewNotifications([
+                  {
+                    id: `artwork-update-${Date.now()}`,
+                    content: `Updating artwork for ${targetSongs.length} track${targetSongs.length > 1 ? 's' : ''}...`,
+                    iconName: 'image',
+                    duration: 4000
+                  }
+                ]);
+                const stats = await updateMissingArtworkForSongs(targetSongs);
+                addNewNotifications([
+                  {
+                    id: `artwork-done-${Date.now()}`,
+                    content: `Artwork update complete: ${stats.updated} updated, ${stats.skipped} skipped.`,
+                    iconName: stats.updated > 0 ? 'check_circle' : 'info',
+                    duration: 5000
+                  }
+                ]);
+              }
+            },
+            {
+              label: 'Update Missing Lyrics',
+              iconName: 'lyrics',
+              handlerFunction: async () => {
+                let targetSongs: SongDataForAutoTag[] = [
+                  {
+                    songId,
+                    title,
+                    artists,
+                    album,
+                    genres,
+                    trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+                    discNo,
+                    year,
+                    path,
+                    duration
+                  }
+                ];
+                if (isMultiSelectionActive) {
+                  const resolved = await resolveAutoTagSongs(songIds);
+                  if (resolved.length > 0) targetSongs = resolved;
+                }
+                addNewNotifications([
+                  {
+                    id: `lyrics-update-${Date.now()}`,
+                    content: `Searching missing lyrics for ${targetSongs.length} track${targetSongs.length > 1 ? 's' : ''}...`,
+                    iconName: 'lyrics',
+                    duration: 4000
+                  }
+                ]);
+                const stats = await updateMissingLyricsForSongs(targetSongs);
+                addNewNotifications([
+                  {
+                    id: `lyrics-done-${Date.now()}`,
+                    content: `Lyrics update complete: ${stats.updated} updated, ${stats.skipped} skipped.`,
+                    iconName: stats.updated > 0 ? 'check_circle' : 'info',
+                    duration: 5000
+                  }
+                ]);
+              }
+            },
+            {
+              label: 'Infer Tags from Filename',
+              iconName: 'description',
+              handlerFunction: () => {
+                const targetIds = isMultiSelectionActive ? songIds : [songId];
+                navigate({
+                  to: '/main-player/songs/batch-edit',
+                  search: { songIds: targetIds }
+                });
+              }
             }
-          }
+          ]
         },
         {
           label: t('song.reparseSong'),
@@ -699,6 +865,8 @@ const Song = memo(
       album,
       navigate,
       openAutoTagDialog,
+      openTrackIdentifyDialog,
+      openGenreStyleDialog,
       artists,
       path,
       isBlacklisted,
@@ -707,7 +875,8 @@ const Song = memo(
       genres,
       year,
       discNo,
-      trackNo
+      trackNo,
+      duration
     ]);
 
     return (
