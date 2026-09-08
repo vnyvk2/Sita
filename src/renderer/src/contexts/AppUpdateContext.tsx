@@ -44,6 +44,12 @@ export interface AppUpdateContextType {
     workflow?: import('../hooks/useMetadataWorkflow').WorkflowType
   ) => void;
   closeAutoTagDialog?: () => void;
+  openTrackIdentifyDialog?: (
+    songs: import('../utils/autoTagUtils').SongDataForAutoTag[]
+  ) => void;
+  openGenreStyleDialog?: (
+    songs: import('../utils/autoTagUtils').SongDataForAutoTag[]
+  ) => void;
   createQueue: (
     songIds: number[],
     queueType: QueueTypes,
