@@ -151,14 +151,40 @@ const audioLibraryControls = {
     ipcRenderer.on('library/scanProgress', callback),
   removeScanProgressEventListener: (callback: (_: unknown, progress: ScannerProgress) => void) =>
     ipcRenderer.removeListener('library/scanProgress', callback),
-  getSongInfo: (
+  getSongInfo: ((
     songIds: number[],
     sortType?: SongSortTypes,
     filterType?: SongFilterTypes,
     limit?: number,
-    preserveIdOrder = false
-  ): Promise<SongData[] | undefined> =>
-    ipcRenderer.invoke('app/getSongInfo', songIds, sortType, filterType, limit, preserveIdOrder),
+    preserveIdOrder = false,
+    options?: WindowHydrationOptions
+  ) =>
+    ipcRenderer.invoke(
+      'app/getSongInfo',
+      songIds,
+      sortType,
+      filterType,
+      limit,
+      preserveIdOrder,
+      options
+    )) as {
+    (
+      songIds: number[],
+      sortType?: SongSortTypes,
+      filterType?: SongFilterTypes,
+      limit?: number,
+      preserveIdOrder?: boolean,
+      options?: { generationToken: number; priority?: 'target' | 'lookahead'; listIdentity?: string }
+    ): Promise<SongData[] | CancelledHydrationResponse | undefined>;
+    (
+      songIds: number[],
+      sortType?: SongSortTypes,
+      filterType?: SongFilterTypes,
+      limit?: number,
+      preserveIdOrder?: boolean,
+      options?: { generationToken?: undefined; priority?: 'target' | 'lookahead'; listIdentity?: string }
+    ): Promise<SongData[] | undefined>;
+  },
   getAllHistorySongs: (
     sortType?: SongSortTypes,
     paginatingData?: PaginatingData,

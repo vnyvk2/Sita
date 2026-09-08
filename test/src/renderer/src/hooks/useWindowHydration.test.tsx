@@ -252,4 +252,66 @@ describe('useWindowHydration - Query Identity & Cache Key Separation', () => {
     expect(renderCount).toBe(settledRenderCount + 1);
     expect(result.current.getItem).toBe(initialGetItem);
   });
+
+  it('handles main-process cancelled responses gracefully without cache poisoning', async () => {
+    const timestamp = 1700000000000;
+    const ids = [1, 2, 3];
+
+    // Mock API returns cancelled response simulating superseded generation
+    (window as any).api.audioLibraryControls.getSongInfo = vi.fn().mockResolvedValue({
+      cancelled: true,
+      generationToken: 0
+    });
+
+    const identity = getSongListIdentity({ sortType: 'aToZ' } as any);
+
+    const { result } = renderHook(
+      () =>
+        useWindowHydration(ids, timestamp, {
+          listIdentity: identity,
+          keyPrefix: 'songs'
+        }),
+      { wrapper }
+    );
+
+    // getItem should remain undefined (skeleton fallback) rather than empty corrupted cache
+    expect(result.current.getItem(0)).toBeUndefined();
+
+    // Verify queryCache does not hold successful data for this cancelled window
+    const cachedData = queryClient.getQueryData(['songs', 'window', identity, timestamp, 0]);
+    expect(cachedData).toBeUndefined();
+  });
+
+  it('cancels evicted in-flight queries when scrolling across distant windows', async () => {
+    const timestamp = 1700000000000;
+    const ids = Array.from({ length: 5000 }, (_, i) => i + 1);
+    const cancelQueriesSpy = vi.spyOn(queryClient, 'cancelQueries');
+
+    const identity = getSongListIdentity({ sortType: 'aToZ' } as any);
+
+    const { result } = renderHook(
+      () =>
+        useWindowHydration(ids, timestamp, {
+          listIdentity: identity,
+          keyPrefix: 'songs'
+        }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(result.current.getItem(0)).toBeDefined();
+    });
+
+    // Fling far away to index 4000 (Window 20)
+    act(() => {
+      result.current.onRangeChange({ startIndex: 4000, endIndex: 4015 });
+    });
+
+    // Verify cancelQueries was called for Window 0
+    expect(cancelQueriesSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['songs', 'window', identity, timestamp, 0]
+      })
+    );
+  });
 });

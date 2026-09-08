@@ -34,6 +34,7 @@ import { getFolderStructures } from './core/getFolderStructures';
 import getGenresInfo from './core/getGenresInfo';
 import { getListeningData } from './core/getListeningData';
 import getMusicFolderData from './core/getMusicFolderData';
+import { hydrationCoordinator, type WindowHydrationOptions } from './core/hydrationCoordinator';
 import getSongInfo from './core/getSongInfo';
 import getSongLyrics from './core/getSongLyrics';
 import getSongWaveform from './core/getSongWaveform';
@@ -504,29 +505,57 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         sortType?: SongSortTypes,
         filterType?: SongFilterTypes,
         limit?: number,
-        preserveIdOrder = false
+        preserveIdOrder = false,
+        options?: WindowHydrationOptions
       ) => {
-        const tStart = performance.now();
-        const results = await memProfiler.wrapHandler('app/getSongInfo', () =>
-          getSongInfo(songIds, sortType, filterType, limit, preserveIdOrder)
-        );
-        const tSqlEnd = performance.now();
-
-        // Approximate IPC structured-clone marshalling cost
-        const tCloneStart = performance.now();
-        structuredClone(results);
-        const tCloneEnd = performance.now();
-
-        const sqlDuration = tSqlEnd - tStart;
-        const cloneDuration = tCloneEnd - tCloneStart;
-
-        if (songIds && songIds.length >= 50) {
-          logger.info(
-            `[TRACE:Main:getSongInfo] count=${results?.length ?? 0} requestedIds=${songIds.length} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
+        // Uncoordinated path: if no generationToken is provided, execute immediately as before
+        if (!options || options.generationToken === undefined) {
+          const tStart = performance.now();
+          const results = await memProfiler.wrapHandler('app/getSongInfo', () =>
+            getSongInfo(songIds, sortType, filterType, limit, preserveIdOrder)
           );
+          const tSqlEnd = performance.now();
+
+          // Approximate IPC structured-clone marshalling cost
+          const tCloneStart = performance.now();
+          structuredClone(results);
+          const tCloneEnd = performance.now();
+
+          const sqlDuration = tSqlEnd - tStart;
+          const cloneDuration = tCloneEnd - tCloneStart;
+
+          if (songIds && songIds.length >= 50) {
+            logger.info(
+              `[TRACE:Main:getSongInfo] count=${results?.length ?? 0} requestedIds=${songIds.length} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
+            );
+          }
+
+          return results;
         }
 
-        return results;
+        // Coordinated path: routed through HydrationCoordinator
+        return hydrationCoordinator.schedule(options, async () => {
+          const tStart = performance.now();
+          const results = await memProfiler.wrapHandler('app/getSongInfo', () =>
+            getSongInfo(songIds, sortType, filterType, limit, preserveIdOrder)
+          );
+          const tSqlEnd = performance.now();
+
+          const tCloneStart = performance.now();
+          structuredClone(results);
+          const tCloneEnd = performance.now();
+
+          const sqlDuration = tSqlEnd - tStart;
+          const cloneDuration = tCloneEnd - tCloneStart;
+
+          if (songIds && songIds.length >= 50) {
+            logger.info(
+              `[TRACE:Main:getSongInfo:coordinated] count=${results?.length ?? 0} requestedIds=${songIds.length} token=${options.generationToken} priority=${options.priority} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
+            );
+          }
+
+          return results;
+        });
       }
     );
 

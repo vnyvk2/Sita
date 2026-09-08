@@ -1,5 +1,5 @@
 import { useQueries, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { SONG_WINDOW_GC_TIME, SONG_WINDOW_SIZE, SONG_WINDOW_STALE_TIME } from '../queries/songs';
 import { scrollTrace } from '../utils/scrollTrace';
@@ -60,9 +60,117 @@ export function useWindowHydration(
   const idsRef = useRef(ids);
   idsRef.current = ids;
 
+  const coordListIdentity = `${keyPrefix}:${listIdentity}`;
+  const generationRef = useRef(0);
+  const lookaheadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Bump generation token and clear pending lookaheads when list version changes
+  const prevIdsVersionRef = useRef(idsVersion);
+  if (prevIdsVersionRef.current !== idsVersion) {
+    prevIdsVersionRef.current = idsVersion;
+    generationRef.current += 1;
+    if (lookaheadTimerRef.current) {
+      clearTimeout(lookaheadTimerRef.current);
+    }
+  }
+
   // Snapped strictly to 200-row window chunks to prevent firing state updates on every scroll frame
   const [windowBounds, setWindowBounds] = useState<WindowBounds>(() =>
     computeWindowBounds(initialIndex, initialIndex, extraRowsBefore, extraRowsAfter, ids.length)
+  );
+
+  const scheduleLookahead = useCallback(
+    (bounds: WindowBounds, token: number) => {
+      if (!enabled || ids.length === 0 || !idsVersion) return;
+      const maxWindow = Math.floor(Math.max(ids.length - 1, 0) / SONG_WINDOW_SIZE);
+
+      // Forward lookahead
+      const lookaheadForward = bounds.lastWindow + 1;
+      if (lookaheadForward <= maxWindow) {
+        const lookaheadStart = lookaheadForward * SONG_WINDOW_SIZE;
+        const lookaheadEnd = Math.min(lookaheadStart + SONG_WINDOW_SIZE, ids.length);
+        if (lookaheadStart < lookaheadEnd) {
+          scrollTrace.onRequestScheduled(lookaheadStart, true);
+          queryClient.prefetchQuery({
+            queryKey: [keyPrefix, 'window', listIdentity, idsVersion, lookaheadStart],
+            queryFn: async () => {
+              scrollTrace.onRequestStarted(lookaheadStart);
+              const t0 = performance.now();
+              try {
+                const res = await window.api.audioLibraryControls.getSongInfo(
+                  idsRef.current.slice(lookaheadStart, lookaheadEnd),
+                  undefined,
+                  undefined,
+                  undefined,
+                  true,
+                  {
+                    generationToken: token,
+                    priority: 'lookahead',
+                    listIdentity: coordListIdentity
+                  }
+                );
+                if (res && 'cancelled' in res && res.cancelled) {
+                  const err = new Error(`Lookahead window ${lookaheadStart} cancelled (generation ${token})`);
+                  err.name = 'AbortError';
+                  throw err;
+                }
+                scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, res?.length ?? 0);
+                return res as SongData[];
+              } catch (e) {
+                scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, 0);
+                throw e;
+              }
+            },
+            staleTime: SONG_WINDOW_STALE_TIME,
+            gcTime: SONG_WINDOW_GC_TIME
+          });
+        }
+      }
+
+      // Backward lookahead
+      const lookaheadBackward = bounds.firstWindow - 1;
+      if (lookaheadBackward >= 0) {
+        const lookaheadStart = lookaheadBackward * SONG_WINDOW_SIZE;
+        const lookaheadEnd = Math.min(lookaheadStart + SONG_WINDOW_SIZE, ids.length);
+        if (lookaheadStart < lookaheadEnd) {
+          scrollTrace.onRequestScheduled(lookaheadStart, true);
+          queryClient.prefetchQuery({
+            queryKey: [keyPrefix, 'window', listIdentity, idsVersion, lookaheadStart],
+            queryFn: async () => {
+              scrollTrace.onRequestStarted(lookaheadStart);
+              const t0 = performance.now();
+              try {
+                const res = await window.api.audioLibraryControls.getSongInfo(
+                  idsRef.current.slice(lookaheadStart, lookaheadEnd),
+                  undefined,
+                  undefined,
+                  undefined,
+                  true,
+                  {
+                    generationToken: token,
+                    priority: 'lookahead',
+                    listIdentity: coordListIdentity
+                  }
+                );
+                if (res && 'cancelled' in res && res.cancelled) {
+                  const err = new Error(`Lookahead window ${lookaheadStart} cancelled (generation ${token})`);
+                  err.name = 'AbortError';
+                  throw err;
+                }
+                scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, res?.length ?? 0);
+                return res as SongData[];
+              } catch (e) {
+                scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, 0);
+                throw e;
+              }
+            },
+            staleTime: SONG_WINDOW_STALE_TIME,
+            gcTime: SONG_WINDOW_GC_TIME
+          });
+        }
+      }
+    },
+    [enabled, ids.length, idsVersion, queryClient, keyPrefix, listIdentity, coordListIdentity]
   );
 
   const handleRangeChange = useCallback(
@@ -76,74 +184,14 @@ export function useWindowHydration(
         ids.length
       );
 
-      // Aligned chunk lookahead prefetching: prefetch the next and previous windows ahead in the background (0 React re-renders)
-      if (enabled && ids.length > 0 && idsVersion) {
-        const maxWindow = Math.floor(Math.max(ids.length - 1, 0) / SONG_WINDOW_SIZE);
-        // Forward lookahead
-        const lookaheadForward = nextBounds.lastWindow + 1;
-        if (lookaheadForward <= maxWindow) {
-          const lookaheadStart = lookaheadForward * SONG_WINDOW_SIZE;
-          const lookaheadEnd = Math.min(lookaheadStart + SONG_WINDOW_SIZE, ids.length);
-          if (lookaheadStart < lookaheadEnd) {
-            scrollTrace.onRequestScheduled(lookaheadStart, true);
-            queryClient.prefetchQuery({
-              queryKey: [keyPrefix, 'window', listIdentity, idsVersion, lookaheadStart],
-              queryFn: async () => {
-                scrollTrace.onRequestStarted(lookaheadStart);
-                const t0 = performance.now();
-                try {
-                  const res = await window.api.audioLibraryControls.getSongInfo(
-                    idsRef.current.slice(lookaheadStart, lookaheadEnd),
-                    undefined,
-                    undefined,
-                    undefined,
-                    true
-                  );
-                  scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, res?.length ?? 0);
-                  return res;
-                } catch (e) {
-                  scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, 0);
-                  throw e;
-                }
-              },
-              staleTime: SONG_WINDOW_STALE_TIME,
-              gcTime: SONG_WINDOW_GC_TIME
-            });
-          }
-        }
-        // Backward lookahead
-        const lookaheadBackward = nextBounds.firstWindow - 1;
-        if (lookaheadBackward >= 0) {
-          const lookaheadStart = lookaheadBackward * SONG_WINDOW_SIZE;
-          const lookaheadEnd = Math.min(lookaheadStart + SONG_WINDOW_SIZE, ids.length);
-          if (lookaheadStart < lookaheadEnd) {
-            scrollTrace.onRequestScheduled(lookaheadStart, true);
-            queryClient.prefetchQuery({
-              queryKey: [keyPrefix, 'window', listIdentity, idsVersion, lookaheadStart],
-              queryFn: async () => {
-                scrollTrace.onRequestStarted(lookaheadStart);
-                const t0 = performance.now();
-                try {
-                  const res = await window.api.audioLibraryControls.getSongInfo(
-                    idsRef.current.slice(lookaheadStart, lookaheadEnd),
-                    undefined,
-                    undefined,
-                    undefined,
-                    true
-                  );
-                  scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, res?.length ?? 0);
-                  return res;
-                } catch (e) {
-                  scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, 0);
-                  throw e;
-                }
-              },
-              staleTime: SONG_WINDOW_STALE_TIME,
-              gcTime: SONG_WINDOW_GC_TIME
-            });
-          }
-        }
+      // Debounce lookahead prefetching by 100ms: during rapid scrolling, intermediate lookaheads
+      // are suppressed completely, eliminating tens of obsolete IPC requests
+      if (lookaheadTimerRef.current) {
+        clearTimeout(lookaheadTimerRef.current);
       }
+      lookaheadTimerRef.current = setTimeout(() => {
+        scheduleLookahead(nextBounds, generationRef.current);
+      }, 100);
 
       setWindowBounds((prev) => {
         if (
@@ -152,11 +200,32 @@ export function useWindowHydration(
         ) {
           return prev; // BAIL OUT: Zero state updates, Zero parent component re-renders!
         }
+        generationRef.current += 1;
+
+        // Cancel in-flight queries for windows that are now evicted from the active range
+        for (let w = prev.firstWindow; w <= prev.lastWindow; w += 1) {
+          if (w < nextBounds.firstWindow || w > nextBounds.lastWindow) {
+            const evictedStart = w * SONG_WINDOW_SIZE;
+            queryClient.cancelQueries({
+              queryKey: [keyPrefix, 'window', listIdentity, idsVersion, evictedStart]
+            });
+          }
+        }
+
         return nextBounds;
       });
     },
-    [extraRowsBefore, extraRowsAfter, ids.length, idsVersion, enabled, keyPrefix, listIdentity, queryClient]
+    [extraRowsBefore, extraRowsAfter, ids.length, idsVersion, keyPrefix, listIdentity, queryClient, scheduleLookahead]
   );
+
+  // Clear pending lookahead timers on unmount
+  useEffect(() => {
+    return () => {
+      if (lookaheadTimerRef.current) {
+        clearTimeout(lookaheadTimerRef.current);
+      }
+    };
+  }, []);
 
   const windows = useMemo<WindowRange[]>(() => {
     if (!enabled || ids.length === 0 || !idsVersion) {
@@ -178,6 +247,7 @@ export function useWindowHydration(
     queries: windows.map((win) => ({
       queryKey: [keyPrefix, 'window', listIdentity, idsVersion, win.startIndex],
       queryFn: async () => {
+        const token = generationRef.current;
         scrollTrace.onRequestScheduled(win.startIndex, false);
         scrollTrace.onRequestStarted(win.startIndex);
         const t0 = performance.now();
@@ -187,10 +257,20 @@ export function useWindowHydration(
             undefined,
             undefined,
             undefined,
-            true
+            true,
+            {
+              generationToken: token,
+              priority: 'target',
+              listIdentity: coordListIdentity
+            }
           );
+          if (res && 'cancelled' in res && res.cancelled) {
+            const err = new Error(`Target window ${win.startIndex} cancelled (generation ${token})`);
+            err.name = 'AbortError';
+            throw err;
+          }
           scrollTrace.onRequestResolved(win.startIndex, performance.now() - t0, res?.length ?? 0);
-          return res;
+          return res as SongData[];
         } catch (e) {
           scrollTrace.onRequestResolved(win.startIndex, performance.now() - t0, 0);
           throw e;
@@ -198,6 +278,7 @@ export function useWindowHydration(
       },
       staleTime: SONG_WINDOW_STALE_TIME,
       gcTime: SONG_WINDOW_GC_TIME,
+      retry: false,
       enabled
     }))
   });
@@ -207,7 +288,7 @@ export function useWindowHydration(
     queries.forEach((query, i) => {
       const win = windows[i];
       const data = query.data;
-      if (!win || !data) return;
+      if (!win || !data || !Array.isArray(data)) return;
 
       const responseById = new Map<number, SongData>();
       for (const item of data) {
@@ -261,7 +342,7 @@ export function useWindowHydration(
         windowStart
       ]);
 
-      if (cachedData && cachedData.length > 0) {
+      if (cachedData && Array.isArray(cachedData) && cachedData.length > 0) {
         if (targetId !== undefined) {
           const offset = index - windowStart;
           const candidate = cachedData[offset];

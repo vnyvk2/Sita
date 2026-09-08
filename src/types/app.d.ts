@@ -530,6 +530,17 @@ declare global {
     y: number;
   }
 
+  interface WindowHydrationOptions {
+    generationToken?: number;
+    priority?: 'target' | 'lookahead';
+    listIdentity?: string;
+  }
+
+  interface CancelledHydrationResponse {
+    cancelled: true;
+    generationToken?: number;
+  }
+
   type WindowState = 'maximized' | 'normal' | 'minimized';
   interface MusicFolderData {
     path: string;

@@ -87,7 +87,12 @@ describe('useWindowHydrationProgressive — Tiers 1, 2 & 3 Validation Suite', ()
         undefined,
         undefined,
         undefined,
-        true
+        true,
+        expect.objectContaining({
+          generationToken: expect.any(Number),
+          listIdentity: 'songs:main-library',
+          priority: 'target'
+        })
       );
 
       // Scroll to range [180..210] -> overlaps window 0 and window 1 (200..399)
@@ -105,7 +110,12 @@ describe('useWindowHydrationProgressive — Tiers 1, 2 & 3 Validation Suite', ()
         undefined,
         undefined,
         undefined,
-        true
+        true,
+        expect.objectContaining({
+          generationToken: expect.any(Number),
+          listIdentity: 'songs:main-library',
+          priority: 'target'
+        })
       );
     });
 
@@ -230,7 +240,12 @@ describe('useWindowHydrationProgressive — Tiers 1, 2 & 3 Validation Suite', ()
         undefined,
         undefined,
         undefined,
-        true
+        true,
+        expect.objectContaining({
+          generationToken: expect.any(Number),
+          listIdentity: 'songs:5k-library',
+          priority: 'target'
+        })
       );
     });
 
@@ -428,7 +443,12 @@ describe('useWindowHydrationProgressive — Tiers 1, 2 & 3 Validation Suite', ()
         undefined,
         undefined,
         undefined,
-        true
+        true,
+        expect.objectContaining({
+          generationToken: expect.any(Number),
+          listIdentity: 'songs:lookahead-test',
+          priority: 'target'
+        })
       );
 
       const renderCountBefore = renderCount;
