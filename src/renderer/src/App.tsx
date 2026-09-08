@@ -7,6 +7,7 @@ import { GenreStyleDialog } from './components/autotag/GenreStyleDialog';
 import { MetadataCenterDialog } from './components/autotag/MetadataCenterDialog';
 import { TrackIdentifyDialog } from './components/autotag/TrackIdentifyDialog';
 import ContextMenu from './components/ContextMenu/ContextMenu';
+import ErrorBoundary from './components/ErrorBoundary';
 import FullScreenPlayer from './components/FullScreenPlayer/FullScreenPlayer';
 import MiniPlayer from './components/MiniPlayer/MiniPlayer';
 import PromptMenu from './components/PromptMenu/PromptMenu';
