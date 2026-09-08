@@ -63,6 +63,8 @@ resources/bin/
 sqlite-migration-progress.md
 PHASE_13_METADATA_PLATFORM.md
 HANDOFF.md
+PERFORMANCE_OPTIMIZATIONS_WALKTHROUGH.md
+walkthrough.md
 tasks/
 plans/
 phases imp/

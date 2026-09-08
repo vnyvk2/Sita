@@ -481,19 +481,53 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       saveLyricsToSong(songPath, lyrics)
     );
 
+    // Main-process event-loop heartbeat to detect sync blocking (e.g. SQLite / Sharp contention)
+    let lastHeartbeat = performance.now();
+    const HEARTBEAT_INTERVAL_MS = 50;
+    const DRIFT_THRESHOLD_MS = 100;
+    setInterval(() => {
+      const now = performance.now();
+      const drift = now - lastHeartbeat - HEARTBEAT_INTERVAL_MS;
+      if (drift > DRIFT_THRESHOLD_MS) {
+        logger.warn(
+          `[Main EventLoop Drift] Heartbeat delayed by ${drift.toFixed(1)}ms (threshold: ${DRIFT_THRESHOLD_MS}ms)`
+        );
+      }
+      lastHeartbeat = now;
+    }, HEARTBEAT_INTERVAL_MS).unref();
+
     ipcMain.handle(
       'app/getSongInfo',
-      (
+      async (
         _,
         songIds: number[],
         sortType?: SongSortTypes,
         filterType?: SongFilterTypes,
         limit?: number,
         preserveIdOrder = false
-      ) =>
-        memProfiler.wrapHandler('app/getSongInfo', () =>
+      ) => {
+        const tStart = performance.now();
+        const results = await memProfiler.wrapHandler('app/getSongInfo', () =>
           getSongInfo(songIds, sortType, filterType, limit, preserveIdOrder)
-        )
+        );
+        const tSqlEnd = performance.now();
+
+        // Approximate IPC structured-clone marshalling cost
+        const tCloneStart = performance.now();
+        structuredClone(results);
+        const tCloneEnd = performance.now();
+
+        const sqlDuration = tSqlEnd - tStart;
+        const cloneDuration = tCloneEnd - tCloneStart;
+
+        if (songIds && songIds.length >= 50) {
+          logger.info(
+            `[TRACE:Main:getSongInfo] count=${results?.length ?? 0} requestedIds=${songIds.length} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
+          );
+        }
+
+        return results;
+      }
     );
 
     ipcMain.handle('app/getSimilarTracksForASong', (_, songId: number) => getSimilarTracks(songId));

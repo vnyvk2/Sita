@@ -10,13 +10,26 @@ import {
 } from 'react-virtuoso';
 
 import { scrollRegistry } from '../utils/scrollStore';
+import { scrollTrace } from '../utils/scrollTrace';
 
 export const SCROLL_IDLE_MS = 150;
 export const MIN_HOLD_MS = 400;
 
 export const DEFAULT_SCROLL_SEEK_CONFIG: ScrollSeekConfiguration = {
-  enter: (velocity) => Math.abs(velocity) > 800,
-  exit: (velocity) => Math.abs(velocity) < 300
+  enter: (velocity) => {
+    const shouldEnter = Math.abs(velocity) > 800;
+    if (shouldEnter) {
+      scrollTrace.onSeek('enter', velocity);
+    }
+    return shouldEnter;
+  },
+  exit: (velocity) => {
+    const shouldExit = Math.abs(velocity) < 300;
+    if (shouldExit) {
+      scrollTrace.onSeek('exit', velocity);
+    }
+    return shouldExit;
+  }
 };
 
 export const DEFAULT_LIST_OVERSCAN = { main: 300, reverse: 150 };
@@ -95,6 +108,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
   const currentScrollKeyRef = useRef<string | undefined>(scrollKey);
   const isInitialMountRef = useRef<boolean>(true);
   const innerVirtuosoRef = useRef<VirtuosoHandle | null>(null);
+  const latestRangeRef = useRef<ListRange | undefined>(undefined);
 
   // Scroller element ref & event listener with lifecycle cleanup
   const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
@@ -114,6 +128,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
       if (scrollerElement.classList.contains('is-scrolling')) {
         scrollerElement.classList.remove('is-scrolling');
         onScrollingStateChangeRef.current?.(false);
+        scrollTrace.onScrollStop(latestRangeRef.current);
       }
     };
 
@@ -286,6 +301,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
           });
         }
 
+        latestRangeRef.current = range;
         // Always notify parent of the currently visible range to keep hydration in sync
         if (onChange) onChange(range);
         handleDebouncedScroll(range);

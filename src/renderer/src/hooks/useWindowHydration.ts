@@ -2,6 +2,7 @@ import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { SONG_WINDOW_GC_TIME, SONG_WINDOW_SIZE, SONG_WINDOW_STALE_TIME } from '../queries/songs';
+import { scrollTrace } from '../utils/scrollTrace';
 
 interface WindowRange {
   startIndex: number;
@@ -56,6 +57,8 @@ export function useWindowHydration(
   } = options ?? {};
 
   const queryClient = useQueryClient();
+  const idsRef = useRef(ids);
+  idsRef.current = ids;
 
   // Snapped strictly to 200-row window chunks to prevent firing state updates on every scroll frame
   const [windowBounds, setWindowBounds] = useState<WindowBounds>(() =>
@@ -64,6 +67,7 @@ export function useWindowHydration(
 
   const handleRangeChange = useCallback(
     (range: WindowRange) => {
+      scrollTrace.onRangeChanged(range);
       const nextBounds = computeWindowBounds(
         range.startIndex,
         range.endIndex,
@@ -81,16 +85,27 @@ export function useWindowHydration(
           const lookaheadStart = lookaheadForward * SONG_WINDOW_SIZE;
           const lookaheadEnd = Math.min(lookaheadStart + SONG_WINDOW_SIZE, ids.length);
           if (lookaheadStart < lookaheadEnd) {
+            scrollTrace.onRequestScheduled(lookaheadStart, true);
             queryClient.prefetchQuery({
               queryKey: [keyPrefix, 'window', listIdentity, idsVersion, lookaheadStart],
-              queryFn: () =>
-                window.api.audioLibraryControls.getSongInfo(
-                  ids.slice(lookaheadStart, lookaheadEnd),
-                  undefined,
-                  undefined,
-                  undefined,
-                  true
-                ),
+              queryFn: async () => {
+                scrollTrace.onRequestStarted(lookaheadStart);
+                const t0 = performance.now();
+                try {
+                  const res = await window.api.audioLibraryControls.getSongInfo(
+                    idsRef.current.slice(lookaheadStart, lookaheadEnd),
+                    undefined,
+                    undefined,
+                    undefined,
+                    true
+                  );
+                  scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, res?.length ?? 0);
+                  return res;
+                } catch (e) {
+                  scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, 0);
+                  throw e;
+                }
+              },
               staleTime: SONG_WINDOW_STALE_TIME,
               gcTime: SONG_WINDOW_GC_TIME
             });
@@ -102,16 +117,27 @@ export function useWindowHydration(
           const lookaheadStart = lookaheadBackward * SONG_WINDOW_SIZE;
           const lookaheadEnd = Math.min(lookaheadStart + SONG_WINDOW_SIZE, ids.length);
           if (lookaheadStart < lookaheadEnd) {
+            scrollTrace.onRequestScheduled(lookaheadStart, true);
             queryClient.prefetchQuery({
               queryKey: [keyPrefix, 'window', listIdentity, idsVersion, lookaheadStart],
-              queryFn: () =>
-                window.api.audioLibraryControls.getSongInfo(
-                  ids.slice(lookaheadStart, lookaheadEnd),
-                  undefined,
-                  undefined,
-                  undefined,
-                  true
-                ),
+              queryFn: async () => {
+                scrollTrace.onRequestStarted(lookaheadStart);
+                const t0 = performance.now();
+                try {
+                  const res = await window.api.audioLibraryControls.getSongInfo(
+                    idsRef.current.slice(lookaheadStart, lookaheadEnd),
+                    undefined,
+                    undefined,
+                    undefined,
+                    true
+                  );
+                  scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, res?.length ?? 0);
+                  return res;
+                } catch (e) {
+                  scrollTrace.onRequestResolved(lookaheadStart, performance.now() - t0, 0);
+                  throw e;
+                }
+              },
               staleTime: SONG_WINDOW_STALE_TIME,
               gcTime: SONG_WINDOW_GC_TIME
             });
@@ -151,14 +177,25 @@ export function useWindowHydration(
   const queries = useQueries({
     queries: windows.map((win) => ({
       queryKey: [keyPrefix, 'window', listIdentity, idsVersion, win.startIndex],
-      queryFn: () =>
-        window.api.audioLibraryControls.getSongInfo(
-          ids.slice(win.startIndex, win.endIndex),
-          undefined,
-          undefined,
-          undefined,
-          true
-        ),
+      queryFn: async () => {
+        scrollTrace.onRequestScheduled(win.startIndex, false);
+        scrollTrace.onRequestStarted(win.startIndex);
+        const t0 = performance.now();
+        try {
+          const res = await window.api.audioLibraryControls.getSongInfo(
+            ids.slice(win.startIndex, win.endIndex),
+            undefined,
+            undefined,
+            undefined,
+            true
+          );
+          scrollTrace.onRequestResolved(win.startIndex, performance.now() - t0, res?.length ?? 0);
+          return res;
+        } catch (e) {
+          scrollTrace.onRequestResolved(win.startIndex, performance.now() - t0, 0);
+          throw e;
+        }
+      },
       staleTime: SONG_WINDOW_STALE_TIME,
       gcTime: SONG_WINDOW_GC_TIME,
       enabled
@@ -195,9 +232,6 @@ export function useWindowHydration(
 
   const itemsByIndexRef = useRef(itemsByIndex);
   itemsByIndexRef.current = itemsByIndex;
-
-  const idsRef = useRef(ids);
-  idsRef.current = ids;
 
   // Lazily-built Map<songId, SongData> per window for O(1) fallback lookups
   // instead of linear Array.find scans in the hot render path.
