@@ -276,7 +276,7 @@ function ArtistPage() {
               fixedItemWidth={MIN_ITEM_WIDTH}
               fixedItemHeight={MIN_ITEM_HEIGHT}
               scrollKey={scrollKey}
-              onRangeChange={handleGridRangeChange}
+              onChange={handleGridRangeChange}
               itemContent={(index, artist) => {
                 return (
                   <Artist
