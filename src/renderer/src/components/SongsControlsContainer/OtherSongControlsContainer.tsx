@@ -14,11 +14,16 @@ import NavLink from '../NavLink';
 import VolumeSlider from '../VolumeSlider';
 
 const AppShortcutsPrompt = lazy(() => import('../SettingsPage/AppShortcutsPrompt'));
+const AudioFxModal = lazy(() => import('./AudioFxModal'));
 
 const OtherSongControlsContainer = () => {
   const currentlyActivePage = useStore(store, (state) => state.currentlyActivePage);
   const isMuted = useStore(store, (state) => state.player.volume.isMuted);
   const volume = useStore(store, (state) => state.player.volume.value);
+  const audioFxPreset = useStore(
+    store,
+    (state) => state.localStorage?.playback?.audioFx?.preset ?? 'normal'
+  );
 
   const { updatePlayerType, toggleMutedState, updateContextMenuData, changePromptMenuData } =
     useContext(AppUpdateContext);
@@ -56,6 +61,18 @@ const OtherSongControlsContainer = () => {
             iconClassName: 'material-icons-round-outlined mr-2',
             handlerFunction: () =>
               navigate({ to: '/main-player/settings', hash: 'audio-playback-settings-container' })
+          },
+          {
+            label: t('audioFx.title', 'Audio Effects'),
+            iconName: 'graphic_eq',
+            iconClassName: 'material-icons-round-outlined mr-2',
+            handlerFunction: () => changePromptMenuData(true, <AudioFxModal />)
+          },
+          {
+            label: t('lyrics.floatingLyrics', 'Desktop Floating Lyrics'),
+            iconName: 'subtitles',
+            iconClassName: 'material-icons-round-outlined mr-2',
+            handlerFunction: () => window.api.windowControls.toggleFloatingLyrics()
           },
           { label: '', isContextMenuItemSeperator: true, handlerFunction: () => true },
           {
@@ -130,6 +147,28 @@ const OtherSongControlsContainer = () => {
         iconName="fullscreen"
         iconClassName="material-icons-round-outlined text-xl text-font-color-black opacity-60 transition-opacity hover:opacity-80 dark:text-font-color-white"
         clickHandler={() => updatePlayerType('full')}
+      />
+
+      <Button
+        className={`audio-fx-btn text-font-color-black text-opacity-60 after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight mr-6! rounded-none! border-0! bg-transparent p-0! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:outline! relative lg:hidden dark:bg-transparent dark:hover:bg-transparent ${
+          audioFxPreset !== 'normal' ? 'after:opacity-100' : ''
+        }`}
+        tooltipLabel={`${t('audioFx.title', 'Audio Effects')}${audioFxPreset !== 'normal' ? ` (${audioFxPreset})` : ''}`}
+        iconName="graphic_eq"
+        iconClassName={`material-icons-round text-xl transition-all ${
+          audioFxPreset !== 'normal'
+            ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! opacity-100 scale-105'
+            : 'text-font-color-black opacity-60 hover:opacity-80 dark:text-font-color-white'
+        }`}
+        clickHandler={() => changePromptMenuData(true, <AudioFxModal />)}
+      />
+
+      <Button
+        className="floating-lyrics-btn text-font-color-black text-opacity-60 mr-6! rounded-none! border-0! bg-transparent p-0! outline-offset-1 hover:bg-transparent focus-visible:outline! relative lg:hidden dark:bg-transparent dark:hover:bg-transparent"
+        tooltipLabel={t('lyrics.floatingLyrics', 'Desktop Floating Lyrics (Ctrl+Shift+L)')}
+        iconName="subtitles"
+        iconClassName="material-icons-round text-xl text-font-color-black opacity-60 hover:opacity-80 dark:text-font-color-white"
+        clickHandler={() => window.api.windowControls.toggleFloatingLyrics()}
       />
 
       <Button

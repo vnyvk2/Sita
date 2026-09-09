@@ -654,6 +654,10 @@ declare global {
       preampDb: number;
       preventClipping: boolean;
     };
+    audioFx?: import('../renderer/src/other/audioFx/types').AudioFxOptions;
+    crossfade?: {
+      duration: number;
+    };
   }
 
   type EqualizerBandFilters =

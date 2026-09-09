@@ -29,10 +29,12 @@ export class PositionTimerScheduler {
       options?.onPositionChange ||
       ((time: number) => {
         if (typeof document !== 'undefined' && document.dispatchEvent) {
+          const roundedTime = roundTo(time, 2);
           const playerPositionChange = new CustomEvent('player/positionChange', {
-            detail: roundTo(time, 2)
+            detail: roundedTime
           });
           document.dispatchEvent(playerPositionChange);
+          window.api?.lyrics?.syncTimeToFloatingLyrics?.(roundedTime);
         }
       });
 

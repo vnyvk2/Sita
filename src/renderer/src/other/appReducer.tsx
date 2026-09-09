@@ -469,6 +469,18 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
       mode: 'track',
       preampDb: 0,
       preventClipping: true
+    },
+    audioFx: {
+      preset: 'normal',
+      playbackRate: 1.0,
+      preservesPitch: true,
+      reverbWet: 0.0,
+      reverbDecay: 2.5,
+      lowPassCutoff: 20000,
+      trebleBoostGain: 0.0
+    },
+    crossfade: {
+      duration: 0
     }
   },
   queue: {

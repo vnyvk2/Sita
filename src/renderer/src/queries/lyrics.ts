@@ -101,6 +101,10 @@ export const lyricsQuery = createQueryKeys('lyrics', {
           }
         }
 
+        if (res) {
+          window.api?.lyrics?.syncLyricsToFloatingLyrics?.(res);
+        }
+
         return res ?? null;
       }
     };
