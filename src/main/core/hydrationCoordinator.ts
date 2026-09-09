@@ -145,11 +145,13 @@ export class HydrationCoordinator {
         }
       }
     } finally {
-      this.isExecuting.set(listIdentity, false);
-      // If new tasks arrived while finishing, pump again
-      const remainingQueue = this.pendingQueues.get(listIdentity);
-      if (remainingQueue && remainingQueue.length > 0) {
-        this.processQueue(listIdentity);
+      this.isExecuting.delete(listIdentity);
+      // Prune empty map entries to prevent slow memory leak from accumulated listIdentity keys
+      // (e.g. each search keystroke creates a unique identity that would persist forever).
+      const queue = this.pendingQueues.get(listIdentity);
+      if (!queue || queue.length === 0) {
+        this.pendingQueues.delete(listIdentity);
+        this.activeGenerations.delete(listIdentity);
       }
     }
   }

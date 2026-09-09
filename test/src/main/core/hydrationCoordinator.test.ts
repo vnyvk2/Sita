@@ -18,7 +18,7 @@ describe('HydrationCoordinator', () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(result).toEqual(['song1', 'song2']);
-    expect(coordinator.getLatestGeneration('songs')).toBe(1);
+    expect(coordinator.getLatestGeneration('songs')).toBe(0); // Pruned after queue drained
   });
 
   it('immediately drops a task if generationToken < latestGeneration', async () => {

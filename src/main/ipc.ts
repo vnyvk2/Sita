@@ -483,19 +483,22 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     );
 
     // Main-process event-loop heartbeat to detect sync blocking (e.g. SQLite / Sharp contention)
-    let lastHeartbeat = performance.now();
-    const HEARTBEAT_INTERVAL_MS = 50;
-    const DRIFT_THRESHOLD_MS = 100;
-    setInterval(() => {
-      const now = performance.now();
-      const drift = now - lastHeartbeat - HEARTBEAT_INTERVAL_MS;
-      if (drift > DRIFT_THRESHOLD_MS) {
-        logger.warn(
-          `[Main EventLoop Drift] Heartbeat delayed by ${drift.toFixed(1)}ms (threshold: ${DRIFT_THRESHOLD_MS}ms)`
-        );
-      }
-      lastHeartbeat = now;
-    }, HEARTBEAT_INTERVAL_MS).unref();
+    // Only active in development — 20Hz timer prevents CPU C-states and spams disk logs in production.
+    if (IS_DEVELOPMENT) {
+      let lastHeartbeat = performance.now();
+      const HEARTBEAT_INTERVAL_MS = 50;
+      const DRIFT_THRESHOLD_MS = 100;
+      setInterval(() => {
+        const now = performance.now();
+        const drift = now - lastHeartbeat - HEARTBEAT_INTERVAL_MS;
+        if (drift > DRIFT_THRESHOLD_MS) {
+          logger.warn(
+            `[Main EventLoop Drift] Heartbeat delayed by ${drift.toFixed(1)}ms (threshold: ${DRIFT_THRESHOLD_MS}ms)`
+          );
+        }
+        lastHeartbeat = now;
+      }, HEARTBEAT_INTERVAL_MS).unref();
+    }
 
     ipcMain.handle(
       'app/getSongInfo',
@@ -510,7 +513,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       ) => {
         // Uncoordinated path: if no generationToken is provided, execute immediately as before
         if (!options || options.generationToken === undefined) {
-          const tStart = performance.now();
+          const tStart = IS_DEVELOPMENT ? performance.now() : 0;
           const results = await memProfiler.wrapHandler('app/getSongInfo', () =>
             getSongInfo(
               songIds,
@@ -523,19 +526,11 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
               options?.compact ? { compact: true } : undefined
             )
           );
-          const tSqlEnd = performance.now();
 
-          // Approximate IPC structured-clone marshalling cost
-          const tCloneStart = performance.now();
-          structuredClone(results);
-          const tCloneEnd = performance.now();
-
-          const sqlDuration = tSqlEnd - tStart;
-          const cloneDuration = tCloneEnd - tCloneStart;
-
-          if (songIds && songIds.length >= 50) {
+          if (IS_DEVELOPMENT && songIds && songIds.length >= 50) {
+            const sqlDuration = performance.now() - tStart;
             logger.info(
-              `[TRACE:Main:getSongInfo] count=${results?.length ?? 0} requestedIds=${songIds.length} compact=${Boolean(options?.compact)} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
+              `[TRACE:Main:getSongInfo] count=${results?.length ?? 0} requestedIds=${songIds.length} compact=${Boolean(options?.compact)} sql=${sqlDuration.toFixed(1)}ms`
             );
           }
 
@@ -544,7 +539,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
         // Coordinated path: routed through HydrationCoordinator
         return hydrationCoordinator.schedule(options, async () => {
-          const tStart = performance.now();
+          const tStart = IS_DEVELOPMENT ? performance.now() : 0;
           const results = await memProfiler.wrapHandler('app/getSongInfo', () =>
             getSongInfo(
               songIds,
@@ -557,18 +552,11 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
               options?.compact ? { compact: true } : undefined
             )
           );
-          const tSqlEnd = performance.now();
 
-          const tCloneStart = performance.now();
-          structuredClone(results);
-          const tCloneEnd = performance.now();
-
-          const sqlDuration = tSqlEnd - tStart;
-          const cloneDuration = tCloneEnd - tCloneStart;
-
-          if (songIds && songIds.length >= 50) {
+          if (IS_DEVELOPMENT && songIds && songIds.length >= 50) {
+            const sqlDuration = performance.now() - tStart;
             logger.info(
-              `[TRACE:Main:getSongInfo:coordinated] count=${results?.length ?? 0} requestedIds=${songIds.length} token=${options.generationToken} priority=${options.priority} compact=${Boolean(options.compact)} sql=${sqlDuration.toFixed(1)}ms clone=${cloneDuration.toFixed(1)}ms total=${(tCloneEnd - tStart).toFixed(1)}ms`
+              `[TRACE:Main:getSongInfo:coordinated] count=${results?.length ?? 0} requestedIds=${songIds.length} token=${options.generationToken} priority=${options.priority} compact=${Boolean(options.compact)} sql=${sqlDuration.toFixed(1)}ms`
             );
           }
 

@@ -25,6 +25,9 @@ export interface ScrollTraceSummary {
   queueDepthSamples: Array<{ time: number; depth: number }>;
 }
 
+const MAX_QUEUE_SAMPLES = 100;
+const IDLE_AUTO_STOP_MS = 2_000;
+
 class ScrollTraceCoordinator {
   private inFlightCount = 0;
   private maxInFlight = 0;
@@ -35,6 +38,7 @@ class ScrollTraceCoordinator {
 
   private queueSamples: Array<{ time: number; depth: number }> = [];
   private sampleTimer: ReturnType<typeof setInterval> | null = null;
+  private idleAutoStopTimer: ReturnType<typeof setTimeout> | null = null;
 
   private isScrolling = false;
   private seekEnteredAt: number | undefined;
@@ -54,6 +58,34 @@ class ScrollTraceCoordinator {
     this.ringBuffer.push(event);
   }
 
+  /** Stop the sample timer and clear idle auto-stop. Safe to call multiple times. */
+  private stopTimers(): void {
+    if (this.sampleTimer) {
+      clearInterval(this.sampleTimer);
+      this.sampleTimer = null;
+    }
+    if (this.idleAutoStopTimer) {
+      clearTimeout(this.idleAutoStopTimer);
+      this.idleAutoStopTimer = null;
+    }
+  }
+
+  /**
+   * Reset the idle auto-stop timer. If no rangeChanged arrives within IDLE_AUTO_STOP_MS,
+   * the session is force-stopped to prevent the sampleTimer from leaking when
+   * Virtuoso fires rangeChanged on mount without an actual scroll event.
+   */
+  private resetIdleAutoStop(): void {
+    if (this.idleAutoStopTimer) {
+      clearTimeout(this.idleAutoStopTimer);
+    }
+    this.idleAutoStopTimer = setTimeout(() => {
+      if (this.isScrolling) {
+        this.onScrollStop(this.targetRange);
+      }
+    }, IDLE_AUTO_STOP_MS);
+  }
+
   public startScrollSession(): void {
     if (!this.isScrolling) {
       this.isScrolling = true;
@@ -64,10 +96,14 @@ class ScrollTraceCoordinator {
         this.sampleTimer = setInterval(() => {
           const depth = this.inFlightCount;
           if (depth > this.maxInFlight) this.maxInFlight = depth;
-          this.queueSamples.push({ time: performance.now(), depth });
+          // Cap queueSamples to prevent unbounded memory growth
+          if (this.queueSamples.length < MAX_QUEUE_SAMPLES) {
+            this.queueSamples.push({ time: performance.now(), depth });
+          }
         }, 100);
       }
     }
+    this.resetIdleAutoStop();
   }
 
   public onRangeChanged(range: { startIndex: number; endIndex: number }): void {
@@ -154,10 +190,7 @@ class ScrollTraceCoordinator {
       this.targetRange = currentRange;
     }
 
-    if (this.sampleTimer) {
-      clearInterval(this.sampleTimer);
-      this.sampleTimer = null;
-    }
+    this.stopTimers();
 
     this.pushEvent({
       timestamp: now,
@@ -166,9 +199,12 @@ class ScrollTraceCoordinator {
     });
 
     // Schedule summary dump after short grace period for in-flight requests to complete
-    setTimeout(() => {
-      this.dumpSummary();
-    }, 400);
+    // Only dump to console in development builds to avoid production log spam.
+    if (import.meta.env.DEV) {
+      setTimeout(() => {
+        this.dumpSummary();
+      }, 400);
+    }
   }
 
   public getSummary(): ScrollTraceSummary {
@@ -228,10 +264,7 @@ class ScrollTraceCoordinator {
     this.scrollStoppedAt = undefined;
     this.targetRange = undefined;
     this.targetResolvedAt = undefined;
-    if (this.sampleTimer) {
-      clearInterval(this.sampleTimer);
-      this.sampleTimer = null;
-    }
+    this.stopTimers();
   }
 }
 
