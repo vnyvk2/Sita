@@ -161,8 +161,8 @@ export class MediaWorkerBridge extends EventEmitter {
   // demand by the next task; supervision and crash recovery are unaffected.
   private lastWorkerActivityAt = Date.now();
   private idleCheckTimer: NodeJS.Timeout | null = null;
-  private static readonly IDLE_CHECK_INTERVAL_MS = 30_000;
-  private static readonly DEFAULT_IDLE_SHUTDOWN_MS = 5 * 60_000;
+  private static readonly IDLE_CHECK_INTERVAL_MS = 10_000;
+  private static readonly DEFAULT_IDLE_SHUTDOWN_MS = 25_000;
 
   public getState(): MediaWorkerState {
     return this.state;
@@ -191,19 +191,20 @@ export class MediaWorkerBridge extends EventEmitter {
     if (idleShutdownMs <= 0) return;
     this.idleCheckTimer = setInterval(() => {
       if (this.state !== 'READY') return;
+      if (
+        this.activeWalkResolvers.size > 0 ||
+        this.activeParseResolvers.size > 0 ||
+        this.activeAssetResolvers.size > 0
+      ) {
+        return;
+      }
       if (Date.now() - this.lastWorkerActivityAt < idleShutdownMs) return;
       logger.info('[MediaWorkerBridge] Worker idle past threshold; shutting down utilityProcess.', {
         idleMs: Date.now() - this.lastWorkerActivityAt,
         idleShutdownMs
       });
       this.disarmIdleShutdownTimer();
-      const child = this.childProcess;
-      // The exit event may fire after terminate() resolves and set TERMINATED; wait for both
-      // before allowing future start() calls, otherwise the worker could never restart.
-      const exited = child
-        ? new Promise<void>((resolve) => child.once('exit', () => resolve()))
-        : Promise.resolve();
-      void Promise.all([this.terminate(), exited]).then(() => {
+      void this.terminate().then(() => {
         if (this.state === 'TERMINATED') this.state = 'UNINITIALIZED';
       });
     }, MediaWorkerBridge.IDLE_CHECK_INTERVAL_MS);

@@ -22,7 +22,7 @@ export const SQLITE_PRAGMAS = [
   'PRAGMA busy_timeout = 5000;',
   'PRAGMA foreign_keys = ON;',
   'PRAGMA temp_store = MEMORY;',
-  'PRAGMA cache_size = -16000;',
+  'PRAGMA cache_size = -4000;',
   'PRAGMA analysis_limit = 1000;'
 ] as const;
 

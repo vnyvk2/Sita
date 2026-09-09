@@ -6,6 +6,10 @@ import path from 'path';
 import { app } from 'electron';
 import sharp from 'sharp';
 
+// Bound libvips memory usage to prevent native memory bloat during catalog scrolling
+sharp.cache({ memory: 10, files: 10, items: 20 });
+sharp.concurrency(1);
+
 import logger from '../logger';
 
 export interface ThumbnailResult {

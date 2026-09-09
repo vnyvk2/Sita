@@ -99,8 +99,9 @@ const LyricsAmbientBackground = ({
           shouldAnimate ? 'animate-ambient-drift' : ''
         }`}
         style={{
-          filter: `blur(${lyricsArtworkBlur}px) saturate(1.35) brightness(0.95)`,
+          filter: `blur(${Math.max(10, Math.round(lyricsArtworkBlur / 2.5))}px) saturate(1.35) brightness(0.95)`,
           transform: 'translate3d(0, 0, 0) scale(1.15)',
+          contain: 'strict',
           willChange: shouldAnimate ? 'transform' : 'auto'
         }}
       >
@@ -112,6 +113,7 @@ const LyricsAmbientBackground = ({
               fallbackSrc={DefaultSongCover}
               loading="eager"
               alt=""
+              thumbnail
               className="h-full w-full object-cover"
             />
           </div>
@@ -127,6 +129,7 @@ const LyricsAmbientBackground = ({
             fallbackSrc={DefaultSongCover}
             loading="eager"
             alt=""
+            thumbnail
             className="h-full w-full object-cover"
           />
         </div>

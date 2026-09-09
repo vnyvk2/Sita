@@ -1,0 +1,178 @@
+{
+  "productionBuild": true,
+  "branch": "test/ram-optimization-pilot",
+  "scroll": {
+    "fps": 57.8,
+    "p50": 16.7,
+    "p95": 16.8,
+    "p99": 17.2,
+    "longTasks": 0
+  },
+  "metrics": {
+    "stage1Cold": {
+      "count": 4,
+      "totalWS": 715.99,
+      "totalPM": 581.6,
+      "procs": [
+        {
+          "Id": 2156,
+          "WorkingSet64": 370876416,
+          "PrivateMemorySize64": 384692224
+        },
+        {
+          "Id": 2612,
+          "WorkingSet64": 160976896,
+          "PrivateMemorySize64": 102764544
+        },
+        {
+          "Id": 5996,
+          "WorkingSet64": 158302208,
+          "PrivateMemorySize64": 107757568
+        },
+        {
+          "Id": 19756,
+          "WorkingSet64": 60612608,
+          "PrivateMemorySize64": 14639104
+        }
+      ]
+    },
+    "stage2ScrollActive": null,
+    "stage3PostGC": {
+      "count": 4,
+      "totalWS": 685.97,
+      "totalPM": 552.64,
+      "procs": [
+        {
+          "Id": 2156,
+          "WorkingSet64": 371200000,
+          "PrivateMemorySize64": 384765952
+        },
+        {
+          "Id": 2612,
+          "WorkingSet64": 150511616,
+          "PrivateMemorySize64": 93016064
+        },
+        {
+          "Id": 5996,
+          "WorkingSet64": 136785920,
+          "PrivateMemorySize64": 86798336
+        },
+        {
+          "Id": 19756,
+          "WorkingSet64": 60796928,
+          "PrivateMemorySize64": 14909440
+        }
+      ]
+    },
+    "stage4Settings": {
+      "count": 4,
+      "totalWS": 693.17,
+      "totalPM": 559.06,
+      "procs": [
+        {
+          "Id": 2156,
+          "WorkingSet64": 371224576,
+          "PrivateMemorySize64": 384770048
+        },
+        {
+          "Id": 2612,
+          "WorkingSet64": 152305664,
+          "PrivateMemorySize64": 94687232
+        },
+        {
+          "Id": 5996,
+          "WorkingSet64": 142516224,
+          "PrivateMemorySize64": 91848704
+        },
+        {
+          "Id": 19756,
+          "WorkingSet64": 60796928,
+          "PrivateMemorySize64": 14909440
+        }
+      ]
+    },
+    "stage5ReturnSongs": {
+      "count": 4,
+      "totalWS": 654.89,
+      "totalPM": 467.98,
+      "procs": [
+        {
+          "Id": 2156,
+          "WorkingSet64": 307417088,
+          "PrivateMemorySize64": 265908224
+        },
+        {
+          "Id": 2612,
+          "WorkingSet64": 160522240,
+          "PrivateMemorySize64": 102326272
+        },
+        {
+          "Id": 5996,
+          "WorkingSet64": 157970432,
+          "PrivateMemorySize64": 107573248
+        },
+        {
+          "Id": 19756,
+          "WorkingSet64": 60796928,
+          "PrivateMemorySize64": 14909440
+        }
+      ]
+    },
+    "stage6Minimized60s": {
+      "count": 4,
+      "totalWS": 619.75,
+      "totalPM": 431.29,
+      "procs": [
+        {
+          "Id": 2156,
+          "WorkingSet64": 301502464,
+          "PrivateMemorySize64": 260050944
+        },
+        {
+          "Id": 2612,
+          "WorkingSet64": 149577728,
+          "PrivateMemorySize64": 90263552
+        },
+        {
+          "Id": 5996,
+          "WorkingSet64": 138162176,
+          "PrivateMemorySize64": 87318528
+        },
+        {
+          "Id": 19756,
+          "WorkingSet64": 60616704,
+          "PrivateMemorySize64": 14606336
+        }
+      ]
+    },
+    "stage7FinalRestored": {
+      "count": 4,
+      "totalWS": 637.67,
+      "totalPM": 448.68,
+      "procs": [
+        {
+          "Id": 2156,
+          "WorkingSet64": 301686784,
+          "PrivateMemorySize64": 260202496
+        },
+        {
+          "Id": 2612,
+          "WorkingSet64": 148418560,
+          "PrivateMemorySize64": 88309760
+        },
+        {
+          "Id": 5996,
+          "WorkingSet64": 157921280,
+          "PrivateMemorySize64": 107356160
+        },
+        {
+          "Id": 19756,
+          "WorkingSet64": 60616704,
+          "PrivateMemorySize64": 14606336
+        }
+      ]
+    }
+  },
+  "domNodes": 543,
+  "rendererHeapMB": 16.31
+}
