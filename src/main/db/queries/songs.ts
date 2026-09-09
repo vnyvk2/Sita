@@ -16,6 +16,7 @@ import { parseSongArtworks } from '@main/fs/resolveFilePaths';
 import logger from '@main/logger';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { and, asc, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm';
+import { titleToBucket } from '../../../common/titleToBucket';
 
 export interface RawFlatSongRow {
   id: number;
@@ -937,7 +938,7 @@ const hasTruthyLanguageOverride = sql`EXISTS (
 export const getFilteredSongLibraryIds = async (
   options: FilteredSongIdsOptions = {},
   trx: DB | DBTransaction = db
-): Promise<{ ids: number[]; total: number; blacklistedIds: number[] }> => {
+): Promise<SongIdsResult> => {
   const {
     sortType = 'aToZ',
     filterType = 'notSelected',
@@ -1042,7 +1043,15 @@ export const getFilteredSongLibraryIds = async (
   else if (sortType === 'mostSkipped') orderClauses = [desc(songs.skipCount), asc(songs.title)];
   else if (sortType === 'leastSkipped') orderClauses = [asc(songs.skipCount), asc(songs.title)];
 
-  const query = trx.select({ id: songs.id, isBlacklisted: songs.isBlacklisted }).from(songs);
+  const isAlphaSort = sortType === 'aToZ' || sortType === 'zToA';
+
+  const query = trx
+    .select({
+      id: songs.id,
+      isBlacklisted: songs.isBlacklisted,
+      title: songs.title
+    })
+    .from(songs);
 
   if (filters.length > 0) {
     query.where(and(...filters));
@@ -1085,11 +1094,28 @@ export const getFilteredSongLibraryIds = async (
   }
   const ids: number[] = [];
   const blacklistedIds: number[] = [];
-  for (const row of results) {
+  const alphabetMap: Record<string, number> = {};
+  const letterCounts: Record<string, number> = {};
+
+  for (let i = 0; i < results.length; i++) {
+    const row = results[i];
     ids.push(row.id);
     if (row.isBlacklisted) blacklistedIds.push(row.id);
+
+    if (isAlphaSort) {
+      const letter = titleToBucket(row.title);
+      if (alphabetMap[letter] === undefined) {
+        alphabetMap[letter] = i;
+      }
+      letterCounts[letter] = (letterCounts[letter] ?? 0) + 1;
+    }
   }
-  return { ids, total: ids.length, blacklistedIds };
+  return {
+    ids,
+    total: ids.length,
+    blacklistedIds,
+    ...(isAlphaSort ? { alphabetMap, letterCounts } : {})
+  };
 };
 
 export interface SongListFacets {

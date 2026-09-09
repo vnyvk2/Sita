@@ -38,6 +38,8 @@ export interface SongIdsResult {
   ids: number[];
   total: number;
   blacklistedIds: number[];
+  alphabetMap?: Record<string, number>;
+  letterCounts?: Record<string, number>;
 }
 
 export const getSongListIdentity = (params: SongIdsParams | unknown): string => {

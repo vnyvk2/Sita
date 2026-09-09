@@ -4,6 +4,13 @@ import { useTranslation } from 'react-i18next';
 
 import storage from '../../../utils/localStorage';
 import Checkbox from '../../Checkbox';
+import Dropdown, { type DropdownOption } from '../../Dropdown';
+
+const alphabetScrubberOptions: DropdownOption<string>[] = [
+  { label: 'Off', value: 'off' },
+  { label: 'Top (Horizontal)', value: 'top-horizontal' },
+  { label: 'Left (Vertical)', value: 'left-vertical' }
+];
 
 const PreferencesSettings = () => {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
@@ -46,6 +53,31 @@ const PreferencesSettings = () => {
               }
               labelContent={t('settingsPage.showTrackNumberAsSongIndex')}
             />
+          </div>
+        </li>
+
+        <li className="alphabet-scrubber-settings-container mb-4">
+          <div className="secondary-container toggle-alphabet-scrubber mb-4">
+            <div className="description">
+              {t(
+                'settingsPage.alphabetScrubberDescription',
+                'Quickly jump to songs starting with a letter using an A–Z navigation bar.'
+              )}
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-sm font-medium">
+                {t('settingsPage.alphabetScrubberPosition', 'Alphabet Navigation Bar')}
+              </span>
+              <Dropdown
+                name="alphabetScrubberPosition"
+                value={preferences?.alphabetScrubberPosition ?? 'off'}
+                options={alphabetScrubberOptions}
+                onChange={(e) => {
+                  const val = e.currentTarget.value as 'off' | 'top-horizontal' | 'left-vertical';
+                  storage.preferences.setPreferences('alphabetScrubberPosition', val);
+                }}
+              />
+            </div>
           </div>
         </li>
 
