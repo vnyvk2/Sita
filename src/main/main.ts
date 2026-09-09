@@ -28,18 +28,18 @@ import {
 } from 'electron';
 
 if (process.env.REMOTE_DEBUGGING_PORT) {
-  app.commandLine.appendSwitch('remote-debugging-port', process.env.REMOTE_DEBUGGING_PORT);
+  app?.commandLine?.appendSwitch?.('remote-debugging-port', process.env.REMOTE_DEBUGGING_PORT);
 }
 
 // Memory & Process Optimizations:
 // 1. Disable Chromium's spare renderer and run audio in-process (eliminates separate utility process)
-app.commandLine.appendSwitch('disable-features', 'SpareRendererForSitePerProcess,AudioServiceOutOfProcess');
+app?.commandLine?.appendSwitch?.('disable-features', 'SpareRendererForSitePerProcess,AudioServiceOutOfProcess');
 // 2. Reclaim renderer memory when window is backgrounded / idle
-app.commandLine.appendSwitch('enable-features', 'PurgeRendererMemoryWhenBackgrounded');
+app?.commandLine?.appendSwitch?.('enable-features', 'PurgeRendererMemoryWhenBackgrounded');
 
 if (process.env.NORA_USER_DATA) {
   fs.mkdirSync(process.env.NORA_USER_DATA, { recursive: true });
-  app.setPath('userData', process.env.NORA_USER_DATA);
+  app?.setPath?.('userData', process.env.NORA_USER_DATA);
 }
 memProfiler.stage('main-entry');
 

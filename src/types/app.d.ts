@@ -621,6 +621,15 @@ declare global {
     isWaveformSeekbarEnabled?: boolean;
     isExperimentalWorkspaceEnabled?: boolean;
     customThemeOverrides?: Record<string, Record<string, string>>;
+    alphabetScrubberPosition?: 'off' | 'top-horizontal' | 'left-vertical';
+  }
+
+  interface SongIdsResult {
+    ids: number[];
+    total: number;
+    blacklistedIds: number[];
+    alphabetMap?: Record<string, number>;
+    letterCounts?: Record<string, number>;
   }
 
   interface CurrentSong {

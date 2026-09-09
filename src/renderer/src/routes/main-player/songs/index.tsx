@@ -7,6 +7,7 @@ import PageSearchInput from '@renderer/components/PageSearchInput';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
+import AlphabetScrubber from '@renderer/components/AlphabetScrubber/AlphabetScrubber';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
@@ -31,8 +32,9 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import { lazy, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ListRange, VirtuosoHandle } from 'react-virtuoso';
 
 export const Route = createFileRoute('/main-player/songs/')({
   validateSearch: songSearchSchema,
@@ -88,6 +90,10 @@ function SongsPage() {
   const isSongIndexingEnabled = useStore(
     store,
     (state) => state.localStorage.preferences.isSongIndexingEnabled
+  );
+  const alphabetScrubberPosition = useStore(
+    store,
+    (state) => state.localStorage.preferences.alphabetScrubberPosition ?? 'off'
   );
   // Single parent-level subscription passed to all Song rows via prop,
   // eliminating ~25 per-row store subscriptions in the hot scrolling path.
@@ -173,6 +179,8 @@ function SongsPage() {
 
   const filteredSongIds = idsQuery.data.ids;
   const blacklistedIds = idsQuery.data.blacklistedIds;
+  const alphabetMap = idsQuery.data.alphabetMap;
+  const letterCounts = idsQuery.data.letterCounts;
   const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
 
   const blacklistedSet = useMemo(() => new Set(blacklistedIds), [blacklistedIds]);
@@ -386,7 +394,55 @@ function SongsPage() {
     [getItem, isSongIndexingEnabled, handleSongPlayBtnClick, selectAllHandler, hasBodyBackgroundImage]
   );
 
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
+  const activeLetterRef = useRef<string | undefined>(undefined);
+  activeLetterRef.current = activeLetter;
+
+  const alphabetEntries = useMemo(() => {
+    if (!alphabetMap) return [];
+    return Object.entries(alphabetMap).sort(([, a], [, b]) => a - b);
+  }, [alphabetMap]);
+
+  const handleListRangeChange = useCallback(
+    (range: ListRange) => {
+      onRangeChange(range);
+      if (alphabetEntries.length === 0) return;
+
+      const startIndex = range.startIndex;
+      let currentLetter = alphabetEntries[0][0];
+      for (let i = 0; i < alphabetEntries.length; i++) {
+        if (alphabetEntries[i][1] <= startIndex) {
+          currentLetter = alphabetEntries[i][0];
+        } else {
+          break;
+        }
+      }
+
+      if (currentLetter !== activeLetterRef.current) {
+        setActiveLetter(currentLetter);
+      }
+    },
+    [onRangeChange, alphabetEntries]
+  );
+
+  const handleSelectLetter = useCallback(
+    (_letter: string, targetIndex: number) => {
+      virtuosoRef.current?.scrollToIndex({
+        index: Math.min(targetIndex, filteredSongIds.length - 1),
+        align: 'start',
+        behavior: 'auto'
+      });
+    },
+    [filteredSongIds.length]
+  );
+
   const normalizedKeyword = keyword?.trim();
+  const shouldShowScrubber =
+    alphabetScrubberPosition !== 'off' &&
+    !normalizedKeyword &&
+    (sortingOrder === 'aToZ' || sortingOrder === 'zToA') &&
+    Boolean(alphabetMap && Object.keys(alphabetMap).length > 0);
   const hasActiveSubFilters =
     (language && language !== 'all') ||
     (genre && genre !== 'all') ||
@@ -728,14 +784,39 @@ function SongsPage() {
           </div>
         </div>
       ) : (
-        <div className="songs-container appear-from-bottom min-h-0 flex-1 delay-100">
-          <VirtualizedList
-            data={filteredSongIds}
-            fixedItemHeight={60}
-            scrollKey={scrollKey}
-            itemContent={renderSong}
-            onChange={onRangeChange}
-          />
+        <div className="songs-container appear-from-bottom min-h-0 flex-1 delay-100 flex flex-col">
+          {shouldShowScrubber && alphabetScrubberPosition === 'top-horizontal' && (
+            <AlphabetScrubber
+              alphabetMap={alphabetMap}
+              letterCounts={letterCounts}
+              position="top-horizontal"
+              sortOrder={sortingOrder as 'aToZ' | 'zToA'}
+              activeLetter={activeLetter}
+              onSelectLetter={handleSelectLetter}
+            />
+          )}
+          <div className="flex min-h-0 flex-1 w-full">
+            {shouldShowScrubber && alphabetScrubberPosition === 'left-vertical' && (
+              <AlphabetScrubber
+                alphabetMap={alphabetMap}
+                letterCounts={letterCounts}
+                position="left-vertical"
+                sortOrder={sortingOrder as 'aToZ' | 'zToA'}
+                activeLetter={activeLetter}
+                onSelectLetter={handleSelectLetter}
+              />
+            )}
+            <div className="min-w-0 flex-1 h-full">
+              <VirtualizedList
+                ref={virtuosoRef}
+                data={filteredSongIds}
+                fixedItemHeight={60}
+                scrollKey={scrollKey}
+                itemContent={renderSong}
+                onChange={handleListRangeChange}
+              />
+            </div>
+          </div>
         </div>
       )}
     </MainContainer>
