@@ -10,6 +10,10 @@ import { inArray } from 'drizzle-orm';
 import { app } from 'electron';
 import sharp from 'sharp';
 
+// Bound libvips memory usage to prevent native memory bloat during artwork generation
+sharp.cache({ memory: 10, files: 10, items: 20 });
+sharp.concurrency(1);
+
 import albumCoverImage from '../../renderer/src/assets/images/webp/album_cover_default.webp?asset';
 import playlistCoverImage from '../../renderer/src/assets/images/webp/playlist_cover_default.webp?asset';
 // import { timeEnd, timeStart } from '../utils/measureTimeUsage';
