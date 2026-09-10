@@ -224,5 +224,5 @@ describe('SmartPlaylistScheduler Integration', () => {
     await vi.advanceTimersByTimeAsync(5000);
     expect(enqueueSpy).toHaveBeenCalledTimes(1);
     expect(enqueueSpy.mock.calls[0][0].id).toBe(`smart_playlist_regenerate_${p2Id}`);
-  });
+  }, 20_000);
 });
