@@ -1,5 +1,4 @@
 import { eq } from 'drizzle-orm';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
 import {
@@ -8,7 +7,12 @@ import {
 } from '../../../../../src/main/collections/operations/BulkDeleteOp';
 import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
 import { db } from '../../../../../src/main/db/db';
-import { playlists, songs, playlistEntries } from '../../../../../src/main/db/schema';
+import {
+  playlists,
+  songs,
+  playlistEntries,
+  smartPlaylistRules
+} from '../../../../../src/main/db/schema';
 
 describe('Delete + Restore Integration', () => {
   let repository: PlaylistRepository;
@@ -17,6 +21,7 @@ describe('Delete + Restore Integration', () => {
 
   beforeEach(async () => {
     // Clean up
+    await db.delete(smartPlaylistRules);
     await db.delete(playlists);
 
     repository = new PlaylistRepository();
@@ -25,6 +30,7 @@ describe('Delete + Restore Integration', () => {
   });
 
   afterEach(async () => {
+    await db.delete(smartPlaylistRules);
     await db.delete(playlists);
   });
 
@@ -150,5 +156,64 @@ describe('Delete + Restore Integration', () => {
       expect(restoredEntries[i].songId).toBe(originalEntries[i].songId);
       expect(restoredEntries[i].position).toBe(originalEntries[i].position);
     }
+  });
+
+  it('deletes and restores a smart playlist preserving its rule definition and maxEntries', async () => {
+    const [smartPl] = await db
+      .insert(playlists)
+      .values({
+        name: 'Rock Classics Smart',
+        playlistType: 'smart',
+        parentId: null
+      })
+      .returning();
+
+    await db.insert(smartPlaylistRules).values({
+      playlistId: smartPl.id,
+      ruleAst: {
+        type: 'group',
+        logicalOperator: 'and',
+        rules: [{ type: 'condition', field: 'genre', operator: 'eq', value: 'Rock' }]
+      },
+      sortDefinition: [{ field: 'year', direction: 'asc' }],
+      maxEntries: 100,
+      dependencies: ['genre'],
+      ruleVersion: 1
+    });
+
+    // Delete smart playlist
+    let restoreInverse: any;
+    await db.transaction(async (trx) => {
+      const ctx = { trx, membershipService: {} as any };
+      const res = await deleteOp.execute({ playlistIds: [smartPl.id] }, ctx);
+      restoreInverse = res.inverseInput;
+    });
+
+    // Verify deleted
+    expect(await db.select().from(playlists)).toHaveLength(0);
+    expect(await db.select().from(smartPlaylistRules)).toHaveLength(0);
+
+    // Restore
+    await db.transaction(async (trx) => {
+      const ctx = { trx, membershipService: {} as any };
+      await restoreOp.execute(restoreInverse.input, ctx);
+    });
+
+    // Verify restored
+    const restoredPls = await db.select().from(playlists);
+    expect(restoredPls).toHaveLength(1);
+    expect(restoredPls[0].id).toBe(smartPl.id);
+    expect(restoredPls[0].playlistType).toBe('smart');
+
+    const restoredRules = await db.select().from(smartPlaylistRules);
+    expect(restoredRules).toHaveLength(1);
+    expect(restoredRules[0].playlistId).toBe(smartPl.id);
+    expect(restoredRules[0].maxEntries).toBe(100);
+    expect(restoredRules[0].ruleAst).toEqual({
+      type: 'group',
+      logicalOperator: 'and',
+      rules: [{ type: 'condition', field: 'genre', operator: 'eq', value: 'Rock' }]
+    });
+    expect(restoredRules[0].dependencies).toEqual(['genre', 'year']);
   });
 });

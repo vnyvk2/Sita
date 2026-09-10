@@ -16,7 +16,6 @@ import type {
 import { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
 import { db } from '@main/db/db';
 import { eq, inArray } from 'drizzle-orm';
-import { describe, expect, it } from 'vitest';
 
 /**
  * Real-PGlite lifecycle proof for the entry-manipulation operations.

@@ -1,5 +1,4 @@
 import { eq } from 'drizzle-orm';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
 import { MoveCollectionOp } from '../../../../../src/main/collections/operations/MoveCollectionOp';

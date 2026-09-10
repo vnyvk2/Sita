@@ -1,6 +1,6 @@
 import { asc, eq, and, ne } from 'drizzle-orm';
 
-import { db } from '../../db/db';
+import { db, type DBTransaction } from '../../db/db';
 import {
   smartPlaylistRules,
   playlistEntries,
@@ -13,6 +13,7 @@ import {
   genresSongs,
   genres
 } from '../../db/schema';
+import type { MembershipService } from '../membership/MembershipService';
 import type { SmartPlaylistDefinition, SmartPlaylistRuleAST, OrderDefinition } from '../query/ast';
 import { QueryPlanner } from '../query/QueryPlanner';
 import { SmartPlaylistCompiler } from '../query/SmartPlaylistCompiler';
@@ -24,12 +25,14 @@ export class SmartPlaylistEngine {
   // Stateless helper for position bookkeeping (accepts an explicit trx)
   private repository = new PlaylistRepository();
 
+  constructor(private membershipService?: MembershipService) {}
+
   /**
    * Safely regenerates the contents of a smart playlist inside a transaction. If any step fails,
    * the entire regeneration rolls back.
    */
-  public async regenerate(playlistId: number): Promise<boolean> {
-    return await db.transaction(async (trx) => {
+  public async regenerate(playlistId: number, externalTrx?: DBTransaction): Promise<boolean> {
+    const execute = async (trx: DBTransaction) => {
       // 1. Fetch rule
       const [ruleRecord] = await trx
         .select()
@@ -72,28 +75,19 @@ export class SmartPlaylistEngine {
         query = query.where(predicate);
       }
 
+      query = query.groupBy(songs.id);
+
       if (orderBySql.length > 0) {
         query = query.orderBy(...orderBySql);
       }
 
-      // Execute query to get matching song IDs
-      const matchingSongs = await query;
-
-      // Deduplicate in JS to avoid SQL DISTINCT vs ORDER BY limitations
-      // Preserves the first encountered element according to the ORDER BY
-      const uniqueSongs = [];
-      const seen = new Set<number>();
-      for (const s of matchingSongs) {
-        if (!seen.has(s.id)) {
-          seen.add(s.id);
-          uniqueSongs.push(s);
-          if (ruleRecord.maxEntries !== null && uniqueSongs.length >= ruleRecord.maxEntries) {
-            break;
-          }
-        }
+      if (ruleRecord.maxEntries !== null && ruleRecord.maxEntries > 0) {
+        query = query.limit(ruleRecord.maxEntries);
       }
 
-      const songIds = uniqueSongs.map((s) => s.id);
+      // Execute query to get matching songs
+      const matchingSongs = await query;
+      const songIds = matchingSongs.map((s) => s.id);
 
       // 5. Capture the current visual order of non-smart entries (e.g. manually
       // pinned tracks co-resident with the smart block) BEFORE deleting, so
@@ -107,6 +101,14 @@ export class SmartPlaylistEngine {
       const manualCount = manualEntries.length;
 
       // 6. Delete existing smart entries
+      const oldEntries = await trx
+        .select({ songId: playlistEntries.songId })
+        .from(playlistEntries)
+        .where(
+          and(eq(playlistEntries.playlistId, playlistId), eq(playlistEntries.source, 'smart'))
+        );
+      const oldSongIds = oldEntries.map((e) => e.songId);
+
       await trx
         .delete(playlistEntries)
         .where(
@@ -122,8 +124,11 @@ export class SmartPlaylistEngine {
           source: 'smart'
         }));
 
-        // Drizzle can handle bulk inserts natively
-        await trx.insert(playlistEntries).values(values);
+        // Chunk bulk insert to respect SQLite variable limits (safe chunk size of 1000)
+        const CHUNK_SIZE = 1000;
+        for (let i = 0; i < values.length; i += CHUNK_SIZE) {
+          await trx.insert(playlistEntries).values(values.slice(i, i + CHUNK_SIZE));
+        }
       }
 
       // 8. Renumber remaining non-smart entries to directly follow the smart
@@ -153,7 +158,7 @@ export class SmartPlaylistEngine {
           );
         manualDuration = manualSongRows.reduce((sum, s) => sum + Number(s.duration ?? 0), 0);
       }
-      const totalDuration = uniqueSongs.reduce((sum, s) => sum + Number(s.duration ?? 0), 0);
+      const totalDuration = matchingSongs.reduce((sum, s) => sum + Number(s.duration ?? 0), 0);
 
       await trx
         .update(playlists)
@@ -172,7 +177,20 @@ export class SmartPlaylistEngine {
         })
         .where(eq(smartPlaylistRules.playlistId, playlistId));
 
+      if (this.membershipService) {
+        const affectedSongIds = Array.from(new Set([...oldSongIds, ...songIds]));
+        if (affectedSongIds.length > 0) {
+          this.membershipService.invalidateSongs(affectedSongIds);
+        }
+      }
+
       return true;
-    });
+    };
+
+    if (externalTrx) {
+      return await execute(externalTrx);
+    } else {
+      return await db.transaction(execute);
+    }
   }
 }

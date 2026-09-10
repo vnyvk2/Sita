@@ -1,5 +1,4 @@
 import { eq, inArray } from 'drizzle-orm';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
 import { DuplicateExecutor } from '../../../../../src/main/collections/operations/DuplicateExecutor';
@@ -7,7 +6,7 @@ import { DuplicateOp } from '../../../../../src/main/collections/operations/Dupl
 import { DuplicatePlanner } from '../../../../../src/main/collections/operations/DuplicatePlanner';
 import { PlaylistRepository } from '../../../../../src/main/collections/repositories/PlaylistRepository';
 import { db } from '../../../../../src/main/db/db';
-import { playlists } from '../../../../../src/main/db/schema';
+import { playlists, smartPlaylistRules } from '../../../../../src/main/db/schema';
 
 describe('DuplicateOp Integration', () => {
   let repository: PlaylistRepository;
@@ -16,6 +15,7 @@ describe('DuplicateOp Integration', () => {
 
   beforeEach(async () => {
     // Clean up
+    await db.delete(smartPlaylistRules);
     await db.delete(playlists);
 
     repository = new PlaylistRepository();
@@ -24,6 +24,7 @@ describe('DuplicateOp Integration', () => {
   });
 
   afterEach(async () => {
+    await db.delete(smartPlaylistRules);
     await db.delete(playlists);
   });
 
@@ -95,5 +96,50 @@ describe('DuplicateOp Integration', () => {
         expect(originalIds.has(node.parentId)).toBe(false); // Should not reference an original parent
       }
     }
+  });
+
+  it('duplicates a smart playlist and its rules without PK collision', async () => {
+    const [smartPl] = await db
+      .insert(playlists)
+      .values({
+        name: 'My Smart Playlist',
+        playlistType: 'smart',
+        parentId: null
+      })
+      .returning();
+
+    await db.insert(smartPlaylistRules).values({
+      playlistId: smartPl.id,
+      ruleAst: {
+        type: 'group',
+        logicalOperator: 'and',
+        rules: [{ type: 'condition', field: 'title', operator: 'contains', value: 'rock' }]
+      },
+      sortDefinition: [{ field: 'addedAt', direction: 'desc' }],
+      maxEntries: 25,
+      dependencies: ['title'],
+      ruleVersion: 1
+    });
+
+    await db.transaction(async (trx) => {
+      const ctx = { trx, membershipService: {} as any };
+      await duplicateOp.execute({ playlistId: smartPl.id }, ctx);
+    });
+
+    const allPlaylists = await db.select().from(playlists).orderBy(playlists.id);
+    expect(allPlaylists.length).toBe(2);
+
+    const copyPl = allPlaylists.find((p) => p.name === 'My Smart Playlist (Copy)');
+    expect(copyPl).toBeDefined();
+    expect(copyPl?.playlistType).toBe('smart');
+
+    const copyRules = await db
+      .select()
+      .from(smartPlaylistRules)
+      .where(eq(smartPlaylistRules.playlistId, copyPl!.id));
+    expect(copyRules.length).toBe(1);
+    expect(copyRules[0].playlistId).toBe(copyPl!.id);
+    expect(copyRules[0].id).not.toBe(smartPl.id);
+    expect(copyRules[0].maxEntries).toBe(25);
   });
 });

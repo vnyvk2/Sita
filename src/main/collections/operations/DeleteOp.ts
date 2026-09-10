@@ -1,5 +1,8 @@
+import { eq } from 'drizzle-orm';
+
 import { createCollectionId } from '../../../common/collections/id';
 import type { DeleteInput } from '../../../common/collections/operationInputs';
+import { smartPlaylistRules } from '../../db/schema';
 import logger from '../../logger';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
@@ -25,7 +28,24 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
     // Get all entries so we know what song memberships are affected, and for undo
     const entries = await this.repository.getEntries(playlistId, {}, ctx.trx);
 
-    // Delete playlist (cascade deletes entries if DB is set up, but let's be explicit or rely on repo)
+    // Snapshot smart rule if applicable before CASCADE deletion
+    let smartRule: any = undefined;
+    if (playlist.playlistType === 'smart') {
+      const [rule] = await ctx.trx
+        .select()
+        .from(smartPlaylistRules)
+        .where(eq(smartPlaylistRules.playlistId, playlistId));
+      if (rule) {
+        smartRule = {
+          ruleAst: rule.ruleAst,
+          sortDefinition: rule.sortDefinition,
+          maxEntries: rule.maxEntries,
+          ruleVersion: rule.ruleVersion
+        };
+      }
+    }
+
+    // Delete playlist (cascade deletes entries and smart_playlist_rules)
     await this.repository.deletePlaylist(playlistId, ctx.trx);
 
     const affectedSongIds = Array.from(new Set(entries.map((e) => e.entry.songId)));
@@ -42,7 +62,7 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
       operationInput: { playlistId },
       inverseInput: {
         operationType: 'playlist.restore',
-        input: { playlist, entries: entries.map((e) => e.entry) }
+        input: { playlist, entries: entries.map((e) => e.entry), smartRule }
       },
       version: 1,
       affectedSongIds,

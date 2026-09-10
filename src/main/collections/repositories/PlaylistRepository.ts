@@ -1,5 +1,12 @@
 import { db } from '@db/db';
-import { playlists, playlistEntries, songs, artists, artistsSongs } from '@db/schema';
+import {
+  playlists,
+  playlistEntries,
+  smartPlaylistRules,
+  songs,
+  artists,
+  artistsSongs
+} from '@db/schema';
 import { rawRun } from '@db/sqlite/raw';
 import { eq, and, gte, inArray, sql, asc, desc, lte } from 'drizzle-orm';
 
@@ -18,6 +25,15 @@ export class PlaylistRepository {
     const [playlist] = await trx.select().from(playlists).where(eq(playlists.id, playlistId));
 
     return playlist || null;
+  }
+
+  public async getSmartRule(playlistId: number, trx: DB | DBTransaction = db) {
+    const [rule] = await trx
+      .select()
+      .from(smartPlaylistRules)
+      .where(eq(smartPlaylistRules.playlistId, playlistId));
+
+    return rule || null;
   }
 
   public async getChildren(parentId: number | null, trx: DB | DBTransaction = db) {
@@ -238,7 +254,14 @@ export class PlaylistRepository {
   public async insertEntries(entries: NewPlaylistEntry[], trx: DB | DBTransaction = db) {
     if (entries.length === 0) return [];
 
-    return await trx.insert(playlistEntries).values(entries).returning();
+    const CHUNK_SIZE = 1000;
+    const inserted: PlaylistEntryRow[] = [];
+    for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
+      const chunk = entries.slice(i, i + CHUNK_SIZE);
+      const res = await trx.insert(playlistEntries).values(chunk).returning();
+      inserted.push(...res);
+    }
+    return inserted;
   }
 
   public async restoreEntriesWithIds(
@@ -248,7 +271,14 @@ export class PlaylistRepository {
     if (entries.length === 0) return [];
 
     // SQLite accepts explicit ids (see restorePlaylistWithId)
-    return await trx.insert(playlistEntries).values(entries).returning();
+    const CHUNK_SIZE = 1000;
+    const restored: PlaylistEntryRow[] = [];
+    for (let i = 0; i < entries.length; i += CHUNK_SIZE) {
+      const chunk = entries.slice(i, i + CHUNK_SIZE);
+      const res = await trx.insert(playlistEntries).values(chunk).returning();
+      restored.push(...res);
+    }
+    return restored;
   }
 
   public async deleteEntries(entryIds: number[], trx: DB | DBTransaction = db) {

@@ -1,5 +1,3 @@
-import { describe, it, expect } from 'vitest';
-
 import type { SmartPlaylistDefinition } from '../../../../../src/main/collections/query/ast';
 import { QueryPlanner } from '../../../../../src/main/collections/query/QueryPlanner';
 

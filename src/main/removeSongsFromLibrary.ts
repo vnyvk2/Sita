@@ -84,6 +84,7 @@ const removeSongsFromLibrary = async (
   songPaths: string[],
   abortSignal: AbortSignal
 ): PromiseFunctionReturn => {
+  const removedSongIds: number[] = [];
   for (let i = 0; i < songPaths.length; i += 1) {
     const songPath = songPaths[i];
 
@@ -107,13 +108,15 @@ const removeSongsFromLibrary = async (
       };
     }
 
+    removedSongIds.push(song.id);
+
     sendMessageToRenderer({
       messageCode: 'SONG_REMOVE_PROCESS_UPDATE',
       data: { total: songPaths.length, value: i }
     });
   }
 
-  dataUpdateEvent('songs/deletedSong');
+  dataUpdateEvent('songs/deletedSong', removedSongIds);
   dataUpdateEvent('artists/deletedArtist');
   dataUpdateEvent('albums/deletedAlbum');
   dataUpdateEvent('genres/deletedGenre');

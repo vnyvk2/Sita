@@ -1,19 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-import { smartPlaylistScheduler } from '../../../../../src/main/collections/engine/SmartPlaylistScheduler';
-import { db } from '../../../../../src/main/db/db';
-import { smartPlaylistRules } from '../../../../../src/main/db/schema';
-import { libraryEventBus } from '../../../../../src/main/events/LibraryEventBus';
-import { libraryScheduler } from '../../../../../src/main/workers/jobScheduler';
-
-vi.mock('../../../../../src/main/workers/jobScheduler', () => ({
+// Mock dependencies
+vi.mock('@main/workers/jobScheduler', () => ({
   libraryScheduler: {
     enqueue: vi.fn()
   }
 }));
 
 // Mock db.select
-vi.mock('../../../../../src/main/db/db', () => ({
+vi.mock('@main/db/db', () => ({
   db: {
     select: vi.fn(() => ({
       from: vi.fn().mockResolvedValue([
@@ -27,6 +20,13 @@ vi.mock('../../../../../src/main/db/db', () => ({
   }
 }));
 
+import { smartPlaylistScheduler } from '@main/collections/engine/SmartPlaylistScheduler';
+import { collectionEventBus } from '@main/collections/events/CollectionEventBus';
+import { db } from '@main/db/db';
+import { smartPlaylistRules } from '@main/db/schema';
+import { libraryEventBus } from '@main/events/LibraryEventBus';
+import { libraryScheduler } from '@main/workers/jobScheduler';
+
 describe('SmartPlaylistScheduler', () => {
   const flushMicrotasks = async (count = 1) => {
     for (let i = 0; i < count; i++) {
@@ -37,11 +37,12 @@ describe('SmartPlaylistScheduler', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    (smartPlaylistScheduler as any).dirtyPlaylists.clear();
-    (smartPlaylistScheduler as any).debounceTimeout = null;
+    smartPlaylistScheduler.reset();
+    smartPlaylistScheduler.setupListeners();
   });
 
   afterEach(() => {
+    smartPlaylistScheduler.cleanup();
     vi.useRealTimers();
   });
 
@@ -150,5 +151,67 @@ describe('SmartPlaylistScheduler', () => {
     // Playlist 1 cares about 'title'. Even after 100 events, it should be queued exactly once.
     expect(libraryScheduler.enqueue).toHaveBeenCalledTimes(1);
     expect((libraryScheduler.enqueue as any).mock.calls[0][0].playlistId).toBe(1);
+  });
+
+  it('should single-flight rule fetching and reuse cached rules across multiple events', async () => {
+    const selectSpy = db.select as any;
+    selectSpy.mockClear();
+
+    // Fire 5 distinct events concurrently
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['title'] });
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 2, changedFields: ['artist'] });
+    libraryEventBus.emitEvent('SongPlayCountChanged', { songId: 3 });
+
+    await flushMicrotasks(5);
+
+    // db.select should only have been called once despite multiple concurrent events
+    expect(selectSpy).toHaveBeenCalledTimes(1);
+
+    // Another event fired later while cache is hot
+    libraryEventBus.emitEvent('SongFavoriteChanged', { songId: 4 });
+    await flushMicrotasks(5);
+
+    // Still only called once because rules are cached in memory
+    expect(selectSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('should invalidate cached rules when collection event is received', async () => {
+    const selectSpy = db.select as any;
+    selectSpy.mockClear();
+
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['title'] });
+    await flushMicrotasks(5);
+    expect(selectSpy).toHaveBeenCalledTimes(1);
+
+    // Emit collection modified event
+    collectionEventBus.emitEvent({
+      type: 'CollectionChanged',
+      collectionId: 1,
+      name: 'New Name'
+    });
+
+    // Fire next event
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 2, changedFields: ['title'] });
+    await flushMicrotasks(5);
+
+    // db.select should have been called again after cache invalidation
+    expect(selectSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('should unregister all listeners and cancel pending timers on cleanup', async () => {
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 1, changedFields: ['title'] });
+    await flushMicrotasks(5);
+
+    smartPlaylistScheduler.cleanup();
+
+    // Advancing timers should not execute any queued flush
+    await vi.runAllTimersAsync();
+    expect(libraryScheduler.enqueue).not.toHaveBeenCalled();
+
+    // Emitting event after cleanup should not trigger any scheduler action
+    libraryEventBus.emitEvent('SongMetadataChanged', { songId: 2, changedFields: ['title'] });
+    await flushMicrotasks(5);
+    await vi.runAllTimersAsync();
+    expect(libraryScheduler.enqueue).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-import { SmartPlaylistEngine } from '../../../../../src/main/collections/engine/SmartPlaylistEngine';
-import { SmartPlaylistJob } from '../../../../../src/main/workers/jobs/smartPlaylistJob';
+import { SmartPlaylistEngine } from '@main/collections/engine/SmartPlaylistEngine';
+import { SmartPlaylistJob } from '@main/workers/jobs/smartPlaylistJob';
 
 describe('SmartPlaylistJob', () => {
   beforeEach(() => {

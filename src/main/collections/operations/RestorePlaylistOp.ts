@@ -1,4 +1,6 @@
 import { createCollectionId } from '../../../common/collections/id';
+import { smartPlaylistRules } from '../../db/schema';
+import { DependencyAnalyzer } from '../engine/DependencyAnalyzer';
 import { PlaylistRepository, type PlaylistRow } from '../repositories/PlaylistRepository';
 import type { RestoreSongsInput } from './RestoreSongsOp';
 import type { CollectionOperation, OperationContext, OperationResult } from './types';
@@ -11,6 +13,12 @@ type RestorablePlaylist = Omit<PlaylistRow, 'createdAt' | 'updatedAt'> & {
 export interface RestorePlaylistInput {
   playlist: RestorablePlaylist;
   entries: RestoreSongsInput['entries'];
+  smartRule?: {
+    ruleAst: any;
+    sortDefinition: any;
+    maxEntries?: number | null;
+    ruleVersion?: number;
+  };
 }
 
 export class RestorePlaylistOp implements CollectionOperation<RestorePlaylistInput, void> {
@@ -24,7 +32,7 @@ export class RestorePlaylistOp implements CollectionOperation<RestorePlaylistInp
     input: RestorePlaylistInput,
     ctx: OperationContext
   ): Promise<OperationResult<void>> {
-    const { playlist, entries } = input;
+    const { playlist, entries, smartRule } = input;
 
     const playlistToInsert = {
       ...playlist,
@@ -35,6 +43,29 @@ export class RestorePlaylistOp implements CollectionOperation<RestorePlaylistInp
     };
 
     await this.repository.restorePlaylistWithId(playlistToInsert, ctx.trx);
+
+    if (smartRule) {
+      const ast =
+        typeof smartRule.ruleAst === 'string' ? JSON.parse(smartRule.ruleAst) : smartRule.ruleAst;
+      const sortDef =
+        typeof smartRule.sortDefinition === 'string'
+          ? JSON.parse(smartRule.sortDefinition)
+          : smartRule.sortDefinition;
+      const dependencies = ast
+        ? DependencyAnalyzer.extractDependencies({
+            rule: ast,
+            orderBy: Array.isArray(sortDef) ? sortDef : []
+          })
+        : [];
+      await ctx.trx.insert(smartPlaylistRules).values({
+        playlistId: playlist.id,
+        ruleAst: smartRule.ruleAst,
+        sortDefinition: smartRule.sortDefinition,
+        maxEntries: smartRule.maxEntries ?? null,
+        ruleVersion: smartRule.ruleVersion ?? 1,
+        dependencies
+      });
+    }
 
     if (entries.length > 0) {
       const entriesToInsert = entries.map((e) => {

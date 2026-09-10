@@ -1,7 +1,7 @@
 import type { PlaylistDto } from '@common/collections/dtos';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useRootCollections } from '@renderer/hooks/collections/useCollectionQueries';
-import { Link, useLocation } from '@tanstack/react-router';
+import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { lazy, memo, useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,7 +17,8 @@ interface SidebarPlaylistsSectionProps {
 
 export const SidebarPlaylistsSection = memo(({ className = '' }: SidebarPlaylistsSectionProps) => {
   const { t } = useTranslation();
-  const { changePromptMenuData } = useContext(AppUpdateContext);
+  const { changePromptMenuData, updateContextMenuData } = useContext(AppUpdateContext);
+  const navigate = useNavigate();
   const activePlaylistPath = useLocation({
     select: (loc) => (loc.pathname.startsWith('/main-player/playlists/') ? loc.pathname : null)
   });
@@ -31,6 +32,31 @@ export const SidebarPlaylistsSection = memo(({ className = '' }: SidebarPlaylist
   const openNewPlaylistPrompt = useCallback(() => {
     changePromptMenuData(true, <NewPlaylistPrompt currentPlaylists={playlists} />);
   }, [changePromptMenuData, playlists]);
+
+  const handleAddClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      updateContextMenuData(
+        true,
+        [
+          {
+            label: t('playlistsPage.createPlaylist', 'New Standard Playlist'),
+            iconName: 'queue_music',
+            handlerFunction: openNewPlaylistPrompt
+          },
+          {
+            label: 'New Smart Playlist',
+            iconName: 'auto_awesome',
+            handlerFunction: () => navigate({ to: '/main-player/playlists/smart-editor' })
+          }
+        ],
+        e.clientX,
+        e.clientY
+      );
+    },
+    [updateContextMenuData, openNewPlaylistPrompt, navigate, t]
+  );
 
   const renderPlaylistItem = useCallback(
     (playlist: PlaylistDto) => {
@@ -93,7 +119,7 @@ export const SidebarPlaylistsSection = memo(({ className = '' }: SidebarPlaylist
         <span className="truncate">{t('common.playlist_other', 'Playlists')}</span>
         <button
           type="button"
-          onClick={openNewPlaylistPrompt}
+          onClick={handleAddClick}
           title={t('playlistsPage.createPlaylist', 'Create Playlist')}
           className="hover:bg-background-color-1 text-font-color-black/70 hover:text-font-color-black dark:text-font-color-white/70 dark:hover:bg-dark-background-color-1 dark:hover:text-font-color-white flex h-5 w-5 cursor-pointer items-center justify-center rounded-full transition-colors"
         >
@@ -111,7 +137,7 @@ export const SidebarPlaylistsSection = memo(({ className = '' }: SidebarPlaylist
             </span>
             <button
               type="button"
-              onClick={openNewPlaylistPrompt}
+              onClick={handleAddClick}
               className="bg-background-color-3 text-font-color-black dark:bg-dark-background-color-3 mt-2 flex cursor-pointer items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-xs hover:opacity-90"
             >
               <span className="material-icons-round text-sm">add</span>

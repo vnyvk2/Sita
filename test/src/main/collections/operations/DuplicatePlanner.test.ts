@@ -1,5 +1,3 @@
-import { describe, it, expect, vi } from 'vitest';
-
 import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
 import { CollectionNamingStrategy } from '../../../../../src/main/collections/operations/CollectionNamingStrategy';
 import { DuplicatePlanner } from '../../../../../src/main/collections/operations/DuplicatePlanner';

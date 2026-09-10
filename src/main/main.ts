@@ -85,6 +85,8 @@ import { attachRendererRecovery } from './lifecycle/rendererRecovery';
 import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
 import logger from './logger';
+import { smartPlaylistScheduler } from './collections/engine/SmartPlaylistScheduler';
+import { libraryEventBus } from './events/LibraryEventBus';
 import { flushScrobbleQueue } from './other/lastFm/flushScrobbleQueue';
 import resetAppData from './resetAppData';
 import { savePendingSongLyrics } from './saveLyricsToSong';
@@ -646,6 +648,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   ShutdownLogger.logEventObservation('main.ts:app.on(will-quit)');
+  smartPlaylistScheduler.cleanup();
   memProfiler.shutdown();
   void closeDatabaseInstance();
 });
@@ -777,6 +780,36 @@ export function dataUpdateEvent(
 ) {
   if (dataUpdateEventTimeOutId) clearTimeout(dataUpdateEventTimeOutId);
   logger.debug(`Data update event fired.`, { dataType, data, message });
+
+  // Bridge library changes to libraryEventBus for background services (e.g. SmartPlaylistScheduler)
+  try {
+    if (dataType === 'songs/newSong') {
+      for (const songId of data) libraryEventBus.emitEvent('SongAdded', { songId });
+    } else if (dataType === 'songs/deletedSong') {
+      for (const songId of data) libraryEventBus.emitEvent('SongRemoved', { songId });
+    } else if (dataType === 'songs/updatedSong') {
+      for (const songId of data) {
+        libraryEventBus.emitEvent('SongMetadataChanged', {
+          songId,
+          changedFields: ['title', 'artist', 'album', 'genre', 'year', 'duration', 'bitRate']
+        });
+      }
+    } else if (dataType === 'songs/likes') {
+      for (const songId of data) libraryEventBus.emitEvent('SongFavoriteChanged', { songId });
+    } else if (dataType === 'songs/listeningData/listens') {
+      for (const songId of data) libraryEventBus.emitEvent('SongPlayCountChanged', { songId });
+    } else if (dataType === 'songs/listeningData/skips') {
+      for (const songId of data) {
+        libraryEventBus.emitEvent('SongMetadataChanged', {
+          songId,
+          changedFields: ['skipCount']
+        });
+      }
+    }
+  } catch (err) {
+    logger.error('Failed to emit library event from dataUpdateEvent', { err, dataType });
+  }
+
   addEventsToCache(dataType, data, message);
   dataUpdateEventTimeOutId = setTimeout(() => {
     logger.verbose('Data Events Cache', { dataEventsCache });

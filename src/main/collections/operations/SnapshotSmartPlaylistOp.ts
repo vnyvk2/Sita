@@ -53,22 +53,31 @@ export class SnapshotSmartPlaylistOp implements CollectionOperation<
         name: snapshotName,
         playlistType: 'standard',
         parentId: smartPlaylist.parentId, // Optionally place in same folder
-        itemCount: currentEntries.length
+        itemCount: currentEntries.length,
+        totalDuration: smartPlaylist.totalDuration ?? 0
       })
       .returning({ id: playlists.id });
 
     // 4. Copy entries
+    const songIds: number[] = [];
     if (currentEntries.length > 0) {
-      const entriesToInsert = currentEntries.map((e) => ({
-        playlistId: inserted.id,
-        songId: e.songId,
-        position: e.position,
-        addedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      }));
+      const entriesToInsert = currentEntries.map((e) => {
+        songIds.push(e.songId);
+        return {
+          playlistId: inserted.id,
+          songId: e.songId,
+          position: e.position,
+          source: 'manual',
+          addedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+      });
 
-      await ctx.trx.insert(playlistEntries).values(entriesToInsert);
+      const CHUNK_SIZE = 1000;
+      for (let i = 0; i < entriesToInsert.length; i += CHUNK_SIZE) {
+        await ctx.trx.insert(playlistEntries).values(entriesToInsert.slice(i, i + CHUNK_SIZE));
+      }
     }
 
     return {
@@ -81,7 +90,7 @@ export class SnapshotSmartPlaylistOp implements CollectionOperation<
         input: { playlistId: inserted.id }
       },
       version: 1,
-      affectedSongIds: []
+      affectedSongIds: songIds
     };
   }
 }

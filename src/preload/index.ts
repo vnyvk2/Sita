@@ -20,8 +20,14 @@ import type {
   BulkRestoreInput,
   PinInput,
   UnpinInput,
-  CollectionEvent
+  CollectionEvent,
+  CreateSmartPlaylistInput,
+  UpdateSmartPlaylistInput
 } from '../common/collections/operationInputs';
+import type {
+  SmartPlaylistDefinition,
+  SmartPlaylistPreviewResult
+} from '../common/collections/smartPlaylist';
 import type {
   PlaylistViewMode,
   PlaylistExportOptions,
@@ -140,8 +146,7 @@ const audioLibraryControls = {
     onlyFavoriteArtists?: boolean;
     onlyFavoriteAlbums?: boolean;
     restrictToIds?: number[];
-  }): Promise<SongIdsResult> =>
-    ipcRenderer.invoke('app/getFilteredSongLibraryIds', options),
+  }): Promise<SongIdsResult> => ipcRenderer.invoke('app/getFilteredSongLibraryIds', options),
   getSongListFacets: (): Promise<{ languages: string[]; genres: string[] }> =>
     ipcRenderer.invoke('app/getSongListFacets'),
   getSongDurations: (songIds: number[]): Promise<{ id: number; duration: number }[]> =>
@@ -183,7 +188,12 @@ const audioLibraryControls = {
       filterType: SongFilterTypes | undefined,
       limit: number | undefined,
       preserveIdOrder: boolean | undefined,
-      options: { generationToken: number; priority?: 'target' | 'lookahead'; listIdentity?: string; compact?: boolean }
+      options: {
+        generationToken: number;
+        priority?: 'target' | 'lookahead';
+        listIdentity?: string;
+        compact?: boolean;
+      }
     ): Promise<SongData[] | CancelledHydrationResponse | undefined>;
     (
       songIds: number[],
@@ -191,7 +201,12 @@ const audioLibraryControls = {
       filterType?: SongFilterTypes,
       limit?: number,
       preserveIdOrder?: boolean,
-      options?: { generationToken?: undefined; priority?: 'target' | 'lookahead'; listIdentity?: string; compact?: boolean }
+      options?: {
+        generationToken?: undefined;
+        priority?: 'target' | 'lookahead';
+        listIdentity?: string;
+        compact?: boolean;
+      }
     ): Promise<SongData[] | undefined>;
   },
   getAllHistorySongs: (
@@ -856,13 +871,24 @@ const collections = {
     getBreadcrumbs: (id: number): Promise<BreadcrumbDto[]> =>
       ipcRenderer.invoke('collections/read/getBreadcrumbs', id),
     getArtworks: (songIds: number[]): Promise<ArtworkPaths[]> =>
-      ipcRenderer.invoke('collections/read/getArtworks', songIds)
+      ipcRenderer.invoke('collections/read/getArtworks', songIds),
+    getSmartRule: (playlistId: number): Promise<unknown> =>
+      ipcRenderer.invoke('collections/read/getSmartRule', playlistId),
+    previewSmartPlaylist: (
+      definition: SmartPlaylistDefinition,
+      maxEntries?: number | null
+    ): Promise<SmartPlaylistPreviewResult> =>
+      ipcRenderer.invoke('collections/read/previewSmartPlaylist', { definition, maxEntries })
   },
   write: {
     createFolder: (input: CreateFolderInput): Promise<number> =>
       ipcRenderer.invoke('collections/write/createFolder', input),
     createPlaylist: (input: CreatePlaylistInput): Promise<number> =>
       ipcRenderer.invoke('collections/write/createPlaylist', input),
+    createSmartPlaylist: (input: CreateSmartPlaylistInput): Promise<CollectionDto | null> =>
+      ipcRenderer.invoke('collections/write/createSmartPlaylist', input),
+    updateSmartPlaylist: (input: UpdateSmartPlaylistInput): Promise<void> =>
+      ipcRenderer.invoke('collections/write/updateSmartPlaylist', input),
     addSongs: (input: AddSongsInput): Promise<void> =>
       ipcRenderer.invoke('collections/write/addSongs', input),
     removeSongs: (input: RemoveSongsInput): Promise<void> =>

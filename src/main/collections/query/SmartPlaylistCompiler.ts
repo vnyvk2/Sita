@@ -11,6 +11,10 @@ import type {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function escapeLike(str: string): string {
+  return str.replace(/[\\%_]/g, '\\$&');
+}
+
 export class SmartPlaylistCompiler {
   public compilePredicate(rule: SmartPlaylistRuleAST | RuleCondition): SQL<unknown> | undefined {
     if (rule.type === 'group') {
@@ -30,21 +34,39 @@ export class SmartPlaylistCompiler {
   }
 
   public compileOrderBy(orderBy: OrderDefinition[]): SQL<unknown>[] {
-    return orderBy.map((order) => {
-      const col = this.getColumnForField(order.field);
+    const compiled = orderBy.map((order) => {
+      if (order.field === 'artist') {
+        const col =
+          order.direction === 'asc' ? sql`min(${artists.name})` : sql`max(${artists.name})`;
+        return order.direction === 'asc' ? sql`${col} ASC` : sql`${col} DESC`;
+      }
+      if (order.field === 'album') {
+        const col =
+          order.direction === 'asc' ? sql`min(${albums.title})` : sql`max(${albums.title})`;
+        return order.direction === 'asc' ? sql`${col} ASC` : sql`${col} DESC`;
+      }
+      if (order.field === 'genre') {
+        const col = order.direction === 'asc' ? sql`min(${genres.name})` : sql`max(${genres.name})`;
+        return order.direction === 'asc' ? sql`${col} ASC` : sql`${col} DESC`;
+      }
+      const col = this.getExpressionForField(order.field);
       return order.direction === 'asc' ? sql`${col} ASC` : sql`${col} DESC`;
     });
+
+    // Enforce deterministic ordering with songs.id tiebreaker
+    compiled.push(sql`${songs.id} ASC`);
+    return compiled;
   }
 
   private compileCondition(condition: RuleCondition): SQL<unknown> {
-    const col = this.getColumnForField(condition.field);
+    const col = this.getExpressionForField(condition.field);
     const value = condition.value;
 
     switch (condition.operator) {
       case 'eq':
         return sql`${col} = ${value}`;
       case 'neq':
-        return sql`${col} != ${value}`;
+        return sql`(${col} IS NULL OR ${col} != ${value})`;
       case 'gt':
         return sql`${col} > ${value}`;
       case 'gte':
@@ -53,37 +75,41 @@ export class SmartPlaylistCompiler {
         return sql`${col} < ${value}`;
       case 'lte':
         return sql`${col} <= ${value}`;
-      case 'contains':
-        // lower() on both sides mirrors pg ILIKE semantics (SQLite LIKE is ASCII-CI
-        // only when unadorned; explicit lower() keeps intent clear and deterministic)
-        return sql`lower(${col}) LIKE ${'%' + String(value).toLowerCase() + '%'}`;
-      case 'not_contains':
-        return sql`lower(${col}) NOT LIKE ${'%' + String(value).toLowerCase() + '%'}`;
-      case 'starts_with':
-        return sql`lower(${col}) LIKE ${String(value).toLowerCase() + '%'}`;
-      case 'ends_with':
-        return sql`lower(${col}) LIKE ${'%' + String(value).toLowerCase()}`;
+      case 'contains': {
+        const escaped = escapeLike(String(value ?? '').toLowerCase());
+        return sql`lower(${col}) LIKE ${'%' + escaped + '%'} ESCAPE '\\'`;
+      }
+      case 'not_contains': {
+        const escaped = escapeLike(String(value ?? '').toLowerCase());
+        return sql`(${col} IS NULL OR lower(${col}) NOT LIKE ${'%' + escaped + '%'} ESCAPE '\\')`;
+      }
+      case 'starts_with': {
+        const escaped = escapeLike(String(value ?? '').toLowerCase());
+        return sql`lower(${col}) LIKE ${escaped + '%'} ESCAPE '\\'`;
+      }
+      case 'ends_with': {
+        const escaped = escapeLike(String(value ?? '').toLowerCase());
+        return sql`lower(${col}) LIKE ${'%' + escaped} ESCAPE '\\'`;
+      }
       case 'is_true':
-        return sql`${col} = true`;
+        return sql`${col} = 1`;
       case 'is_false':
-        return sql`${col} = false`;
+        return sql`${col} = 0`;
       case 'is_null':
         return sql`${col} IS NULL`;
       case 'is_not_null':
         return sql`${col} IS NOT NULL`;
       case 'in_last':
-        // pg: col >= NOW() - (value || ' days')::interval. Timestamps are epoch-ms
-        // integers now; the cutoff is computed at compile time, which removes the
-        // session-timezone dependence pg's naive NOW() had (POC finding b9).
-        return sql`${col} >= ${Date.now() - Number(value) * DAY_MS}`;
+        // Timestamps in SQLite are stored as epoch-ms integers
+        return sql`${col} >= ${Date.now() - Number(value ?? 0) * DAY_MS}`;
       case 'not_in_last':
-        return sql`${col} < ${Date.now() - Number(value) * DAY_MS}`;
+        return sql`${col} < ${Date.now() - Number(value ?? 0) * DAY_MS}`;
       default:
         throw new Error(`Unsupported operator: ${condition.operator}`);
     }
   }
 
-  private getColumnForField(field: SmartPlaylistField): AnySQLiteColumn {
+  public getExpressionForField(field: SmartPlaylistField): AnySQLiteColumn | SQL<unknown> {
     switch (field) {
       case 'title':
         return songs.title;
@@ -99,10 +125,12 @@ export class SmartPlaylistCompiler {
         return songs.year;
       case 'duration':
         return songs.duration;
+      case 'bitRate':
+        return songs.bitRate;
       case 'playCount':
-        throw new Error('playCount is not supported');
+        return sql<number>`(SELECT count(*) FROM play_events WHERE play_events.song_id = ${songs.id})`;
       case 'skipCount':
-        return songs.skipCount;
+        return sql<number>`coalesce(${songs.skipCount}, 0)`;
       case 'addedAt':
         return songs.createdAt;
       case 'isFavorite':

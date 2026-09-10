@@ -1,8 +1,11 @@
+import { eq, sql } from 'drizzle-orm';
+
 import type {
   AddSongsInput,
   BulkDeleteInput,
   CreateFolderInput,
   CreatePlaylistInput,
+  CreateSmartPlaylistInput,
   DeleteInput,
   DuplicateInput,
   MergePlaylistsInput,
@@ -11,9 +14,24 @@ import type {
   RemoveSongsInput,
   RenameInput,
   ReorderInput,
-  UnpinInput
+  UnpinInput,
+  UpdateSmartPlaylistInput
 } from '../../../common/collections/operationInputs';
+import type {
+  SmartPlaylistDefinition,
+  SmartPlaylistPreviewResult
+} from '../../../common/collections/smartPlaylist';
+import getSongInfo from '../../core/getSongInfo';
 import { db } from '../../db/db';
+import {
+  albums,
+  albumsSongs,
+  artists,
+  artistsSongs,
+  genres,
+  genresSongs,
+  songs
+} from '../../db/schema';
 import { generateLocalArtworkBuffer } from '../../filesystem/artworkBuffers';
 import { processArtworkFiles } from '../../other/artworks';
 import { collectionEventBus } from '../events/CollectionEventBus';
@@ -34,10 +52,15 @@ import { RemoveSongsOp } from '../operations/RemoveSongsOp';
 import { RenameOp } from '../operations/RenameOp';
 import { ReorderOp } from '../operations/ReorderOp';
 import { SetArtworkOp, type SetArtworkInput } from '../operations/SetArtworkOp';
+import { CreateSmartPlaylistOp } from '../operations/smart/CreateSmartPlaylistOp';
+import { UpdateSmartPlaylistOp } from '../operations/smart/UpdateSmartPlaylistOp';
 import type { OperationContext } from '../operations/types';
+import { QueryPlanner } from '../query/QueryPlanner';
+import { SmartPlaylistCompiler } from '../query/SmartPlaylistCompiler';
 import type { PlaylistRepository } from '../repositories/PlaylistRepository';
 import { FolderStatisticsService } from './FolderStatisticsService';
 import { HierarchyService } from './HierarchyService';
+import { SmartPlaylistEngine } from './SmartPlaylistEngine';
 
 export class PlaylistEngine {
   private readonly repository: PlaylistRepository;
@@ -60,6 +83,11 @@ export class PlaylistEngine {
   private readonly bulkDeleteOp: BulkDeleteOp;
   private readonly bulkRestoreOp: BulkRestoreOp;
   private readonly setArtworkOp: SetArtworkOp;
+  private readonly createSmartPlaylistOp: CreateSmartPlaylistOp;
+  private readonly updateSmartPlaylistOp: UpdateSmartPlaylistOp;
+  private readonly smartEngine: SmartPlaylistEngine;
+  private readonly queryPlanner: QueryPlanner;
+  private readonly compiler: SmartPlaylistCompiler;
 
   public readonly folderStats: FolderStatisticsService;
   private readonly hierarchyService: HierarchyService;
@@ -93,6 +121,11 @@ export class PlaylistEngine {
     this.bulkDeleteOp = new BulkDeleteOp(this.repository);
     this.bulkRestoreOp = new BulkRestoreOp(this.repository, this.hierarchyService);
     this.setArtworkOp = new SetArtworkOp(this.repository);
+    this.createSmartPlaylistOp = new CreateSmartPlaylistOp();
+    this.updateSmartPlaylistOp = new UpdateSmartPlaylistOp();
+    this.smartEngine = new SmartPlaylistEngine(this.membershipService);
+    this.queryPlanner = new QueryPlanner();
+    this.compiler = new SmartPlaylistCompiler();
 
     this.folderStats = new FolderStatisticsService();
   }
@@ -213,6 +246,165 @@ export class PlaylistEngine {
       payload: { collectionId: result.data, parentId: input.parentId ?? null }
     });
     return result.data;
+  }
+
+  public async createSmartPlaylist(input: CreateSmartPlaylistInput): Promise<number> {
+    const playlistId = await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      const result = await this.executor.execute(this.createSmartPlaylistOp, input, ctx);
+      const newPlaylistId = result.data;
+      await this.smartEngine.regenerate(newPlaylistId, trx);
+      return newPlaylistId;
+    });
+
+    collectionEventBus.emitEvent({
+      type: 'CollectionCreated',
+      payload: { collectionId: playlistId, parentId: input.parentId ?? null }
+    });
+    return playlistId;
+  }
+
+  public async updateSmartPlaylist(input: UpdateSmartPlaylistInput): Promise<void> {
+    await db.transaction(async (trx) => {
+      const ctx: OperationContext = { trx, membershipService: this.membershipService };
+      await this.executor.execute(this.updateSmartPlaylistOp, input, ctx);
+      await this.smartEngine.regenerate(input.playlistId, trx);
+    });
+
+    collectionEventBus.emitEvent({
+      type: 'CollectionChanged',
+      payload: { collectionId: input.playlistId, action: 'updateSmartRule' }
+    });
+  }
+
+  public async previewSmartPlaylist(
+    definition: SmartPlaylistDefinition,
+    maxEntries?: number | null
+  ): Promise<SmartPlaylistPreviewResult> {
+    const plan = this.queryPlanner.plan(definition);
+    const predicate = this.compiler.compilePredicate(plan.rule);
+    const orderBySql = this.compiler.compileOrderBy(plan.orderBy);
+
+    const applyJoins = <T>(qb: T): T => {
+      let q: any = qb;
+      for (const join of plan.joins) {
+        if (join.relation === 'artist') {
+          q = q
+            .leftJoin(artistsSongs, eq(songs.id, artistsSongs.songId))
+            .leftJoin(artists, eq(artistsSongs.artistId, artists.id));
+        } else if (join.relation === 'album') {
+          q = q
+            .leftJoin(albumsSongs, eq(songs.id, albumsSongs.songId))
+            .leftJoin(albums, eq(albumsSongs.albumId, albums.id));
+        } else if (join.relation === 'genre') {
+          q = q
+            .leftJoin(genresSongs, eq(songs.id, genresSongs.songId))
+            .leftJoin(genres, eq(genresSongs.genreId, genres.id));
+        }
+      }
+      return q as T;
+    };
+
+    // 1. Total count pushed to SQLite
+    let countQuery = db
+      .select({
+        total: sql<number>`count(distinct ${songs.id})`
+      })
+      .from(songs)
+      .$dynamic();
+
+    countQuery = applyJoins(countQuery);
+    if (predicate) {
+      countQuery = countQuery.where(predicate);
+    }
+
+    const countResult = await countQuery;
+    const totalMatches = Number(countResult[0]?.total ?? 0);
+
+    if (totalMatches === 0) {
+      return {
+        totalMatches: 0,
+        limitedMatches: 0,
+        limitedDuration: 0,
+        previewSongs: []
+      };
+    }
+
+    const limit = maxEntries && maxEntries > 0 ? maxEntries : null;
+    const limitedMatches = limit !== null ? Math.min(totalMatches, limit) : totalMatches;
+
+    // 2. Query preview rows (at most 100 rows fetched into memory)
+    const previewFetchLimit = limit !== null ? Math.min(limit, 100) : 100;
+
+    let previewQuery = db
+      .select({
+        id: songs.id,
+        duration: songs.duration
+      })
+      .from(songs)
+      .$dynamic();
+
+    previewQuery = applyJoins(previewQuery);
+    if (predicate) {
+      previewQuery = previewQuery.where(predicate);
+    }
+    previewQuery = previewQuery.groupBy(songs.id);
+    if (orderBySql.length > 0) {
+      previewQuery = previewQuery.orderBy(...orderBySql);
+    }
+    previewQuery = previewQuery.limit(previewFetchLimit);
+
+    const previewRows = await previewQuery;
+
+    // 3. Compute limitedDuration
+    let limitedDuration = 0;
+    if (limit !== null && limit <= 100) {
+      // All limited items were fetched in previewRows
+      limitedDuration = previewRows.reduce((acc, row) => acc + Number(row.duration ?? 0), 0);
+    } else {
+      // Need duration for more than 100 items (or all unlimited matches) - execute aggregate subquery in SQLite
+      let durationSubquery = db
+        .select({
+          duration: songs.duration
+        })
+        .from(songs)
+        .$dynamic();
+
+      durationSubquery = applyJoins(durationSubquery);
+      if (predicate) {
+        durationSubquery = durationSubquery.where(predicate);
+      }
+      durationSubquery = durationSubquery.groupBy(songs.id);
+      if (limit !== null) {
+        if (orderBySql.length > 0) {
+          durationSubquery = durationSubquery.orderBy(...orderBySql);
+        }
+        durationSubquery = durationSubquery.limit(limit);
+      }
+
+      const sub = durationSubquery.as('sub');
+      const durationResult = await db
+        .select({
+          totalDuration: sql<number>`coalesce(sum(${sub.duration}), 0)`
+        })
+        .from(sub);
+
+      limitedDuration = Number(durationResult[0]?.totalDuration ?? 0);
+    }
+
+    // 4. Hydrate top <= 100 songs
+    const previewIds = previewRows.map((r) => r.id);
+    let previewSongs: SongData[] = [];
+    if (previewIds.length > 0) {
+      previewSongs = await getSongInfo(previewIds, undefined, undefined, previewIds.length, true);
+    }
+
+    return {
+      totalMatches,
+      limitedMatches,
+      limitedDuration,
+      previewSongs
+    };
   }
 
   public async duplicatePlaylist(input: DuplicateInput) {

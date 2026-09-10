@@ -22,7 +22,7 @@ export class OperationJournalWriter {
     }
 
     // Proactively prune the redo branch if we have an in-memory pointer
-    let currentSeq = this.pointerProvider ? this.pointerProvider(result.collectionId) : undefined;
+    const currentSeq = this.pointerProvider ? this.pointerProvider(result.collectionId) : undefined;
 
     if (currentSeq !== undefined) {
       // Delete any journal entries ahead of the current pointer

@@ -1,5 +1,4 @@
 import { eq, and } from 'drizzle-orm';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock DB
 vi.mock('../../../../src/main/db/db', async () => {

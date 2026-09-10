@@ -68,17 +68,21 @@ export class DuplicateExecutor {
       if (plan.node.playlistType === 'standard' || plan.node.playlistType === 'smart') {
         const entries = allEntries.filter((e: any) => e.playlistId === plan.node.id);
         if (entries.length > 0) {
-          await trx.insert(playlistEntries).values(
-            entries.map((e: any) => {
-              affectedSongIds.add(e.songId);
-              return {
-                playlistId: inserted.id,
-                songId: e.songId,
-                position: e.position,
-                addedAt: new Date()
-              };
-            })
-          );
+          const values = entries.map((e: any) => {
+            affectedSongIds.add(e.songId);
+            return {
+              playlistId: inserted.id,
+              songId: e.songId,
+              position: e.position,
+              source: e.source ?? (plan.node.playlistType === 'smart' ? 'smart' : 'manual'),
+              addedAt: new Date()
+            };
+          });
+
+          const CHUNK_SIZE = 1000;
+          for (let i = 0; i < values.length; i += CHUNK_SIZE) {
+            await trx.insert(playlistEntries).values(values.slice(i, i + CHUNK_SIZE));
+          }
         }
       }
 
@@ -86,10 +90,11 @@ export class DuplicateExecutor {
       if (plan.node.playlistType === 'smart') {
         const rule = allRules.find((r: any) => r.playlistId === plan.node.id);
         if (rule) {
-          const { playlistId: _pid, ...ruleRest } = rule;
+          const { id: _id, playlistId: _pid, createdAt: _cAt, updatedAt: _uAt, ...ruleRest } = rule;
           await trx.insert(smartPlaylistRules).values({
             ...ruleRest,
-            playlistId: inserted.id
+            playlistId: inserted.id,
+            ruleVersion: 1
           });
         }
       }
