@@ -1320,7 +1320,13 @@ class AudioPlayer {
    */
   seek(time: number) {
     this.crossfadeScheduler.cancel();
-    this.audio.currentTime = time;
+    try {
+      if (this.audio.readyState > 0) {
+        this.audio.currentTime = time;
+      }
+    } catch (err) {
+      logPlayer('[AudioPlayer.seek] Failed to set currentTime:', err);
+    }
   }
 
   /**

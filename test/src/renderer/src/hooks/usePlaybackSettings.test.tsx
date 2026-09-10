@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { usePlaybackSettings } from '../../../../../src/renderer/src/hooks/usePlaybackSettings';
+import type AudioPlayer from '../../../../../src/renderer/src/other/player';
 
 vi.mock('../../../../../src/renderer/src/hooks/useUserPreferences', () => ({
   useUserPreferences: () => ({
@@ -16,11 +17,46 @@ describe('usePlaybackSettings', () => {
   beforeEach(() => {
     fakeAudio = {
       duration: 180,
-      currentTime: 10
+      currentTime: 10,
+      readyState: 4
     } as unknown as HTMLAudioElement;
   });
 
-  describe('updateSongPosition', () => {
+  describe('updateSongPosition with AudioPlayer', () => {
+    it('delegates seeking to player.seek() and uses live AudioPlayer duration', () => {
+      const mockSeek = vi.fn();
+      const mockPlayer = {
+        duration: 240,
+        seek: mockSeek
+      } as unknown as AudioPlayer;
+
+      const { result } = renderHook(() => usePlaybackSettings(mockPlayer));
+
+      act(() => {
+        result.current.updateSongPosition(75);
+      });
+
+      expect(mockSeek).toHaveBeenCalledWith(75);
+    });
+
+    it('clamps seek to max(0, d - 0.1) when calling player.seek()', () => {
+      const mockSeek = vi.fn();
+      const mockPlayer = {
+        duration: 200,
+        seek: mockSeek
+      } as unknown as AudioPlayer;
+
+      const { result } = renderHook(() => usePlaybackSettings(mockPlayer));
+
+      act(() => {
+        result.current.updateSongPosition(200);
+      });
+
+      expect(mockSeek).toHaveBeenCalledWith(199.9);
+    });
+  });
+
+  describe('updateSongPosition with HTMLAudioElement fallback', () => {
     it('sets player.currentTime to target position when within valid bounds', () => {
       const { result } = renderHook(() => usePlaybackSettings(fakeAudio));
 
@@ -85,16 +121,19 @@ describe('usePlaybackSettings', () => {
       expect(fakeAudio.currentTime).toBe(20);
     });
 
-    it('allows seeking to target position when player.duration is 0 or NaN before loadedmetadata', () => {
-      fakeAudio.duration = Number.NaN;
+    it('guards against setting currentTime when readyState is 0 (pre-metadata) to prevent InvalidStateError', () => {
+      fakeAudio.readyState = 0; // HAVE_NOTHING
       fakeAudio.currentTime = 0;
+      fakeAudio.duration = Number.NaN;
+
       const { result } = renderHook(() => usePlaybackSettings(fakeAudio));
 
       act(() => {
         result.current.updateSongPosition(30);
       });
 
-      expect(fakeAudio.currentTime).toBe(30);
+      // Should not set currentTime when readyState is 0
+      expect(fakeAudio.currentTime).toBe(0);
     });
 
     it('handles player being undefined/null gracefully', () => {
@@ -105,6 +144,27 @@ describe('usePlaybackSettings', () => {
       expect(() => {
         act(() => {
           result.current.updateSongPosition(30);
+        });
+      }).not.toThrow();
+    });
+
+    it('catches and logs errors without throwing when player throws on seek', () => {
+      const throwingAudio = {
+        duration: 100,
+        readyState: 4,
+        get currentTime() {
+          return 0;
+        },
+        set currentTime(_v: number) {
+          throw new Error('InvalidStateError');
+        }
+      } as unknown as HTMLAudioElement;
+
+      const { result } = renderHook(() => usePlaybackSettings(throwingAudio));
+
+      expect(() => {
+        act(() => {
+          result.current.updateSongPosition(50);
         });
       }).not.toThrow();
     });

@@ -177,18 +177,21 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
       ctx.fill();
     }
 
-    // Draw active playhead scrubber indicator line (solid)
-    const playheadX = progress * width;
-    ctx.beginPath();
-    ctx.strokeStyle = `hsl(${highlightColorRaw})`;
-    ctx.lineWidth = 1.5;
-    ctx.moveTo(playheadX, 2);
-    ctx.lineTo(playheadX, height - 2);
-    ctx.stroke();
+    // Draw active playhead scrubber indicator line (solid) when hovered or dragged
+    if (isHoveredRef.current || isDraggingRef.current) {
+      const playheadX = progress * width;
+      ctx.beginPath();
+      ctx.strokeStyle = `hsl(${highlightColorRaw})`;
+      ctx.lineWidth = 1.5;
+      ctx.moveTo(playheadX, 2);
+      ctx.lineTo(playheadX, height - 2);
+      ctx.stroke();
+    }
 
     // Draw distinct hover guide line if hovering (and not dragging or overlapping playhead)
     if (isHoveredRef.current && !isDraggingRef.current && hoverProgress !== null) {
       const hoverX = hoverProgress * width;
+      const playheadX = progress * width;
       if (Math.abs(hoverX - playheadX) > 3) {
         ctx.beginPath();
         ctx.strokeStyle = `hsl(${highlightColorRaw} / 0.5)`;

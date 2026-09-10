@@ -161,18 +161,21 @@ describe('WaveformSeekbar Component', () => {
     expect(fakeCtx.setLineDash).toHaveBeenCalledWith([]);
   });
 
-  it('updates position when receiving player/positionChange event while not dragging', async () => {
+  it('updates position and redraws fills on player/positionChange event when idle without drawing playhead line', async () => {
     await act(async () => {
       render(<WaveformSeekbar id="test-waveform" name="test-waveform" />);
     });
 
     fakeCtx.stroke.mockClear();
+    fakeCtx.fill.mockClear();
 
     // Position change event at 60s (30% of 200s)
     const event = new CustomEvent('player/positionChange', { detail: 60 });
     document.dispatchEvent(event);
 
-    expect(fakeCtx.stroke).toHaveBeenCalled();
+    expect(fakeCtx.fill).toHaveBeenCalled();
+    // Idle waveform does not draw scrubber stroke at x=0 or current pos
+    expect(fakeCtx.stroke).not.toHaveBeenCalled();
   });
 
   it('preserves dragging position when player/positionChange event arrives during drag', async () => {
