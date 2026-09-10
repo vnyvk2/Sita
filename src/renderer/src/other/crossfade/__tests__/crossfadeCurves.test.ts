@@ -7,9 +7,9 @@ import {
 
 describe('crossfadeCurves', () => {
   describe('generateEqualPowerFadeOutCurve', () => {
-    it('should generate 32 samples by default starting at 1.0 and ending at 0.0', () => {
+    it('should generate 128 samples by default starting at 1.0 and ending at 0.0', () => {
       const curve = generateEqualPowerFadeOutCurve();
-      expect(curve.length).toBe(32);
+      expect(curve.length).toBe(128);
       expect(curve[0]).toBeCloseTo(1.0, 4);
       expect(curve[curve.length - 1]).toBeCloseTo(0.0, 4);
     });
@@ -23,9 +23,9 @@ describe('crossfadeCurves', () => {
   });
 
   describe('generateEqualPowerFadeInCurve', () => {
-    it('should generate 32 samples by default starting at 0.0 and ending at 1.0', () => {
+    it('should generate 128 samples by default starting at 0.0 and ending at 1.0', () => {
       const curve = generateEqualPowerFadeInCurve();
-      expect(curve.length).toBe(32);
+      expect(curve.length).toBe(128);
       expect(curve[0]).toBeCloseTo(0.0, 4);
       expect(curve[curve.length - 1]).toBeCloseTo(1.0, 4);
     });

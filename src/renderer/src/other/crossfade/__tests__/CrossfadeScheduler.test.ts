@@ -215,4 +215,38 @@ describe('CrossfadeScheduler', () => {
     expect(delegate.startFade).not.toHaveBeenCalled();
     expect(delegate.onFadeCancel).toHaveBeenCalled();
   });
+
+  it('should freeze fade completion timer on pauseFade() and resume on resumeFade()', async () => {
+    // 1. Enter READY then FADING
+    await scheduler.onTimeUpdate(89);
+    expect(scheduler.getState()).toBe('READY');
+
+    await scheduler.onTimeUpdate(94);
+    expect(scheduler.getState()).toBe('FADING');
+    expect(delegate.startFade).toHaveBeenCalled();
+
+    // 2. Advance 2 seconds into a 6 second fade
+    vi.advanceTimersByTime(2000);
+    expect(delegate.onFadeComplete).not.toHaveBeenCalled();
+
+    // 3. User pauses playback mid-fade
+    scheduler.pauseFade();
+
+    // 4. Time passes while paused (e.g. 15 seconds)
+    vi.advanceTimersByTime(15000);
+    // MUST NOT complete while paused!
+    expect(delegate.onFadeComplete).not.toHaveBeenCalled();
+    expect(scheduler.getState()).toBe('FADING');
+
+    // 5. User resumes playback
+    scheduler.resumeFade();
+
+    // 6. Remaining ~4 seconds should now elapse
+    vi.advanceTimersByTime(3500);
+    expect(delegate.onFadeComplete).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(600);
+    expect(delegate.onFadeComplete).toHaveBeenCalledWith(expect.any(Number), 42);
+    expect(scheduler.getState()).toBe('IDLE');
+  });
 });

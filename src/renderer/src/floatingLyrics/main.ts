@@ -142,6 +142,69 @@ styleSheet.textContent = `
     text-align: center;
     overflow: hidden;
     padding: 24px 8px 8px;
+    position: relative;
+  }
+
+  .unsynced-container {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    -webkit-app-region: no-drag;
+  }
+
+  .unsynced-container::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .unsynced-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+  }
+
+  .unsynced-line {
+    font-size: calc(var(--base-font-size) * 0.8);
+    opacity: 0.85;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  }
+
+  .unlock-badge {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    background: rgba(245, 158, 11, 0.9);
+    color: #000;
+    border: none;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    z-index: 100;
+    opacity: 0.45;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+    -webkit-app-region: no-drag;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  }
+
+  .unlock-badge:hover {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+
+  .lyrics-app.locked .unlock-badge {
+    display: flex;
   }
 
   .lyric-line {
@@ -198,6 +261,9 @@ const container = document.createElement('div');
 container.className = 'lyrics-app';
 
 container.innerHTML = `
+  <button class="unlock-badge" id="unlockBadge" title="Unlock Window (or Ctrl+Shift+U)">
+    <span class="material-symbols-rounded" style="font-size: 16px;">lock</span>
+  </button>
   <div class="toolbar">
     <div class="drag-handle" id="dragTitle">Nora Floating Lyrics</div>
     <div class="controls">
@@ -222,6 +288,7 @@ container.innerHTML = `
   </div>
   <div class="lyrics-stage" id="stage">
     <div class="empty-state" id="emptyState">Listening for playback...</div>
+    <div class="unsynced-container" id="unsyncedContainer"></div>
     <div class="lyric-line line-prev" id="linePrev" style="display: none;"></div>
     <div class="lyric-line line-current" id="lineCurrent" style="display: none;"></div>
     <div class="lyric-line line-next" id="lineNext" style="display: none;"></div>
@@ -233,12 +300,14 @@ app.appendChild(container);
 // ========== REFS ==========
 const dragTitle = document.getElementById('dragTitle')!;
 const emptyState = document.getElementById('emptyState')!;
+const unsyncedContainer = document.getElementById('unsyncedContainer')!;
 const linePrev = document.getElementById('linePrev')!;
 const lineCurrent = document.getElementById('lineCurrent')!;
 const lineNext = document.getElementById('lineNext')!;
 const iconPlayPause = document.getElementById('iconPlayPause')!;
 const btnLock = document.getElementById('btnLock')!;
 const iconLock = document.getElementById('iconLock')!;
+const unlockBadge = document.getElementById('unlockBadge')!;
 
 // ========== HELPERS ==========
 function getLineText(line?: ParsedLyricLine): string {
@@ -278,10 +347,29 @@ function updateDisplay(index: number | null) {
     linePrev.style.display = 'none';
     lineCurrent.style.display = 'none';
     lineNext.style.display = 'none';
+    unsyncedContainer.style.display = 'none';
     return;
   }
 
   const lines = currentLyrics.lyrics.parsedLyrics;
+
+  if (!currentLyrics.lyrics.isSynced) {
+    emptyState.style.display = 'none';
+    linePrev.style.display = 'none';
+    lineCurrent.style.display = 'none';
+    lineNext.style.display = 'none';
+    unsyncedContainer.style.display = 'flex';
+    unsyncedContainer.innerHTML = '';
+    for (const line of lines) {
+      const p = document.createElement('div');
+      p.className = 'unsynced-line';
+      p.textContent = getLineText(line);
+      unsyncedContainer.appendChild(p);
+    }
+    return;
+  }
+
+  unsyncedContainer.style.display = 'none';
 
   if (index === null || index < 0 || index >= lines.length) {
     // Show intro or first line preview
@@ -353,6 +441,30 @@ btnLock?.addEventListener('click', async () => {
   }
 });
 
+unlockBadge?.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  if (window.floatingLyricsApi) {
+    const locked = await window.floatingLyricsApi.toggleLock();
+    setLockState(locked);
+  }
+});
+
+window.addEventListener('mousemove', (e) => {
+  if (!isLocked) return;
+  const rect = unlockBadge.getBoundingClientRect();
+  const isOverBadge =
+    e.clientX >= rect.left - 12 &&
+    e.clientX <= rect.right + 12 &&
+    e.clientY >= rect.top - 12 &&
+    e.clientY <= rect.bottom + 12;
+
+  if (isOverBadge) {
+    window.floatingLyricsApi?.setIgnoreMouseEvents(false, false);
+  } else {
+    window.floatingLyricsApi?.setIgnoreMouseEvents(true, true);
+  }
+});
+
 document.getElementById('btnClose')?.addEventListener('click', () => {
   window.floatingLyricsApi?.closeWindow();
 });
@@ -382,9 +494,21 @@ if (window.floatingLyricsApi) {
   });
 
   window.floatingLyricsApi.onTimeUpdate((time) => {
-    if (!currentLyrics?.lyrics?.isSynced || !currentLyrics.lyrics.parsedLyrics?.length) {
+    if (!currentLyrics?.lyrics?.parsedLyrics?.length) {
       return;
     }
+
+    if (!currentLyrics.lyrics.isSynced) {
+      if (currentLyrics.duration && currentLyrics.duration > 0) {
+        const progress = Math.min(1.0, Math.max(0, time / currentLyrics.duration));
+        const maxScroll = unsyncedContainer.scrollHeight - unsyncedContainer.clientHeight;
+        if (maxScroll > 0) {
+          unsyncedContainer.scrollTop = progress * maxScroll;
+        }
+      }
+      return;
+    }
+
     const offset = currentLyrics.lyrics.offset || 0;
     const activeIndex = binarySearchActiveLine(currentLyrics.lyrics.parsedLyrics, time, offset);
 

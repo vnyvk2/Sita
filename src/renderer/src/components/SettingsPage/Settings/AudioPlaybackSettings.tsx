@@ -168,7 +168,7 @@ const AudioPlaybackSettings = () => {
               label={t('settingsPage.resetPlaybackRate')}
               iconName="restart_alt"
               className="ml-6"
-              isDisabled={playbackRateInterval === 1}
+              isDisabled={playbackRateInterval === 1 || audioFxPreset !== 'normal'}
               clickHandler={() => {
                 setPlaybackRateInterval(1);
                 storage.playback.setPlaybackOptions('playbackRate', 1);
@@ -176,6 +176,11 @@ const AudioPlaybackSettings = () => {
               }}
             />
           </div>
+          {audioFxPreset !== 'normal' && (
+            <p className="mt-2 text-xs text-font-color-highlight dark:text-dark-font-color-highlight">
+              {t('audioFx.speedOverridden', 'Playback rate is currently overridden by active Audio FX preset.')}
+            </p>
+          )}
         </li>
 
         <li className="seekbar-scroll-interval mb-6">

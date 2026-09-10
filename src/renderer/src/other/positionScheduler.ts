@@ -13,13 +13,20 @@ export interface PositionSchedulerOptions {
 }
 
 let isFloatingLyricsWindowActive = false;
+const activeSchedulers = new Set<PositionTimerScheduler>();
 
 if (typeof window !== 'undefined' && window.api?.windowControls?.onFloatingLyricsStateChange) {
   window.api.windowControls.onFloatingLyricsStateChange(({ isOpen }) => {
     isFloatingLyricsWindowActive = isOpen;
+    for (const s of activeSchedulers) {
+      s.reschedule();
+    }
   });
   window.api.windowControls.isFloatingLyricsOpen?.().then((isOpen) => {
     isFloatingLyricsWindowActive = isOpen;
+    for (const s of activeSchedulers) {
+      s.reschedule();
+    }
   }).catch(() => {});
 }
 
@@ -51,6 +58,7 @@ export class PositionTimerScheduler {
         }
       });
 
+    activeSchedulers.add(this);
     this.setupListeners();
     this.recomputeState();
   }
@@ -89,7 +97,7 @@ export class PositionTimerScheduler {
     this.reschedule();
   }
 
-  private reschedule(): void {
+  public reschedule(): void {
     if (this.timerId) {
       clearTimeout(this.timerId);
       this.timerId = null;
@@ -99,7 +107,10 @@ export class PositionTimerScheduler {
       return;
     }
 
-    const interval = this.state === 'PLAYING_VISIBLE' ? CADENCE_VISIBLE_MS : CADENCE_HIDDEN_MS;
+    const interval =
+      this.state === 'PLAYING_VISIBLE' || isFloatingLyricsWindowActive
+        ? CADENCE_VISIBLE_MS
+        : CADENCE_HIDDEN_MS;
 
     const tick = () => {
       if (this.isDestroyed || this.state === 'PAUSED' || this.state === 'IDLE_NO_SONG') {
@@ -163,6 +174,7 @@ export class PositionTimerScheduler {
 
   public destroy(): void {
     this.isDestroyed = true;
+    activeSchedulers.delete(this);
     if (this.timerId) {
       clearTimeout(this.timerId);
       this.timerId = null;

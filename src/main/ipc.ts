@@ -1097,6 +1097,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('floating-lyrics/get-lyrics', () => getCachedLyrics());
     ipcMain.handle('floating-lyrics/get-play-state', () => getFloatingLyricsPlayState());
     ipcMain.handle('floating-lyrics/toggle-lock', () => toggleFloatingLyricsLock());
+    ipcMain.handle('app/toggleFloatingLyricsLock', () => toggleFloatingLyricsLock());
     ipcMain.on('floating-lyrics/close', () => closeFloatingLyricsWindow());
     ipcMain.on(
       'floating-lyrics/set-ignore-mouse-events',

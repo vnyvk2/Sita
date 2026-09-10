@@ -98,12 +98,13 @@ describe('floatingLyricsWindow', () => {
     await createOrToggleFloatingLyricsWindow();
   });
 
-  it('should create BrowserWindow with transparent and backgroundThrottling: false', () => {
+  it('should create BrowserWindow with transparent, skipTaskbar: true, and backgroundThrottling: false', () => {
     expect(BrowserWindow).toHaveBeenCalledWith(
       expect.objectContaining({
         frame: false,
         transparent: true,
         alwaysOnTop: true,
+        skipTaskbar: true,
         webPreferences: expect.objectContaining({
           backgroundThrottling: false
         })
@@ -166,10 +167,14 @@ describe('floatingLyricsWindow', () => {
     );
   });
 
-  it('should register CommandOrControl+Shift+L global shortcut', () => {
+  it('should register CommandOrControl+Shift+L and CommandOrControl+Shift+U global shortcuts', () => {
     registerFloatingLyricsGlobalShortcut();
     expect(globalShortcut.register).toHaveBeenCalledWith(
       'CommandOrControl+Shift+L',
+      expect.any(Function)
+    );
+    expect(globalShortcut.register).toHaveBeenCalledWith(
+      'CommandOrControl+Shift+U',
       expect.any(Function)
     );
   });

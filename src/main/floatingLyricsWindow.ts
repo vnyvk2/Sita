@@ -31,8 +31,18 @@ function getSavedBounds(): SavedBounds | null {
   try {
     if (fs.existsSync(BOUNDS_FILE)) {
       const data = JSON.parse(fs.readFileSync(BOUNDS_FILE, 'utf-8'));
-      if (typeof data.x === 'number' && typeof data.y === 'number') {
-        return data;
+      if (
+        typeof data.x === 'number' &&
+        typeof data.y === 'number' &&
+        typeof data.width === 'number' &&
+        typeof data.height === 'number'
+      ) {
+        return {
+          x: data.x,
+          y: data.y,
+          width: Math.max(320, Math.min(1920, data.width)),
+          height: Math.max(100, Math.min(1080, data.height))
+        };
       }
     }
   } catch (err) {
@@ -68,9 +78,16 @@ function getPreloadPath(): string {
 
 function isBoundsVisibleOnAnyScreen(b: SavedBounds): boolean {
   const displays = screen.getAllDisplays();
+  const width = b.width || 650;
+  const height = b.height || 160;
   return displays.some((display) => {
-    const { x, y, width, height } = display.bounds;
-    return b.x >= x - 50 && b.x < x + width && b.y >= y - 50 && b.y < y + height;
+    const { x, y, width: dW, height: dH } = display.bounds;
+    return (
+      b.x < x + dW - 50 &&
+      b.x + width > x + 50 &&
+      b.y < y + dH - 50 &&
+      b.y + height > y + 50
+    );
   });
 }
 
@@ -122,7 +139,7 @@ export async function createOrToggleFloatingLyricsWindow(
     hasShadow: false,
     alwaysOnTop: true,
     resizable: true,
-    skipTaskbar: false,
+    skipTaskbar: true,
     show: false,
     webPreferences: {
       preload: getPreloadPath(),
@@ -177,17 +194,22 @@ export async function createOrToggleFloatingLyricsWindow(
 }
 
 export function closeFloatingLyricsWindow(): void {
+  if (boundsSaveTimeout) {
+    clearTimeout(boundsSaveTimeout);
+    boundsSaveTimeout = null;
+  }
   if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
     floatingLyricsWindow.close();
     floatingLyricsWindow = null;
   }
+  isLocked = false;
 }
 
-export function toggleFloatingLyricsLock(): boolean {
+export function toggleFloatingLyricsLock(explicitState?: boolean): boolean {
   if (!floatingLyricsWindow || floatingLyricsWindow.isDestroyed()) {
     return false;
   }
-  isLocked = !isLocked;
+  isLocked = explicitState !== undefined ? explicitState : !isLocked;
   floatingLyricsWindow.setIgnoreMouseEvents(isLocked, { forward: true });
   floatingLyricsWindow.webContents.send('floating-lyrics/lock-changed', isLocked);
   return isLocked;
@@ -232,6 +254,17 @@ export function registerFloatingLyricsGlobalShortcut(mainWindowRef?: BrowserWind
       logger.warn(`[FloatingLyrics] Shortcut ${shortcutKey} registration failed (may already be bound)`);
     } else {
       logger.info(`[FloatingLyrics] Global shortcut ${shortcutKey} registered successfully`);
+    }
+
+    // Escape hatch shortcut to toggle lock: CommandOrControl+Shift+U
+    const unlockShortcutKey = 'CommandOrControl+Shift+U';
+    const unlockRegistered = globalShortcut.register(unlockShortcutKey, () => {
+      toggleFloatingLyricsLock();
+    });
+    if (!unlockRegistered) {
+      logger.warn(`[FloatingLyrics] Shortcut ${unlockShortcutKey} registration failed (may already be bound)`);
+    } else {
+      logger.info(`[FloatingLyrics] Global shortcut ${unlockShortcutKey} registered successfully`);
     }
   } catch (err) {
     logger.warn('[FloatingLyrics] Error registering global shortcut:', { err });

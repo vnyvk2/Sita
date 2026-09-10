@@ -3,7 +3,7 @@
  * Completely decoupled from DOM and Web Audio API for 100% testability.
  */
 
-export const CURVE_SAMPLE_COUNT = 32;
+export const CURVE_SAMPLE_COUNT = 128;
 
 /**
  * Generates an equal-power fade-out curve (cosine taper).
