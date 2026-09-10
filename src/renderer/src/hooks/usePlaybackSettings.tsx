@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 
+import type AudioPlayer from '../other/player';
 import toggleSongIsFavorite from '../other/toggleSongIsFavorite';
 import { dispatch, store } from '../store/store';
 import storage from '../utils/localStorage';
@@ -29,10 +30,10 @@ import { useUserPreferences } from './useUserPreferences';
  *   updateEqualizerOptions({ preset: 'rock', bands: [...] });
  *   ```;
  *
- * @param player - The HTMLAudioElement instance
+ * @param player - The AudioPlayer or HTMLAudioElement instance
  * @returns Object containing playback setting functions
  */
-export function usePlaybackSettings(player: HTMLAudioElement) {
+export function usePlaybackSettings(player: AudioPlayer | HTMLAudioElement) {
   const { saveEqualizerPreset } = useUserPreferences();
 
   const toggleRepeat = useCallback((newState?: RepeatTypes) => {
@@ -71,7 +72,31 @@ export function usePlaybackSettings(player: HTMLAudioElement) {
 
   const updateSongPosition = useCallback(
     (position: number) => {
-      if (position >= 0 && position <= player.duration) player.currentTime = position;
+      if (!Number.isFinite(position) || position < 0) return;
+      if (!player) return;
+      const d = player.duration;
+      // Clamp position within [0, max]. If duration is finite and > 0, clamp to max(0, d - 0.1) so near-end clicks don't prematurely fire 'ended'
+      const max = Number.isFinite(d) && d > 0 ? Math.max(0, d - 0.1) : position;
+      const targetTime = Math.max(0, Math.min(position, max));
+
+      // Guard against pre-metadata seek on HTMLAudioElement which throws InvalidStateError in browser
+      if (
+        'readyState' in player &&
+        typeof player.readyState === 'number' &&
+        player.readyState === 0
+      ) {
+        return;
+      }
+
+      try {
+        if ('seek' in player && typeof player.seek === 'function') {
+          player.seek(targetTime);
+        } else {
+          player.currentTime = targetTime;
+        }
+      } catch (err) {
+        console.error('[usePlaybackSettings.updateSongPosition] Failed to seek:', err);
+      }
     },
     [player]
   );

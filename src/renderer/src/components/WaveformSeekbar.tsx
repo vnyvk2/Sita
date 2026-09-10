@@ -64,6 +64,10 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
   const durationRef = useRef(currentSongData.duration || 0);
   durationRef.current = currentSongData.duration || 0;
 
+  const getEffectiveDuration = useCallback((): number => {
+    return durationRef.current || store.state.currentSongData?.duration || 0;
+  }, []);
+
   const progressPercentRef = useRef(0); // 0.0 to 1.0
   const isDraggingRef = useRef(false);
   const isHoveredRef = useRef(false);
@@ -173,7 +177,7 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
       ctx.fill();
     }
 
-    // Draw playhead scrubber indicator line if hovered or dragged
+    // Draw active playhead scrubber indicator line (solid) when hovered or dragged
     if (isHoveredRef.current || isDraggingRef.current) {
       const playheadX = progress * width;
       ctx.beginPath();
@@ -182,6 +186,22 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
       ctx.moveTo(playheadX, 2);
       ctx.lineTo(playheadX, height - 2);
       ctx.stroke();
+    }
+
+    // Draw distinct hover guide line if hovering (and not dragging or overlapping playhead)
+    if (isHoveredRef.current && !isDraggingRef.current && hoverProgress !== null) {
+      const hoverX = hoverProgress * width;
+      const playheadX = progress * width;
+      if (Math.abs(hoverX - playheadX) > 3) {
+        ctx.beginPath();
+        ctx.strokeStyle = `hsl(${highlightColorRaw} / 0.5)`;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([2, 2]);
+        ctx.moveTo(hoverX, 2);
+        ctx.lineTo(hoverX, height - 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     }
 
     ctx.restore();
@@ -235,7 +255,7 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
       if ('detail' in e && typeof e.detail === 'number') {
         const songPosition = e.detail as number;
         if (!isDraggingRef.current) {
-          const liveDuration = durationRef.current || store.state.currentSongData?.duration || 0;
+          const liveDuration = getEffectiveDuration();
           const songDuration = liveDuration > 0 ? liveDuration : songPosition;
           const pct = songDuration > 0 ? Math.min(1, Math.max(0, songPosition / songDuration)) : 0;
           progressPercentRef.current = pct;
@@ -243,7 +263,7 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
         }
       }
     },
-    [drawCanvas]
+    [drawCanvas, getEffectiveDuration]
   );
 
   useEffect(() => {
@@ -265,15 +285,18 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
   }, [drawCanvas]);
 
   // Seek calculation helper
-  const calculateSeekFromEvent = useCallback((clientX: number): number => {
-    const container = containerRef.current;
-    if (!container) return 0;
-    const rect = container.getBoundingClientRect();
-    const clickX = Math.max(0, Math.min(rect.width, clientX - rect.left));
-    const pct = rect.width > 0 ? clickX / rect.width : 0;
-    const totalDuration = durationRef.current || 0;
-    return pct * totalDuration;
-  }, []);
+  const calculateSeekFromEvent = useCallback(
+    (clientX: number): number => {
+      const container = containerRef.current;
+      if (!container) return 0;
+      const rect = container.getBoundingClientRect();
+      const clickX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const pct = rect.width > 0 ? clickX / rect.width : 0;
+      const totalDuration = getEffectiveDuration();
+      return pct * totalDuration;
+    },
+    [getEffectiveDuration]
+  );
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     isDraggingRef.current = true;
@@ -284,8 +307,9 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     }
 
     const targetPos = calculateSeekFromEvent(e.clientX);
-    const totalDuration = durationRef.current || 0;
-    progressPercentRef.current = totalDuration > 0 ? targetPos / totalDuration : 0;
+    const totalDuration = getEffectiveDuration();
+    progressPercentRef.current =
+      totalDuration > 0 ? Math.min(1, Math.max(0, targetPos / totalDuration)) : 0;
     drawCanvas();
   };
 
@@ -303,7 +327,8 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
       progressPercentRef.current = pct;
     }
 
-    const hoverTimeSec = pct * (durationRef.current || 0);
+    const totalDuration = getEffectiveDuration();
+    const hoverTimeSec = pct * totalDuration;
     const timeObj = calculateTime(hoverTimeSec);
     setTooltipState({
       visible: true,
@@ -323,6 +348,9 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
         // Ignore unsupported pointer release
       }
       const finalPos = calculateSeekFromEvent(e.clientX);
+      const totalDuration = getEffectiveDuration();
+      progressPercentRef.current =
+        totalDuration > 0 ? Math.min(1, Math.max(0, finalPos / totalDuration)) : 0;
       updateSongPosition(finalPos);
       onSeek?.(finalPos);
       drawCanvas();
@@ -341,18 +369,20 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
   const handleWheelSeek = useCallback(
     debounce((direction: 'up' | 'down') => {
       const interval = preferences?.seekbarScrollInterval ?? 5;
-      const currentPos = progressPercentRef.current * (durationRef.current || 0);
+      const totalDuration = getEffectiveDuration();
+      const currentPos = progressPercentRef.current * totalDuration;
       const nextPos =
         direction === 'up'
-          ? Math.min(durationRef.current, currentPos + interval)
+          ? Math.min(totalDuration, currentPos + interval)
           : Math.max(0, currentPos - interval);
 
-      progressPercentRef.current = durationRef.current > 0 ? nextPos / durationRef.current : 0;
+      progressPercentRef.current =
+        totalDuration > 0 ? Math.min(1, Math.max(0, nextPos / totalDuration)) : 0;
       updateSongPosition(nextPos);
       onSeek?.(nextPos);
       drawCanvas();
     }, 100),
-    [preferences?.seekbarScrollInterval, updateSongPosition, onSeek, drawCanvas]
+    [preferences?.seekbarScrollInterval, updateSongPosition, onSeek, drawCanvas, getEffectiveDuration]
   );
 
   const handleWheel = (e: ReactWheelEvent<HTMLDivElement>) => {
