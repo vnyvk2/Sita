@@ -301,6 +301,19 @@ class AudioPlayer {
     element.addEventListener('loadedmetadata', () => {
       if (this.activeSlot === slot) {
         this.emit('durationChange', element.duration);
+        if (
+          this.currentSongData &&
+          Number.isFinite(element.duration) &&
+          element.duration > 0 &&
+          Math.abs(this.currentSongData.duration - element.duration) > 0.1
+        ) {
+          logPlayer('[AudioPlayer.loadedmetadata] Reconciling duration discrepancy:', {
+            taglibDuration: this.currentSongData.duration,
+            audioDuration: element.duration
+          });
+          this.currentSongData = { ...this.currentSongData, duration: element.duration };
+          dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: this.currentSongData });
+        }
       }
     });
 
@@ -1166,7 +1179,16 @@ class AudioPlayer {
 
         // Swap active slot immediately so UI, controls, timeupdate track the new song
         this.activeSlot = this.activeSlot === 'A' ? 'B' : 'A';
-        this.currentSongData = incomingSongData;
+        let effectiveSongData = incomingSongData;
+        if (
+          effectiveSongData &&
+          Number.isFinite(this.audio.duration) &&
+          this.audio.duration > 0 &&
+          Math.abs(effectiveSongData.duration - this.audio.duration) > 0.1
+        ) {
+          effectiveSongData = { ...effectiveSongData, duration: this.audio.duration };
+        }
+        this.currentSongData = effectiveSongData;
 
         // Advance queue position without triggering standard reload
         this.suppressQueuePositionLoad = true;
@@ -1178,14 +1200,14 @@ class AudioPlayer {
         this.suppressQueuePositionLoad = false;
 
         // Store & event notifications for new track
-        if (incomingSongData) {
-          dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: incomingSongData });
-          storage.playback.setCurrentSongOptions('songId', incomingSongData.songId);
+        if (effectiveSongData) {
+          dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: effectiveSongData });
+          storage.playback.setCurrentSongOptions('songId', effectiveSongData.songId);
           const trackChangeEvent = new CustomEvent('player/trackchange', {
-            detail: incomingSongData.songId
+            detail: effectiveSongData.songId
           });
           this.audio.dispatchEvent(trackChangeEvent);
-          this.emit('songLoaded', incomingSongData);
+          this.emit('songLoaded', effectiveSongData);
         }
       },
       onFadeComplete: (sessionId, incomingTrackId) => {

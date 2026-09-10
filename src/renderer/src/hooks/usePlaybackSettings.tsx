@@ -71,7 +71,12 @@ export function usePlaybackSettings(player: HTMLAudioElement) {
 
   const updateSongPosition = useCallback(
     (position: number) => {
-      if (position >= 0 && position <= player.duration) player.currentTime = position;
+      if (!Number.isFinite(position) || position < 0) return;
+      if (!player) return;
+      const d = player.duration;
+      // Clamp position within [0, max]. If duration is finite and > 0, clamp to max(0, d - 0.1) so near-end clicks don't prematurely fire 'ended'
+      const max = Number.isFinite(d) && d > 0 ? Math.max(0, d - 0.1) : position;
+      player.currentTime = Math.max(0, Math.min(position, max));
     },
     [player]
   );
