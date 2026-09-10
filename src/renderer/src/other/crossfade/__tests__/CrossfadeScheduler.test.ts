@@ -249,4 +249,23 @@ describe('CrossfadeScheduler', () => {
     expect(delegate.onFadeComplete).toHaveBeenCalledWith(expect.any(Number), 42);
     expect(scheduler.getState()).toBe('IDLE');
   });
+
+  it('should not arm completion timer or set fading fields if cancelled during startFade await', async () => {
+    // 1. Enter READY
+    await scheduler.onTimeUpdate(89);
+    expect(scheduler.getState()).toBe('READY');
+
+    // 2. Mock startFade to simulate cancellation occurring during await (e.g. user skips track)
+    (delegate.startFade as unknown as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      scheduler.cancel();
+    });
+
+    // 3. Trigger fade
+    await scheduler.onTimeUpdate(94);
+    expect(scheduler.getState()).toBe('IDLE');
+
+    // 4. Timers should not fire onFadeComplete
+    vi.advanceTimersByTime(10000);
+    expect(delegate.onFadeComplete).not.toHaveBeenCalled();
+  });
 });

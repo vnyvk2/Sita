@@ -147,10 +147,11 @@ const AudioPlaybackSettings = () => {
                   type="range"
                   name="seek-bar-slider"
                   id="seek-bar-slider"
-                  className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-4 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
+                  className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-4 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline! disabled:opacity-50 disabled:cursor-not-allowed"
                   min={0.25}
                   step={0.05}
                   max={4.0}
+                  disabled={audioFxPreset !== 'normal'}
                   value={playbackRateInterval || 1}
                   onChange={(e) => {
                     const val = e.currentTarget.valueAsNumber;

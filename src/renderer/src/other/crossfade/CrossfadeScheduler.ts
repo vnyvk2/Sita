@@ -144,6 +144,11 @@ export class CrossfadeScheduler {
           fadeInCurve
         });
 
+        // Guard against cancellation/reset occurring while startFade was awaiting
+        if (this.state !== 'FADING' || this.currentSessionId !== sessionId) {
+          return;
+        }
+
         this.fadingSessionId = sessionId;
         this.fadingTrackId = incomingId;
         this.fadeStartTimeWallClock = Date.now();

@@ -62,6 +62,8 @@ const windowControls = {
   changePlayerType: (type: PlayerTypes, mode?: 'standard' | 'compact'): Promise<void> =>
     ipcRenderer.invoke('app/changePlayerType', type, mode),
   toggleFloatingLyrics: (): Promise<void> => ipcRenderer.invoke('app/toggleFloatingLyrics'),
+  toggleFloatingLyricsLock: (): Promise<boolean> =>
+    ipcRenderer.invoke('app/toggleFloatingLyricsLock'),
   isFloatingLyricsOpen: (): Promise<boolean> => ipcRenderer.invoke('app/isFloatingLyricsOpen'),
   onFloatingLyricsStateChange: (callback: (state: { isOpen: boolean }) => void) => {
     const handler = (_: unknown, state: { isOpen: boolean }) => callback(state);
