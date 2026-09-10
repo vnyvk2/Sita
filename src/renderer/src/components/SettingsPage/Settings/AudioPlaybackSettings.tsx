@@ -97,6 +97,14 @@ const AudioPlaybackSettings = () => {
     ((playbackRateInterval - 0.25) / (4 - 0.25)) * 100
   }%`;
 
+  const preampSeekBarCssProperties: CSSProperties = {
+    '--seek-before-width': `${Math.max(0, Math.min(100, ((preampDb + 12) / 24) * 100))}%`
+  } as CSSProperties;
+
+  const crossfadeSeekBarCssProperties: CSSProperties = {
+    '--seek-before-width': `${Math.max(0, Math.min(100, (crossfadeDuration / 12) * 100))}%`
+  } as CSSProperties;
+
   return (
     <li
       className="main-container audio-playback-settings-container mb-16"
@@ -147,7 +155,7 @@ const AudioPlaybackSettings = () => {
                   type="range"
                   name="seek-bar-slider"
                   id="seek-bar-slider"
-                  className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-4 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline! disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-4 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline! disabled:cursor-not-allowed disabled:opacity-50"
                   min={0.25}
                   step={0.05}
                   max={4.0}
@@ -178,8 +186,11 @@ const AudioPlaybackSettings = () => {
             />
           </div>
           {audioFxPreset !== 'normal' && (
-            <p className="mt-2 text-xs text-font-color-highlight dark:text-dark-font-color-highlight">
-              {t('audioFx.speedOverridden', 'Playback rate is currently overridden by active Audio FX preset.')}
+            <p className="text-font-color-highlight dark:text-dark-font-color-highlight mt-2 text-xs">
+              {t(
+                'audioFx.speedOverridden',
+                'Playback rate is currently overridden by active Audio FX preset.'
+              )}
             </p>
           )}
         </li>
@@ -254,7 +265,9 @@ const AudioPlaybackSettings = () => {
                   setPreampDb(val);
                   updateReplayGain({ preampDb: val });
                 }}
-                className="h-1 w-full cursor-pointer appearance-none rounded-lg bg-neutral-300 dark:bg-neutral-700"
+                className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-2 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
+                style={preampSeekBarCssProperties}
+                title={`${preampDb > 0 ? `+${preampDb}` : preampDb} dB`}
               />
               <span className="ml-2 text-xs">+12 dB</span>
               <Button
@@ -301,7 +314,9 @@ const AudioPlaybackSettings = () => {
                   const val = e.currentTarget.valueAsNumber;
                   updateCrossfade(val);
                 }}
-                className="h-1 w-full cursor-pointer appearance-none rounded-lg bg-neutral-300 dark:bg-neutral-700"
+                className="seek-bar-slider thumb-visible before:bg-font-color-highlight hover:before:bg-font-color-highlight dark:before:bg-font-color-highlight dark:hover:before:bg-dark-font-color-highlight relative float-left mx-2 h-6 w-full appearance-none bg-transparent p-0 outline-hidden outline-offset-1 before:absolute before:top-1/2 before:left-0 before:h-1 before:w-(--seek-before-width) before:-translate-y-1/2 before:cursor-pointer before:rounded-3xl before:transition-[width,background] before:content-[''] focus-visible:outline!"
+                style={crossfadeSeekBarCssProperties}
+                title={crossfadeDuration === 0 ? 'Off' : `${crossfadeDuration}s`}
               />
               <span className="ml-2 text-xs">12s</span>
               <Button
@@ -335,7 +350,13 @@ const AudioPlaybackSettings = () => {
             <Button
               label="Configure Audio Effects"
               iconName="graphic_eq"
-              clickHandler={() => changePromptMenuData(true, <AudioFxModal />)}
+              clickHandler={() =>
+                changePromptMenuData(
+                  true,
+                  <AudioFxModal />,
+                  'audio-fx-modal-dialog w-[860px] max-w-[94vw]'
+                )
+              }
             />
           </div>
         </li>
