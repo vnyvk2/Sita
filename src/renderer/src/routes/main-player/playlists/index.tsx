@@ -98,7 +98,32 @@ function PlaylistsPage() {
 
   const createNewPlaylist = useCallback(
     () => changePromptMenuData(true, <NewPlaylistPrompt currentPlaylists={playlists} />),
-    [changePromptMenuData, playlists, sortingOrder]
+    [changePromptMenuData, playlists]
+  );
+
+  const handleAddPlaylistClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      updateContextMenuData(
+        true,
+        [
+          {
+            label: t('playlistsPage.createPlaylist', 'New Standard Playlist'),
+            iconName: 'queue_music',
+            handlerFunction: createNewPlaylist
+          },
+          {
+            label: 'New Smart Playlist',
+            iconName: 'auto_awesome',
+            handlerFunction: () => navigate({ to: '/main-player/playlists/smart-editor' })
+          }
+        ],
+        e.clientX,
+        e.clientY
+      );
+    },
+    [updateContextMenuData, createNewPlaylist, navigate, t]
   );
 
   return (
@@ -121,9 +146,14 @@ function PlaylistsPage() {
           true,
           [
             {
-              label: t('playlistsPage.createNewPlaylist'),
+              label: t('playlistsPage.createNewPlaylist', 'New Standard Playlist'),
               handlerFunction: createNewPlaylist,
-              iconName: 'add'
+              iconName: 'queue_music'
+            },
+            {
+              label: 'New Smart Playlist',
+              iconName: 'auto_awesome',
+              handlerFunction: () => navigate({ to: '/main-player/playlists/smart-editor' })
             },
             {
               label: t('playlistsPage.importPlaylist'),
@@ -249,7 +279,7 @@ function PlaylistsPage() {
               label={t(`playlistsPage.addPlaylist`)}
               className="add-new-playlist-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
               iconName="add"
-              clickHandler={createNewPlaylist}
+              clickHandler={handleAddPlaylistClick}
             />
             <Dropdown
               name="playlistsSortDropdown"

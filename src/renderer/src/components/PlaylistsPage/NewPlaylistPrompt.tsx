@@ -1,4 +1,5 @@
 import type { PlaylistDto } from '@common/collections/dtos';
+import { useNavigate } from '@tanstack/react-router';
 import { useContext, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,6 +20,7 @@ const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
   const { songIds } = props;
   const { changePromptMenuData, addNewNotifications } = useContext(AppUpdateContext);
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const [input, setInput] = useState('');
   const [artworkPath, setArtworkPath] = useState('');
@@ -111,7 +113,6 @@ const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
           e.stopPropagation();
           if (e.key === 'Enter') createNewPlaylist(e.currentTarget.value);
         }}
-        autoFocus
       />
       <Button
         label={t('playlistsPage.addPlaylist')}
@@ -119,6 +120,17 @@ const NewPlaylistPrompt = (props: NewPlaylistPromptProp) => {
         className="bg-background-color-3! text-font-color-black! dark:bg-dark-background-color-3! dark:text-font-color-black mt-6 mr-0! cursor-pointer justify-center p-2 px-8! py-3! text-lg"
         clickHandler={() => createNewPlaylist(input)}
       />
+      <button
+        type="button"
+        onClick={() => {
+          changePromptMenuData(false);
+          navigate({ to: '/main-player/playlists/smart-editor' });
+        }}
+        className="text-font-color-highlight dark:text-dark-font-color-highlight hover:text-font-color-highlight/80 mt-5 flex cursor-pointer items-center gap-1.5 text-sm font-medium transition-colors hover:underline"
+      >
+        <span className="material-icons-round text-base">auto_awesome</span>
+        Create a Smart Playlist with rules instead
+      </button>
     </div>
   );
 };
