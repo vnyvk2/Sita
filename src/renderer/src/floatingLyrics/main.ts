@@ -25,6 +25,7 @@ declare global {
       onPlayStateChange: (callback: (isPlaying: boolean) => void) => () => void;
       onLockChange: (callback: (isLocked: boolean) => void) => () => void;
       getCurrentLyrics: () => Promise<FloatingLyricsData | null>;
+      getPlayState?: () => Promise<boolean>;
       toggleLock: () => Promise<boolean>;
       closeWindow: () => void;
       setIgnoreMouseEvents: (ignore: boolean, forward?: boolean) => void;
@@ -186,7 +187,7 @@ document.head.appendChild(styleSheet);
 let currentLyrics: FloatingLyricsData | null = null;
 let currentActiveIndex: number | null = null;
 let isLocked = false;
-let isPlaying = true;
+let isPlaying = false;
 let baseFontSize = parseInt(localStorage.getItem('nora_floating_lyrics_font_size') || '20', 10);
 
 const app = document.getElementById('app')!;
@@ -204,7 +205,7 @@ container.innerHTML = `
         <span class="material-symbols-rounded" style="font-size: 16px;">skip_previous</span>
       </button>
       <button class="btn" id="btnPlayPause" title="Play / Pause">
-        <span class="material-symbols-rounded" id="iconPlayPause" style="font-size: 16px;">pause</span>
+        <span class="material-symbols-rounded" id="iconPlayPause" style="font-size: 16px;">play_arrow</span>
       </button>
       <button class="btn" id="btnNext" title="Next Song">
         <span class="material-symbols-rounded" style="font-size: 16px;">skip_next</span>
@@ -375,10 +376,9 @@ function setLockState(locked: boolean) {
 if (window.floatingLyricsApi) {
   window.floatingLyricsApi.onLyricsUpdate((lyrics) => {
     currentLyrics = lyrics;
-    if (lyrics?.title) {
-      dragTitle.textContent = lyrics.title;
-    }
-    updateDisplay(currentActiveIndex);
+    currentActiveIndex = null;
+    dragTitle.textContent = lyrics?.title ? lyrics.title : 'Nora Floating Lyrics';
+    updateDisplay(null);
   });
 
   window.floatingLyricsApi.onTimeUpdate((time) => {
@@ -395,13 +395,19 @@ if (window.floatingLyricsApi) {
   });
 
   window.floatingLyricsApi.onPlayStateChange((playing) => {
-    isPlaying = playing;
+    isPlaying = Boolean(playing);
     iconPlayPause.textContent = isPlaying ? 'pause' : 'play_arrow';
   });
 
   window.floatingLyricsApi.onLockChange((locked) => {
     setLockState(locked);
   });
+
+  // Fetch initial play state
+  window.floatingLyricsApi.getPlayState?.().then((playing) => {
+    isPlaying = Boolean(playing);
+    iconPlayPause.textContent = isPlaying ? 'pause' : 'play_arrow';
+  }).catch(() => {});
 
   // Fetch initial lyrics
   window.floatingLyricsApi.getCurrentLyrics().then((lyrics) => {

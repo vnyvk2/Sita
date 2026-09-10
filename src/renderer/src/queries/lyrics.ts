@@ -50,62 +50,72 @@ export const lyricsQuery = createQueryKeys('lyrics', {
         `autoConvert=${autoConvertLyrics}`
       ],
       queryFn: async () => {
-        if (!title || !path) return null;
-
-        let res = await window.api.lyrics.getSongLyrics(
-          {
-            songTitle: title,
-            songArtists: artists,
-            album: album,
-            songPath: path,
-            duration: duration
-          },
-          lyricsType,
-          lyricsRequestType,
-          saveLyricsAutomatically
-        );
-
-        if (!res) return null;
-
-        // Auto-translation step if configured and not already translated
-        if (
-          autoTranslateLyrics &&
-          !res.lyrics.isReset &&
-          !res.lyrics.isTranslated &&
-          res.lyrics.originalLanguage !== targetLanguage
-        ) {
-          try {
-            const translated = await window.api.lyrics.getTranslatedLyrics(
-              targetLanguage as LanguageCodes
-            );
-            if (translated) res = translated;
-          } catch (err) {
-            console.warn('Auto-translate lyrics failed:', err);
-          }
+        if (!title || !path) {
+          window.api?.lyrics?.syncLyricsToFloatingLyrics?.(null);
+          return null;
         }
 
-        // Auto-conversion step (pinyin / romanization / romaja) if configured
-        if (autoConvertLyrics && !res.lyrics.isReset && !res.lyrics.isRomanized) {
-          try {
-            let converted: SongLyrics | null | undefined;
-            if (res.lyrics.originalLanguage === 'zh') {
-              converted = await window.api.lyrics.convertLyricsToPinyin();
-            } else if (res.lyrics.originalLanguage === 'ja') {
-              converted = await window.api.lyrics.romanizeLyrics();
-            } else if (res.lyrics.originalLanguage === 'ko') {
-              converted = await window.api.lyrics.convertLyricsToRomaja();
+        try {
+          let res = await window.api.lyrics.getSongLyrics(
+            {
+              songTitle: title,
+              songArtists: artists,
+              album: album,
+              songPath: path,
+              duration: duration
+            },
+            lyricsType,
+            lyricsRequestType,
+            saveLyricsAutomatically
+          );
+
+          if (!res) {
+            window.api?.lyrics?.syncLyricsToFloatingLyrics?.(null);
+            return null;
+          }
+
+          // Auto-translation step if configured and not already translated
+          if (
+            autoTranslateLyrics &&
+            !res.lyrics.isReset &&
+            !res.lyrics.isTranslated &&
+            res.lyrics.originalLanguage !== targetLanguage
+          ) {
+            try {
+              const translated = await window.api.lyrics.getTranslatedLyrics(
+                targetLanguage as LanguageCodes
+              );
+              if (translated) res = translated;
+            } catch (err) {
+              console.warn('Auto-translate lyrics failed:', err);
             }
-            if (converted) res = converted;
-          } catch (err) {
-            console.warn('Auto-convert lyrics failed:', err);
           }
-        }
 
-        if (res) {
-          window.api?.lyrics?.syncLyricsToFloatingLyrics?.(res);
-        }
+          // Auto-conversion step (pinyin / romanization / romaja) if configured
+          if (autoConvertLyrics && !res.lyrics.isReset && !res.lyrics.isRomanized) {
+            try {
+              let converted: SongLyrics | null | undefined;
+              if (res.lyrics.originalLanguage === 'zh') {
+                converted = await window.api.lyrics.convertLyricsToPinyin();
+              } else if (res.lyrics.originalLanguage === 'ja') {
+                converted = await window.api.lyrics.romanizeLyrics();
+              } else if (res.lyrics.originalLanguage === 'ko') {
+                converted = await window.api.lyrics.convertLyricsToRomaja();
+              }
+              if (converted) res = converted;
+            } catch (err) {
+              console.warn('Auto-convert lyrics failed:', err);
+            }
+          }
 
-        return res ?? null;
+          const finalLyrics = res ?? null;
+          window.api?.lyrics?.syncLyricsToFloatingLyrics?.(finalLyrics);
+          return finalLyrics;
+        } catch (err) {
+          console.warn('[lyricsQuery] Failed to fetch lyrics:', err);
+          window.api?.lyrics?.syncLyricsToFloatingLyrics?.(null);
+          return null;
+        }
       }
     };
   }

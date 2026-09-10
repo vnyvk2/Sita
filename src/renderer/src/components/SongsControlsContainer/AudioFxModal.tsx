@@ -139,6 +139,27 @@ const AudioFxModal = () => {
           />
         </div>
 
+        {/* Reverb Decay Duration */}
+        <div className="slider-row pt-1">
+          <div className="mb-1.5 flex justify-between text-xs">
+            <span className="font-medium text-font-color-black dark:text-font-color-white">
+              {t('audioFx.reverbDecay', 'Reverb Decay')}
+            </span>
+            <span className="font-mono text-font-color-highlight dark:text-dark-font-color-highlight">
+              {currentFx.reverbDecay.toFixed(1)}s
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0.5"
+            max="5.0"
+            step="0.1"
+            value={currentFx.reverbDecay}
+            onChange={(e) => updateParam('reverbDecay', parseFloat(e.target.value))}
+            className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-background-color-2 accent-font-color-highlight dark:bg-dark-background-color-2 dark:accent-dark-font-color-highlight"
+          />
+        </div>
+
         {/* Low-Pass Cutoff (Warm / Muffled Filter) */}
         <div className="slider-row pt-1">
           <div className="mb-1.5 flex justify-between text-xs">

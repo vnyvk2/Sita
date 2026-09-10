@@ -403,7 +403,8 @@ const createWindow = async () => {
     title: 'Nora',
     webPreferences: {
       zoomFactor: currentWindowZoomFactor,
-      preload: getPreloadPath()
+      preload: getPreloadPath(),
+      backgroundThrottling: false
     },
     visualEffectState: 'followWindow',
     roundedCorners: true,

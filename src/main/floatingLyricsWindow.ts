@@ -8,7 +8,15 @@ import logger from './logger';
 
 let floatingLyricsWindow: BrowserWindow | null = null;
 let isLocked = false;
+let lastKnownPlayState = false;
+let mainWindowReference: BrowserWindow | null = null;
 let boundsSaveTimeout: NodeJS.Timeout | null = null;
+
+function notifyFloatingLyricsStateChange(isOpen: boolean) {
+  if (mainWindowReference && !mainWindowReference.isDestroyed()) {
+    mainWindowReference.webContents.send('floating-lyrics/state-changed', { isOpen });
+  }
+}
 
 const BOUNDS_FILE = path.join(app.getPath('userData'), 'floating_lyrics_bounds.json');
 
@@ -67,18 +75,24 @@ function isBoundsVisibleOnAnyScreen(b: SavedBounds): boolean {
 }
 
 export function isFloatingLyricsOpen(): boolean {
-  return floatingLyricsWindow !== null && !floatingLyricsWindow.isDestroyed();
+  return floatingLyricsWindow !== null && !floatingLyricsWindow.isDestroyed() && floatingLyricsWindow.isVisible();
 }
 
 export async function createOrToggleFloatingLyricsWindow(
-  _mainWindowRef?: BrowserWindow
+  mainWindowRef?: BrowserWindow
 ): Promise<void> {
+  if (mainWindowRef) {
+    mainWindowReference = mainWindowRef;
+  }
+
   if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
     if (floatingLyricsWindow.isVisible()) {
       floatingLyricsWindow.hide();
+      notifyFloatingLyricsStateChange(false);
     } else {
       floatingLyricsWindow.show();
       floatingLyricsWindow.focus();
+      notifyFloatingLyricsStateChange(true);
     }
     return;
   }
@@ -132,6 +146,19 @@ export async function createOrToggleFloatingLyricsWindow(
   floatingLyricsWindow.on('closed', () => {
     floatingLyricsWindow = null;
     isLocked = false;
+    notifyFloatingLyricsStateChange(false);
+  });
+
+  // Attach ready-to-show listener BEFORE initiating page load to avoid lifecycle races
+  floatingLyricsWindow.once('ready-to-show', () => {
+    floatingLyricsWindow?.show();
+    notifyFloatingLyricsStateChange(true);
+    // Send cached lyrics and play state immediately
+    const lyrics = getCachedLyrics();
+    if (lyrics) {
+      broadcastLyricsToFloatingWindow(lyrics);
+    }
+    broadcastPlayStateToFloatingWindow(lastKnownPlayState);
   });
 
   // Load URL or file
@@ -147,15 +174,6 @@ export async function createOrToggleFloatingLyricsWindow(
     const htmlPath = htmlCandidates.find((c) => fs.existsSync(c)) ?? htmlCandidates[0];
     await floatingLyricsWindow.loadFile(htmlPath);
   }
-
-  floatingLyricsWindow.once('ready-to-show', () => {
-    floatingLyricsWindow?.show();
-    // Send cached lyrics immediately
-    const lyrics = getCachedLyrics();
-    if (lyrics) {
-      broadcastLyricsToFloatingWindow(lyrics);
-    }
-  });
 }
 
 export function closeFloatingLyricsWindow(): void {
@@ -194,9 +212,14 @@ export function broadcastTimeToFloatingWindow(time: number): void {
 }
 
 export function broadcastPlayStateToFloatingWindow(isPlaying: boolean): void {
+  lastKnownPlayState = isPlaying;
   if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
     floatingLyricsWindow.webContents.send('floating-lyrics/update-play-state', isPlaying);
   }
+}
+
+export function getFloatingLyricsPlayState(): boolean {
+  return lastKnownPlayState;
 }
 
 export function registerFloatingLyricsGlobalShortcut(mainWindowRef?: BrowserWindow): void {

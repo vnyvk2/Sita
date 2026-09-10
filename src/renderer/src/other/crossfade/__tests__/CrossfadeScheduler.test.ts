@@ -118,4 +118,43 @@ describe('CrossfadeScheduler', () => {
     expect(delegate.startFade).not.toHaveBeenCalled();
     expect(delegate.onFadeCancel).toHaveBeenCalled();
   });
+
+  it('MUST NOT start fade if still PRELOADING when trigger time is reached', async () => {
+    // Simulate slow preload that has not resolved yet
+    let resolvePreload!: (val: boolean) => void;
+    delegate.preloadTrack = vi.fn().mockImplementation(() => {
+      return new Promise<boolean>((resolve) => {
+        resolvePreload = resolve;
+      });
+    });
+
+    // 1. Enter PRELOADING
+    const preloadPromise = scheduler.onTimeUpdate(89);
+    expect(scheduler.getState()).toBe('PRELOADING');
+
+    // 2. Playback advances to trigger time (94s) while preload is STILL in flight
+    await scheduler.onTimeUpdate(94);
+
+    // Assert: scheduler must abort/cancel rather than prematurely starting the fade!
+    expect(scheduler.getState()).toBe('IDLE');
+    expect(delegate.startFade).not.toHaveBeenCalled();
+    expect(delegate.onFadeCancel).toHaveBeenCalled();
+
+    // 3. Even when late preload eventually resolves, it should be ignored due to cancelled session
+    resolvePreload(true);
+    await preloadPromise;
+    expect(scheduler.getState()).toBe('IDLE');
+    expect(delegate.startFade).not.toHaveBeenCalled();
+  });
+
+  it('should return to IDLE and not start fade if preloadTrack fails', async () => {
+    delegate.preloadTrack = vi.fn().mockResolvedValue(false);
+
+    await scheduler.onTimeUpdate(89);
+    expect(scheduler.getState()).toBe('IDLE');
+
+    await scheduler.onTimeUpdate(94);
+    expect(scheduler.getState()).toBe('IDLE');
+    expect(delegate.startFade).not.toHaveBeenCalled();
+  });
 });

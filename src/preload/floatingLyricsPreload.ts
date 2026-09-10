@@ -6,6 +6,7 @@ export interface FloatingLyricsApi {
   onPlayStateChange: (callback: (isPlaying: boolean) => void) => () => void;
   onLockChange: (callback: (isLocked: boolean) => void) => () => void;
   getCurrentLyrics: () => Promise<any>;
+  getPlayState: () => Promise<boolean>;
   toggleLock: () => Promise<boolean>;
   closeWindow: () => void;
   setIgnoreMouseEvents: (ignore: boolean, forward?: boolean) => void;
@@ -36,6 +37,7 @@ const api: FloatingLyricsApi = {
     return () => ipcRenderer.removeListener('floating-lyrics/lock-changed', handler);
   },
   getCurrentLyrics: () => ipcRenderer.invoke('floating-lyrics/get-lyrics'),
+  getPlayState: () => ipcRenderer.invoke('floating-lyrics/get-play-state'),
   toggleLock: () => ipcRenderer.invoke('floating-lyrics/toggle-lock'),
   closeWindow: () => ipcRenderer.send('floating-lyrics/close'),
   setIgnoreMouseEvents: (ignore, forward = true) =>

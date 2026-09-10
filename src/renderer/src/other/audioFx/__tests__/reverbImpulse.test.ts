@@ -1,5 +1,8 @@
-/// <reference types="vitest/globals" />
-import { generateReverbImpulse } from '../reverbImpulse';
+import {
+  generateReverbImpulse,
+  getOrCreateReverbBuffer,
+  getReverbCacheSizeForContext
+} from '../reverbImpulse';
 
 describe('generateReverbImpulse', () => {
   it('generates stereo float32 buffers of the correct length and sample rate', () => {
@@ -71,5 +74,57 @@ describe('generateReverbImpulse', () => {
 
     // Tail energy must be significantly lower than initial transient energy
     expect(earlyRms).toBeGreaterThan(lateRms * 5);
+  });
+});
+
+describe('getOrCreateReverbBuffer', () => {
+  const createMockAudioContext = (sampleRate = 48000): AudioContext => {
+    return {
+      sampleRate,
+      createBuffer: vi.fn((channels: number, length: number, sr: number) => {
+        const left = new Float32Array(length);
+        const right = new Float32Array(length);
+        return {
+          numberOfChannels: channels,
+          length,
+          sampleRate: sr,
+          getChannelData: (c: number) => (c === 0 ? left : right)
+        } as unknown as AudioBuffer;
+      })
+    } as unknown as AudioContext;
+  };
+
+  it('reuses cached buffer for identical parameters on the same context', () => {
+    const ctx = createMockAudioContext(48000);
+    const buf1 = getOrCreateReverbBuffer(ctx, 2.0, 2.5);
+    const buf2 = getOrCreateReverbBuffer(ctx, 2.0, 2.5);
+
+    expect(buf1).toBe(buf2);
+    expect(ctx.createBuffer).toHaveBeenCalledTimes(1);
+    expect(getReverbCacheSizeForContext(ctx)).toBe(1);
+  });
+
+  it('isolates cache per AudioContext avoiding cross-context leakage', () => {
+    const ctx1 = createMockAudioContext(48000);
+    const ctx2 = createMockAudioContext(48000);
+
+    const bufCtx1 = getOrCreateReverbBuffer(ctx1, 2.0, 2.5);
+    const bufCtx2 = getOrCreateReverbBuffer(ctx2, 2.0, 2.5);
+
+    // Buffers belong to their respective context
+    expect(bufCtx1).not.toBe(bufCtx2);
+    expect(ctx1.createBuffer).toHaveBeenCalledTimes(1);
+    expect(ctx2.createBuffer).toHaveBeenCalledTimes(1);
+  });
+
+  it('caps cache size per context to at most 2 buffers', () => {
+    const ctx = createMockAudioContext(48000);
+
+    getOrCreateReverbBuffer(ctx, 1.0, 2.0); // entry 1
+    getOrCreateReverbBuffer(ctx, 2.0, 2.0); // entry 2
+    expect(getReverbCacheSizeForContext(ctx)).toBe(2);
+
+    getOrCreateReverbBuffer(ctx, 3.0, 2.0); // entry 3 (should evict entry 1)
+    expect(getReverbCacheSizeForContext(ctx)).toBe(2);
   });
 });

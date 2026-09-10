@@ -70,6 +70,7 @@ class AudioPlayer {
   fadeGainB: GainNode;
 
   // Shared Audio FX & Output nodes
+  headroomGainNode: GainNode;
   dryGainNode: GainNode;
   wetGainNode: GainNode;
   convolverNode: ConvolverNode;
@@ -137,6 +138,9 @@ class AudioPlayer {
     this.fadeGainA.gain.value = 1.0;
     this.fadeGainB = this.currentContext.createGain();
     this.fadeGainB.gain.value = 0.0;
+
+    this.headroomGainNode = this.currentContext.createGain();
+    this.headroomGainNode.gain.value = 0.8414; // -1.5 dB headroom attenuation
 
     this.dryGainNode = this.currentContext.createGain();
     this.dryGainNode.gain.value = 1.0;
@@ -303,12 +307,14 @@ class AudioPlayer {
     element.addEventListener('play', () => {
       if (this.activeSlot === slot) {
         this.emit('play');
+        window.api?.lyrics?.syncPlayStateToFloatingLyrics?.(true);
       }
     });
 
     element.addEventListener('pause', () => {
       if (this.activeSlot === slot) {
         this.emit('pause');
+        window.api?.lyrics?.syncPlayStateToFloatingLyrics?.(false);
       }
     });
 
@@ -735,8 +741,9 @@ class AudioPlayer {
     this.replayGainB.connect(this.fadeGainB);
     this.fadeGainB.connect(firstFilter);
 
-    // 2. Dry path from last equalizer filter
-    lastFilter.connect(this.dryGainNode);
+    // 2. Route last equalizer filter through -1.5dB headroom gain staging
+    lastFilter.connect(this.headroomGainNode);
+    this.headroomGainNode.connect(this.dryGainNode);
     this.dryGainNode.connect(this.nightcoreTrebleBoostNode);
 
     // 3. Wet path: convolver -> lowpass -> wetGain -> nightcoreTrebleBoost
@@ -779,12 +786,9 @@ class AudioPlayer {
     const clampedWet = Math.max(0, Math.min(1.0, reverbWet));
     const targetDry = Math.max(0, 1.0 - 0.5 * clampedWet);
 
-    const filterMapKeys = [...this.equalizerBands.keys()];
-    const lastFilter = this.equalizerBands.get(filterMapKeys[filterMapKeys.length - 1]);
-
     if (clampedWet > 0) {
-      if (!this.isConvolverConnected && lastFilter) {
-        lastFilter.connect(this.convolverNode);
+      if (!this.isConvolverConnected) {
+        this.headroomGainNode.connect(this.convolverNode);
         this.isConvolverConnected = true;
       }
       try {
@@ -796,9 +800,9 @@ class AudioPlayer {
         logPlayer('[AudioPlayer.applyAudioFx] Error creating reverb buffer', { err });
       }
     } else {
-      if (this.isConvolverConnected && lastFilter) {
+      if (this.isConvolverConnected) {
         try {
-          lastFilter.disconnect(this.convolverNode);
+          this.headroomGainNode.disconnect(this.convolverNode);
         } catch {
           // ignore if already disconnected
         }
@@ -845,6 +849,12 @@ class AudioPlayer {
         preset: 'custom',
         ...(customOptions ?? {})
       };
+    } else if (preset === 'normal') {
+      const userBaseRate = store ? store.state.player.playbackRate ?? 1.0 : 1.0;
+      targetOptions = {
+        ...AUDIO_FX_PRESETS.normal,
+        playbackRate: userBaseRate
+      };
     } else {
       targetOptions = { ...AUDIO_FX_PRESETS[preset] };
     }
@@ -862,6 +872,7 @@ class AudioPlayer {
 
   private updatePlaybackRate(playbackRate: number) {
     if (this.currentAudioFx.preset === 'normal') {
+      this.currentAudioFx.playbackRate = playbackRate;
       if (this.audioA.playbackRate !== playbackRate) {
         this.audioA.playbackRate = playbackRate;
         this.audioB.playbackRate = playbackRate;
@@ -989,6 +1000,44 @@ class AudioPlayer {
           this.standbyAudio.src = songData.path;
           this.standbyAudio.load();
 
+          // Wait for standby audio to decode/buffer enough to play seamlessly
+          const isReady = await new Promise<boolean>((resolve) => {
+            const standby = this.standbyAudio;
+            if (standby.readyState >= 3 /* HAVE_FUTURE_DATA */) {
+              resolve(true);
+              return;
+            }
+
+            const timeoutId = setTimeout(() => {
+              cleanup();
+              resolve(false);
+            }, 4000);
+
+            const onCanPlay = () => {
+              cleanup();
+              resolve(true);
+            };
+
+            const onError = () => {
+              cleanup();
+              resolve(false);
+            };
+
+            const cleanup = () => {
+              clearTimeout(timeoutId);
+              standby.removeEventListener('canplay', onCanPlay);
+              standby.removeEventListener('error', onError);
+            };
+
+            standby.addEventListener('canplay', onCanPlay);
+            standby.addEventListener('error', onError);
+          });
+
+          if (!isReady || this.crossfadeScheduler.getSessionId() !== sessionId) {
+            this.preloadedSongData = null;
+            return false;
+          }
+
           // Apply pre-calculated ReplayGain to standbyReplayGain
           const settings = storage.playback.getPlaybackOptions('replayGain') ?? {
             mode: 'track',
@@ -1022,6 +1071,21 @@ class AudioPlayer {
         fadeInCurve
       }) => {
         logPlayer('[AudioPlayer.startFade]', { sessionId, incomingTrackId, clampedFadeDuration });
+
+        // Validate readiness and song data integrity before initiating crossfade
+        if (
+          !this.preloadedSongData ||
+          this.preloadedSongData.songId !== incomingTrackId ||
+          this.crossfadeScheduler.getSessionId() !== sessionId
+        ) {
+          logPlayer('[AudioPlayer.startFade] Preloaded track mismatch or session expired; aborting fade', {
+            sessionId,
+            incomingTrackId,
+            preloadedId: this.preloadedSongData?.songId
+          });
+          return;
+        }
+
         const now = this.currentContext.currentTime;
 
         // Ensure standby audio is ready and playing

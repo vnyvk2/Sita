@@ -111,40 +111,48 @@ export class CrossfadeScheduler {
     }
 
     // 2. Check Fade Start Trigger
-    if ((this.state === 'READY' || this.state === 'PRELOADING') && currentTime >= trigger.triggerTime) {
-      const nextTrackId = this.delegate.getNextTrackId();
-      if (nextTrackId === null || (this.preloadedTrackId !== null && nextTrackId !== this.preloadedTrackId)) {
-        // Queue mutated while preparing; abort crossfade
+    if (currentTime >= trigger.triggerTime) {
+      if (this.state === 'PRELOADING') {
+        // Preload took too long and missed the fade window; abort and fall back to normal track end
         this.cancel();
         return;
       }
 
-      this.state = 'FADING';
-      const sessionId = this.currentSessionId;
-      const incomingId = nextTrackId;
-      const fadeOutCurve = generateEqualPowerFadeOutCurve();
-      const fadeInCurve = generateEqualPowerFadeInCurve();
-
-      await this.delegate.startFade({
-        sessionId,
-        incomingTrackId: incomingId,
-        clampedFadeDuration: trigger.clampedFadeDuration,
-        fadeOutCurve,
-        fadeInCurve
-      });
-
-      if (this.fadeTimeoutId) {
-        clearTimeout(this.fadeTimeoutId);
-      }
-
-      this.fadeTimeoutId = setTimeout(() => {
-        if (this.currentSessionId === sessionId && this.state === 'FADING') {
-          this.state = 'IDLE';
-          this.preloadedTrackId = null;
-          this.fadeTimeoutId = null;
-          this.delegate.onFadeComplete(sessionId, incomingId);
+      if (this.state === 'READY') {
+        const nextTrackId = this.delegate.getNextTrackId();
+        if (nextTrackId === null || this.preloadedTrackId !== nextTrackId) {
+          // Queue mutated or track mismatch while waiting; abort crossfade
+          this.cancel();
+          return;
         }
-      }, trigger.clampedFadeDuration * 1000);
+
+        this.state = 'FADING';
+        const sessionId = this.currentSessionId;
+        const incomingId = nextTrackId;
+        const fadeOutCurve = generateEqualPowerFadeOutCurve();
+        const fadeInCurve = generateEqualPowerFadeInCurve();
+
+        await this.delegate.startFade({
+          sessionId,
+          incomingTrackId: incomingId,
+          clampedFadeDuration: trigger.clampedFadeDuration,
+          fadeOutCurve,
+          fadeInCurve
+        });
+
+        if (this.fadeTimeoutId) {
+          clearTimeout(this.fadeTimeoutId);
+        }
+
+        this.fadeTimeoutId = setTimeout(() => {
+          if (this.currentSessionId === sessionId && this.state === 'FADING') {
+            this.state = 'IDLE';
+            this.preloadedTrackId = null;
+            this.fadeTimeoutId = null;
+            this.delegate.onFadeComplete(sessionId, incomingId);
+          }
+        }, trigger.clampedFadeDuration * 1000);
+      }
     }
   }
 

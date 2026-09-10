@@ -83,11 +83,15 @@ export function generateReverbImpulse(
   };
 }
 
-/** Cache map to avoid regenerating buffers on identical decay/duration queries */
-const impulseCache = new Map<string, AudioBuffer>();
+/** Scoped WeakMap cache to prevent memory bloat and cross-AudioContext buffer assignment */
+const contextImpulseCache = new WeakMap<AudioContext, Map<string, AudioBuffer>>();
+
+/** Maximum cached buffers per AudioContext to cap memory footprint to ~4.6 MB */
+const MAX_BUFFERS_PER_CONTEXT = 2;
 
 /**
  * Creates or retrieves a cached Web Audio AudioBuffer for the given reverb parameters.
+ * Buffers are strictly scoped to their creating AudioContext via WeakMap.
  */
 export function getOrCreateReverbBuffer(
   audioContext: AudioContext,
@@ -99,7 +103,13 @@ export function getOrCreateReverbBuffer(
   const roundedDecay = Math.round(decay * 10) / 10;
   const cacheKey = `${audioContext.sampleRate}_${roundedDuration}_${roundedDecay}`;
 
-  const cached = impulseCache.get(cacheKey);
+  let bufferMap = contextImpulseCache.get(audioContext);
+  if (!bufferMap) {
+    bufferMap = new Map<string, AudioBuffer>();
+    contextImpulseCache.set(audioContext, bufferMap);
+  }
+
+  const cached = bufferMap.get(cacheKey);
   if (cached) {
     return cached;
   }
@@ -109,12 +119,19 @@ export function getOrCreateReverbBuffer(
   audioBuffer.getChannelData(0).set(rawData.leftChannel);
   audioBuffer.getChannelData(1).set(rawData.rightChannel);
 
-  // Maintain cache size <= 10
-  if (impulseCache.size >= 10) {
-    const firstKey = impulseCache.keys().next().value;
-    if (firstKey) impulseCache.delete(firstKey);
+  // Evict oldest entry if exceeding limit
+  if (bufferMap.size >= MAX_BUFFERS_PER_CONTEXT) {
+    const firstKey = bufferMap.keys().next().value;
+    if (firstKey) bufferMap.delete(firstKey);
   }
 
-  impulseCache.set(cacheKey, audioBuffer);
+  bufferMap.set(cacheKey, audioBuffer);
   return audioBuffer;
+}
+
+/**
+ * Utility function to inspect cache size for a given AudioContext (used in tests).
+ */
+export function getReverbCacheSizeForContext(audioContext: AudioContext): number {
+  return contextImpulseCache.get(audioContext)?.size ?? 0;
 }

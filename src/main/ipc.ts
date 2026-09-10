@@ -94,9 +94,11 @@ import {
 import { setupDownloadsIpc } from './downloads/setupDownloads';
 import {
   broadcastLyricsToFloatingWindow,
+  broadcastPlayStateToFloatingWindow,
   broadcastTimeToFloatingWindow,
   closeFloatingLyricsWindow,
   createOrToggleFloatingLyricsWindow,
+  getFloatingLyricsPlayState,
   isFloatingLyricsOpen,
   setFloatingLyricsIgnoreMouse,
   toggleFloatingLyricsLock
@@ -1093,6 +1095,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     );
     ipcMain.handle('app/isFloatingLyricsOpen', () => isFloatingLyricsOpen());
     ipcMain.handle('floating-lyrics/get-lyrics', () => getCachedLyrics());
+    ipcMain.handle('floating-lyrics/get-play-state', () => getFloatingLyricsPlayState());
     ipcMain.handle('floating-lyrics/toggle-lock', () => toggleFloatingLyricsLock());
     ipcMain.on('floating-lyrics/close', () => closeFloatingLyricsWindow());
     ipcMain.on(
@@ -1106,6 +1109,9 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     });
     ipcMain.on('floating-lyrics/sync-lyrics', (_, lyrics: unknown) => {
       broadcastLyricsToFloatingWindow(lyrics);
+    });
+    ipcMain.on('floating-lyrics/sync-play-state', (_, isPlaying: boolean) => {
+      broadcastPlayStateToFloatingWindow(isPlaying);
     });
     ipcMain.on('floating-lyrics/playback-toggle', () => {
       if (mainWindow && !mainWindow.isDestroyed()) {

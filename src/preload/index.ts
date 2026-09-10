@@ -63,6 +63,11 @@ const windowControls = {
     ipcRenderer.invoke('app/changePlayerType', type, mode),
   toggleFloatingLyrics: (): Promise<void> => ipcRenderer.invoke('app/toggleFloatingLyrics'),
   isFloatingLyricsOpen: (): Promise<boolean> => ipcRenderer.invoke('app/isFloatingLyricsOpen'),
+  onFloatingLyricsStateChange: (callback: (state: { isOpen: boolean }) => void) => {
+    const handler = (_: unknown, state: { isOpen: boolean }) => callback(state);
+    ipcRenderer.on('floating-lyrics/state-changed', handler);
+    return () => ipcRenderer.removeListener('floating-lyrics/state-changed', handler);
+  },
   onWindowFocus: (callback: (e: unknown) => void) => ipcRenderer.on('app/focused', callback),
   onWindowBlur: (callback: (e: unknown) => void) => ipcRenderer.on('app/blurred', callback)
 };
@@ -349,6 +354,9 @@ const lyrics = {
 
   syncTimeToFloatingLyrics: (time: number): void =>
     ipcRenderer.send('floating-lyrics/sync-time', time),
+
+  syncPlayStateToFloatingLyrics: (isPlaying: boolean): void =>
+    ipcRenderer.send('floating-lyrics/sync-play-state', isPlaying),
 
   onFloatingLyricsRemoteControl: (callback: (action: 'toggle' | 'next' | 'prev') => void) => {
     const handler = (_: unknown, action: 'toggle' | 'next' | 'prev') => callback(action);

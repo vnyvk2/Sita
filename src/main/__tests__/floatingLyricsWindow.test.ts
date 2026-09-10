@@ -2,17 +2,27 @@
 
 vi.mock('electron', () => {
   const listeners: Record<string, Function[]> = {};
+  let visible = false;
   const mockWebContents = {
     send: vi.fn(),
     isDestroyed: vi.fn(() => false)
   };
   const mockWin = {
     isDestroyed: vi.fn(() => false),
-    isVisible: vi.fn(() => false),
-    show: vi.fn(),
-    hide: vi.fn(),
+    isVisible: vi.fn(() => visible),
+    show: vi.fn(() => {
+      visible = true;
+    }),
+    hide: vi.fn(() => {
+      visible = false;
+    }),
     focus: vi.fn(),
-    close: vi.fn(),
+    close: vi.fn(() => {
+      visible = false;
+      if (listeners['closed']) {
+        listeners['closed'].forEach((cb) => cb());
+      }
+    }),
     setAlwaysOnTop: vi.fn(),
     setIgnoreMouseEvents: vi.fn(),
     getBounds: vi.fn(() => ({ x: 100, y: 200, width: 650, height: 160 })),
@@ -69,23 +79,26 @@ vi.mock('../logger', () => ({
 
 import {
   createOrToggleFloatingLyricsWindow,
+  closeFloatingLyricsWindow,
   isFloatingLyricsOpen,
   toggleFloatingLyricsLock,
   setFloatingLyricsIgnoreMouse,
   broadcastLyricsToFloatingWindow,
   broadcastTimeToFloatingWindow,
+  broadcastPlayStateToFloatingWindow,
+  getFloatingLyricsPlayState,
   registerFloatingLyricsGlobalShortcut
 } from '../floatingLyricsWindow';
 import { BrowserWindow, globalShortcut } from 'electron';
 
 describe('floatingLyricsWindow', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    closeFloatingLyricsWindow();
+    await createOrToggleFloatingLyricsWindow();
   });
 
-  it('should create BrowserWindow with transparent and backgroundThrottling: false', async () => {
-    await createOrToggleFloatingLyricsWindow();
-
+  it('should create BrowserWindow with transparent and backgroundThrottling: false', () => {
     expect(BrowserWindow).toHaveBeenCalledWith(
       expect.objectContaining({
         frame: false,
@@ -112,19 +125,45 @@ describe('floatingLyricsWindow', () => {
   it('should broadcast lyrics and time to webContents', () => {
     broadcastLyricsToFloatingWindow({ title: 'New Song' });
     broadcastTimeToFloatingWindow(45.5);
+    broadcastLyricsToFloatingWindow(null);
 
     const instance = (BrowserWindow as unknown as { mock: { results: Array<{ value: any }> } }).mock
       .results[0]?.value;
-    if (instance) {
-      expect(instance.webContents.send).toHaveBeenCalledWith(
-        'floating-lyrics/update-lyrics',
-        { title: 'New Song' }
-      );
-      expect(instance.webContents.send).toHaveBeenCalledWith(
-        'floating-lyrics/update-time',
-        45.5
-      );
-    }
+    expect(instance).toBeDefined();
+    expect(instance.webContents.send).toHaveBeenCalledWith(
+      'floating-lyrics/update-lyrics',
+      { title: 'New Song' }
+    );
+    expect(instance.webContents.send).toHaveBeenCalledWith(
+      'floating-lyrics/update-time',
+      45.5
+    );
+    expect(instance.webContents.send).toHaveBeenCalledWith(
+      'floating-lyrics/update-lyrics',
+      null
+    );
+  });
+
+  it('should synchronize playback state and track getFloatingLyricsPlayState()', () => {
+    expect(getFloatingLyricsPlayState()).toBe(false);
+
+    broadcastPlayStateToFloatingWindow(true);
+    expect(getFloatingLyricsPlayState()).toBe(true);
+
+    const instance = (BrowserWindow as unknown as { mock: { results: Array<{ value: any }> } }).mock
+      .results[0]?.value;
+    expect(instance).toBeDefined();
+    expect(instance.webContents.send).toHaveBeenCalledWith(
+      'floating-lyrics/update-play-state',
+      true
+    );
+
+    broadcastPlayStateToFloatingWindow(false);
+    expect(getFloatingLyricsPlayState()).toBe(false);
+    expect(instance.webContents.send).toHaveBeenCalledWith(
+      'floating-lyrics/update-play-state',
+      false
+    );
   });
 
   it('should register CommandOrControl+Shift+L global shortcut', () => {

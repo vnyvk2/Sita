@@ -12,10 +12,21 @@ export interface PositionSchedulerOptions {
   documentRef?: Document;
 }
 
+let isFloatingLyricsWindowActive = false;
+
+if (typeof window !== 'undefined' && window.api?.windowControls?.onFloatingLyricsStateChange) {
+  window.api.windowControls.onFloatingLyricsStateChange(({ isOpen }) => {
+    isFloatingLyricsWindowActive = isOpen;
+  });
+  window.api.windowControls.isFloatingLyricsOpen?.().then((isOpen) => {
+    isFloatingLyricsWindowActive = isOpen;
+  }).catch(() => {});
+}
+
 export class PositionTimerScheduler {
   private player: AudioPlayer;
   private state: SchedulerState = 'IDLE_NO_SONG';
-  private timerId: ReturnType<typeof setTimeout> | null = null;
+  private timerId: NodeJS.Timeout | null = null;
   private isDestroyed = false;
   private documentRef: Document;
   private onPositionChange: (position: number) => void;
@@ -34,7 +45,9 @@ export class PositionTimerScheduler {
             detail: roundedTime
           });
           document.dispatchEvent(playerPositionChange);
-          window.api?.lyrics?.syncTimeToFloatingLyrics?.(roundedTime);
+          if (isFloatingLyricsWindowActive) {
+            window.api?.lyrics?.syncTimeToFloatingLyrics?.(roundedTime);
+          }
         }
       });
 
