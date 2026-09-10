@@ -1,5 +1,8 @@
+import { eq } from 'drizzle-orm';
+
 import { createCollectionId } from '../../../common/collections/id';
 import type { BulkDeleteInput } from '../../../common/collections/operationInputs';
+import { smartPlaylistRules } from '../../db/schema';
 import logger from '../../logger';
 import { HierarchyService } from '../engine/HierarchyService';
 import { PlaylistRepository } from '../repositories/PlaylistRepository';
@@ -56,9 +59,25 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
       const playlist = await this.repository.getById(id, ctx.trx);
       if (!playlist) continue;
       const entries = await this.repository.getEntries(id, {}, ctx.trx);
+      let smartRule: any = undefined;
+      if (playlist.playlistType === 'smart') {
+        const [rule] = await ctx.trx
+          .select()
+          .from(smartPlaylistRules)
+          .where(eq(smartPlaylistRules.playlistId, id));
+        if (rule) {
+          smartRule = {
+            ruleAst: rule.ruleAst,
+            sortDefinition: rule.sortDefinition,
+            maxEntries: rule.maxEntries,
+            ruleVersion: rule.ruleVersion
+          };
+        }
+      }
       inverseInputs.push({
         playlist,
-        entries: entries.map((e) => e.entry)
+        entries: entries.map((e) => e.entry),
+        smartRule
       } as unknown as RestorePlaylistInput);
     }
 

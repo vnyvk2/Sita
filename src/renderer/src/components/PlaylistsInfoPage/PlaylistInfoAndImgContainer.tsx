@@ -1,5 +1,6 @@
 import type { PlaylistDto } from '@common/collections/dtos';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { useNavigate } from '@tanstack/react-router';
 import { useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -17,6 +18,7 @@ type Props = {
 const PlaylistInfoAndImgContainer = (props: Props) => {
   const { changePromptMenuData } = useContext(AppUpdateContext);
   const { t } = useTranslation();
+  const navigate = useNavigate();
 
   const { playlist, songs, filteredSongs } = props;
 
@@ -60,8 +62,16 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
             </button>
           </div>
           <div className="playlist-info-container text-font-color-black dark:text-font-color-white ml-8 min-w-0 flex-1 overflow-hidden">
-            <div className="font-semibold tracking-wider uppercase opacity-50">
-              {t('common.playlist_one')}
+            <div className="flex items-center gap-2">
+              <span className="font-semibold tracking-wider uppercase opacity-50">
+                {playlist.playlistType === 'smart' ? 'Smart Playlist' : t('common.playlist_one')}
+              </span>
+              {playlist.playlistType === 'smart' && (
+                <span className="bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black dark:text-font-color-white inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold">
+                  <span className="material-icons-round text-xs">auto_awesome</span>
+                  Smart
+                </span>
+              )}
             </div>
             <ScrollableTitle
               title={playlist.name}
@@ -92,6 +102,23 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
                     }
                   }
                 })}
+              </div>
+            )}
+            {playlist.playlistType === 'smart' && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate({
+                      to: '/main-player/playlists/smart-editor',
+                      search: { playlistId: playlist.id }
+                    })
+                  }
+                  className="bg-background-color-3 text-font-color-black dark:bg-dark-background-color-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-xs transition-opacity hover:opacity-90"
+                >
+                  <span className="material-icons-round text-sm">tune</span>
+                  <span>Edit Rules</span>
+                </button>
               </div>
             )}
           </div>

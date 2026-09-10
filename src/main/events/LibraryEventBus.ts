@@ -6,7 +6,6 @@ export type LibraryEvent =
   | 'SongMetadataChanged'
   | 'SongPlayCountChanged'
   | 'SongFavoriteChanged'
-  | 'SongRatingChanged'
   | 'SongAdded'
   | 'SongRemoved';
 
@@ -23,7 +22,6 @@ export interface LibraryEventMap {
   SongMetadataChanged: (event: SongMetadataChangedEvent) => void;
   SongPlayCountChanged: (event: SongEvent) => void;
   SongFavoriteChanged: (event: SongEvent) => void;
-  SongRatingChanged: (event: SongEvent) => void;
   SongAdded: (event: SongEvent) => void;
   SongRemoved: (event: SongEvent) => void;
 }

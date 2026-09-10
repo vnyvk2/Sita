@@ -1,7 +1,6 @@
 import { RestoreSongsOp } from '@main/collections/operations/RestoreSongsOp';
 import type { OperationContext } from '@main/collections/operations/types';
 import type { PlaylistRepository } from '@main/collections/repositories/PlaylistRepository';
-import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@main/collections/repositories/PlaylistRepository', () => ({
   PlaylistRepository: class MockPlaylistRepository {}

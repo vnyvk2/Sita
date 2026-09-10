@@ -1,9 +1,14 @@
 import { eq } from 'drizzle-orm';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import { SmartPlaylistEngine } from '../../../../../src/main/collections/engine/SmartPlaylistEngine';
-import type { SmartPlaylistDefinition } from '../../../../../src/main/collections/query/ast';
-import { db } from '../../../../../src/main/db/db';
+// Mock DB
+vi.mock('@main/db/db', async () => {
+  const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
+  return createSqliteMockDb();
+});
+
+import { SmartPlaylistEngine } from '@main/collections/engine/SmartPlaylistEngine';
+import type { SmartPlaylistDefinition } from '@main/collections/query/ast';
+import { db } from '@main/db/db';
 import {
   songs,
   playlists,
@@ -13,7 +18,7 @@ import {
   albums,
   artistsSongs,
   albumsSongs
-} from '../../../../../src/main/db/schema';
+} from '@main/db/schema';
 
 describe('SmartPlaylistEngine', () => {
   const engine = new SmartPlaylistEngine();
@@ -254,5 +259,51 @@ describe('SmartPlaylistEngine', () => {
     // Should only have Song 3
     expect(entries.length).toBe(1);
     expect(entries[0].songId).toBe(testSongs[2].id);
+  });
+
+  it('should chunk insertion and successfully regenerate playlists with >1000 entries', async () => {
+    // Generate 1200 songs to exceed CHUNK_SIZE = 1000
+    const bulkSongsData = Array.from({ length: 1200 }, (_, i) => ({
+      title: `Bulk Chunk Song ${i}`,
+      duration: 100.0,
+      path: `/bulk/${i}`,
+      fileCreatedAt: new Date(),
+      fileModifiedAt: new Date()
+    }));
+
+    for (let i = 0; i < bulkSongsData.length; i += 500) {
+      await db.insert(songs).values(bulkSongsData.slice(i, i + 500));
+    }
+
+    const def: SmartPlaylistDefinition = {
+      rule: {
+        type: 'group',
+        logicalOperator: 'and',
+        rules: [
+          { type: 'condition', field: 'title', operator: 'contains', value: 'Bulk Chunk Song' }
+        ]
+      },
+      orderBy: []
+    };
+
+    await db.insert(smartPlaylistRules).values({
+      playlistId,
+      ruleAst: def.rule,
+      sortDefinition: def.orderBy
+    });
+
+    const success = await engine.regenerate(playlistId);
+    expect(success).toBe(true);
+
+    const entries = await db
+      .select()
+      .from(playlistEntries)
+      .where(eq(playlistEntries.playlistId, playlistId));
+
+    expect(entries.length).toBe(1200);
+
+    const [pl] = await db.select().from(playlists).where(eq(playlists.id, playlistId));
+    expect(pl.itemCount).toBe(1200);
+    expect(pl.totalDuration).toBe(1200 * 100.0);
   });
 });

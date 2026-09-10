@@ -13,8 +13,15 @@ import type {
   BulkRestoreInput,
   PinInput,
   UnpinInput,
-  CollectionEvent
+  CollectionEvent,
+  CreateSmartPlaylistInput,
+  UpdateSmartPlaylistInput
 } from '@common/collections/operationInputs';
+import type {
+  SmartPlaylistDefinition,
+  SmartPlaylistPreviewResult,
+  SmartPlaylistRuleDto
+} from '@common/collections/smartPlaylist';
 import type {
   PlaylistViewMode,
   PlaylistExportOptions,
@@ -30,11 +37,24 @@ export const CollectionClient = {
     window.api.collections.read.getEntries(id, offset, limit, sortType),
   getBreadcrumbs: (id: number) => window.api.collections.read.getBreadcrumbs(id),
   getArtworks: (songIds: number[]) => window.api.collections.read.getArtworks(songIds),
+  getSmartRule: (playlistId: number): Promise<SmartPlaylistRuleDto | undefined> =>
+    window.api.collections.read.getSmartRule(playlistId) as Promise<
+      SmartPlaylistRuleDto | undefined
+    >,
+  previewSmartPlaylist: (
+    definition: SmartPlaylistDefinition,
+    maxEntries?: number | null
+  ): Promise<SmartPlaylistPreviewResult> =>
+    window.api.collections.read.previewSmartPlaylist(definition, maxEntries),
 
   // Write
   createFolder: (input: CreateFolderInput) => window.api.collections.write.createFolder(input),
   createPlaylist: (input: CreatePlaylistInput) =>
     window.api.collections.write.createPlaylist(input),
+  createSmartPlaylist: (input: CreateSmartPlaylistInput) =>
+    window.api.collections.write.createSmartPlaylist(input),
+  updateSmartPlaylist: (input: UpdateSmartPlaylistInput) =>
+    window.api.collections.write.updateSmartPlaylist(input),
   addSongs: (input: AddSongsInput) => window.api.collections.write.addSongs(input),
   removeSongs: (input: RemoveSongsInput) => window.api.collections.write.removeSongs(input),
   reorderSongs: (input: ReorderInput) => window.api.collections.write.reorder(input),
@@ -56,9 +76,9 @@ export const CollectionClient = {
 
   // Events
   onEvent: (callback: (e: unknown, event: CollectionEvent) => void) =>
-    window.api?.collections?.events?.onEvent?.(callback as any),
+    window.api?.collections?.events?.onEvent?.(callback as (...args: unknown[]) => void),
   offEvent: (callback: (e: unknown, event: CollectionEvent) => void) =>
-    window.api?.collections?.events?.offEvent?.(callback as any),
+    window.api?.collections?.events?.offEvent?.(callback as (...args: unknown[]) => void),
 
   // Import / Export
   export: (playlistId: number, options?: PlaylistExportOptions) =>

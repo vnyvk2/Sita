@@ -1,11 +1,16 @@
 import { eq } from 'drizzle-orm';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { UpdateSmartPlaylistOp } from '../../../../../../src/main/collections/operations/smart/UpdateSmartPlaylistOp';
-import type { OperationContext } from '../../../../../../src/main/collections/operations/types';
-import type { SmartPlaylistDefinition } from '../../../../../../src/main/collections/query/ast';
-import { db } from '../../../../../../src/main/db/db';
-import { playlists, smartPlaylistRules } from '../../../../../../src/main/db/schema';
+// Mock DB
+vi.mock('@main/db/db', async () => {
+  const { createSqliteMockDb } = await import('@test-helpers/sqliteMockDb');
+  return createSqliteMockDb();
+});
+
+import { UpdateSmartPlaylistOp } from '@main/collections/operations/smart/UpdateSmartPlaylistOp';
+import type { OperationContext } from '@main/collections/operations/types';
+import type { SmartPlaylistDefinition } from '@main/collections/query/ast';
+import { db } from '@main/db/db';
+import { playlists, smartPlaylistRules } from '@main/db/schema';
 
 describe('UpdateSmartPlaylistOp', () => {
   const op = new UpdateSmartPlaylistOp();

@@ -1,3 +1,5 @@
+import type { SmartPlaylistDefinition } from './smartPlaylist';
+
 export interface RestoreSongsInput {
   playlistId: number;
   entries: {
@@ -23,6 +25,12 @@ export interface RestorePlaylistInput {
     updatedAt: Date;
   };
   entries: RestoreSongsInput['entries'];
+  smartRule?: {
+    ruleAst: any;
+    sortDefinition: any;
+    maxEntries?: number | null;
+    ruleVersion?: number;
+  };
 }
 
 export interface CreateFolderInput {
@@ -33,6 +41,20 @@ export interface CreateFolderInput {
 export interface CreatePlaylistInput {
   name: string;
   parentId?: number | null;
+}
+
+export interface CreateSmartPlaylistInput {
+  name: string;
+  parentId?: number | null;
+  definition: SmartPlaylistDefinition;
+  maxEntries?: number | null;
+}
+
+export interface UpdateSmartPlaylistInput {
+  playlistId: number;
+  name?: string;
+  definition: SmartPlaylistDefinition;
+  maxEntries?: number | null;
 }
 
 export interface AddSongsInput {

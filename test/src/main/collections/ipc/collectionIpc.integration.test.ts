@@ -1,6 +1,5 @@
 import { eq } from 'drizzle-orm';
 import { ipcMain } from 'electron';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';
 import { PlaylistEngine } from '../../../../../src/main/collections/engine/PlaylistEngine';

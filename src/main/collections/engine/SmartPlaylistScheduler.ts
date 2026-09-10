@@ -3,11 +3,20 @@ import { smartPlaylistRules } from '../../db/schema';
 import { libraryEventBus } from '../../events/LibraryEventBus';
 import { SmartPlaylistJob } from '../../workers/jobs/smartPlaylistJob';
 import { libraryScheduler } from '../../workers/jobScheduler';
+import { collectionEventBus, type CollectionEvent } from '../events/CollectionEventBus';
 import { DependencyAnalyzer } from './DependencyAnalyzer';
+
+interface CachedRule {
+  playlistId: number;
+  dependencies: any;
+}
 
 export class SmartPlaylistScheduler {
   private dirtyPlaylists = new Set<number>();
   private debounceTimeout: NodeJS.Timeout | null = null;
+  private cachedRules: CachedRule[] | null = null;
+  private pendingRuleFetch: Promise<CachedRule[]> | null = null;
+  private unregisterListeners: (() => void)[] = [];
   private metrics = {
     eventsReceived: 0,
     playlistsConsidered: 0,
@@ -23,40 +32,99 @@ export class SmartPlaylistScheduler {
     return { ...this.metrics };
   }
 
-  private setupListeners() {
-    // Structural changes
-    libraryEventBus.onEvent('SongAdded', () => this.handleEvent('SongAdded', []));
-    libraryEventBus.onEvent('SongRemoved', () => this.handleEvent('SongRemoved', []));
+  public invalidateRulesCache() {
+    this.cachedRules = null;
+    this.pendingRuleFetch = null;
+  }
 
-    // Metadata/Field changes
-    libraryEventBus.onEvent('SongMetadataChanged', (event) =>
-      this.handleEvent('SongMetadataChanged', event.changedFields)
-    );
-    libraryEventBus.onEvent('SongPlayCountChanged', () =>
-      this.handleEvent('SongPlayCountChanged', ['playCount'])
-    );
-    libraryEventBus.onEvent('SongFavoriteChanged', () =>
-      this.handleEvent('SongFavoriteChanged', ['isFavorite'])
-    );
-    libraryEventBus.onEvent('SongRatingChanged', () =>
-      this.handleEvent('SongRatingChanged', ['rating'])
-    );
+  public reset() {
+    if (this.debounceTimeout) {
+      clearTimeout(this.debounceTimeout);
+      this.debounceTimeout = null;
+    }
+    this.dirtyPlaylists.clear();
+    this.invalidateRulesCache();
+  }
+
+  public cleanup() {
+    this.reset();
+    for (const unreg of this.unregisterListeners) {
+      unreg();
+    }
+    this.unregisterListeners = [];
+  }
+
+  public setupListeners() {
+    for (const unreg of this.unregisterListeners) {
+      unreg();
+    }
+    this.unregisterListeners = [];
+    const onSongAdded = () => this.handleEvent('SongAdded', []);
+    const onSongRemoved = () => this.handleEvent('SongRemoved', []);
+    const onMetaChanged = (event: { songId: number; changedFields: any[] }) =>
+      this.handleEvent('SongMetadataChanged', event.changedFields);
+    const onPlayCountChanged = () => this.handleEvent('SongPlayCountChanged', ['playCount']);
+    const onFavoriteChanged = () => this.handleEvent('SongFavoriteChanged', ['isFavorite']);
+
+    libraryEventBus.onEvent('SongAdded', onSongAdded);
+    libraryEventBus.onEvent('SongRemoved', onSongRemoved);
+    libraryEventBus.onEvent('SongMetadataChanged', onMetaChanged);
+    libraryEventBus.onEvent('SongPlayCountChanged', onPlayCountChanged);
+    libraryEventBus.onEvent('SongFavoriteChanged', onFavoriteChanged);
+
+    const onCollectionEvent = (event: CollectionEvent) => {
+      if (
+        event.type === 'CollectionCreated' ||
+        event.type === 'CollectionChanged' ||
+        event.type === 'CollectionDeleted'
+      ) {
+        this.invalidateRulesCache();
+      }
+    };
+    collectionEventBus.onEvent(onCollectionEvent);
+
+    this.unregisterListeners = [
+      () => libraryEventBus.offEvent('SongAdded', onSongAdded),
+      () => libraryEventBus.offEvent('SongRemoved', onSongRemoved),
+      () => libraryEventBus.offEvent('SongMetadataChanged', onMetaChanged),
+      () => libraryEventBus.offEvent('SongPlayCountChanged', onPlayCountChanged),
+      () => libraryEventBus.offEvent('SongFavoriteChanged', onFavoriteChanged),
+      () => collectionEventBus.offEvent(onCollectionEvent)
+    ];
+  }
+
+  private async getRules(): Promise<CachedRule[]> {
+    if (this.cachedRules) {
+      return this.cachedRules;
+    }
+
+    if (!this.pendingRuleFetch) {
+      this.pendingRuleFetch = (async () => {
+        try {
+          const rules = await db
+            .select({
+              playlistId: smartPlaylistRules.playlistId,
+              dependencies: smartPlaylistRules.dependencies
+            })
+            .from(smartPlaylistRules);
+          this.cachedRules = rules;
+          return rules;
+        } finally {
+          this.pendingRuleFetch = null;
+        }
+      })();
+    }
+
+    return await this.pendingRuleFetch;
   }
 
   private async handleEvent(eventName: string, changedFields: readonly string[]) {
     this.metrics.eventsReceived++;
     try {
-      const allRules = await db
-        .select({
-          playlistId: smartPlaylistRules.playlistId,
-          dependencies: smartPlaylistRules.dependencies
-        })
-        .from(smartPlaylistRules);
-
+      const allRules = await this.getRules();
       this.metrics.playlistsConsidered += allRules.length;
 
       for (const rule of allRules) {
-        // If it's a structural change, we assume it's affected since it could match any rule
         let affected = false;
 
         if (eventName === 'SongAdded' || eventName === 'SongRemoved') {
@@ -67,7 +135,6 @@ export class SmartPlaylistScheduler {
             changedFields
           );
         } else {
-          // If dependencies are missing/not extracted for some reason, default to dirty
           affected = true;
         }
 

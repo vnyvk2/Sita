@@ -1,5 +1,4 @@
 import { eq } from 'drizzle-orm';
-import { describe, it, expect, vi } from 'vitest';
 
 import { FolderStatisticsService } from '../../../../../src/main/collections/engine/FolderStatisticsService';
 import { HierarchyService } from '../../../../../src/main/collections/engine/HierarchyService';

@@ -1,5 +1,4 @@
 import { eq } from 'drizzle-orm';
-import { describe, it, expect, vi } from 'vitest';
 
 import { PinOp, UnpinOp } from '../../../../../src/main/collections/operations/PinOp';
 import { playlists } from '../../../../../src/main/db/schema';

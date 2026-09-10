@@ -3,12 +3,6 @@ import os from 'os';
 import path from 'path';
 
 import { File } from 'node-taglib-sharp';
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-
-// Measured: ~2.3s of test time standalone, but these real-file + real-DB
-// tests exceed the 5s default when the full suite runs in parallel on
-// slower machines. Scoped here instead of raising the global timeout.
-vi.setConfig({ testTimeout: 30_000 });
 import { db } from '@main/db/db';
 import * as albumsDb from '@main/db/queries/albums';
 import * as artistsDb from '@main/db/queries/artists';

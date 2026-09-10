@@ -30,7 +30,10 @@ import {
   removeSongsInputSchema,
   renameInputSchema,
   reorderInputSchema,
-  setArtworkInputSchema
+  setArtworkInputSchema,
+  createSmartPlaylistInputSchema,
+  updateSmartPlaylistInputSchema,
+  previewSmartPlaylistInputSchema
 } from './schemas';
 
 /** Parses an IPC payload against a schema, failing with a descriptive error. */
@@ -90,6 +93,16 @@ export function setupCollectionIpc(
     return await CollectionArtworkRepository.getArtworks(songIds);
   });
 
+  ipcMain.handle('collections/read/getSmartRule', async (_, playlistId: number) => {
+    const safeId = parse(idParamSchema, playlistId);
+    return await repository.getSmartRule(safeId);
+  });
+
+  ipcMain.handle('collections/read/previewSmartPlaylist', async (_, input) => {
+    const safeInput = parse(previewSmartPlaylistInputSchema, input);
+    return await engine.previewSmartPlaylist(safeInput.definition, safeInput.maxEntries);
+  });
+
   // Write Endpoints
   ipcMain.handle('collections/write/createFolder', async (_, input) => {
     const result = await engine.createFolder(parse(createFolderInputSchema, input));
@@ -101,6 +114,18 @@ export function setupCollectionIpc(
     const result = await engine.createPlaylist(parse(createPlaylistInputSchema, input));
     const playlist = await repository.getById(result);
     return playlist ? mapPlaylistToDto(playlist) : null;
+  });
+
+  ipcMain.handle('collections/write/createSmartPlaylist', async (_, input) => {
+    const safeInput = parse(createSmartPlaylistInputSchema, input);
+    const result = await engine.createSmartPlaylist(safeInput);
+    const playlist = await repository.getById(result);
+    return playlist ? mapPlaylistToDto(playlist) : null;
+  });
+
+  ipcMain.handle('collections/write/updateSmartPlaylist', async (_, input) => {
+    const safeInput = parse(updateSmartPlaylistInputSchema, input);
+    return await engine.updateSmartPlaylist(safeInput);
   });
 
   ipcMain.handle('collections/write/reorder', async (_, input) => {

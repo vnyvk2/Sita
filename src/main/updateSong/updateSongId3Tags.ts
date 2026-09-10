@@ -192,8 +192,11 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
           messageCode: 'PENDING_METADATA_UPDATES_SAVED',
           data: { title: pendingMetadata.tags.title }
         });
-        dataUpdateEvent('songs/artworks');
-        dataUpdateEvent('songs/updatedSong');
+        const songRecord = await getSongByPath(songPath);
+        const affectedSongIds = songRecord?.id ? [songRecord.id] : [];
+
+        dataUpdateEvent('songs/artworks', affectedSongIds);
+        dataUpdateEvent('songs/updatedSong', affectedSongIds);
         dataUpdateEvent('artists');
         dataUpdateEvent('albums');
         dataUpdateEvent('genres');
@@ -205,7 +208,7 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
           if (stats?.mtime) {
             const modifiedDate = stats.mtime.getTime();
             await updateSongModifiedAtByPath(songPath, new Date(modifiedDate));
-            dataUpdateEvent('songs/updatedSong');
+            dataUpdateEvent('songs/updatedSong', affectedSongIds);
           }
         } catch (error) {
           logger.error(`FAILED TO GET SONG STATS AFTER UPDATING THE SONG WITH NEWER METADATA.`, {
