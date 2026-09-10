@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import calculateElapsedTime from '../../../utils/calculateElapsedTime';
 import parseByteSizes from '../../../utils/parseByteSizes';
 import Button from '../../Button';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const StorageSettings = () => {
   const { t } = useTranslation();
@@ -63,11 +64,13 @@ const StorageSettings = () => {
   }%`;
 
   return (
-    <li className="main-container storage-settings-container mb-16" id="storage-settings-container">
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">hard_drive</span>
-        {t('settingsPage.storage')}
-      </div>
+    <CollapsibleSettingsSection
+      id="storage-settings-container"
+      sectionKey="storage"
+      title={t('settingsPage.storage')}
+      iconName="hard_drive"
+      className="storage-settings-container"
+    >
       <p>{t('settingsPage.storageDescription')}</p>
 
       {storageMetrics && (
@@ -241,7 +244,7 @@ const StorageSettings = () => {
           />
         </div>
       )}
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

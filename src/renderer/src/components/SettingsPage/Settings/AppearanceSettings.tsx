@@ -19,6 +19,7 @@ import Checkbox from '../../Checkbox';
 import Img from '../../Img';
 import DynamicThemeSettings from './DynamicThemeSettings';
 import ThemePreviewGrid from './ThemePreviewGrid';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const ThemeSettings = () => {
   const [showThemeGrid, setShowThemeGrid] = useState(false);
@@ -84,14 +85,13 @@ const ThemeSettings = () => {
   const { isThemeControlled } = useEffectiveAppearance();
 
   return userSettings ? (
-    <li
-      className="main-container appearance-settings-container mb-16"
+    <CollapsibleSettingsSection
       id="appearance-settings-container"
+      sectionKey="appearance"
+      title={t('settingsPage.appearance')}
+      iconName="dark_mode"
+      className="appearance-settings-container"
     >
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">dark_mode</span>
-        {t('settingsPage.appearance')}
-      </div>
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight list-disc pl-6">
         <li>
           <div className="description">
@@ -264,7 +264,7 @@ const ThemeSettings = () => {
           />
         </li>
       </ul>
-    </li>
+    </CollapsibleSettingsSection>
   ) : null;
 };
 

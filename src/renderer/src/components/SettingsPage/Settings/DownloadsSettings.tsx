@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import Button from '../../Button';
 import Checkbox from '../../Checkbox';
 import Dropdown, { type DropdownOption } from '../../Dropdown';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const duplicatePolicyOptions: DropdownOption<DuplicatePolicy>[] = [
   { label: 'Skip duplicates', value: 'SKIP' },
@@ -37,10 +38,13 @@ const DownloadsSettings = () => {
   });
 
   return (
-    <li className="downloads settings-container">
-      <div className="title-container flex items-center justify-between">
-        <h3>{t('settingsPage.downloads.title', 'Online downloads')}</h3>
-      </div>
+    <CollapsibleSettingsSection
+      id="downloads-settings-container"
+      sectionKey="downloads"
+      title={t('settingsPage.downloads.title', 'Online downloads')}
+      iconName="download"
+      className="downloads-settings-container"
+    >
       <ul className="secondary-container p-4">
         <li className="download-folder mb-4">
           <div className="description">
@@ -119,7 +123,7 @@ const DownloadsSettings = () => {
           </div>
         </li>
       </ul>
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

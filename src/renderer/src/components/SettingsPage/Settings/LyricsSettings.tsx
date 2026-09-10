@@ -11,6 +11,7 @@ import storage from '../../../utils/localStorage';
 import Button from '../../Button';
 import Checkbox from '../../Checkbox';
 import Dropdown, { type DropdownOption } from '../../Dropdown';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const automaticallySaveLyricsOptions: DropdownOption<AutomaticallySaveLyricsTypes>[] = [
   {
@@ -107,35 +108,16 @@ const LyricsSettings = () => {
     ['--seek-before-width' as string]: `${((lyricsArtworkDarkness - 20) / 60) * 100}%`
   };
 
-  const [isExpanded, setIsExpanded] = useState(false);
-
   return (
-    <li
-      className={`main-container lyrics-settings-container transition-all duration-200 ${
-        isExpanded ? 'mb-16' : 'mb-6'
-      }`}
+    <CollapsibleSettingsSection
       id="lyrics-settings-container"
+      sectionKey="lyrics"
+      title={t('settingsPage.lyrics')}
+      iconName="notes"
+      className="lyrics-settings-container"
+      defaultExpanded={false}
     >
-      <button
-        type="button"
-        onClick={() => setIsExpanded((prev) => !prev)}
-        className="title-container text-font-color-highlight dark:text-dark-font-color-highlight group mt-1 mb-4 flex w-full cursor-pointer items-center justify-between text-left text-2xl font-medium focus-visible:outline-none"
-        aria-expanded={isExpanded}
-      >
-        <div className="flex items-center">
-          <span className="material-icons-round-outlined mr-2">notes</span>
-          {t('settingsPage.lyrics')}
-        </div>
-        <span
-          className={`material-icons-round text-font-color-dim dark:text-dark-font-color-dim group-hover:text-font-color-highlight dark:group-hover:text-dark-font-color-highlight text-2xl transition-transform duration-200 ${
-            isExpanded ? 'rotate-180' : 'rotate-0'
-          }`}
-        >
-          expand_more
-        </span>
-      </button>
-      {isExpanded && (
-        <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight appear-from-bottom list-disc pl-6">
+      <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight appear-from-bottom list-disc pl-6">
           {/* 1. Lyrics Appearance (Default vs Artwork background) */}
           <li className="lyrics-appearance-section mb-6 -ml-6 list-none">
             <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 border-background-color-3/20 dark:border-dark-background-color-3/20 flex flex-col gap-4 rounded-lg border p-4">
@@ -373,8 +355,7 @@ const LyricsSettings = () => {
             />
           </li>
         </ul>
-      )}
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

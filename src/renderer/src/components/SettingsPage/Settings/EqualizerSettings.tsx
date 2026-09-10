@@ -18,6 +18,7 @@ import { isDataChanged } from '../../../utils/hasDataChanged';
 import Button from '../../Button';
 import Dropdown from '../../Dropdown';
 import EqualierBand from './EqualierBand';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const presets: EqualizerPresetDropdownOptions[] = equalizerPresetsData.map((presetData) => {
   return {
@@ -147,14 +148,13 @@ const EqualizerSettings = () => {
   }, [content]);
 
   return (
-    <li
-      className="main-container equalizer-settings-container mb-12"
+    <CollapsibleSettingsSection
       id="equalizer-settings-container"
+      sectionKey="equalizer"
+      title={t('settingsPage.equalizer')}
+      iconName="graphic_eq"
+      className="equalizer-settings-container"
     >
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">graphic_eq</span>
-        {t('settingsPage.equalizer')}
-      </div>
       <div className="pl-6">
         <div className="flex items-center justify-between">
           <Dropdown
@@ -197,7 +197,7 @@ const EqualizerSettings = () => {
           {equalizerBands}
         </div>
       </div>
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

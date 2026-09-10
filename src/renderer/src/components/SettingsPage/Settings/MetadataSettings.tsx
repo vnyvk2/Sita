@@ -9,6 +9,7 @@ import type {
 import { DEFAULT_SEARCH_RANKING_WEIGHTS } from '../../../../../common/metadata/types';
 import { metadataApi } from '../../../services/metadataApi';
 import Checkbox from '../../Checkbox';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 interface RankingWeightField {
   key: keyof SearchRankingWeights;
@@ -272,15 +273,13 @@ const MetadataSettings: React.FC = () => {
   }
 
   return (
-    <li
-      className="main-container metadata-settings-container mb-16"
+    <CollapsibleSettingsSection
       id="metadata-settings-container"
+      sectionKey="metadata"
+      title="Metadata & AutoTag Sources"
+      iconName="travel_explore"
+      className="metadata-settings-container"
     >
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">travel_explore</span>
-        Metadata & AutoTag Sources
-      </div>
-
       <p className="text-font-color-dim mb-4 text-sm">
         Configure multi-source release discovery, Best Match ranking behavior, and specialized field
         enrichment providers.
@@ -495,7 +494,7 @@ const MetadataSettings: React.FC = () => {
       {saveMessage && (
         <div className="text-font-color-highlight mt-3 text-xs font-medium">{saveMessage}</div>
       )}
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

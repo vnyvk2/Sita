@@ -10,6 +10,7 @@ import LastFMIcon from '../../../assets/images/webp/last-fm-logo.webp';
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import Button from '../../Button';
 import Checkbox from '../../Checkbox';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 import { SpotifyPlaylistImportModal } from './SpotifyPlaylistImportModal';
 
 const AccountsSettings = () => {
@@ -177,35 +178,16 @@ const AccountsSettings = () => {
     }
   });
 
-  const [isExpanded, setIsExpanded] = useState(false);
-
   return (
-    <li
-      className={`main-container accounts-settings-container transition-all duration-200 ${
-        isExpanded ? 'mb-16' : 'mb-6'
-      }`}
+    <CollapsibleSettingsSection
       id="accounts-settings-container"
+      sectionKey="accounts"
+      title={t('settingsPage.accounts')}
+      iconName="account_circle"
+      className="accounts-settings-container"
+      defaultExpanded={false}
     >
-      <button
-        type="button"
-        onClick={() => setIsExpanded((prev) => !prev)}
-        className="title-container text-font-color-highlight dark:text-dark-font-color-highlight group mt-1 mb-4 flex w-full cursor-pointer items-center justify-between text-left text-2xl font-medium focus-visible:outline-none"
-        aria-expanded={isExpanded}
-      >
-        <div className="flex items-center">
-          <span className="material-icons-round-outlined mr-2">account_circle</span>
-          {t('settingsPage.accounts')}
-        </div>
-        <span
-          className={`material-icons-round text-font-color-dim dark:text-dark-font-color-dim group-hover:text-font-color-highlight dark:group-hover:text-dark-font-color-highlight text-2xl transition-transform duration-200 ${
-            isExpanded ? 'rotate-180' : 'rotate-0'
-          }`}
-        >
-          expand_more
-        </span>
-      </button>
-      {isExpanded && (
-        <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 appear-from-bottom list-disc pl-6">
+      <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 appear-from-bottom list-disc pl-6">
           {/* Spotify Integration */}
           <li className="spotify-integration mb-8">
             <div className="description">
@@ -588,8 +570,7 @@ const AccountsSettings = () => {
             </ul>
           </li>
         </ul>
-      )}
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

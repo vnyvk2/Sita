@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import storage from '../../../utils/localStorage';
 import Checkbox from '../../Checkbox';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const PerformanceSettings = () => {
   const localStorageData = useStore(store, (state) => state.localStorage);
@@ -11,14 +12,14 @@ const PerformanceSettings = () => {
   const { t } = useTranslation();
 
   return (
-    <li
-      className="main-container performance-settings-container mb-16"
+    <CollapsibleSettingsSection
       id="performance-settings-container"
+      sectionKey="performance"
+      title={t('settingsPage.performance')}
+      iconName="offline_bolt"
+      iconClassName="leading-none"
+      className="performance-settings-container"
     >
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2 leading-none">offline_bolt</span>
-        <span> {t('settingsPage.performance')}</span>
-      </div>
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
         <li className="secondary-container toggle-remove-animations-on-battery-power mb-4">
           <div className="description">{t('settingsPage.removeAnimationOnBatteryDescription')}</div>
@@ -67,7 +68,7 @@ const PerformanceSettings = () => {
           />
         </li>
       </ul>
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

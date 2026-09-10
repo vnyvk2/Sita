@@ -379,6 +379,8 @@
 
   "settingsPage": {
     "settings": "Settings",
+    "collapseAll": "Collapse all",
+    "expandAll": "Expand all",
 
     "appearance": "Appearance",
     "changeTheme": "Change the theme of the application to your preference.",

@@ -5,6 +5,7 @@ import calculateElapsedTime from '@renderer/utils/calculateElapsedTime';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const LibrarySettings = () => {
   const { t } = useTranslation();
@@ -121,15 +122,13 @@ const LibrarySettings = () => {
   }, [t, userSettings?.lastScanTime]);
 
   return (
-    <li
-      className="main-container library-scanning-settings-container mb-16"
+    <CollapsibleSettingsSection
       id="library-scanning-settings-container"
+      sectionKey="library"
+      title={t('settingsPage.libraryScanning', { defaultValue: 'Library Scanning' })}
+      iconName="sync_saved_locally"
+      className="library-scanning-settings-container"
     >
-      {/* Title */}
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">sync_saved_locally</span>
-        {t('settingsPage.libraryScanning', { defaultValue: 'Library Scanning' })}
-      </div>
       <p className="description mb-6">
         {t('settingsPage.libraryScanningDescription', {
           defaultValue: 'Configure when Nora scans and synchronizes your music library.'
@@ -305,7 +304,7 @@ const LibrarySettings = () => {
           </div>
         </div>
       </div>
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

@@ -9,6 +9,7 @@ import storage from '../../../utils/localStorage';
 import Button from '../../Button';
 import Checkbox from '../../Checkbox';
 import Dropdown, { type DropdownOption } from '../../Dropdown';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const AudioFxModal = lazy(() => import('../../SongsControlsContainer/AudioFxModal'));
 
@@ -106,14 +107,13 @@ const AudioPlaybackSettings = () => {
   } as CSSProperties;
 
   return (
-    <li
-      className="main-container audio-playback-settings-container mb-16"
+    <CollapsibleSettingsSection
       id="audio-playback-settings-container"
+      sectionKey="audioPlayback"
+      title={t('settingsPage.audioPlayback')}
+      iconName="slow_motion_video"
+      className="audio-playback-settings-container"
     >
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">slow_motion_video</span>
-        {t('settingsPage.audioPlayback')}
-      </div>
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight list-disc pl-6">
         <li className="secondary-container enable-waveform-seekbar mb-4">
           <div className="description">{t('settingsPage.enableWaveformSeekbarDescription')}</div>
@@ -361,7 +361,7 @@ const AudioPlaybackSettings = () => {
           </div>
         </li>
       </ul>
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

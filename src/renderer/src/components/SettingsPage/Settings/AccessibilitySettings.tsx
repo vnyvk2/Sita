@@ -4,20 +4,20 @@ import { useTranslation } from 'react-i18next';
 
 import storage from '../../../utils/localStorage';
 import Checkbox from '../../Checkbox';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const AccessibilitySettings = () => {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const { t } = useTranslation();
 
   return (
-    <li
-      className="main-container accessibility-settings-container mb-16"
+    <CollapsibleSettingsSection
       id="accessibility-settings-container"
+      sectionKey="accessibility"
+      title={t('settingsPage.accessibility')}
+      iconName="settings_accessibility"
+      className="accessibility-settings-container"
     >
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">settings_accessibility</span>
-        {t('settingsPage.accessibility')}
-      </div>
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
         <li className="secondary-container toggle-reduced-motion mb-4">
           <div className="description">{t('settingsPage.reducedMotionDescription')}</div>
@@ -31,7 +31,7 @@ const AccessibilitySettings = () => {
           />
         </li>
       </ul>
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

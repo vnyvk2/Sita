@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import storage from '../../../utils/localStorage';
 import Dropdown from '../../Dropdown';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const DefaultPageSettings = () => {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
@@ -11,11 +12,13 @@ const DefaultPageSettings = () => {
   const { t } = useTranslation();
 
   return (
-    <li className="main-container mb-16" id="default-page-settings-container">
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">home</span>
-        {t('settingsPage.defaultPage')}
-      </div>
+    <CollapsibleSettingsSection
+      id="default-page-settings-container"
+      sectionKey="defaultPage"
+      title={t('settingsPage.defaultPage')}
+      iconName="home"
+      className="default-page-settings-container"
+    >
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
         <li className="default-page-dropdown-container">
           <div className="description"> {t('settingsPage.changeDefaultPageDescription')}</div>
@@ -42,7 +45,7 @@ const DefaultPageSettings = () => {
           />
         </li>
       </ul>
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

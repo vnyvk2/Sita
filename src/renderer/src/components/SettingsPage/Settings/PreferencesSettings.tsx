@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import storage from '../../../utils/localStorage';
 import Checkbox from '../../Checkbox';
 import Dropdown, { type DropdownOption } from '../../Dropdown';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const alphabetScrubberOptions: DropdownOption<string>[] = [
   { label: 'Off', value: 'off' },
@@ -17,14 +18,14 @@ const PreferencesSettings = () => {
   const { t } = useTranslation();
 
   return (
-    <li
-      className="main-container preferences-settings-container mb-16"
+    <CollapsibleSettingsSection
       id="preferences-settings-container"
+      sectionKey="preferences"
+      title={t('settingsPage.preferences')}
+      iconName="tune"
+      className="preferences-settings-container"
+      defaultExpanded={true}
     >
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">tune</span>
-        {t('settingsPage.preferences')}
-      </div>
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
         <li className="checkbox-container">
           <div className="secondary-container toggle-song-indexing mb-4">
@@ -268,7 +269,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
       </ul>
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 
