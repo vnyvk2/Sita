@@ -108,7 +108,7 @@ export const lyricsQuery = createQueryKeys('lyrics', {
             }
           }
 
-          const finalLyrics = res ?? null;
+          const finalLyrics = res ? { ...res, duration } : null;
           window.api?.lyrics?.syncLyricsToFloatingLyrics?.(finalLyrics);
           return finalLyrics;
         } catch (err) {

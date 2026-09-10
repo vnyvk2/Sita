@@ -1135,6 +1135,17 @@ class AudioPlayer {
           return;
         }
 
+        // Post-yield guard: abort fade if user skipped, stopped, or cancelled while play() was awaiting
+        if (
+          this.crossfadeScheduler.getSessionId() !== sessionId ||
+          this.crossfadeScheduler.getState() !== 'FADING'
+        ) {
+          this.standbyAudio.pause();
+          this.standbyAudio.currentTime = 0;
+          this.standbyAudio.src = '';
+          return;
+        }
+
         const now = this.currentContext.currentTime;
 
         // Apply equal power curves with prior automation cancellation and anchoring

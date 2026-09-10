@@ -328,6 +328,7 @@ declare global {
     link?: string;
     lyrics: LyricsData; // original and translated lyrics data
     isOfflineLyricsAvailable: boolean;
+    duration?: number;
   }
 
   interface LyricsRequestTrackInfo {

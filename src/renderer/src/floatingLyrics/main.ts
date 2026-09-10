@@ -9,6 +9,7 @@ interface ParsedLyricLine {
 interface FloatingLyricsData {
   title?: string;
   artists?: string[];
+  duration?: number;
   lyrics?: {
     isSynced: boolean;
     parsedLyrics: ParsedLyricLine[];
@@ -449,6 +450,8 @@ unlockBadge?.addEventListener('click', async (e) => {
   }
 });
 
+let lastIgnoreState: boolean | null = null;
+
 window.addEventListener('mousemove', (e) => {
   if (!isLocked) return;
   const rect = unlockBadge.getBoundingClientRect();
@@ -458,10 +461,10 @@ window.addEventListener('mousemove', (e) => {
     e.clientY >= rect.top - 12 &&
     e.clientY <= rect.bottom + 12;
 
-  if (isOverBadge) {
-    window.floatingLyricsApi?.setIgnoreMouseEvents(false, false);
-  } else {
-    window.floatingLyricsApi?.setIgnoreMouseEvents(true, true);
+  const shouldIgnore = !isOverBadge;
+  if (lastIgnoreState !== shouldIgnore) {
+    lastIgnoreState = shouldIgnore;
+    window.floatingLyricsApi?.setIgnoreMouseEvents(shouldIgnore, shouldIgnore);
   }
 });
 
@@ -475,11 +478,13 @@ function setLockState(locked: boolean) {
     container.classList.add('locked');
     btnLock.classList.add('active');
     iconLock.textContent = 'lock';
+    lastIgnoreState = true;
     window.floatingLyricsApi?.setIgnoreMouseEvents(true, true);
   } else {
     container.classList.remove('locked');
     btnLock.classList.remove('active');
     iconLock.textContent = 'lock_open';
+    lastIgnoreState = false;
     window.floatingLyricsApi?.setIgnoreMouseEvents(false, false);
   }
 }
