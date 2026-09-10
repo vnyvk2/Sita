@@ -12,10 +12,28 @@ export interface PositionSchedulerOptions {
   documentRef?: Document;
 }
 
+let isFloatingLyricsWindowActive = false;
+const activeSchedulers = new Set<PositionTimerScheduler>();
+
+if (typeof window !== 'undefined' && window.api?.windowControls?.onFloatingLyricsStateChange) {
+  window.api.windowControls.onFloatingLyricsStateChange(({ isOpen }) => {
+    isFloatingLyricsWindowActive = isOpen;
+    for (const s of activeSchedulers) {
+      s.reschedule();
+    }
+  });
+  window.api.windowControls.isFloatingLyricsOpen?.().then((isOpen) => {
+    isFloatingLyricsWindowActive = isOpen;
+    for (const s of activeSchedulers) {
+      s.reschedule();
+    }
+  }).catch(() => {});
+}
+
 export class PositionTimerScheduler {
   private player: AudioPlayer;
   private state: SchedulerState = 'IDLE_NO_SONG';
-  private timerId: ReturnType<typeof setTimeout> | null = null;
+  private timerId: NodeJS.Timeout | null = null;
   private isDestroyed = false;
   private documentRef: Document;
   private onPositionChange: (position: number) => void;
@@ -29,13 +47,18 @@ export class PositionTimerScheduler {
       options?.onPositionChange ||
       ((time: number) => {
         if (typeof document !== 'undefined' && document.dispatchEvent) {
+          const roundedTime = roundTo(time, 2);
           const playerPositionChange = new CustomEvent('player/positionChange', {
-            detail: roundTo(time, 2)
+            detail: roundedTime
           });
           document.dispatchEvent(playerPositionChange);
+          if (isFloatingLyricsWindowActive) {
+            window.api?.lyrics?.syncTimeToFloatingLyrics?.(roundedTime);
+          }
         }
       });
 
+    activeSchedulers.add(this);
     this.setupListeners();
     this.recomputeState();
   }
@@ -74,7 +97,7 @@ export class PositionTimerScheduler {
     this.reschedule();
   }
 
-  private reschedule(): void {
+  public reschedule(): void {
     if (this.timerId) {
       clearTimeout(this.timerId);
       this.timerId = null;
@@ -84,7 +107,10 @@ export class PositionTimerScheduler {
       return;
     }
 
-    const interval = this.state === 'PLAYING_VISIBLE' ? CADENCE_VISIBLE_MS : CADENCE_HIDDEN_MS;
+    const interval =
+      this.state === 'PLAYING_VISIBLE' || isFloatingLyricsWindowActive
+        ? CADENCE_VISIBLE_MS
+        : CADENCE_HIDDEN_MS;
 
     const tick = () => {
       if (this.isDestroyed || this.state === 'PAUSED' || this.state === 'IDLE_NO_SONG') {
@@ -125,7 +151,7 @@ export class PositionTimerScheduler {
     this.player.on('play', handlePlay);
     this.player.on('pause', handlePause);
     this.player.on('seeked', handleSeeked);
-    this.player.on('songChange', handleSongOrQueueChange);
+    this.player.on('songLoaded', handleSongOrQueueChange);
     this.player.on('queueChange', handleSongOrQueueChange);
     this.player.on('durationChange', handleSongOrQueueChange);
 
@@ -133,7 +159,7 @@ export class PositionTimerScheduler {
       this.player.off('play', handlePlay);
       this.player.off('pause', handlePause);
       this.player.off('seeked', handleSeeked);
-      this.player.off('songChange', handleSongOrQueueChange);
+      this.player.off('songLoaded', handleSongOrQueueChange);
       this.player.off('queueChange', handleSongOrQueueChange);
       this.player.off('durationChange', handleSongOrQueueChange);
     });
@@ -148,6 +174,7 @@ export class PositionTimerScheduler {
 
   public destroy(): void {
     this.isDestroyed = true;
+    activeSchedulers.delete(this);
     if (this.timerId) {
       clearTimeout(this.timerId);
       this.timerId = null;

@@ -1,0 +1,272 @@
+import fs from 'fs';
+import path from 'path';
+
+import { app, BrowserWindow, globalShortcut, screen } from 'electron';
+
+import { getCachedLyrics } from './core/getSongLyrics';
+import logger from './logger';
+
+let floatingLyricsWindow: BrowserWindow | null = null;
+let isLocked = false;
+let lastKnownPlayState = false;
+let mainWindowReference: BrowserWindow | null = null;
+let boundsSaveTimeout: NodeJS.Timeout | null = null;
+
+function notifyFloatingLyricsStateChange(isOpen: boolean) {
+  if (mainWindowReference && !mainWindowReference.isDestroyed()) {
+    mainWindowReference.webContents.send('floating-lyrics/state-changed', { isOpen });
+  }
+}
+
+const BOUNDS_FILE = path.join(app.getPath('userData'), 'floating_lyrics_bounds.json');
+
+interface SavedBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function getSavedBounds(): SavedBounds | null {
+  try {
+    if (fs.existsSync(BOUNDS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(BOUNDS_FILE, 'utf-8'));
+      if (
+        typeof data.x === 'number' &&
+        typeof data.y === 'number' &&
+        typeof data.width === 'number' &&
+        typeof data.height === 'number'
+      ) {
+        return {
+          x: data.x,
+          y: data.y,
+          width: Math.max(320, Math.min(1920, data.width)),
+          height: Math.max(100, Math.min(1080, data.height))
+        };
+      }
+    }
+  } catch (err) {
+    logger.warn('[FloatingLyrics] Failed to read saved bounds:', { err });
+  }
+  return null;
+}
+
+function saveBounds(bounds: SavedBounds): void {
+  if (boundsSaveTimeout) clearTimeout(boundsSaveTimeout);
+  boundsSaveTimeout = setTimeout(() => {
+    try {
+      fs.writeFileSync(BOUNDS_FILE, JSON.stringify(bounds, null, 2), 'utf-8');
+    } catch (err) {
+      logger.warn('[FloatingLyrics] Failed to save bounds:', { err });
+    }
+  }, 500);
+}
+
+function getPreloadPath(): string {
+  const candidates = [
+    path.resolve(import.meta.dirname, '../preload/floatingLyrics.cjs'),
+    path.resolve(import.meta.dirname, '../../preload/floatingLyrics.cjs'),
+    path.resolve(app.getAppPath(), 'out/preload/floatingLyrics.cjs')
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return candidates[0];
+}
+
+function isBoundsVisibleOnAnyScreen(b: SavedBounds): boolean {
+  const displays = screen.getAllDisplays();
+  const width = b.width || 650;
+  const height = b.height || 160;
+  return displays.some((display) => {
+    const { x, y, width: dW, height: dH } = display.bounds;
+    return (
+      b.x < x + dW - 50 &&
+      b.x + width > x + 50 &&
+      b.y < y + dH - 50 &&
+      b.y + height > y + 50
+    );
+  });
+}
+
+export function isFloatingLyricsOpen(): boolean {
+  return floatingLyricsWindow !== null && !floatingLyricsWindow.isDestroyed() && floatingLyricsWindow.isVisible();
+}
+
+export async function createOrToggleFloatingLyricsWindow(
+  mainWindowRef?: BrowserWindow
+): Promise<void> {
+  if (mainWindowRef) {
+    mainWindowReference = mainWindowRef;
+  }
+
+  if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
+    if (floatingLyricsWindow.isVisible()) {
+      floatingLyricsWindow.hide();
+      notifyFloatingLyricsStateChange(false);
+    } else {
+      floatingLyricsWindow.show();
+      floatingLyricsWindow.focus();
+      notifyFloatingLyricsStateChange(true);
+    }
+    return;
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const defaultWidth = 650;
+  const defaultHeight = 160;
+  let initialX = Math.round(primaryDisplay.bounds.x + (primaryDisplay.bounds.width - defaultWidth) / 2);
+  let initialY = Math.round(primaryDisplay.bounds.y + primaryDisplay.bounds.height - defaultHeight - 120);
+
+  const saved = getSavedBounds();
+  if (saved && isBoundsVisibleOnAnyScreen(saved)) {
+    initialX = saved.x;
+    initialY = saved.y;
+  }
+
+  floatingLyricsWindow = new BrowserWindow({
+    x: initialX,
+    y: initialY,
+    width: saved?.width ?? defaultWidth,
+    height: saved?.height ?? defaultHeight,
+    minWidth: 320,
+    minHeight: 100,
+    title: 'Nora - Floating Lyrics',
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    alwaysOnTop: true,
+    resizable: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: getPreloadPath(),
+      backgroundThrottling: false,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  floatingLyricsWindow.setAlwaysOnTop(true, 'screen-saver');
+
+  // Track and persist bounds
+  const updateBounds = () => {
+    if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
+      saveBounds(floatingLyricsWindow.getBounds());
+    }
+  };
+  floatingLyricsWindow.on('moved', updateBounds);
+  floatingLyricsWindow.on('resized', updateBounds);
+
+  floatingLyricsWindow.on('closed', () => {
+    floatingLyricsWindow = null;
+    isLocked = false;
+    notifyFloatingLyricsStateChange(false);
+  });
+
+  // Attach ready-to-show listener BEFORE initiating page load to avoid lifecycle races
+  floatingLyricsWindow.once('ready-to-show', () => {
+    floatingLyricsWindow?.show();
+    notifyFloatingLyricsStateChange(true);
+    // Send cached lyrics and play state immediately
+    const lyrics = getCachedLyrics();
+    if (lyrics) {
+      broadcastLyricsToFloatingWindow(lyrics);
+    }
+    broadcastPlayStateToFloatingWindow(lastKnownPlayState);
+  });
+
+  // Load URL or file
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
+    await floatingLyricsWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/floatingLyrics.html`);
+  } else {
+    const htmlCandidates = [
+      path.join(import.meta.dirname, '../renderer/floatingLyrics.html'),
+      path.join(import.meta.dirname, '../../renderer/floatingLyrics.html'),
+      path.join(app.getAppPath(), 'out/renderer/floatingLyrics.html')
+    ];
+    const htmlPath = htmlCandidates.find((c) => fs.existsSync(c)) ?? htmlCandidates[0];
+    await floatingLyricsWindow.loadFile(htmlPath);
+  }
+}
+
+export function closeFloatingLyricsWindow(): void {
+  if (boundsSaveTimeout) {
+    clearTimeout(boundsSaveTimeout);
+    boundsSaveTimeout = null;
+  }
+  if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
+    floatingLyricsWindow.close();
+    floatingLyricsWindow = null;
+  }
+  isLocked = false;
+}
+
+export function toggleFloatingLyricsLock(explicitState?: boolean): boolean {
+  if (!floatingLyricsWindow || floatingLyricsWindow.isDestroyed()) {
+    return false;
+  }
+  isLocked = explicitState !== undefined ? explicitState : !isLocked;
+  floatingLyricsWindow.setIgnoreMouseEvents(isLocked, { forward: true });
+  floatingLyricsWindow.webContents.send('floating-lyrics/lock-changed', isLocked);
+  return isLocked;
+}
+
+export function setFloatingLyricsIgnoreMouse(ignore: boolean, forward: boolean = true): void {
+  if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
+    floatingLyricsWindow.setIgnoreMouseEvents(ignore, { forward });
+  }
+}
+
+export function broadcastLyricsToFloatingWindow(lyrics: unknown): void {
+  if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
+    floatingLyricsWindow.webContents.send('floating-lyrics/update-lyrics', lyrics);
+  }
+}
+
+export function broadcastTimeToFloatingWindow(time: number): void {
+  if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
+    floatingLyricsWindow.webContents.send('floating-lyrics/update-time', time);
+  }
+}
+
+export function broadcastPlayStateToFloatingWindow(isPlaying: boolean): void {
+  lastKnownPlayState = isPlaying;
+  if (floatingLyricsWindow && !floatingLyricsWindow.isDestroyed()) {
+    floatingLyricsWindow.webContents.send('floating-lyrics/update-play-state', isPlaying);
+  }
+}
+
+export function getFloatingLyricsPlayState(): boolean {
+  return lastKnownPlayState;
+}
+
+export function registerFloatingLyricsGlobalShortcut(mainWindowRef?: BrowserWindow): void {
+  try {
+    const shortcutKey = 'CommandOrControl+Shift+L';
+    const registered = globalShortcut.register(shortcutKey, () => {
+      createOrToggleFloatingLyricsWindow(mainWindowRef);
+    });
+    if (!registered) {
+      logger.warn(`[FloatingLyrics] Shortcut ${shortcutKey} registration failed (may already be bound)`);
+    } else {
+      logger.info(`[FloatingLyrics] Global shortcut ${shortcutKey} registered successfully`);
+    }
+
+    // Escape hatch shortcut to toggle lock: CommandOrControl+Shift+U
+    const unlockShortcutKey = 'CommandOrControl+Shift+U';
+    const unlockRegistered = globalShortcut.register(unlockShortcutKey, () => {
+      toggleFloatingLyricsLock();
+    });
+    if (!unlockRegistered) {
+      logger.warn(`[FloatingLyrics] Shortcut ${unlockShortcutKey} registration failed (may already be bound)`);
+    } else {
+      logger.info(`[FloatingLyrics] Global shortcut ${unlockShortcutKey} registered successfully`);
+    }
+  } catch (err) {
+    logger.warn('[FloatingLyrics] Error registering global shortcut:', { err });
+  }
+}

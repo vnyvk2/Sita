@@ -328,6 +328,7 @@ declare global {
     link?: string;
     lyrics: LyricsData; // original and translated lyrics data
     isOfflineLyricsAvailable: boolean;
+    duration?: number;
   }
 
   interface LyricsRequestTrackInfo {
@@ -653,6 +654,10 @@ declare global {
       mode: 'track' | 'album' | 'off';
       preampDb: number;
       preventClipping: boolean;
+    };
+    audioFx?: import('../renderer/src/other/audioFx/types').AudioFxOptions;
+    crossfade?: {
+      duration: number;
     };
   }
 

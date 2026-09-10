@@ -92,6 +92,18 @@ import {
   saveUserEqualizerPreset
 } from './db/queries/userPreferences';
 import { setupDownloadsIpc } from './downloads/setupDownloads';
+import {
+  broadcastLyricsToFloatingWindow,
+  broadcastPlayStateToFloatingWindow,
+  broadcastTimeToFloatingWindow,
+  closeFloatingLyricsWindow,
+  createOrToggleFloatingLyricsWindow,
+  getFloatingLyricsPlayState,
+  isFloatingLyricsOpen,
+  setFloatingLyricsIgnoreMouse,
+  toggleFloatingLyricsLock
+} from './floatingLyricsWindow';
+import { getCachedLyrics } from './core/getSongLyrics';
 import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
@@ -1077,6 +1089,46 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     );
 
     ipcMain.handle('app/resetMiniPlayerToDefault', () => resetMiniPlayerToDefault());
+
+    ipcMain.handle('app/toggleFloatingLyrics', () =>
+      createOrToggleFloatingLyricsWindow(mainWindow)
+    );
+    ipcMain.handle('app/isFloatingLyricsOpen', () => isFloatingLyricsOpen());
+    ipcMain.handle('floating-lyrics/get-lyrics', () => getCachedLyrics());
+    ipcMain.handle('floating-lyrics/get-play-state', () => getFloatingLyricsPlayState());
+    ipcMain.handle('floating-lyrics/toggle-lock', () => toggleFloatingLyricsLock());
+    ipcMain.handle('app/toggleFloatingLyricsLock', () => toggleFloatingLyricsLock());
+    ipcMain.on('floating-lyrics/close', () => closeFloatingLyricsWindow());
+    ipcMain.on(
+      'floating-lyrics/set-ignore-mouse-events',
+      (_, ignore: boolean, forward?: boolean) => {
+        setFloatingLyricsIgnoreMouse(ignore, forward);
+      }
+    );
+    ipcMain.on('floating-lyrics/sync-time', (_, time: number) => {
+      broadcastTimeToFloatingWindow(time);
+    });
+    ipcMain.on('floating-lyrics/sync-lyrics', (_, lyrics: unknown) => {
+      broadcastLyricsToFloatingWindow(lyrics);
+    });
+    ipcMain.on('floating-lyrics/sync-play-state', (_, isPlaying: boolean) => {
+      broadcastPlayStateToFloatingWindow(isPlaying);
+    });
+    ipcMain.on('floating-lyrics/playback-toggle', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('floating-lyrics/remote-control', 'toggle');
+      }
+    });
+    ipcMain.on('floating-lyrics/playback-next', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('floating-lyrics/remote-control', 'next');
+      }
+    });
+    ipcMain.on('floating-lyrics/playback-prev', () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('floating-lyrics/remote-control', 'prev');
+      }
+    });
 
     ipcMain.handle('app/showMiniPlayerContextMenu', (event, template: any[]) => {
       return new Promise((resolve) => {

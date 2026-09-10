@@ -307,7 +307,8 @@ const getSongLyrics = async (
         source: 'IN_SONG_LYRICS',
         lyricsType: type,
         lyrics: offlineLyrics,
-        isOfflineLyricsAvailable
+        isOfflineLyricsAvailable,
+        duration: trackInfo.duration
       };
       return cachedLyrics;
     }
@@ -321,7 +322,8 @@ const getSongLyrics = async (
       if (onlineLyrics) {
         cachedLyrics = {
           ...onlineLyrics,
-          isOfflineLyricsAvailable
+          isOfflineLyricsAvailable,
+          duration: trackInfo.duration
         };
 
         if (saveLyricsAutomatically !== 'NONE')
@@ -337,7 +339,11 @@ const getSongLyrics = async (
       if (lyricsType !== 'SYNCED') {
         const unsyncedLyrics = await fetchUnsyncedLyrics(songTitle, songArtists);
         if (unsyncedLyrics) {
-          cachedLyrics = { ...unsyncedLyrics, isOfflineLyricsAvailable };
+          cachedLyrics = {
+            ...unsyncedLyrics,
+            isOfflineLyricsAvailable,
+            duration: trackInfo.duration
+          };
 
           if (saveLyricsAutomatically === 'SYNCED_OR_UN_SYNCED')
             await saveLyricsAutomaticallyIfAsked(

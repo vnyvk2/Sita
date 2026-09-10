@@ -88,6 +88,7 @@ import logger from './logger';
 import { flushScrobbleQueue } from './other/lastFm/flushScrobbleQueue';
 import resetAppData from './resetAppData';
 import { savePendingSongLyrics } from './saveLyricsToSong';
+import { registerFloatingLyricsGlobalShortcut } from './floatingLyricsWindow';
 import checkForUpdates from './update';
 import { savePendingMetadataUpdates } from './updateSong/updateSongId3Tags';
 import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
@@ -402,7 +403,8 @@ const createWindow = async () => {
     title: 'Nora',
     webPreferences: {
       zoomFactor: currentWindowZoomFactor,
-      preload: getPreloadPath()
+      preload: getPreloadPath(),
+      backgroundThrottling: false
     },
     visualEffectState: 'followWindow',
     roundedCorners: true,
@@ -517,6 +519,7 @@ app
 
     if (BrowserWindow.getAllWindows().length === 0) await createWindow();
     memProfiler.stage('window-created-and-loaded');
+    registerFloatingLyricsGlobalShortcut(mainWindow);
 
     if (windowState === 'maximized') mainWindow.maximize();
 
