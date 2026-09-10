@@ -211,7 +211,14 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
     window.api.playerControls.skipBackwardToPreviousSong(handleSkipBackwardClick);
     window.api.playerControls.skipForwardToNextSong(handleSkipForwardClickListener);
 
+    const unsubFloatingRemote = window.api.lyrics?.onFloatingLyricsRemoteControl?.((action) => {
+      if (action === 'toggle') handleToggleSongPlayback();
+      else if (action === 'next') handleSkipForwardClickListener();
+      else if (action === 'prev') handleSkipBackwardClick();
+    });
+
     return () => {
+      unsubFloatingRemote?.();
       window.api.unknownSource.removePlaySongFromUnknownSourceEvent(
         handlePlaySongFromUnknownSource
       );

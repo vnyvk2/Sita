@@ -1329,5 +1329,35 @@
     "clearFinished": "Hide finished",
     "configureFolderWarning": "Set a download folder in Settings before downloading.",
     "binaryMissingError": "The download backend is not installed. Run \"npm run fetch:binaries\" and restart the app."
+  },
+
+  "audioFx": {
+    "title": "Audio Effects",
+    "description": "Transform your playback with live acoustic effects and speed modulation.",
+    "preset": "Preset",
+    "presets": {
+      "normal": "Normal",
+      "slowed": "Slowed + Reverb",
+      "nightcore": "Nightcore",
+      "custom": "Custom"
+    },
+    "speed": "Playback Speed",
+    "preservePitch": "Preserve Original Pitch",
+    "reverbWet": "Reverb Intensity",
+    "reverbDecay": "Reverb Decay",
+    "lowPassCutoff": "Tone Damping (Cutoff)",
+    "trebleBoost": "Treble Boost",
+    "reset": "Reset to Default"
+  },
+
+  "crossfade": {
+    "title": "Crossfade Songs",
+    "description": "Smoothly fade between consecutive tracks using equal-power volume curves.",
+    "duration": "Crossfade Duration",
+    "off": "Off"
+  },
+
+  "lyrics": {
+    "floatingLyrics": "Desktop Floating Lyrics"
   }
 }

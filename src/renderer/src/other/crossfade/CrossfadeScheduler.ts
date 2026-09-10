@@ -1,0 +1,233 @@
+import {
+  calculateEffectiveTriggerTime,
+  generateEqualPowerFadeInCurve,
+  generateEqualPowerFadeOutCurve
+} from './crossfadeCurves';
+
+export type CrossfadeState = 'IDLE' | 'PRELOADING' | 'READY' | 'FADING' | 'CANCELLED';
+
+export interface CrossfadeDelegate {
+  getCrossfadeDuration(): number;
+  getTrackInfo(): {
+    duration: number;
+    currentTime: number;
+    playbackRate: number;
+    repeatMode: 'off' | 'one' | 'all';
+  };
+  getNextTrackId(): number | null;
+  preloadTrack(trackId: number, sessionId: number): Promise<boolean>;
+  startFade(params: {
+    sessionId: number;
+    incomingTrackId: number;
+    clampedFadeDuration: number;
+    fadeOutCurve: Float32Array;
+    fadeInCurve: Float32Array;
+  }): Promise<void>;
+  onFadeComplete(sessionId: number, incomingTrackId: number): void;
+  onFadeCancel(sessionId: number): void;
+}
+
+export class CrossfadeScheduler {
+  private state: CrossfadeState = 'IDLE';
+  private currentSessionId: number = 0;
+  private preloadedTrackId: number | null = null;
+  private fadeTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private fadeStartTimeWallClock: number = 0;
+  private remainingFadeDurationMs: number = 0;
+  private fadingSessionId: number | null = null;
+  private fadingTrackId: number | null = null;
+  private delegate: CrossfadeDelegate;
+
+  constructor(delegate: CrossfadeDelegate) {
+    this.delegate = delegate;
+  }
+
+  public getState(): CrossfadeState {
+    return this.state;
+  }
+
+  public getSessionId(): number {
+    return this.currentSessionId;
+  }
+
+  public getPreloadedTrackId(): number | null {
+    return this.preloadedTrackId;
+  }
+
+  /**
+   * Called on every time update (or position tick) of the currently playing audio.
+   */
+  public async onTimeUpdate(currentTime: number): Promise<void> {
+    const requestedDuration = this.delegate.getCrossfadeDuration();
+    if (requestedDuration <= 0) {
+      if (this.state !== 'IDLE') {
+        this.cancel();
+      }
+      return;
+    }
+
+    const { duration, playbackRate, repeatMode } = this.delegate.getTrackInfo();
+
+    // Repeat 'one' bypasses crossfade
+    if (repeatMode === 'one') {
+      if (this.state !== 'IDLE') {
+        this.cancel();
+      }
+      return;
+    }
+
+    const trigger = calculateEffectiveTriggerTime(duration, requestedDuration, playbackRate);
+    if (!trigger.canCrossfade) {
+      if (this.state !== 'IDLE') {
+        this.cancel();
+      }
+      return;
+    }
+
+    // 1. Check Preload Trigger
+    if (this.state === 'IDLE' && currentTime >= trigger.preloadTime && currentTime < trigger.triggerTime) {
+      const nextTrackId = this.delegate.getNextTrackId();
+      if (nextTrackId === null) {
+        return; // At end of queue with repeat off
+      }
+
+      this.state = 'PRELOADING';
+      const sessionId = ++this.currentSessionId;
+      this.preloadedTrackId = nextTrackId;
+
+      try {
+        const success = await this.delegate.preloadTrack(nextTrackId, sessionId);
+        if (this.currentSessionId === sessionId && this.state === 'PRELOADING') {
+          if (success) {
+            this.state = 'READY';
+          } else {
+            this.state = 'IDLE';
+            this.preloadedTrackId = null;
+          }
+        }
+      } catch {
+        if (this.currentSessionId === sessionId) {
+          this.state = 'IDLE';
+          this.preloadedTrackId = null;
+        }
+      }
+      return;
+    }
+
+    // 2. Check Fade Start Trigger
+    if (currentTime >= trigger.triggerTime) {
+      if (this.state === 'PRELOADING') {
+        // Preload took too long and missed the fade window; abort and fall back to normal track end
+        this.cancel();
+        return;
+      }
+
+      if (this.state === 'READY') {
+        const nextTrackId = this.delegate.getNextTrackId();
+        if (nextTrackId === null || this.preloadedTrackId !== nextTrackId) {
+          // Queue mutated or track mismatch while waiting; abort crossfade
+          this.cancel();
+          return;
+        }
+
+        this.state = 'FADING';
+        const sessionId = this.currentSessionId;
+        const incomingId = nextTrackId;
+        const fadeOutCurve = generateEqualPowerFadeOutCurve();
+        const fadeInCurve = generateEqualPowerFadeInCurve();
+
+        await this.delegate.startFade({
+          sessionId,
+          incomingTrackId: incomingId,
+          clampedFadeDuration: trigger.clampedFadeDuration,
+          fadeOutCurve,
+          fadeInCurve
+        });
+
+        // Guard against cancellation/reset occurring while startFade was awaiting
+        if (this.state !== 'FADING' || this.currentSessionId !== sessionId) {
+          return;
+        }
+
+        this.fadingSessionId = sessionId;
+        this.fadingTrackId = incomingId;
+        this.fadeStartTimeWallClock = Date.now();
+        this.remainingFadeDurationMs = trigger.clampedFadeDuration * 1000;
+
+        this.scheduleFadeCompletion(this.remainingFadeDurationMs);
+      }
+    }
+  }
+
+  private scheduleFadeCompletion(delayMs: number): void {
+    if (this.fadeTimeoutId) {
+      clearTimeout(this.fadeTimeoutId);
+    }
+    const sessionId = this.fadingSessionId;
+    const incomingId = this.fadingTrackId;
+
+    this.fadeTimeoutId = setTimeout(() => {
+      if (this.currentSessionId === sessionId && this.state === 'FADING') {
+        this.state = 'IDLE';
+        this.preloadedTrackId = null;
+        this.fadeTimeoutId = null;
+        this.fadingSessionId = null;
+        this.fadingTrackId = null;
+        this.remainingFadeDurationMs = 0;
+        if (incomingId !== null) {
+          this.delegate.onFadeComplete(sessionId, incomingId);
+        }
+      }
+    }, delayMs);
+  }
+
+  /**
+   * Pauses the fade completion timer when audio playback is paused or context is suspended.
+   */
+  public pauseFade(): void {
+    if (this.state === 'FADING' && this.fadeTimeoutId) {
+      clearTimeout(this.fadeTimeoutId);
+      this.fadeTimeoutId = null;
+      const elapsed = Date.now() - this.fadeStartTimeWallClock;
+      this.remainingFadeDurationMs = Math.max(0, this.remainingFadeDurationMs - elapsed);
+    }
+  }
+
+  /**
+   * Resumes the fade completion timer when audio playback resumes.
+   */
+  public resumeFade(): void {
+    if (this.state === 'FADING' && !this.fadeTimeoutId && this.remainingFadeDurationMs > 0) {
+      this.fadeStartTimeWallClock = Date.now();
+      this.scheduleFadeCompletion(this.remainingFadeDurationMs);
+    }
+  }
+
+  /**
+   * Immediately aborts any in-flight preload, preparation, or crossfade transition.
+   */
+  public cancel(): void {
+    if (this.state === 'IDLE') {
+      return;
+    }
+
+    const previousSessionId = this.currentSessionId;
+    this.currentSessionId++; // Invalidate pending callbacks
+    this.state = 'IDLE';
+    this.preloadedTrackId = null;
+
+    if (this.fadeTimeoutId) {
+      clearTimeout(this.fadeTimeoutId);
+      this.fadeTimeoutId = null;
+    }
+    this.fadingSessionId = null;
+    this.fadingTrackId = null;
+    this.remainingFadeDurationMs = 0;
+
+    this.delegate.onFadeCancel(previousSessionId);
+  }
+
+  public reset(): void {
+    this.cancel();
+  }
+}

@@ -33,13 +33,25 @@ export default defineConfig({
     build: {
       sourcemap: true,
       minify: false,
-      rollupOptions: { output: { format: 'cjs', entryFileNames: '[name].cjs' } }
+      rollupOptions: {
+        input: {
+          index: resolve(import.meta.dirname, 'src/preload/index.ts'),
+          floatingLyrics: resolve(import.meta.dirname, 'src/preload/floatingLyricsPreload.ts')
+        },
+        output: { format: 'cjs', entryFileNames: '[name].cjs' }
+      }
     }
   },
   renderer: {
     build: {
       minify: true,
-      sourcemap: true
+      sourcemap: true,
+      rollupOptions: {
+        input: {
+          index: resolve(import.meta.dirname, 'src/renderer/index.html'),
+          floatingLyrics: resolve(import.meta.dirname, 'src/renderer/floatingLyrics.html')
+        }
+      }
     },
     resolve: {
       alias: {
