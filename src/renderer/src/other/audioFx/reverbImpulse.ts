@@ -86,7 +86,7 @@ export function generateReverbImpulse(
 /** Scoped WeakMap cache to prevent memory bloat and cross-AudioContext buffer assignment */
 const contextImpulseCache = new WeakMap<AudioContext, Map<string, AudioBuffer>>();
 
-/** Maximum cached buffers per AudioContext to cap memory footprint to ~4.6 MB */
+/** Maximum two cached buffers per AudioContext; actual memory footprint depends on sample rate and duration (e.g. ~4.6 MB at 48kHz/6s, up to ~24.6 MB at 192kHz/8s). */
 const MAX_BUFFERS_PER_CONTEXT = 2;
 
 /**

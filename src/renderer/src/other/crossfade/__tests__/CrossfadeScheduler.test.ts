@@ -157,4 +157,62 @@ describe('CrossfadeScheduler', () => {
     expect(scheduler.getState()).toBe('IDLE');
     expect(delegate.startFade).not.toHaveBeenCalled();
   });
+
+  it('MUST ignore late preload resolution if cancellation occurred while in-flight', async () => {
+    let resolvePreload!: (val: boolean) => void;
+    delegate.preloadTrack = vi.fn().mockImplementation(() => {
+      return new Promise<boolean>((resolve) => {
+        resolvePreload = resolve;
+      });
+    });
+
+    // 1. Preload starts at 89s
+    const preloadPromise = scheduler.onTimeUpdate(89);
+    expect(scheduler.getState()).toBe('PRELOADING');
+
+    // 2. User seeks or cancels at 90s
+    scheduler.cancel();
+    expect(scheduler.getState()).toBe('IDLE');
+    expect(delegate.onFadeCancel).toHaveBeenCalled();
+
+    // 3. Late preload resolves right after cancellation
+    resolvePreload(true);
+    await preloadPromise;
+
+    // Assert: State must remain IDLE (not transition to READY with a stale track)
+    expect(scheduler.getState()).toBe('IDLE');
+
+    // 4. If playback reaches 94s now, it must not start fade
+    await scheduler.onTimeUpdate(94);
+    expect(delegate.startFade).not.toHaveBeenCalled();
+  });
+
+  it('MUST NOT fade into old track if queue mutates to another song while preload is pending', async () => {
+    let resolvePreload!: (val: boolean) => void;
+    delegate.preloadTrack = vi.fn().mockImplementation(() => {
+      return new Promise<boolean>((resolve) => {
+        resolvePreload = resolve;
+      });
+    });
+
+    // 1. Preload starts for track 42
+    const preloadPromise = scheduler.onTimeUpdate(89);
+    expect(scheduler.getState()).toBe('PRELOADING');
+
+    // 2. While preload is pending, user alters queue so next track becomes 99
+    nextTrackId = 99;
+
+    // 3. Preload for old track 42 finishes
+    resolvePreload(true);
+    await preloadPromise;
+
+    // State may become READY for old track 42, but at fade trigger...
+    // 4. Playback reaches trigger time (94s)
+    await scheduler.onTimeUpdate(94);
+
+    // Assert: scheduler detects nextTrackId (99) !== preloadedTrackId (42) and aborts!
+    expect(scheduler.getState()).toBe('IDLE');
+    expect(delegate.startFade).not.toHaveBeenCalled();
+    expect(delegate.onFadeCancel).toHaveBeenCalled();
+  });
 });
