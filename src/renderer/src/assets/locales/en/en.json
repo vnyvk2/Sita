@@ -1193,6 +1193,18 @@
     "ignoreFailed": "Couldn't save this preference."
   },
 
+  "duplicateSongsPrompt": {
+    "openButton": "Clear Duplicates",
+    "title": "Duplicate Songs",
+    "subtitle": "{{count}} duplicate groups found. The original is locked, review and verify the copies below.",
+    "noDuplicates": "No duplicate songs found — your library is clean!",
+    "noDuplicatesDesc": "All indexed songs appear to be unique recordings.",
+    "scanning": "Scanning library for duplicates…",
+    "originalBadge": "Original (Keep)",
+    "close": "Close",
+    "removeAllSelected": "Remove Selected ({{count}})"
+  },
+
   "duplicateArtistsSuggestion": {
     "message": "<div><p>Are <span/> the same artist?</p><p>If they are, you can link content of them into a single artist, or you can ignore this suggestion.</p></div>",
     "linkToArtist": "Link to {{name}}"

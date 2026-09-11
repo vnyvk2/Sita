@@ -2,7 +2,7 @@ import NoSongsImage from '@assets/images/svg/Empty Inbox _Monochromatic.svg';
 import AlphabetScrubber from '@renderer/components/AlphabetScrubber/AlphabetScrubber';
 import Button from '@renderer/components/Button';
 import Dropdown, { type DropdownOption } from '@renderer/components/Dropdown';
-import DuplicateSongsSuggestion from '@renderer/components/DuplicateSongsSuggestion';
+import DuplicateSongsCleanupPrompt from '@renderer/components/DuplicateSongsCleanupPrompt';
 import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
@@ -750,9 +750,23 @@ function SongsPage() {
             }}
           />
         )}
+        {!isLibraryEmpty && (
+          <Button
+            key="clear-duplicates-btn"
+            className="clear-duplicates-btn bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 rounded-3xl px-3 py-1 text-xs md:text-sm"
+            iconName="cleaning_services"
+            label={t('duplicateSongsPrompt.openButton', 'Clear Duplicates')}
+            clickHandler={() => {
+              changePromptMenuData(
+                true,
+                <DuplicateSongsCleanupPrompt />,
+                'w-[850px] max-w-[90vw]',
+                { scrollBehavior: 'content' }
+              );
+            }}
+          />
+        )}
       </div>
-
-      {!isLibraryEmpty && <DuplicateSongsSuggestion />}
 
       {isFilteredEmpty ? (
         <div className="no-songs-search-container text-font-color-black dark:text-font-color-white my-12 flex h-64 w-full flex-col items-center justify-center text-center">
