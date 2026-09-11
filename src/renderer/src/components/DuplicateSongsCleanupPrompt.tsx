@@ -1,10 +1,9 @@
+import Button from '@renderer/components/Button';
+import Checkbox from '@renderer/components/Checkbox';
+import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { AppUpdateContext } from '../../contexts/AppUpdateContext';
-import Button from '../Button';
-import Checkbox from '../Checkbox';
 
 // ---------------------------------------------------------------------------
 // Types — mirror of the main-process payload
