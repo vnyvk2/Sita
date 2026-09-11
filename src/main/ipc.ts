@@ -2,6 +2,7 @@ import {
   COMPACT_LYRICS_EXTENSION_HEIGHT,
   MINI_PLAYER_SEARCH_EXTENSION_HEIGHT
 } from '@common/miniPlayerConstants';
+import { inArray } from 'drizzle-orm';
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
 import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
@@ -19,6 +20,8 @@ import checkForStartUpSongs from './core/checkForStartUpSongs';
 import clearSearchHistoryResults from './core/clearSeachHistoryResults';
 import clearSongHistory from './core/clearSongHistory';
 import deleteSongsFromSystem from './core/deleteSongsFromSystem';
+import { getSongDuplicateGroups } from './core/duplicates/getSongDuplicateGroups';
+import { resolveSongDuplicates } from './core/duplicates/resolveSongDuplicates';
 import exportAppData from './core/exportAppData';
 import fetchAlbumData from './core/fetchAlbumData';
 import fetchArtistData from './core/fetchArtistData';
@@ -34,11 +37,12 @@ import { getFolderStructures } from './core/getFolderStructures';
 import getGenresInfo from './core/getGenresInfo';
 import { getListeningData } from './core/getListeningData';
 import getMusicFolderData from './core/getMusicFolderData';
-import { hydrationCoordinator, type WindowHydrationOptions } from './core/hydrationCoordinator';
 import getSongInfo from './core/getSongInfo';
 import getSongLyrics from './core/getSongLyrics';
+import { getCachedLyrics } from './core/getSongLyrics';
 import getSongWaveform from './core/getSongWaveform';
 import getStorageUsage from './core/getStorageUsage';
+import { hydrationCoordinator, type WindowHydrationOptions } from './core/hydrationCoordinator';
 import importAppData from './core/importAppData';
 import { recoverLibraryAssets } from './core/recovery';
 import removeMusicFolder from './core/removeMusicFolder';
@@ -56,14 +60,15 @@ import toggleLikeAlbums from './core/toggleLikeAlbums';
 import toggleLikeArtists from './core/toggleLikeArtists';
 import toggleLikeSongs from './core/toggleLikeSongs';
 import updateSongListeningData from './core/updateSongListeningData';
+import { db } from './db/db';
 import { getAlbumSummaries, getAlbumSongIds } from './db/queries/albums';
-import { getArtistSummaries, getArtistSongIds } from './db/queries/artists';
-import { getGenreSummaries, getGenreSongIds } from './db/queries/genres';
 import {
   getListeningAnalytics,
   getLibraryAudioStats,
   type HistoryPeriod
 } from './db/queries/analytics';
+import { getArtistSummaries, getArtistSongIds } from './db/queries/artists';
+import { getGenreSummaries, getGenreSongIds } from './db/queries/genres';
 import type { HistoryQueryOptions } from './db/queries/history';
 import {
   addIgnoredArtist,
@@ -91,6 +96,7 @@ import {
   getUserEqualizerPreset,
   saveUserEqualizerPreset
 } from './db/queries/userPreferences';
+import { songs as songsTable } from './db/schema';
 import { setupDownloadsIpc } from './downloads/setupDownloads';
 import {
   broadcastLyricsToFloatingWindow,
@@ -103,7 +109,6 @@ import {
   setFloatingLyricsIgnoreMouse,
   toggleFloatingLyricsLock
 } from './floatingLyricsWindow';
-import { getCachedLyrics } from './core/getSongLyrics';
 import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
@@ -155,6 +160,7 @@ import reParseSong from './parseSong/reParseSong';
 import { setupPlaylistExportIpc } from './playlistExport/ipc/setupPlaylistExportIpc';
 import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImportIpc';
 import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
+import removeSongsFromLibrary from './removeSongsFromLibrary';
 import saveLyricsToSong from './saveLyricsToSong';
 import { SearchCoordinator } from './search/coordinator/SearchCoordinator';
 import { artistDiscographyService } from './services/ArtistDiscographyService';
@@ -730,6 +736,41 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       'app/resolveArtistDuplicates',
       (_, selectedArtistId: number, duplicateIds: number[]) =>
         resolveArtistDuplicates(selectedArtistId, duplicateIds)
+    );
+
+    ipcMain.handle('app/getSongDuplicateGroups', () => getSongDuplicateGroups());
+
+    ipcMain.handle(
+      'app/resolveSongDuplicates',
+      (_event, request: { songIds: number[]; mode: 'trash' | 'library-only' }) =>
+        resolveSongDuplicates(
+          { removeSongIds: request.songIds, mode: request.mode },
+          {
+            loadGroups: getSongDuplicateGroups,
+            trashFile: async (filePath) => {
+              try {
+                await shell.trashItem(filePath);
+              } catch (error) {
+                if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
+              }
+            },
+            removeSongsFromLibrary: async (ids) => {
+              const idsToRemove = ids.filter((id): id is number => typeof id === 'number');
+              const rows = await db
+                .select({ path: songsTable.path })
+                .from(songsTable)
+                .where(inArray(songsTable.id, idsToRemove));
+              if (rows.length === 0) return;
+              const result = await removeSongsFromLibrary(
+                rows.map((row) => row.path),
+                new AbortController().signal
+              );
+              if (!result?.success) {
+                throw new Error(result?.message ?? 'Failed to remove songs from the library.');
+              }
+            }
+          }
+        )
     );
 
     ipcMain.handle(

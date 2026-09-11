@@ -271,6 +271,13 @@ const suggestions = {
   ): Promise<UpdateSongDataResult | undefined> =>
     ipcRenderer.invoke('app/resolveArtistDuplicates', selectedArtistId, duplicateIds),
 
+  getSongDuplicateGroups: (): Promise<any[]> => ipcRenderer.invoke('app/getSongDuplicateGroups'),
+
+  resolveSongDuplicates: (request: {
+    songIds: number[];
+    mode: 'trash' | 'library-only';
+  }): Promise<any> => ipcRenderer.invoke('app/resolveSongDuplicates', request),
+
   resolveSeparateArtists: (
     separateArtistId: number,
     separateArtistNames: string[]
@@ -978,6 +985,11 @@ const metadata = {
 };
 
 export const api = {
+  getSongDuplicateGroups: () => ipcRenderer.invoke('app/getSongDuplicateGroups'),
+  resolveSongDuplicates: (request: { songIds: number[]; mode: 'trash' | 'library-only' }) =>
+    ipcRenderer.invoke('app/resolveSongDuplicates', request),
+  addIgnoredDuplicate: (duplicateGroupId: string, songId: number) =>
+    ipcRenderer.invoke('app/addIgnoredDuplicate', duplicateGroupId, songId),
   properties,
   windowControls,
   theme,

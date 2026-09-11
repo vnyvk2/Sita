@@ -1167,6 +1167,32 @@
     "description": "You are trying to open a file with a <span/> extension, which is not supported by this app.<br/> Currently, we only support following audio formats. <div/>"
   },
 
+  "duplicateSongsSuggestion": {
+    "title": "Possible Duplicate Songs",
+    "experimental": "Experimental",
+    "exactDuplicates": "Exact Duplicates",
+    "exactDuplicatesDesc": "Same recording, multiple files — safe to clean up.",
+    "probableDuplicates": "Probable Duplicates",
+    "probableDuplicatesDesc": "Very likely the same recording — please verify before removing.",
+    "needsReview": "Needs Your Review",
+    "needsReviewDesc": "The engine is not sure about these — you decide.",
+    "otherVersions": "Other Versions",
+    "otherVersionsDesc": "Different recordings (remix, live, acoustic) — never removed, shown for awareness.",
+    "recommended": "Keep (recommended)",
+    "lossless": "Lossless",
+    "reasonOneSidedPart": "One title has a part number the other doesn't",
+    "reasonArtistMismatch": "Artist tags don't fully match",
+    "versionNote": "This is a different version of the song, not a duplicate. Nothing will be removed.",
+    "moveToTrash": "Move files to Trash (recoverable)",
+    "ignore": "Not duplicates",
+    "hide": "Hide",
+    "removeSelected": "Remove selected ({{count}})",
+    "removedDuplicates": "Removed {{count}} duplicate files.",
+    "partialRemoval": "{{count}} files could not be removed and were kept in your library.",
+    "resolveFailed": "Couldn't remove the selected songs.",
+    "ignoreFailed": "Couldn't save this preference."
+  },
+
   "duplicateArtistsSuggestion": {
     "message": "<div><p>Are <span/> the same artist?</p><p>If they are, you can link content of them into a single artist, or you can ignore this suggestion.</p></div>",
     "linkToArtist": "Link to {{name}}"

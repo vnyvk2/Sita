@@ -1,13 +1,14 @@
 import NoSongsImage from '@assets/images/svg/Empty Inbox _Monochromatic.svg';
+import AlphabetScrubber from '@renderer/components/AlphabetScrubber/AlphabetScrubber';
 import Button from '@renderer/components/Button';
 import Dropdown, { type DropdownOption } from '@renderer/components/Dropdown';
+import DuplicateSongsSuggestion from '@renderer/components/DuplicateSongsSuggestion';
 import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
-import AlphabetScrubber from '@renderer/components/AlphabetScrubber/AlphabetScrubber';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
@@ -97,10 +98,7 @@ function SongsPage() {
   );
   // Single parent-level subscription passed to all Song rows via prop,
   // eliminating ~25 per-row store subscriptions in the hot scrolling path.
-  const hasBodyBackgroundImage = useStore(
-    store,
-    (state) => Boolean(state.bodyBackgroundImage)
-  );
+  const hasBodyBackgroundImage = useStore(store, (state) => Boolean(state.bodyBackgroundImage));
   const isMultipleSelectionEnabled = useStore(
     store,
     (state) =>
@@ -391,7 +389,13 @@ function SongsPage() {
       }
       return <SongRowSkeleton index={index} />;
     },
-    [getItem, isSongIndexingEnabled, handleSongPlayBtnClick, selectAllHandler, hasBodyBackgroundImage]
+    [
+      getItem,
+      isSongIndexingEnabled,
+      handleSongPlayBtnClick,
+      selectAllHandler,
+      hasBodyBackgroundImage
+    ]
   );
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);
@@ -748,6 +752,8 @@ function SongsPage() {
         )}
       </div>
 
+      {!isLibraryEmpty && <DuplicateSongsSuggestion />}
+
       {isFilteredEmpty ? (
         <div className="no-songs-search-container text-font-color-black dark:text-font-color-white my-12 flex h-64 w-full flex-col items-center justify-center text-center">
           <span className="material-icons-round-outlined mb-3 text-4xl opacity-75">search_off</span>
@@ -784,7 +790,7 @@ function SongsPage() {
           </div>
         </div>
       ) : (
-        <div className="songs-container appear-from-bottom min-h-0 flex-1 delay-100 flex flex-col">
+        <div className="songs-container appear-from-bottom flex min-h-0 flex-1 flex-col delay-100">
           {shouldShowScrubber && alphabetScrubberPosition === 'top-horizontal' && (
             <AlphabetScrubber
               alphabetMap={alphabetMap}
@@ -795,7 +801,7 @@ function SongsPage() {
               onSelectLetter={handleSelectLetter}
             />
           )}
-          <div className="flex min-h-0 flex-1 w-full">
+          <div className="flex min-h-0 w-full flex-1">
             {shouldShowScrubber && alphabetScrubberPosition === 'left-vertical' && (
               <AlphabetScrubber
                 alphabetMap={alphabetMap}
@@ -806,7 +812,7 @@ function SongsPage() {
                 onSelectLetter={handleSelectLetter}
               />
             )}
-            <div className="min-w-0 flex-1 h-full">
+            <div className="h-full min-w-0 flex-1">
               <VirtualizedList
                 ref={virtuosoRef}
                 data={filteredSongIds}
