@@ -32,8 +32,10 @@ import { usePlaybackErrors } from './hooks/usePlaybackErrors';
 import { usePlaybackSettings } from './hooks/usePlaybackSettings';
 import { usePlayerControl } from './hooks/usePlayerControl';
 import { usePlayerNavigation } from './hooks/usePlayerNavigation';
+import { usePlaylistBatchImport } from './hooks/usePlaylistBatchImport';
 import { usePromptMenu } from './hooks/usePromptMenu';
 import { useQueueManagement } from './hooks/useQueueManagement';
+
 import { useUserPreferences } from './hooks/useUserPreferences';
 import { useWindowManagement } from './hooks/useWindowManagement';
 import { initializeQueuesManager } from './other/queuesManager';
@@ -104,6 +106,8 @@ export default function App() {
   // ? INITIALIZE NOTIFICATIONS
   // Notifications hook handles adding/updating notifications and IPC messages from main
   const { addNewNotifications, updateNotifications } = useNotifications();
+  usePlaylistBatchImport();
+
 
   // ? INITIALIZE DYNAMIC THEME
   // Dynamic theme hook handles theme generation from song palettes and background images

@@ -1,12 +1,28 @@
 import { createQueryKeys } from '@lukemorales/query-key-factory';
 
 import type {
+  DailyActivityItem,
   HistoryPeriod,
+  HourlyDistributionItem,
+  LibraryAudioStatsData,
   ListeningAnalyticsData,
-  LibraryAudioStatsData
-} from '../../../main/db/queries/analytics';
+  ListeningAnalyticsSummary,
+  TopArtistItem,
+  TopGenreItem,
+  TopTrackItem
+} from '@common/analytics';
 
-export type { HistoryPeriod, ListeningAnalyticsData, LibraryAudioStatsData };
+export type {
+  DailyActivityItem,
+  HistoryPeriod,
+  HourlyDistributionItem,
+  LibraryAudioStatsData,
+  ListeningAnalyticsData,
+  ListeningAnalyticsSummary,
+  TopArtistItem,
+  TopGenreItem,
+  TopTrackItem
+};
 
 export const analyticsQuery = createQueryKeys('analytics', {
   listening: (period: HistoryPeriod = '30') => ({

@@ -128,42 +128,70 @@ export function useWindowManagement(
   const onSongDrop = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
       console.log(e.dataTransfer.files);
-      if (e.dataTransfer.files.length > 0) {
-        const file = e.dataTransfer.files.item(0);
-        if (file) {
-          const filePath = window.api.utils.showFilePath(file);
-          console.log('Dropped file path:', filePath);
-          const isASupportedAudioFormat = appPreferences.supportedMusicExtensions.some((type) =>
-            file?.webkitRelativePath.endsWith(type)
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        const playlistPaths: string[] = [];
+        const audioPaths: string[] = [];
+        const unsupportedPaths: string[] = [];
+
+        for (const file of files) {
+          const filePath = window.api.utils.showFilePath(file) || file.name;
+          const fileName = file.name.toLowerCase();
+          const isPlaylistFile = fileName.endsWith('.m3u') || fileName.endsWith('.m3u8');
+          const isAudio = appPreferences.supportedMusicExtensions.some((ext) =>
+            fileName.endsWith(`.${ext.toLowerCase()}`) ||
+            file.webkitRelativePath.toLowerCase().endsWith(`.${ext.toLowerCase()}`)
           );
-          const isPlaylistFile =
-            file.name.toLowerCase().endsWith('.m3u') || file.name.toLowerCase().endsWith('.m3u8');
 
           if (isPlaylistFile) {
-            CollectionClient.analyze(filePath).then((analysis) => {
-              if (analysis && changePromptMenuData) {
-                changePromptMenuData(
-                  true,
-                  <Suspense fallback={null}>
-                    <PlaylistImportConflictPrompt
-                      filePath={analysis.filePath}
-                      importedPlaylistName={analysis.playlistName}
-                      totalEntries={analysis.totalEntries}
-                      skippedCount={analysis.skippedCount}
-                      repairedCount={analysis.repairedCount}
-                    />
-                  </Suspense>
-                );
-              }
-            });
-          } else if (isASupportedAudioFormat && fetchSongFromUnknownSource) {
-            fetchSongFromUnknownSource(filePath);
-          } else if (changePromptMenuData) {
-            changePromptMenuData(
-              true,
-              <UnsupportedFileMessagePrompt filePath={filePath || file.name} />
-            );
+            playlistPaths.push(filePath);
+          } else if (isAudio) {
+            audioPaths.push(filePath);
+          } else {
+            unsupportedPaths.push(filePath);
           }
+        }
+
+        // 1. Process playlist files
+        if (playlistPaths.length === 1) {
+          // Single-file: preserve conflict prompt (merge/replace)
+          CollectionClient.analyze(playlistPaths[0]).then((analysis) => {
+            if (analysis && changePromptMenuData) {
+              changePromptMenuData(
+                true,
+                <Suspense fallback={null}>
+                  <PlaylistImportConflictPrompt
+                    filePath={analysis.filePath}
+                    importedPlaylistName={analysis.playlistName}
+                    totalEntries={analysis.totalEntries}
+                    skippedCount={analysis.skippedCount}
+                    repairedCount={analysis.repairedCount}
+                  />
+                </Suspense>
+              );
+            }
+          });
+        } else if (playlistPaths.length > 1) {
+          // Multi-file: batch pipeline (skip on conflict)
+          CollectionClient.importBatch(playlistPaths);
+        }
+
+        // 2. Process audio files
+        if (audioPaths.length > 0 && fetchSongFromUnknownSource) {
+          audioPaths.forEach((path) => fetchSongFromUnknownSource(path));
+        }
+
+        // 3. Fallback for completely unsupported drops (no playlists and no audio)
+        if (
+          playlistPaths.length === 0 &&
+          audioPaths.length === 0 &&
+          unsupportedPaths.length > 0 &&
+          changePromptMenuData
+        ) {
+          changePromptMenuData(
+            true,
+            <UnsupportedFileMessagePrompt filePath={unsupportedPaths[0]} />
+          );
         }
       }
       if (appRef.current) appRef.current.classList.remove('song-drop');

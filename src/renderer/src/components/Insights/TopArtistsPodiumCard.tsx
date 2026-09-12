@@ -1,4 +1,4 @@
-﻿import React, { memo } from 'react';
+import { memo } from 'react';
 
 import DefaultArtistCover from '../../assets/images/webp/artist_cover_default.webp';
 import type { TopArtistItem } from '../../queries/analytics';

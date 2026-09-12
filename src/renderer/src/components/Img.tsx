@@ -19,6 +19,7 @@ type ImgProps = {
   noFallbacks?: boolean;
   className?: string;
   onClick?: (_e: ReactMouseEvent<HTMLImageElement, MouseEvent>) => void;
+  onError?: (_e: React.SyntheticEvent<HTMLImageElement, Event>) => void;
   loading?: 'eager' | 'lazy';
   onContextMenu?: (_e: ReactMouseEvent<HTMLImageElement, MouseEvent>) => void;
   showImgPropsOnTooltip?: boolean;
@@ -84,6 +85,7 @@ const Img = memo((props: ImgProps) => {
     fallbackSrc = DefaultImage,
     noFallbacks = false,
     onClick = () => true,
+    onError,
     loading = 'eager',
     onContextMenu,
     showImgPropsOnTooltip = false,
@@ -116,6 +118,7 @@ const Img = memo((props: ImgProps) => {
       } ${className}`}
       draggable={draggable}
       onError={(e) => {
+        onError?.(e);
         if (thumbnail && src && e.currentTarget.src !== src) {
           e.currentTarget.src = src;
           return;

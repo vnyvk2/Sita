@@ -2,8 +2,8 @@ import type { BatchExecutionPlan } from './BatchExecutionPlan';
 import type { BatchExecutionSummary } from './BatchExecutionSummary';
 
 export type BatchSessionStatus =
-  | 'IDLE'
   | 'RUNNING'
+  | 'CANCELLING'
   | 'PAUSED'
   | 'COMPLETED'
   | 'CANCELLED'
@@ -16,4 +16,7 @@ export interface BatchSession {
   startedAt: Date;
   completedAt?: Date;
   summary?: BatchExecutionSummary;
+  currentProcessed?: number;
+  currentPlaylistName?: string;
 }
+

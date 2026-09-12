@@ -350,7 +350,7 @@ function HistoryPlaylistInfoPage() {
             <PlaylistInfoAndImgContainer
               playlist={mapLegacyPlaylistToDto({
                 ...playlistData,
-                songs: historySongs
+                songs: historySongs.map((s) => s.songId)
               })}
               songs={historySongs}
               filteredSongs={filteredSongs}

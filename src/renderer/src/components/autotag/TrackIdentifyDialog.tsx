@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useEffectiveAppearance } from '../../hooks/useEffectiveAppearance';
 import { useTrackIdentify } from '../../hooks/useTrackIdentify';
@@ -19,35 +19,36 @@ export function TrackIdentifyDialog({ isOpen, songs, onClose }: TrackIdentifyDia
 
   // Focus preservation and Escape key to close
   useEffect(() => {
-    if (isOpen) {
-      previousFocusRef.current = document.activeElement as HTMLElement;
-
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
-      };
-      document.addEventListener('keydown', handleKeyDown);
-
-      // Auto-trigger search when opening or advancing to a new track
-      if (songs.length > 0 && searchedIndexRef.current !== state.currentIndex) {
-        searchedIndexRef.current = state.currentIndex;
-        void actions.search();
-      }
-
-      return () => {
-        document.removeEventListener('keydown', handleKeyDown);
-        if (previousFocusRef.current) {
-          previousFocusRef.current.focus();
-        }
-      };
-    } else {
+    if (!isOpen) {
       searchedIndexRef.current = null;
       actions.reset();
+      return undefined;
     }
+
+    previousFocusRef.current = document.activeElement as HTMLElement;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Auto-trigger search when opening or advancing to a new track
+    if (songs.length > 0 && searchedIndexRef.current !== state.currentIndex) {
+      searchedIndexRef.current = state.currentIndex;
+      void actions.search();
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (previousFocusRef.current) {
+        previousFocusRef.current.focus();
+      }
+    };
   }, [isOpen, state.currentIndex, songs.length, onClose]);
 
   if (!isOpen) return null;
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const handleSearchSubmit = (e: FormEvent) => {
     e.preventDefault();
     actions.search();
   };

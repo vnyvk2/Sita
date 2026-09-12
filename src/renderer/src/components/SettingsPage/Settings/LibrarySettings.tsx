@@ -107,7 +107,7 @@ const LibrarySettings = () => {
 
     try {
       const scanDate = new Date(userSettings.lastScanTime);
-      const elapsed = calculateElapsedTime(scanDate.getTime());
+      const elapsed = calculateElapsedTime(scanDate.toISOString());
       if (elapsed?.elapsedString) {
         return t('settingsPage.lastScan', {
           time: elapsed.elapsedString,
@@ -285,7 +285,7 @@ const LibrarySettings = () => {
             {isScanning ? (
               <Button
                 tooltipLabel={t('settingsPage.cancelScan', { defaultValue: 'Cancel' })}
-                labelContent={t('settingsPage.cancelScan', { defaultValue: 'Cancel' })}
+                label={t('settingsPage.cancelScan', { defaultValue: 'Cancel' })}
                 iconName="close"
                 isDisabled={isCancellingScan}
                 clickHandler={() => cancelScan()}
@@ -294,7 +294,7 @@ const LibrarySettings = () => {
             ) : (
               <Button
                 tooltipLabel={t('settingsPage.scanNow', { defaultValue: 'Scan Now' })}
-                labelContent={t('settingsPage.scanNow', { defaultValue: 'Scan Now' })}
+                label={t('settingsPage.scanNow', { defaultValue: 'Scan Now' })}
                 iconName="sync"
                 isDisabled={isStartingScan}
                 clickHandler={() => startScan()}

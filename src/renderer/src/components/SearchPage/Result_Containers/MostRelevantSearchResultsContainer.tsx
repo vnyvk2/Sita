@@ -1,7 +1,5 @@
 import { getQueuesManager } from '@renderer/other/queuesManager';
-import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
-import { useStore } from '@tanstack/react-store';
 import { type ReactNode, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -15,12 +13,10 @@ type Props = { searchResults: SearchResult; searchInput?: string };
 const MostRelevantSearchResultsContainer = (props: Props) => {
   const { searchResults, searchInput } = props;
 
-  const currentSongData = useStore(store, (state) => state.currentSongData);
-
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  const { playSong, updateQueueData, createQueue, addNewNotifications } =
+  const { playSong, createQueue, addNewNotifications } =
     useContext(AppUpdateContext);
 
   const mostRelevantItems: { element: ReactNode; confidence: number; index: number }[] = [];

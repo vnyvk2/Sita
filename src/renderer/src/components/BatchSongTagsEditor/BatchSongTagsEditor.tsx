@@ -11,10 +11,8 @@ import {
   useReactTable
 } from '@tanstack/react-table';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { TableVirtuoso } from 'react-virtuoso';
 
-import type { BatchSongItemResult, BatchTagUpdateProgressEvent } from '../../../../types/app';
 import Button from '../Button';
 import {
   autoNumber,
@@ -55,7 +53,6 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
   initialSongIds,
   onBack
 }) => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
 
   // Snapshot immutable session song IDs

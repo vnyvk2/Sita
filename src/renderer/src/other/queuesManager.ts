@@ -202,6 +202,13 @@ export class QueuesManager {
     const isActive = this.activeQueueIndex === queueIndex;
     const targetPosition =
       options.startSongId !== undefined ? queue.getPositionOfSongId(options.startSongId) : -1;
+    // For rebuild operations, target position must be evaluated against the incoming requestIds (new projection),
+    // not the existing queue's arrangement. If startSongId is missing from requestIds (-1), Math.max(0, -1) in
+    // rebuildCanonicalProjection intentionally defaults playback position to 0 (start of queue).
+    const requestTargetPosition =
+      options.startSongId !== undefined && requestIds
+        ? requestIds.indexOf(options.startSongId)
+        : -1;
 
     if (options.shuffle) {
       if (requestIds && (isStale || !isActive)) {
@@ -233,7 +240,7 @@ export class QueuesManager {
         queue,
         requestIds,
         attestedVersion,
-        targetPosition,
+        requestTargetPosition,
         options.sortingOrder
       );
     } else if (targetPosition >= 0) {

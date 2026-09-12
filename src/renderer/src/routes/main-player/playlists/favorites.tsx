@@ -255,7 +255,7 @@ function FavoritesPlaylistInfoPage() {
             <PlaylistInfoAndImgContainer
               playlist={mapLegacyPlaylistToDto({
                 ...playlistData,
-                songs: favoriteSongs
+                songs: favoriteSongs.map((s) => s.songId)
               })}
               songs={favoriteSongs}
               filteredSongs={filteredSongs}

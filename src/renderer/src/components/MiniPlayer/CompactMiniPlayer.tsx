@@ -1,4 +1,3 @@
-import { COMPACT_MINI_PLAYER_HEIGHT } from '@common/miniPlayerConstants';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 import {

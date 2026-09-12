@@ -157,9 +157,12 @@ import scrobbleSongToListenBrainz from './other/listenBrainz/scrobbleSongToListe
 import sendNowPlayingSongDataToListenBrainz from './other/listenBrainz/sendNowPlayingSongDataToListenBrainz';
 import validateAndSaveListenBrainzToken from './other/listenBrainz/validateAndSaveListenBrainzToken';
 import reParseSong from './parseSong/reParseSong';
+import { setupPlaylistBatchIpc } from './playlistBatch/ipc/setupPlaylistBatchIpc';
+import { playlistBatchOrchestrator, playlistBatchPlanner } from './playlistBatch/setup';
 import { setupPlaylistExportIpc } from './playlistExport/ipc/setupPlaylistExportIpc';
 import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImportIpc';
 import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
+
 import removeSongsFromLibrary from './removeSongsFromLibrary';
 import saveLyricsToSong from './saveLyricsToSong';
 import { SearchCoordinator } from './search/coordinator/SearchCoordinator';
@@ -222,8 +225,14 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
   );
 
   setupPlaylistImportIpc(playlistImportWorkflow, importHistoryService);
+  setupPlaylistBatchIpc(
+    playlistBatchPlanner,
+    playlistBatchOrchestrator,
+    (channel: string, ...args: any[]) => mainWindow?.webContents?.send(channel, ...args)
+  );
 
   setupPlaylistExportIpc(playlistRepository);
+
   setupSpotifyIpc();
   registerMembershipIPCHandlers();
   setupDownloadsIpc((snapshot) => {

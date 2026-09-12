@@ -4,6 +4,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppUpdateContext, type AppUpdateContextType } from '../../contexts/AppUpdateContext';
+import { SongPreferencesProvider } from '../../contexts/SongPreferencesContext';
 import { store } from '../../store/store';
 import Song from './Song';
 
@@ -57,13 +58,10 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
     toggleRepeat: vi.fn(),
     toggleMutedState: vi.fn(),
     changeQueueCurrentSongIndex: vi.fn(),
-    reParseSong: vi.fn(),
-    toggleMiniPlayer: vi.fn(),
     toggleSongPlayback: vi.fn(),
-    skipSong: vi.fn(),
-    handleSongPlaybackError: vi.fn(),
-    updatePlaybackRate: vi.fn()
-  };
+    handleSkipBackwardClick: vi.fn(),
+    handleSkipForwardClick: vi.fn()
+  } as unknown as AppUpdateContextType;
 
   beforeEach(() => {
     // Reset store state before each test
@@ -72,8 +70,9 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
       currentSongData: {
         songId: 101,
         title: 'Playing Song',
-        isAFavorite: false
-      } as unknown as SongData,
+        isAFavorite: false,
+        isKnownSource: true
+      } as unknown as AudioPlayerData,
       player: {
         ...prev.player,
         isCurrentSongPlaying: true
@@ -105,16 +104,19 @@ describe('Song Component Equalizer Preference & Playback State Integration', () 
   ) =>
     render(
       <AppUpdateContext.Provider value={mockContextValue}>
-        <Song
-          songId={songId}
-          index={index}
-          trackNo={trackNo}
-          title={`Test Song ${songId}`}
-          duration={180}
-          path={`/music/song_${songId}.mp3`}
-          isIndexingSongs={isIndexingSongs}
-          isAFavorite={false}
-        />
+        <SongPreferencesProvider>
+          <Song
+            songId={songId}
+            index={index}
+            trackNo={trackNo}
+            title={`Test Song ${songId}`}
+            duration={180}
+            path={`/music/song_${songId}.mp3`}
+            isIndexingSongs={isIndexingSongs}
+            isAFavorite={false}
+            artworkPaths={{ artworkPath: '', optimizedArtworkPath: '', isDefaultArtwork: true }}
+          />
+        </SongPreferencesProvider>
       </AppUpdateContext.Provider>
     );
 

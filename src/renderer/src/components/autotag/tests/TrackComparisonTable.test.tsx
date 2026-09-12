@@ -1,9 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 // @vitest-environment jsdom
-import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { TrackMatchPreview } from '../../../../common/metadata/types';
+import type { TrackMatchPreview } from '@common/metadata/types';
 import { TrackComparisonTable } from '../TrackComparisonTable';
 
 describe('TrackComparisonTable (Detailed Review Mode)', () => {
@@ -18,7 +17,7 @@ describe('TrackComparisonTable (Detailed Review Mode)', () => {
       oldArtist: 'Original Artist',
       oldTrackNumber: 1,
       confidence: 0.98,
-      confidenceLevel: 'High',
+      confidenceLevel: 'Excellent',
       why: 'Matched',
       reasons: [],
       applyTrack: true,

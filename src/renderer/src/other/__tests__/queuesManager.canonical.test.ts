@@ -317,4 +317,53 @@ describe('QueuesManager — Canonical All Songs Queue invariants', () => {
     expect(recovered.getAllSongIds()).toEqual([1, 2, 3]);
     expect(recovered.getMetadata().builtAtLibraryVersion).toBe(getLibraryVersion());
   });
+
+  it('P0: sort-changed rebuild uses requestIds index instead of old queue index', () => {
+    const manager = new QueuesManager();
+    const queue = manager.getOrCreateCanonicalQueue({
+      songIds: [1, 2, 3, 4],
+      sortingOrder: 'aToZ',
+      ...CANONICAL_METADATA
+    })!;
+
+    // In old queue [1, 2, 3, 4], song 4 is at index 3.
+    // In new reversed queue [4, 3, 2, 1], song 4 is at index 0.
+    const rebuilt = manager.getOrCreateCanonicalQueue({
+      songIds: [4, 3, 2, 1],
+      sortingOrder: 'zToA',
+      startSongId: 4,
+      ...CANONICAL_METADATA
+    })!;
+
+    expect(rebuilt.id).toBe(queue.id);
+    expect(rebuilt.getAllSongIds()).toEqual([4, 3, 2, 1]);
+    expect(rebuilt.currentSongId).toBe(4);
+    expect(rebuilt.position).toBe(0);
+    expect(rebuilt.getMetadata().sortingOrder).toBe('zToA');
+  });
+
+  it('P0: stale membership shift positions correctly via requestIds index', () => {
+    const manager = new QueuesManager();
+    const queue = manager.getOrCreateCanonicalQueue({
+      songIds: [10, 20, 30],
+      sortingOrder: 'aToZ',
+      ...CANONICAL_METADATA,
+      builtAtLibraryVersion: 1
+    })!;
+
+    // Library updated: song 5 added at beginning, song 20 now at index 2 (was 1 in old queue)
+    bumpLibraryVersion();
+    const rebuilt = manager.getOrCreateCanonicalQueue({
+      songIds: [5, 10, 20, 30],
+      sortingOrder: 'aToZ',
+      startSongId: 20,
+      ...CANONICAL_METADATA,
+      builtAtLibraryVersion: getLibraryVersion()
+    })!;
+
+    expect(rebuilt.id).toBe(queue.id);
+    expect(rebuilt.getAllSongIds()).toEqual([5, 10, 20, 30]);
+    expect(rebuilt.currentSongId).toBe(20);
+    expect(rebuilt.position).toBe(2);
+  });
 });

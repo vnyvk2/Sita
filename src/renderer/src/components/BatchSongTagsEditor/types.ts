@@ -1,4 +1,4 @@
-﻿export interface BatchTrackData {
+export interface BatchTrackData {
   songId: number;
   path: string;
   duration: number;
@@ -32,7 +32,7 @@ export interface BatchTrackRow {
   draft: BatchTrackData;
   dirtyFields: Set<EditableField>;
   validationErrors: Map<EditableField, string>;
-  status?: 'saved' | 'file-write-failed' | 'database-update-failed' | 'skipped';
+  status?: BatchSongUpdateStatus | 'file-write-failed' | 'database-update-failed';
   errorMessage?: string;
 }
 

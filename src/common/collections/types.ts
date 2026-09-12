@@ -144,3 +144,32 @@ export interface BatchExportProgressPayload {
   total: number;
   playlistName: string;
 }
+
+export type BatchImportStatus =
+  | 'RUNNING'
+  | 'CANCELLING'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'FAILED';
+
+export interface BatchImportProgressPayload {
+  sessionId: string;
+  current: number;
+  total: number;
+  currentPlaylistName: string;
+  status: BatchImportStatus;
+}
+
+export interface BatchImportSummaryResult {
+  sessionId: string;
+  totalPlaylists: number;
+  successfulCount: number;
+  skippedCount: number;
+  failedCount: number;
+  importedSongsCount: number;
+  conflictNames: string[];
+  failedDetails: { file: string; reason: string }[];
+  status: 'COMPLETED' | 'CANCELLED' | 'FAILED';
+  durationMs: number;
+}
+

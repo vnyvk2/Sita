@@ -71,7 +71,7 @@ export const SettingsCollapseProvider = ({
   }, []);
 
   const collapseAll = useCallback(() => {
-    setExpandedMap((prev) => {
+    setExpandedMap(() => {
       const next = {} as Record<SettingsSectionKey, boolean>;
       for (const key of SETTINGS_SECTION_KEYS) {
         next[key] = false;
@@ -81,7 +81,7 @@ export const SettingsCollapseProvider = ({
   }, []);
 
   const expandAll = useCallback(() => {
-    setExpandedMap((prev) => {
+    setExpandedMap(() => {
       const next = {} as Record<SettingsSectionKey, boolean>;
       for (const key of SETTINGS_SECTION_KEYS) {
         next[key] = true;

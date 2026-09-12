@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 describe('Candidate Switching Race Condition & State Protection', () => {
   it('discards stale candidate A when candidate B is selected before A finishes, preserving candidate B preview and loading state', async () => {
     let previewRequestId = 0;
-    let loading = false;
     let loadingPreview = false;
     let loadingCandidateId: string | null = null;
     let activePreview: { releaseId: string; title: string } | null = null;
@@ -31,7 +30,6 @@ describe('Candidate Switching Race Condition & State Protection', () => {
     // Simulates useAlbumAutoTag buildPreview logic
     const buildPreview = async (releaseId: string) => {
       const requestId = ++previewRequestId;
-      loading = true;
       loadingPreview = true;
       loadingCandidateId = releaseId;
 
@@ -46,7 +44,6 @@ describe('Candidate Switching Race Condition & State Protection', () => {
         }
       } finally {
         if (requestId === previewRequestId) {
-          loading = false;
           loadingPreview = false;
           loadingCandidateId = null;
         }
@@ -84,7 +81,6 @@ describe('Candidate Switching Race Condition & State Protection', () => {
 
   it('preserves completed Candidate B preview when stale Candidate A finishes afterwards', async () => {
     let previewRequestId = 0;
-    let loading = false;
     let loadingPreview = false;
     let loadingCandidateId: string | null = null;
     let activePreview: { releaseId: string; title: string } | null = null;
@@ -109,7 +105,6 @@ describe('Candidate Switching Race Condition & State Protection', () => {
 
     const buildPreview = async (releaseId: string) => {
       const requestId = ++previewRequestId;
-      loading = true;
       loadingPreview = true;
       loadingCandidateId = releaseId;
 
@@ -123,7 +118,6 @@ describe('Candidate Switching Race Condition & State Protection', () => {
         }
       } finally {
         if (requestId === previewRequestId) {
-          loading = false;
           loadingPreview = false;
           loadingCandidateId = null;
         }

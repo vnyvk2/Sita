@@ -250,7 +250,7 @@ export default function QueueTabs({ viewingQueueIndex, setViewingQueueIndex }: Q
                               visibility
                             </span>
                           )}
-                          {q.metadata?.isLocked && (
+                          {q.isLocked && (
                             <span
                               className="material-icons-round text-font-color-black/60 dark:text-font-color-white/60 mr-2 text-sm"
                               title={t('currentQueuePage.lockedQueue', 'Locked Queue')}

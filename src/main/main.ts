@@ -771,6 +771,13 @@ export function sendMessageToRenderer(props: MessageToRendererProps) {
   }
 }
 
+export function sendProgressToRenderer(channel: string, ...args: any[]) {
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+    mainWindow.webContents.send(channel, ...args);
+  }
+}
+
+
 let dataUpdateEventTimeOutId: NodeJS.Timeout;
 let dataEventsCache: DataUpdateEvent[] = [];
 export function dataUpdateEvent(

@@ -102,9 +102,11 @@ function PlaylistsPage() {
   );
 
   const handleAddPlaylistClick = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLButtonElement>) => {
       e.preventDefault();
       e.stopPropagation();
+      const clientX = 'clientX' in e ? e.clientX : 0;
+      const clientY = 'clientY' in e ? e.clientY : 0;
       updateContextMenuData(
         true,
         [
@@ -119,8 +121,8 @@ function PlaylistsPage() {
             handlerFunction: () => navigate({ to: '/main-player/playlists/smart-editor' })
           }
         ],
-        e.clientX,
-        e.clientY
+        clientX,
+        clientY
       );
     },
     [updateContextMenuData, createNewPlaylist, navigate, t]
@@ -156,7 +158,7 @@ function PlaylistsPage() {
               handlerFunction: () => navigate({ to: '/main-player/playlists/smart-editor' })
             },
             {
-              label: t('playlistsPage.importPlaylist'),
+              label: t('playlistsPage.importPlaylists', 'Import Playlists'),
               iconName: 'publish',
               handlerFunction: () => CollectionClient.import().catch((err) => console.error(err))
             }
@@ -260,7 +262,7 @@ function PlaylistsPage() {
               isDisabled={playlists.length === 0}
             />
             <Button
-              label={t(`playlistsPage.importPlaylist`)}
+              label={t('playlistsPage.importPlaylists', 'Import Playlists')}
               className="import-playlist-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
               iconName="publish"
               clickHandler={(_, setIsDisabled, setIsPending) => {
@@ -274,6 +276,7 @@ function PlaylistsPage() {
                   })
                   .catch((err) => console.error(err));
               }}
+              tooltipLabel={t('playlistsPage.importPlaylists', 'Import Playlists')}
             />
             <Button
               label={t(`playlistsPage.addPlaylist`)}

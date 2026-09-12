@@ -60,7 +60,6 @@ export const TopTracksLeaderboardCard = memo(({ topTracks }: TopTracksLeaderboar
             {topTracks.map((track, idx) => {
               const artistNames = track.artists.map((a) => a.name).join(', ') || 'Unknown Artist';
               const rank = idx + 1;
-              const isTop3 = rank <= 3;
               const rankColor =
                 rank === 1
                   ? 'text-amber-500 font-bold'

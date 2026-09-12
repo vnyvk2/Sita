@@ -90,10 +90,10 @@ const TheatreLyricsPlayerBar = () => {
                 className="truncate text-sm font-semibold text-white drop-shadow-xs"
                 title={currentSongData.title}
               >
-                {currentSongData.title || t('player.noSongPlaying')}
+                {currentSongData.title || t('common.unknownTitle')}
               </span>
               <span className="truncate text-xs text-white/70" title={artistNames}>
-                {artistNames || t('player.unknownArtist')}
+                {artistNames || t('common.unknownArtist')}
               </span>
             </div>
           </div>

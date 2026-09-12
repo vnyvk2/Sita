@@ -1,9 +1,8 @@
-import React from 'react';
-
-import { getTrackPreviewKey } from '../../../../common/metadata/preview';
-import type { TrackMatchPreview } from '../../../../common/metadata/types';
+import { Fragment } from 'react';
+import { getTrackPreviewKey } from '@common/metadata/preview';
+import type { MetadataFieldId, TrackMatchPreview } from '@common/metadata/types';
 import type { PreviewFilterOption, PreviewSortOption } from '../../hooks/useAlbumAutoTag';
-import { getChangedFieldDiffs, getTrackChangeCount } from './utils/previewSummary';
+import { getChangedFieldDiffs } from './utils/previewSummary';
 
 export interface CompactReviewViewProps {
   matches: TrackMatchPreview[];
@@ -22,7 +21,7 @@ export interface CompactReviewViewProps {
   onClearSelections: () => void;
   onFilterChange?: (filter: PreviewFilterOption) => void;
   onSortChange?: (sort: PreviewSortOption) => void;
-  onToggleField?: (songId: number, fieldId: string) => void;
+  onToggleField?: (songId: number, fieldId: MetadataFieldId) => void;
 }
 
 export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
@@ -267,7 +266,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
               const changedDiffs = getChangedFieldDiffs(match);
 
               return (
-                <React.Fragment key={itemKey}>
+                <Fragment key={itemKey}>
                   <tr
                     onClick={isMissing ? undefined : () => onToggleExpand(match.localSongId)}
                     className={`border-background-color-2/40 dark:border-dark-background-color-2/40 text-font-color-black dark:text-font-color-white border-b transition-colors ${
@@ -558,7 +557,7 @@ export const CompactReviewView: React.FC<CompactReviewViewProps> = ({
                       </td>
                     </tr>
                   )}
-                </React.Fragment>
+                </Fragment>
               );
             })}
           </tbody>

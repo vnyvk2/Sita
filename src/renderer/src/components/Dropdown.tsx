@@ -19,6 +19,7 @@ export interface DropdownOption<T extends string> {
 }
 
 export interface DropdownProp<T extends string> {
+  id?: string;
   name: string;
   className?: string;
   options: DropdownOption<T>[];
@@ -29,7 +30,7 @@ export interface DropdownProp<T extends string> {
 }
 
 function Dropdown<T extends string>(props: DropdownProp<T>) {
-  const { className, name, value, onChange, options, isDisabled = false, type = '' } = props;
+  const { id, className, name, value, onChange, options, isDisabled = false, type = '' } = props;
 
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -201,6 +202,7 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
     >
       {iconName ? (
         <button
+          id={id}
           ref={triggerButtonRef}
           type="button"
           aria-haspopup="menu"
@@ -227,6 +229,7 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
         </button>
       ) : (
         <button
+          id={id}
           ref={triggerButtonRef}
           type="button"
           aria-haspopup="menu"

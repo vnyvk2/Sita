@@ -45,6 +45,7 @@ const notificationsFromMainConfig: AppNotificationConfig[] = [
       'APPDATA_IMPORT_SUCCESS_WITH_PENDING_RESTART',
       'PLAYLIST_EXPORT_SUCCESS',
       'PLAYLIST_IMPORT_SUCCESS',
+      'PLAYLIST_IMPORT_BATCH_SUCCESS',
       'PLAYLIST_RENAME_SUCCESS',
       'SONG_REPARSE_SUCCESS',
       'LIBRARY_BATCH_COMPLETE'
@@ -63,9 +64,36 @@ const notificationsFromMainConfig: AppNotificationConfig[] = [
         const skipped = data.skippedCount ? `, ${data.skippedCount} unavailable` : '';
         this.content = `Imported "${name}": ${count} tracks imported${repaired}${skipped}.`;
       }
+      if (messageCode === 'PLAYLIST_IMPORT_BATCH_SUCCESS' && data) {
+        const total = (data.total as number) ?? 0;
+        const imported = (data.imported as number) ?? 0;
+        const songs = (data.songs as number) ?? 0;
+        const skipped = (data.skipped as number) ?? 0;
+        const failed = (data.failed as number) ?? 0;
+        const conflictNames = Array.isArray(data.conflictNames)
+          ? (data.conflictNames as string[])
+          : [];
+
+        let conflictText = '';
+        if (conflictNames.length > 0) {
+          const cap = 3;
+          const shown = conflictNames
+            .slice(0, cap)
+            .map((n) => `'${n}'`)
+            .join(', ');
+          const extra = conflictNames.length > cap ? ` +${conflictNames.length - cap} more` : '';
+          conflictText = `, ${conflictNames.length} skipped due to name conflict (${shown}${extra})`;
+        } else if (skipped > 0) {
+          conflictText = `, ${skipped} skipped`;
+        }
+
+        const failText = failed > 0 ? `, ${failed} failed` : '';
+        this.content = `Imported ${imported} of ${total} playlists (${songs} tracks)${conflictText}${failText}.`;
+      }
       return this;
     }
   },
+
   {
     trigger: [
       'FAILURE',
@@ -79,6 +107,7 @@ const notificationsFromMainConfig: AppNotificationConfig[] = [
       'APPDATA_IMPORT_FAILED_DUE_TO_MISSING_FILES',
       'PLAYLIST_EXPORT_FAILED',
       'PLAYLIST_IMPORT_FAILED',
+      'PLAYLIST_IMPORT_BATCH_FAILED',
       'PLAYLIST_IMPORT_FAILED_DUE_TO_INVALID_FILE_DATA',
       'PLAYLIST_IMPORT_FAILED_DUE_TO_INVALID_FILE_EXTENSION',
       'PLAYLIST_IMPORT_FAILED_DUE_TO_SONGS_OUTSIDE_LIBRARY',
@@ -87,7 +116,24 @@ const notificationsFromMainConfig: AppNotificationConfig[] = [
       'SONG_REPARSE_FAILED'
     ],
     iconName: 'error',
-    iconClassName: 'material-icons-round-outlined'
+    iconClassName: 'material-icons-round-outlined',
+    update({ messageCode, data }) {
+      if (messageCode === 'PLAYLIST_IMPORT_BATCH_FAILED' && data && typeof data.error === 'string') {
+        this.content = `Playlist batch import failed: ${data.error}`;
+      }
+      return this;
+    }
+  },
+  {
+    trigger: ['PLAYLIST_IMPORT_BATCH_CANCELLED'],
+    iconName: 'info',
+    iconClassName: 'material-icons-round-outlined',
+    update({ data }) {
+      if (data && typeof data.imported === 'number' && typeof data.total === 'number') {
+        this.content = `Playlist batch import cancelled (${data.imported} of ${data.total} imported).`;
+      }
+      return this;
+    }
   },
   {
     trigger: ['LOADING'],
@@ -108,6 +154,7 @@ const notificationsFromMainConfig: AppNotificationConfig[] = [
       'NO_MORE_GENRE_PALETTES',
       'NO_MORE_SONG_PALETTES',
       'PLAYLIST_IMPORT_TO_EXISTING_PLAYLIST',
+      'PLAYLIST_IMPORT_BATCH_ALREADY_IN_PROGRESS',
       'PLAYLIST_NOT_FOUND',
       'LYRICS_TRANSLATION_TO_SAME_SOURCE_LANGUAGE'
     ],

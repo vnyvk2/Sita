@@ -26,8 +26,11 @@ import type {
   PlaylistViewMode,
   PlaylistExportOptions,
   PlaylistImportIpcOptions,
-  PlaylistBatchExportOptions
+  PlaylistBatchExportOptions,
+  BatchImportProgressPayload,
+  BatchImportSummaryResult
 } from '@common/collections/types';
+
 
 export const CollectionClient = {
   // Read
@@ -86,5 +89,12 @@ export const CollectionClient = {
   exportBatch: (playlistIds: number[], options?: PlaylistBatchExportOptions) =>
     window.api.collections.exportBatch(playlistIds, options),
   analyze: (filePath?: string) => window.api.collections.analyze(filePath),
-  import: (options?: PlaylistImportIpcOptions) => window.api.collections.import(options)
+  import: (options?: PlaylistImportIpcOptions) => window.api.collections.import(options),
+  importBatch: (filePaths: string[]): Promise<BatchImportSummaryResult> =>
+    window.api.collections.importBatch(filePaths),
+  cancelImportBatch: (sessionId: string): Promise<boolean> =>
+    window.api.collections.cancelImportBatch(sessionId),
+  onBatchProgress: (callback: (progress: BatchImportProgressPayload) => void) =>
+    window.api.collections.onBatchProgress(callback)
 };
+

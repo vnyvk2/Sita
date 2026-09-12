@@ -53,7 +53,6 @@ export const Artist = memo((props: ArtistProp) => {
   const {
     updateContextMenuData,
     createQueue,
-    updateQueueData,
     addNewNotifications,
     toggleMultipleSelections,
     updateMultipleSelections

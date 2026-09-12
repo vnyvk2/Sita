@@ -1,4 +1,5 @@
 import { store } from '@renderer/store/store';
+import storage from '@renderer/utils/localStorage';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';

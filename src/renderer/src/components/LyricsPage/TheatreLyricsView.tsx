@@ -59,10 +59,6 @@ const TheatreLyricsView = ({
             currentSongData.artworkPaths?.optimizedArtworkPath ?? currentSongData.artworkPath
           }
           paletteData={currentSongData.paletteData}
-          blur={preferences?.lyricsArtworkBlur}
-          darkness={preferences?.lyricsArtworkDarkness}
-          enableAnimation={preferences?.lyricsArtworkAnimation}
-          reducedMotion={preferences?.isReducedMotion}
         />
       )}
 

@@ -72,7 +72,7 @@ export const RuleRow = memo(({ condition, onChange, onDelete, canDelete }: RuleR
       'is_null',
       'is_not_null'
     ];
-    let nextValue: string | number | boolean | undefined;
+    let nextValue: RuleCondition['value'] | undefined;
     if (noValueOperators.includes(newOperator)) {
       nextValue = undefined;
     } else if (condition.value === undefined || condition.value === '') {
@@ -142,7 +142,11 @@ export const RuleRow = memo(({ condition, onChange, onDelete, canDelete }: RuleR
               <input
                 type="number"
                 aria-label="Filter value"
-                value={condition.value ?? ''}
+                value={
+                  typeof condition.value === 'number' || typeof condition.value === 'string'
+                    ? condition.value
+                    : ''
+                }
                 min={
                   condition.operator === 'in_last' || condition.operator === 'not_in_last'
                     ? 1

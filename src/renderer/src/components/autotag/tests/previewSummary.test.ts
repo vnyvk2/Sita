@@ -5,7 +5,7 @@ import type {
   AlbumTagPreview,
   MetadataFieldDiff,
   TrackMatchPreview
-} from '../../../../common/metadata/types';
+} from '@common/metadata/types';
 import {
   computeFederationSummary,
   getChangedFieldDiffs,
@@ -45,7 +45,7 @@ describe('AutoTag Preview Summary Utilities', () => {
         songPath: '/song.mp3',
         oldTitle: 'Track 1',
         confidence: 0.95,
-        confidenceLevel: 'High',
+        confidenceLevel: 'Excellent',
         why: 'exact match',
         reasons: [],
         applyTrack: true,
@@ -80,7 +80,7 @@ describe('AutoTag Preview Summary Utilities', () => {
             songPath: '/song1.mp3',
             oldTitle: 'brutal',
             confidence: 0.98,
-            confidenceLevel: 'High',
+            confidenceLevel: 'Excellent',
             why: '',
             reasons: [],
             applyTrack: true,
@@ -98,7 +98,7 @@ describe('AutoTag Preview Summary Utilities', () => {
             songPath: '/song2.mp3',
             oldTitle: 'traitor',
             confidence: 0.95,
-            confidenceLevel: 'High',
+            confidenceLevel: 'Excellent',
             why: '',
             reasons: [],
             applyTrack: true,
@@ -113,7 +113,7 @@ describe('AutoTag Preview Summary Utilities', () => {
         ],
         warnings: [],
         overallConfidence: 0.96,
-        confidenceLevel: 'High',
+        confidenceLevel: 'Excellent',
         provider: 'musicbrainz',
         providerReleaseId: 'mb-rel-1'
       };

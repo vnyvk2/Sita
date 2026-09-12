@@ -346,7 +346,17 @@ function SongsPage() {
           title: canonicalQueueTitle
         });
       } else {
-        createQueue(queueSongIds, 'songs', false, undefined, true, contextualQueueTitle);
+        const targetIndex = queueSongIds.indexOf(currSongId);
+        if (targetIndex === -1) return;
+        createQueue(
+          queueSongIds,
+          'songs',
+          false,
+          undefined,
+          true,
+          contextualQueueTitle,
+          targetIndex
+        );
       }
     },
     [
@@ -760,7 +770,7 @@ function SongsPage() {
               changePromptMenuData(
                 true,
                 <DuplicateSongsCleanupPrompt />,
-                'w-[850px] max-w-[90vw]',
+                'w-[1100px] max-w-[94vw]',
                 { scrollBehavior: 'content' }
               );
             }}

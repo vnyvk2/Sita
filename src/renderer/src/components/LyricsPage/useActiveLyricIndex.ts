@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 /** Binary search to find the active lyric index in O(log N) time */
 function findActiveLyricIndex(
-  parsedLyrics: ParsedLyricsLine[],
+  parsedLyrics: LyricLine[],
   pos: number,
   offset: number
 ): number | null {
