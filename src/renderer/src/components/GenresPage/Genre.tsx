@@ -337,7 +337,7 @@ const Genre = memo((props: GenreProp) => {
         />
         <div className="genre-no-of-songs text-font-color-white/75 dark:text-font-color-white/75 text-sm">
           {t(`common.songWithCount`, {
-            count: songIds.length
+            count: resolvedSongCount
           })}
         </div>
         {isMultipleSelectionEnabled && (
