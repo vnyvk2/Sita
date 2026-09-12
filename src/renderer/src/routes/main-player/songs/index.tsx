@@ -760,7 +760,7 @@ function SongsPage() {
               changePromptMenuData(
                 true,
                 <DuplicateSongsCleanupPrompt />,
-                'w-[850px] max-w-[90vw]',
+                'w-[1100px] max-w-[94vw]',
                 { scrollBehavior: 'content' }
               );
             }}

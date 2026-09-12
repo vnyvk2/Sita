@@ -583,40 +583,75 @@ function DuplicateGroupCard({
     !isVersionFamily && selection.length > 0 && selection.length < group.songs.length;
 
   return (
-    <div className="bg-background-color-2 dark:bg-dark-background-color-2 mb-3 rounded-lg border border-black/5 p-3.5 shadow-xs dark:border-white/5">
-      <div className="mb-2.5 flex items-center justify-between gap-2">
-        <div className="min-w-0">
+    <div className="bg-background-color-2 dark:bg-dark-background-color-2 mb-2.5 rounded-lg border border-black/5 p-3 shadow-xs dark:border-white/5">
+      {/* Card Header: Left side Title/Artist/Info, Right side Actions */}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <p className="truncate text-sm font-semibold">{group.songs[0]?.title}</p>
+          <span className="text-xs opacity-40">•</span>
           <p className="truncate text-xs text-black/60 dark:text-white/60">
             {group.songs[0]?.artist}
           </p>
+          <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-[11px] font-medium text-black/60 dark:bg-white/10 dark:text-white/60">
+            {group.songs.length} files
+          </span>
+          {isReview &&
+            group.reasons.map((reason) => (
+              <span
+                key={reason}
+                className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[10px] font-medium text-blue-600 dark:text-blue-400"
+              >
+                {t(REASON_LABEL_KEYS[reason] ?? 'duplicateSongsSuggestion.needsReviewDesc')}
+              </span>
+            ))}
         </div>
-        <span className="shrink-0 text-xs text-black/50 dark:text-white/50">
-          {group.songs.length} files
-        </span>
+
+        {/* Right side: Action buttons */}
+        <div className="flex shrink-0 items-center gap-2">
+          {isVersionFamily ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-black/50 dark:text-white/50">
+                {t('duplicateSongsSuggestion.versionNote')}
+              </span>
+              <Button
+                label={t('duplicateSongsSuggestion.hide', 'Hide')}
+                iconName="visibility_off"
+                className="px-2.5! py-0.5! text-xs"
+                clickHandler={() => onIgnore(group)}
+              />
+            </div>
+          ) : (
+            <>
+              <Button
+                label={t('duplicateSongsSuggestion.ignore', 'Not duplicates')}
+                iconName="do_not_disturb_on"
+                className="px-2.5! py-0.5! text-xs"
+                isDisabled={isResolving}
+                clickHandler={() => onIgnore(group)}
+              />
+              <Button
+                label={t('duplicateSongsSuggestion.removeSelected', {
+                  count: selection.length,
+                  defaultValue: `Remove selected (${selection.length})`
+                })}
+                iconName="delete"
+                className="bg-font-color-crimson! text-font-color-white! hover:border-font-color-crimson dark:bg-font-color-crimson! dark:text-font-color-white! dark:hover:border-font-color-crimson px-3! py-0.5! text-xs"
+                isDisabled={!canRemove || isResolving}
+                clickHandler={() => onRemove(group)}
+              />
+            </>
+          )}
+        </div>
       </div>
 
-      {isReview && (
-        <div className="mb-2 flex flex-wrap gap-1">
-          {group.reasons.map((reason) => (
-            <span
-              key={reason}
-              className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[11px] text-blue-600 dark:text-blue-400"
-            >
-              {t(REASON_LABEL_KEYS[reason] ?? 'duplicateSongsSuggestion.needsReviewDesc')}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Song rows */}
-      <div className="flex flex-col gap-1.5">
+      {/* Song rows — single compact line per track */}
+      <div className="flex flex-col gap-1">
         {group.songs.map((song) => {
           const isLockedOriginal = hasKeeperLogic && song.id === keeperId;
           return (
             <div
               key={song.id}
-              className={`flex items-center gap-2.5 rounded-md p-2 transition-colors ${
+              className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 transition-colors ${
                 isLockedOriginal
                   ? 'border border-green-500/30 bg-green-500/15 dark:bg-green-400/15'
                   : 'bg-background-color-1 dark:bg-dark-background-color-1 border border-black/5 dark:border-white/5'
@@ -637,12 +672,15 @@ function DuplicateGroupCard({
                 />
               )}
 
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-xs font-medium">{song.title}</p>
-                </div>
+              <div className="flex min-w-0 flex-1 items-center gap-3">
                 <p
-                  className="truncate text-[11px] text-black/50 dark:text-white/50"
+                  className="max-w-[260px] shrink-0 truncate text-xs font-medium"
+                  title={song.title}
+                >
+                  {song.title}
+                </p>
+                <p
+                  className="flex-1 truncate font-mono text-[11px] text-black/45 dark:text-white/45"
                   title={song.path ?? undefined}
                 >
                   {song.path}
@@ -673,41 +711,6 @@ function DuplicateGroupCard({
           );
         })}
       </div>
-
-      {/* Card actions */}
-      {isVersionFamily ? (
-        <div className="mt-2.5 flex items-center justify-between gap-2">
-          <p className="text-[11px] text-black/60 dark:text-white/60">
-            {t('duplicateSongsSuggestion.versionNote')}
-          </p>
-          <Button
-            label={t('duplicateSongsSuggestion.hide', 'Hide')}
-            iconName="visibility_off"
-            className="text-xs"
-            clickHandler={() => onIgnore(group)}
-          />
-        </div>
-      ) : (
-        <div className="mt-2.5 flex items-center justify-end gap-2">
-          <Button
-            label={t('duplicateSongsSuggestion.ignore', 'Not duplicates')}
-            iconName="do_not_disturb_on"
-            className="text-xs"
-            isDisabled={isResolving}
-            clickHandler={() => onIgnore(group)}
-          />
-          <Button
-            label={t('duplicateSongsSuggestion.removeSelected', {
-              count: selection.length,
-              defaultValue: `Remove selected (${selection.length})`
-            })}
-            iconName="delete"
-            className="bg-font-color-crimson! text-font-color-white! hover:border-font-color-crimson dark:bg-font-color-crimson! dark:text-font-color-white! dark:hover:border-font-color-crimson text-xs"
-            isDisabled={!canRemove || isResolving}
-            clickHandler={() => onRemove(group)}
-          />
-        </div>
-      )}
     </div>
   );
 }
