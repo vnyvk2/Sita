@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 
 import type { NightModePreset } from './audioFx/nightModeNode';
+import type { AbLoopState } from './abLoopController';
 import { normalizedKeys } from './appShortcuts';
 
 export interface AppReducer {
@@ -57,6 +58,7 @@ export type AppReducerStateActions =
   | { type: 'UPDATE_KARAOKE_LEVEL'; data: number }
   | { type: 'TOGGLE_NIGHT_MODE'; data?: boolean }
   | { type: 'SET_NIGHT_MODE_PRESET'; data: NightModePreset }
+  | { type: 'SET_AB_LOOP_STATE'; data: AbLoopState }
   | { type: 'UPDATE_VOLUME_VALUE'; data: number }
   | { type: 'UPDATE_QUEUE'; data: QueuesState }
   | { type: 'UPDATE_QUEUE_CURRENT_SONG_INDEX'; data: number }
@@ -345,6 +347,15 @@ export const reducer = (state: AppReducer, action: AppReducerStateActions): AppR
             ...state.localStorage.playback,
             nightModePreset: action.data
           }
+        }
+      };
+    }
+    case 'SET_AB_LOOP_STATE': {
+      return {
+        ...state,
+        player: {
+          ...state.player,
+          abLoop: action.data
         }
       };
     }
@@ -645,6 +656,18 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
           keys: [normalizedKeys.ctrlKey, '\\']
         },
         {
+          label: 'appShortcutsPrompt.setLoopA',
+          keys: ['[']
+        },
+        {
+          label: 'appShortcutsPrompt.setLoopB',
+          keys: [']']
+        },
+        {
+          label: 'appShortcutsPrompt.clearLoop',
+          keys: ['\\']
+        },
+        {
           label: 'appShortcutsPrompt.openAppShortcutsPrompt',
           keys: [normalizedKeys.ctrlKey, '/']
         }
@@ -833,7 +856,12 @@ export const DEFAULT_REDUCER_DATA: AppReducer = {
     isShuffling: LOCAL_STORAGE_DEFAULT_TEMPLATE.playback.isShuffling,
     songPosition: 0,
     isPlayerStalled: false,
-    playbackRate: LOCAL_STORAGE_DEFAULT_TEMPLATE.playback.playbackRate
+    playbackRate: LOCAL_STORAGE_DEFAULT_TEMPLATE.playback.playbackRate,
+    abLoop: {
+      phase: 'idle',
+      pointA: null,
+      pointB: null
+    }
   },
   currentSongData: {} as AudioPlayerData,
   upNextSongData: {} as AudioPlayerData,

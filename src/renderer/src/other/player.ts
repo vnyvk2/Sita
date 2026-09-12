@@ -11,6 +11,11 @@ import { computeEffectiveReplayGain } from './replayGainCalculator';
 import { CrossfadeScheduler, type CrossfadeDelegate } from './crossfade/CrossfadeScheduler';
 import KaraokeNode from './audioFx/karaokeNode';
 import { NightModeNode, type NightModePreset } from './audioFx/nightModeNode';
+import {
+  AbLoopController,
+  type AbLoopState,
+  type SetPointResult
+} from './abLoopController';
 
 const DEBUG_PLAYER = false;
 
@@ -46,7 +51,8 @@ type PlayerEventType =
   | 'queueMetadataChange'
   | 'audioFxChange'
   | 'karaokeChange'
-  | 'nightModeChange';
+  | 'nightModeChange'
+  | 'abLoopChange';
 
 type PlayerEventCallback<T = unknown> = (data: T) => void;
 
@@ -121,6 +127,10 @@ class AudioPlayer {
   private preloadedSongData: AudioPlayerData | null = null;
   private isCrossfading: boolean = false;
   private suppressQueuePositionLoad: boolean = false;
+  private abLoopController: AbLoopController;
+  private loopJumpPending: boolean = false;
+  private loopPredictionTimerId: ReturnType<typeof setTimeout> | null = null;
+  private loopRafId: number | null = null;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -189,6 +199,7 @@ class AudioPlayer {
     this.setupQueueIntegration();
     this.setupAudioEventListeners();
     this.crossfadeScheduler = new CrossfadeScheduler(this.createCrossfadeDelegate());
+    this.abLoopController = new AbLoopController();
 
     const savedFx = storage.playback.getPlaybackOptions('audioFx');
     if (savedFx) {
@@ -295,6 +306,11 @@ class AudioPlayer {
   private setupAudioEventListenersFor(element: HTMLAudioElement, slot: 'A' | 'B') {
     element.addEventListener('ended', () => {
       if (this.activeSlot === slot) {
+        if (this.abLoopController.isActive()) {
+          this.executeLoopSeek(this.abLoopController.pointA!);
+          element.play().catch(() => {});
+          return;
+        }
         this.crossfadeScheduler.cancel();
         this.handleSongEnd();
       } else {
@@ -307,7 +323,12 @@ class AudioPlayer {
     element.addEventListener('timeupdate', () => {
       if (this.activeSlot === slot) {
         this.emit('timeUpdate', element.currentTime);
-        this.crossfadeScheduler.onTimeUpdate(element.currentTime);
+        if (this.abLoopController.phase !== 'active') {
+          this.crossfadeScheduler.onTimeUpdate(element.currentTime);
+        }
+        if (this.abLoopController.isActive()) {
+          this.checkLoopTurnaround();
+        }
       }
     });
 
@@ -358,6 +379,7 @@ class AudioPlayer {
 
     element.addEventListener('seeked', () => {
       if (this.activeSlot === slot) {
+        this.loopJumpPending = false;
         this.emit('seeked', element.currentTime);
       }
     });
@@ -368,6 +390,7 @@ class AudioPlayer {
    * Auto-resumes playback for the next song.
    */
   private async handleSongEnd() {
+    this.clearAbLoop('SONG_END');
     logPlayer('[AudioPlayer.handleSongEnd]', { repeatMode: this.repeatMode });
 
     if (this.repeatMode === 'one') {
@@ -504,6 +527,7 @@ class AudioPlayer {
             : (options?.updateStore !== false);
 
         this.currentSongData = songData;
+        this.clearAbLoop('TRACK_LOAD');
         this.applyReplayGain();
 
         // Ensure active slot is at full gain and standby is muted
@@ -610,6 +634,7 @@ class AudioPlayer {
 
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
+    this.clearAbLoop('DESTROY');
     this.crossfadeScheduler.cancel();
     this.cancelActiveFade();
     this.inFlightLoad = null;
@@ -1260,6 +1285,7 @@ class AudioPlayer {
         this.standbyAudio.src = '';
         this.activeFadeGain.gain.value = 1.0;
         this.isCrossfading = false;
+        this.clearAbLoop('CROSSFADE_COMPLETE');
         if (this.currentSongData && this.currentSongData.songId === incomingTrackId) {
           this.emit('recordListening', {
             songId: this.currentSongData.songId,
@@ -1304,6 +1330,102 @@ class AudioPlayer {
     };
   }
 
+  // ========== A-B LOOP INTERNAL WATCHERS & ENGINE ==========
+
+  /**
+   * Private turnaround seek that directly assigns audio.currentTime,
+   * completely bypassing public seek() to avoid recursive loop clearing
+   * and redundant crossfade cancellation.
+   */
+  private executeLoopSeek(targetTime: number) {
+    if (this.loopJumpPending) return;
+    this.loopJumpPending = true;
+    try {
+      if (this.audio.readyState > 0) {
+        this.audio.currentTime = targetTime;
+      }
+    } catch (err) {
+      logPlayer('[AudioPlayer.executeLoopSeek] Failed:', err);
+    }
+  }
+
+  private checkLoopTurnaround() {
+    if (!this.abLoopController.isActive()) return;
+    const check = this.abLoopController.checkLoop(this.audio.currentTime);
+    if (check.shouldSeek) {
+      this.executeLoopSeek(check.targetTime);
+      this.schedulePredictionTimer();
+    }
+  }
+
+  private startLoopWatchers() {
+    this.stopLoopWatchers();
+    if (!this.abLoopController.isActive() || this.paused) return;
+
+    // Layer 1: High-frequency rAF loop while active
+    const rafTick = () => {
+      if (!this.abLoopController.isActive() || this.paused) {
+        this.loopRafId = null;
+        return;
+      }
+      this.checkLoopTurnaround();
+      this.loopRafId = requestAnimationFrame(rafTick);
+    };
+    this.loopRafId = requestAnimationFrame(rafTick);
+
+    // Layer 2: Self-rescheduling prediction timer for background resilience
+    this.schedulePredictionTimer();
+  }
+
+  private stopLoopWatchers() {
+    if (this.loopRafId !== null) {
+      cancelAnimationFrame(this.loopRafId);
+      this.loopRafId = null;
+    }
+    if (this.loopPredictionTimerId !== null) {
+      clearTimeout(this.loopPredictionTimerId);
+      this.loopPredictionTimerId = null;
+    }
+    this.loopJumpPending = false;
+  }
+
+  private schedulePredictionTimer() {
+    if (this.loopPredictionTimerId !== null) {
+      clearTimeout(this.loopPredictionTimerId);
+      this.loopPredictionTimerId = null;
+    }
+
+    if (!this.abLoopController.isActive() || this.paused) return;
+
+    const pointB = this.abLoopController.pointB;
+    if (pointB === null) return;
+
+    const current = this.audio.currentTime;
+    const rate = this.audio.playbackRate || 1.0;
+    const remainingSec = Math.max(0, (pointB - current) / rate);
+    const delayMs = Math.round(remainingSec * 1000);
+
+    this.loopPredictionTimerId = setTimeout(() => {
+      this.loopPredictionTimerId = null;
+      if (!this.abLoopController.isActive() || this.paused) return;
+
+      const check = this.abLoopController.checkLoop(this.audio.currentTime);
+      if (check.shouldSeek) {
+        this.executeLoopSeek(check.targetTime);
+        this.schedulePredictionTimer();
+      } else {
+        // Timer fired slightly early due to jitter; self-reschedule
+        this.schedulePredictionTimer();
+      }
+    }, delayMs);
+  }
+
+  private syncAbLoopStateToStore() {
+    const state = this.abLoopController.state;
+    dispatch({ type: 'SET_AB_LOOP_STATE', data: state });
+    this.emit('abLoopChange', state);
+  }
+
   // ========== PUBLIC PLAYBACK CONTROLS ==========
 
   /** Starts or resumes audio playback with fade-in effect. */
@@ -1317,11 +1439,15 @@ class AudioPlayer {
       return;
     }
     await this.audio.play();
+    if (this.abLoopController.isActive()) {
+      this.startLoopWatchers();
+    }
     return this.fadeInAudio();
   }
 
   /** Pauses audio playback with fade-out effect. */
   async pause() {
+    this.stopLoopWatchers();
     if (this.isCrossfading) {
       this.crossfadeScheduler.pauseFade();
       this.audio.pause();
@@ -1361,6 +1487,9 @@ class AudioPlayer {
    */
   seek(time: number) {
     this.crossfadeScheduler.cancel();
+    if (this.abLoopController.isPositionOutside(time)) {
+      this.clearAbLoop('SEEK_OUTSIDE');
+    }
     try {
       if (this.audio.readyState > 0) {
         this.audio.currentTime = time;
@@ -1707,6 +1836,75 @@ class AudioPlayer {
    */
   public getNightModeReduction(): number {
     return this.nightModeNode ? this.nightModeNode.getReduction() : 0;
+  }
+
+  // ========== A-B LOOP PUBLIC CONTROLS ==========
+
+  /**
+   * Sets Point A (loop start). Transitions to 'armed'.
+   * Does NOT cancel crossfade (arming only).
+   */
+  public setAbLoopPointA(time?: number): SetPointResult {
+    const target = time !== undefined ? time : this.currentTime;
+    const res = this.abLoopController.setPointA(target, this.duration);
+    if (res.changed) {
+      this.syncAbLoopStateToStore();
+    }
+    return res;
+  }
+
+  /**
+   * Sets Point B (loop end). Requires Point A to be set.
+   * Cancels in-flight crossfade on activation to prevent collision.
+   */
+  public setAbLoopPointB(time?: number): SetPointResult {
+    const target = time !== undefined ? time : this.currentTime;
+    const res = this.abLoopController.setPointB(target, this.duration);
+    if (res.success && this.abLoopController.isActive()) {
+      this.crossfadeScheduler.cancel();
+      if (!this.paused) {
+        this.startLoopWatchers();
+      }
+    }
+    if (res.changed) {
+      this.syncAbLoopStateToStore();
+    }
+    return res;
+  }
+
+  /**
+   * Sets both Point A and Point B atomically (e.g. from waveform Shift+Drag).
+   * Direction-agnostic. Cancels in-flight crossfade on activation.
+   */
+  public setAbLoopRange(start: number, end: number): SetPointResult {
+    const res = this.abLoopController.setRange(start, end, this.duration);
+    if (res.success && this.abLoopController.isActive()) {
+      this.crossfadeScheduler.cancel();
+      if (!this.paused) {
+        this.startLoopWatchers();
+      }
+    }
+    if (res.changed) {
+      this.syncAbLoopStateToStore();
+    }
+    return res;
+  }
+
+  /**
+   * Clears the active loop or armed state.
+   */
+  public clearAbLoop(reason?: string): void {
+    const res = this.abLoopController.clear();
+    if (res.changed) {
+      this.stopLoopWatchers();
+      this.syncAbLoopStateToStore();
+      logPlayer('[AudioPlayer.clearAbLoop]', { reason });
+    }
+  }
+
+  /** Gets current A-B loop state. */
+  public getAbLoopState(): AbLoopState {
+    return this.abLoopController.state;
   }
 }
 

@@ -255,6 +255,13 @@ declare global {
 
   type PlayerTypes = 'normal' | 'mini' | 'full';
 
+  type AbLoopPhase = 'idle' | 'armed' | 'active';
+  interface AbLoopState {
+    phase: AbLoopPhase;
+    pointA: number | null;
+    pointB: number | null;
+  }
+
   type PlayerVolume = { isMuted: boolean; value: number };
   interface Player {
     isCurrentSongPlaying: boolean;
@@ -264,6 +271,7 @@ declare global {
     isShuffling: boolean;
     isPlayerStalled: boolean;
     playbackRate: number;
+    abLoop: AbLoopState;
   }
 
   type SongSkipReason = 'USER_SKIP' | 'PLAYER_SKIP';
