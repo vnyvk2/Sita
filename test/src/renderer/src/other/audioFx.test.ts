@@ -49,18 +49,34 @@ class MockAudioContext {
   }
 
   createDynamicsCompressor() {
+    const makeParam = (val: number) => ({
+      value: val,
+      setTargetAtTime: vi.fn(function (this: { value: number }, v: number) {
+        this.value = v;
+      }),
+      cancelScheduledValues: vi.fn()
+    });
     return {
-      threshold: { value: -6 },
-      ratio: { value: 20 },
-      knee: { value: 0 },
-      attack: { value: 0.003 },
-      release: { value: 0.15 },
+      threshold: makeParam(-6),
+      ratio: makeParam(20),
+      knee: makeParam(0),
+      attack: makeParam(0.003),
+      release: makeParam(0.15),
+      reduction: 0,
       connect: vi.fn(),
       disconnect: vi.fn()
     };
   }
 
   createMediaElementSource() {
+    return { connect: vi.fn(), disconnect: vi.fn() };
+  }
+
+  createChannelSplitter(_channels: number) {
+    return { connect: vi.fn(), disconnect: vi.fn() };
+  }
+
+  createChannelMerger(_channels: number) {
     return { connect: vi.fn(), disconnect: vi.fn() };
   }
 

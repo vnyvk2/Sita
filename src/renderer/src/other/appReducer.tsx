@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 
+import type { NightModePreset } from './audioFx/nightModeNode';
 import { normalizedKeys } from './appShortcuts';
 
 export interface AppReducer {
@@ -52,6 +53,10 @@ export type AppReducerStateActions =
   | { type: 'UPDATE_IS_REPEATING_STATE'; data: RepeatTypes }
   | { type: 'TOGGLE_IS_FAVORITE_STATE'; data?: boolean }
   | { type: 'TOGGLE_SHUFFLE_STATE'; data?: boolean }
+  | { type: 'TOGGLE_KARAOKE_MODE'; data?: boolean }
+  | { type: 'UPDATE_KARAOKE_LEVEL'; data: number }
+  | { type: 'TOGGLE_NIGHT_MODE'; data?: boolean }
+  | { type: 'SET_NIGHT_MODE_PRESET'; data: NightModePreset }
   | { type: 'UPDATE_VOLUME_VALUE'; data: number }
   | { type: 'UPDATE_QUEUE'; data: QueuesState }
   | { type: 'UPDATE_QUEUE_CURRENT_SONG_INDEX'; data: number }
@@ -289,6 +294,60 @@ export const reducer = (state: AppReducer, action: AppReducerStateActions): AppR
         }
       };
     }
+    case 'TOGGLE_KARAOKE_MODE': {
+      const isKaraoke = action.data ?? !state.localStorage.playback.isKaraoke;
+      const currentLevel = state.localStorage.playback.karaokeLevel ?? 100;
+      return {
+        ...state,
+        localStorage: {
+          ...state.localStorage,
+          playback: {
+            ...state.localStorage.playback,
+            isKaraoke,
+            karaokeLevel: isKaraoke && currentLevel === 0 ? 100 : currentLevel
+          }
+        }
+      };
+    }
+    case 'UPDATE_KARAOKE_LEVEL': {
+      const level = Math.max(0, Math.min(100, action.data));
+      return {
+        ...state,
+        localStorage: {
+          ...state.localStorage,
+          playback: {
+            ...state.localStorage.playback,
+            karaokeLevel: level,
+            isKaraoke: level > 0
+          }
+        }
+      };
+    }
+    case 'TOGGLE_NIGHT_MODE': {
+      const isNightMode = action.data ?? !state.localStorage.playback.isNightMode;
+      return {
+        ...state,
+        localStorage: {
+          ...state.localStorage,
+          playback: {
+            ...state.localStorage.playback,
+            isNightMode
+          }
+        }
+      };
+    }
+    case 'SET_NIGHT_MODE_PRESET': {
+      return {
+        ...state,
+        localStorage: {
+          ...state.localStorage,
+          playback: {
+            ...state.localStorage.playback,
+            nightModePreset: action.data
+          }
+        }
+      };
+    }
     case 'UPDATE_VOLUME': {
       const volume = action.data ?? state.player.volume;
       return {
@@ -481,7 +540,11 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     },
     crossfade: {
       duration: 0
-    }
+    },
+    isKaraoke: false,
+    karaokeLevel: 100,
+    isNightMode: false,
+    nightModePreset: 'standard'
   },
   queue: {
     queues: [{ id: 'default-queue', position: 0, songIds: [] }],

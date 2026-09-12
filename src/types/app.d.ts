@@ -659,6 +659,10 @@ declare global {
     crossfade?: {
       duration: number;
     };
+    isKaraoke?: boolean;
+    karaokeLevel?: number;
+    isNightMode?: boolean;
+    nightModePreset?: 'gentle' | 'standard' | 'strong';
   }
 
   type EqualizerBandFilters =

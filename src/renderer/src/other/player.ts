@@ -9,24 +9,31 @@ import PlayerQueue from './playerQueue';
 import type { QueuesManager } from './queuesManager';
 import { computeEffectiveReplayGain } from './replayGainCalculator';
 import { CrossfadeScheduler, type CrossfadeDelegate } from './crossfade/CrossfadeScheduler';
+import KaraokeNode from './audioFx/karaokeNode';
+import { NightModeNode, type NightModePreset } from './audioFx/nightModeNode';
 
 const DEBUG_PLAYER = false;
 
 const logPlayer = (...args: unknown[]) => {
-  if (!DEBUG_PLAYER) return;
-  console.debug(...args);
+  if (DEBUG_PLAYER) {
+    console.log(...args);
+  }
 };
 
 const AUDIO_FADE_DURATION = 250;
 
 type PlayerEventType =
-  | 'timeUpdate'
-  | 'durationChange'
   | 'play'
   | 'pause'
-  | 'error'
+  | 'timeUpdate'
+  | 'durationChange'
   | 'seeking'
   | 'seeked'
+  | 'ended'
+  | 'error'
+  | 'volumeChange'
+  | 'mutedChange'
+  | 'repeatChange'
   | 'repeatOne'
   | 'repeatAll'
   | 'playbackComplete'
@@ -37,7 +44,9 @@ type PlayerEventType =
   | 'repeatModeChange'
   | 'queueChange'
   | 'queueMetadataChange'
-  | 'audioFxChange';
+  | 'audioFxChange'
+  | 'karaokeChange'
+  | 'nightModeChange';
 
 type PlayerEventCallback<T = unknown> = (data: T) => void;
 
@@ -77,6 +86,8 @@ class AudioPlayer {
   fxLowPassNode: BiquadFilterNode;
   nightcoreTrebleBoostNode: BiquadFilterNode;
   safetyLimiterNode: DynamicsCompressorNode;
+  karaokeNode: KaraokeNode;
+  nightModeNode: NightModeNode;
   gainNode: GainNode;
 
   private isConvolverConnected = false;
@@ -168,6 +179,8 @@ class AudioPlayer {
     this.safetyLimiterNode.release.value = 0.15;
 
     this.gainNode = this.currentContext.createGain();
+    this.karaokeNode = new KaraokeNode(this.currentContext);
+    this.nightModeNode = new NightModeNode(this.currentContext);
 
     this.currentVolume = this.audioA.volume;
 
@@ -765,10 +778,22 @@ class AudioPlayer {
     this.wetGainNode.connect(this.nightcoreTrebleBoostNode);
     this.isConvolverConnected = false;
 
-    // 4. Treble boost -> Safety Limiter -> Master Gain -> Destination
-    this.nightcoreTrebleBoostNode.connect(this.safetyLimiterNode);
+    // 4. Treble boost -> Karaoke Node -> Night Mode Node -> Safety Limiter -> Master Gain -> Destination
+    this.nightcoreTrebleBoostNode.connect(this.karaokeNode.input);
+    this.karaokeNode.output.connect(this.nightModeNode.input);
+    this.nightModeNode.output.connect(this.safetyLimiterNode);
     this.safetyLimiterNode.connect(this.gainNode);
     this.gainNode.connect(this.currentContext.destination);
+
+    const savedKaraoke = storage.playback.getPlaybackOptions('isKaraoke') ?? false;
+    const savedKaraokeLevel = storage.playback.getPlaybackOptions('karaokeLevel') ?? 100;
+    this.karaokeNode.setEnabled(savedKaraoke, true, savedKaraokeLevel);
+
+    const savedNightMode = storage.playback.getPlaybackOptions('isNightMode') ?? false;
+    const savedNightModePreset =
+      storage.playback.getPlaybackOptions('nightModePreset') ?? 'standard';
+    this.nightModeNode.setPreset(savedNightModePreset, true);
+    this.nightModeNode.setEnabled(savedNightMode, true);
   }
 
   public applyAudioFx(options?: AudioFxOptions) {
@@ -934,6 +959,22 @@ class AudioPlayer {
           this.lastPreampDb = rg.preampDb;
           this.lastPreventClipping = rg.preventClipping;
           this.applyReplayGain();
+        }
+
+        const isKaraoke = localStorage?.playback?.isKaraoke ?? false;
+        const karaokeLevel = localStorage?.playback?.karaokeLevel ?? 100;
+        if (isKaraoke !== this.isKaraokeEnabled() || karaokeLevel !== this.getKaraokeLevel()) {
+          this.setKaraoke(isKaraoke, karaokeLevel, false);
+        }
+
+        const isNightMode = localStorage?.playback?.isNightMode ?? false;
+        const nightModePreset =
+          (localStorage?.playback?.nightModePreset as NightModePreset) ?? 'standard';
+        if (
+          isNightMode !== this.isNightModeEnabled() ||
+          nightModePreset !== this.getNightModePreset()
+        ) {
+          this.setNightMode(isNightMode, nightModePreset, false);
         }
       }
     });
@@ -1571,6 +1612,101 @@ class AudioPlayer {
   set playbackRate(value: number) {
     this.audioA.playbackRate = value;
     this.audioB.playbackRate = value;
+  }
+
+  /**
+   * Sets the karaoke (vocal reducer) state.
+   */
+  public setKaraoke(enabled: boolean, level?: number, immediate = false): void {
+    if (this.karaokeNode) {
+      this.karaokeNode.setEnabled(enabled, immediate, level);
+      storage.playback.setPlaybackOptions('isKaraoke', enabled);
+      if (level !== undefined) {
+        storage.playback.setPlaybackOptions('karaokeLevel', level);
+      }
+      this.emit('karaokeChange', { enabled, level: this.karaokeNode.level });
+    }
+  }
+
+  /**
+   * Sets the vocal reduction level (0 to 100).
+   */
+  public setKaraokeLevel(level: number, immediate = false): void {
+    if (this.karaokeNode) {
+      this.karaokeNode.setLevel(level, immediate);
+      storage.playback.setPlaybackOptions('karaokeLevel', level);
+      this.emit('karaokeChange', { enabled: this.karaokeNode.enabled, level });
+    }
+  }
+
+  /**
+   * Toggles the karaoke mode on or off.
+   */
+  public toggleKaraoke(enabled?: boolean): boolean {
+    const nextState = enabled ?? !this.isKaraokeEnabled();
+    this.setKaraoke(nextState, undefined, false);
+    return nextState;
+  }
+
+  /**
+   * Returns whether karaoke mode is currently enabled.
+   */
+  public isKaraokeEnabled(): boolean {
+    return this.karaokeNode ? this.karaokeNode.enabled : false;
+  }
+
+  /**
+   * Returns current karaoke vocal reduction level (0 to 100).
+   */
+  public getKaraokeLevel(): number {
+    return this.karaokeNode ? this.karaokeNode.level : 100;
+  }
+
+  /**
+   * Sets the night mode (smart dynamic volume compressor) state.
+   */
+  public setNightMode(enabled: boolean, preset?: NightModePreset, immediate = false): void {
+    if (this.nightModeNode) {
+      if (preset) {
+        this.nightModeNode.setPreset(preset, immediate);
+        storage.playback.setPlaybackOptions('nightModePreset', preset);
+      }
+      this.nightModeNode.setEnabled(enabled, immediate);
+      storage.playback.setPlaybackOptions('isNightMode', enabled);
+      this.emit('nightModeChange', { enabled, preset: this.nightModeNode.getPreset() });
+    }
+  }
+
+  /**
+   * Sets the night mode compressor profile preset.
+   */
+  public setNightModePreset(preset: NightModePreset, immediate = false): void {
+    if (this.nightModeNode) {
+      this.nightModeNode.setPreset(preset, immediate);
+      storage.playback.setPlaybackOptions('nightModePreset', preset);
+      this.emit('nightModeChange', { enabled: this.nightModeNode.isEnabled(), preset });
+    }
+  }
+
+  /**
+   * Returns whether night mode is currently enabled.
+   */
+  public isNightModeEnabled(): boolean {
+    return this.nightModeNode ? this.nightModeNode.isEnabled() : false;
+  }
+
+  /**
+   * Returns the current night mode preset profile.
+   */
+  public getNightModePreset(): NightModePreset {
+    return this.nightModeNode ? this.nightModeNode.getPreset() : 'standard';
+  }
+
+  /**
+   * Returns current live gain reduction in dB (negative float under compression, 0 when idle).
+   */
+  public getNightModeReduction(): number {
+    return this.nightModeNode ? this.nightModeNode.getReduction() : 0;
   }
 }
 

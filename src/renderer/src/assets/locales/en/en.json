@@ -138,6 +138,8 @@
     "unmute": "Unmute",
     "currentQueue": "Current queue (Ctrl + Q)",
     "adjustPlaybackSpeed": "Adjust playback speed",
+    "karaoke": "Karaoke Mode",
+    "karaokeTooltip": "Toggle Karaoke Mode (Vocal Reducer)",
     "showCurrentQueue": "Show current queue",
     "showMiniPlayer": "Show Mini Player",
     "showCompactPlayer": "Show Compact Player",
@@ -1395,6 +1397,16 @@
     "reverbDecay": "Reverb Decay",
     "lowPassCutoff": "Tone Damping (Cutoff)",
     "trebleBoost": "Treble Boost",
+    "karaokeTitle": "Karaoke Mode (Vocal Reducer)",
+    "karaokeDescription": "Suppresses center-panned lead vocals in real-time while preserving instruments, bass, and stereo imaging.",
+    "nightModeTitle": "Night Listening Mode (Dynamic Normalizer)",
+    "nightModeDescription": "Evens out dynamic range between quiet intros/dialogue and loud drops for comfortable late-night listening.",
+    "nightModeReduction": "Gain Reduction",
+    "nightMode": {
+      "gentle": "Gentle",
+      "standard": "Standard",
+      "strong": "Strong"
+    },
     "reset": "Reset to Default"
   },
 
