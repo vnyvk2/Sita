@@ -739,6 +739,11 @@
     "expandToFullPage": "Expand to full page",
     "dockToSidePanel": "Dock to side panel",
     "noSongPlaying": "No song playing",
+    "loopThisLine": "Loop this line",
+    "setLoopStart": "Set as Loop Start (A)",
+    "setLoopEnd": "Set as Loop End (B)",
+    "clearLoop": "Clear A-B Loop",
+    "loopingSnippet": "Looping: \"{{snippet}}\"",
 
     "lyricsLoading": "Looking for lyrics",
     "lyricsLoadingDescription": "Hang on... We're looking everywhere...",

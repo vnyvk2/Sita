@@ -18,6 +18,7 @@ const LyricsDrawer = () => {
   const isLyricsDrawerOpen = useStore(store, (state) => state.isLyricsDrawerOpen);
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
+  const abLoop = useStore(store, (state) => state.player.abLoop);
 
   const { toggleLyricsDrawer } = useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -37,8 +38,15 @@ const LyricsDrawer = () => {
   const activeLineIndex = useActiveLyricIndex(isLyricsDrawerOpen ? lyrics : null);
 
   const lyricsComponents = useMemo(() => {
-    return renderLyricsLines(lyrics, currentSongData.duration, true, 'drawer', activeLineIndex);
-  }, [currentSongData.duration, lyrics, activeLineIndex]);
+    return renderLyricsLines(
+      lyrics,
+      currentSongData.duration,
+      true,
+      'drawer',
+      activeLineIndex,
+      abLoop
+    );
+  }, [currentSongData.duration, lyrics, activeLineIndex, abLoop]);
 
   const handleExpandClick = () => {
     const loc = router.state.location;

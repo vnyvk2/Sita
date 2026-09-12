@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 
 import roundTo from '../../../../common/roundTo';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useAudioPlayer } from '../../hooks/useAudioPlayer';
+import { computeLyricLoopRange } from '../../utils/lyricLoopRange';
 import EnhancedSyncedLyricWord from '../LyricsEditingPage/EnhancedSyncedLyricWord';
 import LyricsProgressBar from './LyricsProgressBar';
 
@@ -17,6 +19,11 @@ interface LyricProp {
   isActive?: boolean;
   syncedStart?: number;
   syncedEnd?: number;
+  prevLineEnd?: number;
+  nextLineStart?: number;
+  songDuration?: number;
+  isInAbLoop?: boolean;
+  isLoopStart?: boolean;
   isAutoScrolling?: boolean;
   playerType?: PlayerTypes | 'drawer';
 }
@@ -34,8 +41,10 @@ const getLyricText = (lyrics: string) => {
 };
 
 const LyricLine = (props: LyricProp) => {
-  const { updateSongPosition, updateContextMenuData } = useContext(AppUpdateContext);
+  const { updateSongPosition, updateContextMenuData, addNewNotifications } =
+    useContext(AppUpdateContext);
   const { t } = useTranslation();
+  const player = useAudioPlayer();
 
   const lyricsRef = useRef<HTMLDivElement | null>(null);
   const prevIsActiveRef = useRef(false);
@@ -48,6 +57,11 @@ const LyricLine = (props: LyricProp) => {
     convertedLyric,
     syncedStart,
     syncedEnd,
+    prevLineEnd,
+    nextLineStart,
+    songDuration,
+    isInAbLoop = false,
+    isLoopStart = false,
     isActive = false,
     isAutoScrolling = true,
     playerType = 'normal'
@@ -177,9 +191,14 @@ const LyricLine = (props: LyricProp) => {
           ? `cursor-pointer blur-[1px] ${
               isActive
                 ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! scale-100! font-semibold blur-none! [&>div>span]:mr-3!'
-                : 'scale-75!'
+                : isInAbLoop
+                  ? 'text-font-color-black/75! dark:text-font-color-white/75! scale-90! blur-none! [&>div>span]:mr-3!'
+                  : 'scale-75!'
             }`
           : 'text-font-color-black! dark:text-font-color-white! scale-100! text-4xl! font-medium blur-none! [&>div>span]:mr-3'
+      } ${
+        isInAbLoop &&
+        'ring-font-color-highlight/25 dark:ring-dark-font-color-highlight/25 rounded-2xl px-4 py-1.5 ring-1'
       } ${playerType === 'mini' && 'text-font-color-white/20! mb-2! text-2xl!'} ${
         playerType === 'drawer' &&
         'mb-4! w-full! items-center! justify-center! text-center! text-2xl! leading-snug'
@@ -188,35 +207,150 @@ const LyricLine = (props: LyricProp) => {
         'text-font-color-white/20! mb-6! origin-left items-start! justify-start! text-left! text-7xl!'
       }`}
       ref={lyricsRef}
-      onClick={() =>
-        isSynced &&
-        (typeof lyric === 'string' || translatedLyricString) &&
-        updateSongPosition(syncedStart)
-      }
+      onClick={(e) => {
+        if (!isSynced || (typeof lyric !== 'string' && !translatedLyricString)) return;
+
+        if (e.altKey) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const range = computeLyricLoopRange({
+            syncedStart,
+            syncedEnd,
+            prevEnd: prevLineEnd,
+            nextStart: nextLineStart,
+            songDuration
+          });
+
+          if (range.success) {
+            player.setAbLoopRange(range.start, range.end);
+            player.seek(range.start);
+
+            if (addNewNotifications) {
+              const snippet =
+                typeof lyric === 'string'
+                  ? getLyricText(lyric)
+                  : lyric.map((x) => x.text).join(' ');
+              const shortSnippet = snippet.length > 30 ? `${snippet.slice(0, 30)}…` : snippet;
+              addNewNotifications([
+                {
+                  id: 'abLoop',
+                  iconName: 'repeat',
+                  content: t('lyricsPage.loopingSnippet', {
+                    snippet: shortSnippet,
+                    defaultValue: `Looping: "${shortSnippet}"`
+                  })
+                }
+              ]);
+            }
+          }
+          return;
+        }
+
+        updateSongPosition(syncedStart);
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        updateContextMenuData(
-          true,
-          [
+
+        const menuItems: ContextMenuItem[] = [];
+
+        if (isSynced && index >= 0) {
+          const range = computeLyricLoopRange({
+            syncedStart,
+            syncedEnd,
+            prevEnd: prevLineEnd,
+            nextStart: nextLineStart,
+            songDuration
+          });
+
+          menuItems.push(
             {
-              label: t('common.copy'),
-              class: 'sync',
-              iconName: 'content_copy',
+              label: t('lyricsPage.loopThisLine', 'Loop this line'),
+              iconName: 'repeat_one',
               iconClassName: 'material-icons-round-outlined',
-              handlerFunction: () =>
-                window.navigator.clipboard.writeText(
-                  typeof lyric === 'string'
-                    ? getLyricText(lyric)
-                    : lyric.map((x) => x.text).join(' ')
-                )
+              handlerFunction: () => {
+                if (range.success) {
+                  player.setAbLoopRange(range.start, range.end);
+                  player.seek(range.start);
+
+                  if (addNewNotifications) {
+                    const snippet =
+                      typeof lyric === 'string'
+                        ? getLyricText(lyric)
+                        : lyric.map((x) => x.text).join(' ');
+                    const shortSnippet = snippet.length > 30 ? `${snippet.slice(0, 30)}…` : snippet;
+                    addNewNotifications([
+                      {
+                        id: 'abLoop',
+                        iconName: 'repeat',
+                        content: t('lyricsPage.loopingSnippet', {
+                          snippet: shortSnippet,
+                          defaultValue: `Looping: "${shortSnippet}"`
+                        })
+                      }
+                    ]);
+                  }
+                }
+              }
+            },
+            {
+              label: t('lyricsPage.setLoopStart', 'Set as Loop Start (A)'),
+              iconName: 'first_page',
+              iconClassName: 'material-icons-round-outlined',
+              handlerFunction: () => {
+                player.setAbLoopPointA(range.start);
+              }
+            },
+            {
+              label: t('lyricsPage.setLoopEnd', 'Set as Loop End (B)'),
+              iconName: 'last_page',
+              iconClassName: 'material-icons-round-outlined',
+              handlerFunction: () => {
+                player.setAbLoopPointB(range.end);
+              }
             }
-          ],
-          e.pageX,
-          e.pageY
-        );
+          );
+
+          const loopState = player.getAbLoopState();
+          if (loopState.phase !== 'idle') {
+            menuItems.push({
+              label: t('lyricsPage.clearLoop', 'Clear A-B Loop'),
+              iconName: 'close',
+              iconClassName: 'material-icons-round-outlined',
+              handlerFunction: () => {
+                player.clearAbLoop('USER_MANUAL');
+              }
+            });
+          }
+
+          menuItems.push({
+            label: '',
+            isContextMenuItemSeperator: true,
+            handlerFunction: null
+          });
+        }
+
+        menuItems.push({
+          label: t('common.copy'),
+          class: 'sync',
+          iconName: 'content_copy',
+          iconClassName: 'material-icons-round-outlined',
+          handlerFunction: () =>
+            window.navigator.clipboard.writeText(
+              typeof lyric === 'string' ? getLyricText(lyric) : lyric.map((x) => x.text).join(' ')
+            )
+        });
+
+        updateContextMenuData(true, menuItems, e.pageX, e.pageY);
       }}
     >
+      {isLoopStart && (
+        <span className="ab-loop-badge bg-font-color-highlight/15 dark:bg-dark-font-color-highlight/20 text-font-color-highlight dark:text-dark-font-color-highlight mb-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wider uppercase">
+          <span className="material-icons-round text-xs">repeat</span>
+          A-B Loop
+        </span>
+      )}
       {lyricStringLineSecondaryUpper && (
         <div
           className={`flex flex-row flex-wrap ${

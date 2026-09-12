@@ -17,6 +17,7 @@ type Props = {
 const LyricsContainer = (props: Props) => {
   const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
   const currentSongData = useStore(store, (state) => state.currentSongData);
+  const abLoop = useStore(store, (state) => state.player.abLoop);
 
   const { isLyricsVisible, setIsLyricsAvailable } = props;
   const { t } = useTranslation();
@@ -33,8 +34,15 @@ const LyricsContainer = (props: Props) => {
   }, [isLyricsVisible, lyrics, setIsLyricsAvailable]);
 
   const lyricsComponents = useMemo(() => {
-    return renderLyricsLines(lyrics, currentSongData.duration, true, 'full', activeLineIndex);
-  }, [lyrics, currentSongData.duration, activeLineIndex]);
+    return renderLyricsLines(
+      lyrics,
+      currentSongData.duration,
+      true,
+      'full',
+      activeLineIndex,
+      abLoop
+    );
+  }, [lyrics, currentSongData.duration, activeLineIndex, abLoop]);
 
   const lyricsSource = useMemo(() => {
     if (lyrics && lyrics?.lyrics) {
