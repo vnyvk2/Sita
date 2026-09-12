@@ -1507,6 +1507,13 @@ declare global {
     musicBrainzRecordingId?: string;
     isrc?: string;
     path?: string;
+    /**
+     * Language edit signal:
+     *   undefined = field not edited (skip entirely)
+     *   ''        = explicit clear (delete override, null column, clear tag)
+     *   non-empty = set value
+     */
+    language?: string;
   }
 
   interface SongOutsideLibraryData {

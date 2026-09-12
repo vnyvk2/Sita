@@ -1,5 +1,7 @@
+import { normalizeLanguageName } from '@common/languages';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 
+import LanguageCombobox from './LanguageCombobox';
 import type { EditableField } from './types';
 
 export interface EditableCellProps {
@@ -9,7 +11,7 @@ export interface EditableCellProps {
   isDirty?: boolean;
   errorMessage?: string;
   placeholder?: string;
-  type?: 'text' | 'number';
+  type?: 'text' | 'number' | 'language';
   onCommit: (field: EditableField, value: string | number | undefined) => void;
 }
 
@@ -36,11 +38,11 @@ export const EditableCell = memo(function EditableCell({
   }, [value, isEditing]);
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
+    if (isEditing && inputRef.current && type !== 'language') {
       inputRef.current.focus();
       inputRef.current.select();
     }
-  }, [isEditing]);
+  }, [isEditing, type]);
 
   const handleCommit = useCallback(() => {
     setIsEditing(false);
@@ -50,7 +52,9 @@ export const EditableCell = memo(function EditableCell({
       return;
     }
 
-    if (type === 'number') {
+    if (type === 'language') {
+      onCommit(field, normalizeLanguageName(trimmed));
+    } else if (type === 'number') {
       const parsed = Number(trimmed);
       onCommit(field, isNaN(parsed) ? undefined : parsed);
     } else {
@@ -82,6 +86,33 @@ export const EditableCell = memo(function EditableCell({
   const shownText = displayValue !== undefined ? displayValue : (value ?? '');
 
   if (isEditing) {
+    if (type === 'language') {
+      return (
+        <div className="relative flex h-full w-full items-center">
+          <LanguageCombobox
+            value={currentInput}
+            placeholder={placeholder}
+            focusOnMount
+            onChange={(val) => {
+              setCurrentInput(val);
+            }}
+            onSelect={(val) => {
+              setCurrentInput(val);
+              onCommit(field, val ? normalizeLanguageName(val) : undefined);
+              setIsEditing(false);
+            }}
+            onBlur={handleCommit}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                handleCancel();
+              }
+            }}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="relative flex h-full w-full items-center">
         <input

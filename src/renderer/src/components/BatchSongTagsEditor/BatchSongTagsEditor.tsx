@@ -1,5 +1,5 @@
-import { songQuery } from '@renderer/queries/songs';
 import { invalidateWindowsContainingIds } from '@renderer/hooks/useDataSync';
+import { songQuery } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { useNavigate } from '@tanstack/react-router';
 import {
@@ -118,7 +118,8 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
               trackNumber: tags.trackNumber,
               discNumber: tags.discNumber,
               year: tags.releasedYear,
-              composer: tags.composer
+              composer: tags.composer,
+              language: tags.language || ''
             };
 
             const row: BatchTrackRow = {
@@ -190,7 +191,12 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
           nextDraft[field] = typeof value === 'string' ? parseStringList(value) : [];
         } else if (field === 'trackNumber' || field === 'discNumber' || field === 'year') {
           nextDraft[field] = typeof value === 'number' ? value : undefined;
-        } else if (field === 'title' || field === 'album' || field === 'composer') {
+        } else if (
+          field === 'title' ||
+          field === 'album' ||
+          field === 'composer' ||
+          field === 'language'
+        ) {
           nextDraft[field] = typeof value === 'string' ? value : '';
         }
 
@@ -484,6 +490,28 @@ export const BatchSongTagsEditor: React.FC<BatchSongTagsEditorProps> = ({
           />
         ),
         size: 130
+      },
+      {
+        id: 'language',
+        accessorFn: (row) => row.draft.language,
+        header: 'Language',
+        cell: ({ row, getValue }) => {
+          const rawVal = getValue() as string | undefined;
+          const displayVal = rawVal ? rawVal : 'Unspecified';
+          return (
+            <EditableCell
+              value={rawVal || ''}
+              displayValue={displayVal}
+              field="language"
+              type="language"
+              placeholder="Unspecified"
+              isDirty={row.original.dirtyFields.has('language')}
+              errorMessage={row.original.validationErrors.get('language')}
+              onCommit={(field, val) => handleCellCommit(row.index, field, val)}
+            />
+          );
+        },
+        size: 120
       },
       {
         id: 'year',

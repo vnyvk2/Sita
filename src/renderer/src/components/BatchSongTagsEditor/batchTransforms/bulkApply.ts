@@ -1,3 +1,5 @@
+import { normalizeLanguageName } from '@common/languages';
+
 import { parseStringList } from '../utils';
 import { applyFieldChange, cloneRow, getTargetRowIds } from './transformHelpers';
 import type { BatchTransformContext, BatchTransformResult, BulkApplyConfig } from './types';
@@ -32,7 +34,12 @@ export function bulkApply(
       if (op.type === 'clear') {
         if (op.field === 'artists' || op.field === 'albumArtists' || op.field === 'genres') {
           finalValue = [];
-        } else if (op.field === 'title' || op.field === 'album' || op.field === 'composer') {
+        } else if (
+          op.field === 'title' ||
+          op.field === 'album' ||
+          op.field === 'composer' ||
+          op.field === 'language'
+        ) {
           finalValue = '';
         } else {
           finalValue = undefined;
@@ -53,6 +60,8 @@ export function bulkApply(
               continue;
             }
           }
+        } else if (op.field === 'language') {
+          finalValue = typeof op.value === 'string' ? normalizeLanguageName(op.value) : '';
         } else {
           finalValue = op.value ?? '';
         }

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import BatchSongTagsEditor from './BatchSongTagsEditor';
+import type { EditableField } from './types';
 import {
   buildCanonicalSongTags,
   formatStringList,
@@ -169,13 +169,77 @@ describe('BatchSongTagsEditor — Utilities', () => {
     expect(payload.trackNumber).toBe(5);
     expect(payload.releasedYear).toBe(2024);
 
-    // Untouched complex fields must remain exactly identical to rawOriginalTags without lossy conversion
+    expect(payload.language).toBeUndefined();
     expect(payload.artists).toBe(rawOriginalTags.artists);
     expect(payload.albums).toBe(rawOriginalTags.albums);
     expect(payload.genres).toBe(rawOriginalTags.genres);
     expect(payload.synchronizedLyrics).toBe('[00:01.00] Hello');
     expect(payload.isrc).toBe('USRC12345678');
     expect(payload.musicBrainzRecordingId).toBe('mb-uuid-123');
+  });
+
+  it('builds canonical SongTags with normalized language when dirty and sentinel empty string when cleared', () => {
+    const rawOriginalTags: SongTags = {
+      title: 'Orig Title',
+      duration: 200,
+      path: 'C:/Music/song.mp3',
+      language: 'English'
+    };
+
+    // Case A: Dirty language set to new value
+    const rowDirtySet = {
+      songId: 1,
+      path: 'C:/Music/song.mp3',
+      duration: 200,
+      original: {
+        songId: 1,
+        path: 'C:/Music/song.mp3',
+        duration: 200,
+        title: 'Orig Title',
+        artists: [],
+        albumArtists: [],
+        album: '',
+        genres: [],
+        language: 'English'
+      },
+      draft: {
+        songId: 1,
+        path: 'C:/Music/song.mp3',
+        duration: 200,
+        title: 'Orig Title',
+        artists: [],
+        albumArtists: [],
+        album: '',
+        genres: [],
+        language: '  telugu  '
+      },
+      dirtyFields: new Set(['language'] as const),
+      validationErrors: new Map()
+    };
+
+    const payloadSet = buildCanonicalSongTags(rowDirtySet, rawOriginalTags);
+    expect(payloadSet.language).toBe('Telugu');
+
+    // Case B: Dirty language cleared
+    const rowDirtyCleared = {
+      ...rowDirtySet,
+      draft: {
+        ...rowDirtySet.draft,
+        language: ''
+      }
+    };
+
+    const payloadCleared = buildCanonicalSongTags(rowDirtyCleared, rawOriginalTags);
+    expect(payloadCleared.language).toBe('');
+
+    // Case C: Untouched language must remain undefined in payload so main doesn't overwrite DB/tags
+    const rowUntouched = {
+      ...rowDirtySet,
+      dirtyFields: new Set<EditableField>()
+    };
+
+    const payloadUntouched = buildCanonicalSongTags(rowUntouched, rawOriginalTags);
+    expect(payloadUntouched.language).toBeUndefined();
   });
 });
 
@@ -486,6 +550,41 @@ describe('BatchSongTagsEditor Component', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Synthesized Band')).not.toBeNull();
+      expect(screen.getByText(/1 modified/i)).not.toBeNull();
+    });
+  });
+
+  it('opens bulk set values modal and applies language across selected tracks', async () => {
+    render(<BatchSongTagsEditor initialSongIds={[1, 2]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Track 1')).not.toBeNull();
+    });
+
+    // Select row 1
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]);
+
+    const setValuesBtn = screen.getByText('Set Values...').closest('button')!;
+    fireEvent.click(setValuesBtn);
+
+    // Modal is open
+    expect(screen.getByText('Set Values Across Selection')).not.toBeNull();
+
+    // Check "Language" field checkbox inside modal
+    const langLabels = screen.getAllByText('Language');
+    fireEvent.click(langLabels[langLabels.length - 1]);
+
+    // Type language
+    const langInput = screen.getByPlaceholderText(/Select or type language\.\.\./i);
+    fireEvent.change(langInput, { target: { value: 'Telugu' } });
+
+    // Click Apply
+    const applyBtn = screen.getByText(/Apply to 1 Tracks/i).closest('button')!;
+    fireEvent.click(applyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Telugu')).not.toBeNull();
       expect(screen.getByText(/1 modified/i)).not.toBeNull();
     });
   });

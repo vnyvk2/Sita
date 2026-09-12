@@ -1,4 +1,4 @@
-﻿export interface BatchTrackData {
+export interface BatchTrackData {
   songId: number;
   path: string;
   duration: number;
@@ -11,6 +11,7 @@
   discNumber?: number;
   year?: number;
   composer?: string;
+  language?: string;
 }
 
 export type EditableField =
@@ -22,7 +23,8 @@ export type EditableField =
   | 'trackNumber'
   | 'discNumber'
   | 'year'
-  | 'composer';
+  | 'composer'
+  | 'language';
 
 export interface BatchTrackRow {
   songId: number;

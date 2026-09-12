@@ -1,3 +1,5 @@
+import { normalizeLanguageName } from '@common/languages';
+
 import type { BatchTrackData, BatchTrackRow, EditableField } from './types';
 
 /** Splits a comma or semicolon separated string into a trimmed string array. */
@@ -91,6 +93,11 @@ export function buildCanonicalSongTags(row: BatchTrackRow, rawOriginalTags?: Son
   }
   if (dirtyFields.has('composer')) {
     payload.composer = draft.composer;
+  }
+  if (dirtyFields.has('language')) {
+    payload.language = draft.language ? normalizeLanguageName(draft.language) : '';
+  } else {
+    payload.language = undefined;
   }
 
   if (dirtyFields.has('artists')) {

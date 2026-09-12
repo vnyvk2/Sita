@@ -16,6 +16,7 @@ import { parseSongArtworks } from '@main/fs/resolveFilePaths';
 import logger from '@main/logger';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { and, asc, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm';
+
 import { titleToBucket } from '../../../common/titleToBucket';
 
 export interface RawFlatSongRow {
@@ -512,6 +513,7 @@ export interface UpdateSongBasicFieldsData {
   diskNumber?: number | null;
   musicBrainzRecordingId?: string | null;
   isrc?: string | null;
+  language?: string | null;
 }
 
 export const updateSongBasicFields = async (
@@ -539,6 +541,9 @@ export const updateSongBasicFields = async (
   }
   if (data.isrc !== undefined) {
     updatePayload.isrc = data.isrc || null;
+  }
+  if (data.language !== undefined) {
+    updatePayload.language = data.language || null;
   }
 
   if (Object.keys(updatePayload).length === 0) {
