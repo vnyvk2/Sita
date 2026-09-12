@@ -1,4 +1,4 @@
-﻿import React, { memo, useState } from 'react';
+import { memo, useState } from 'react';
 
 import Button from '../Button';
 
@@ -20,9 +20,7 @@ export interface BulkOperationsBarProps {
 }
 
 export const BulkOperationsBar = memo(function BulkOperationsBar({
-  totalCount,
   selectedCount,
-  modifiedCount,
   hasSelectedDirtyRows,
   onSelectAll,
   onDeselectAll,

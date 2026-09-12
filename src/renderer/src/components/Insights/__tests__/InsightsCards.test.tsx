@@ -1,6 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
 // @vitest-environment jsdom
-import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AppUpdateContext, type AppUpdateContextType } from '../../../contexts/AppUpdateContext';

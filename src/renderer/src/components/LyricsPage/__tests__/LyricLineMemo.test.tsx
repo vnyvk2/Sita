@@ -1,4 +1,4 @@
-﻿import { render, screen, act } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import React, { useState } from 'react';
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
@@ -116,21 +116,32 @@ describe('LyricLine Memoization Boundary (Phase L1)', () => {
 
   it('renderLyricsLines delivers scalar syncedStart and syncedEnd props', () => {
     const mockLyrics: SongLyrics = {
+      title: 'Test Song',
+      source: 'IN_SONG_LYRICS',
+      lyricsType: 'SYNCED',
       isOfflineLyricsAvailable: false,
       lyrics: {
         copyright: 'Test',
         isSynced: true,
+        isRomanized: false,
+        isTranslated: false,
+        isReset: false,
+        unparsedLyrics: '',
         offset: 0,
         parsedLyrics: [
-          { start: 0, end: 5, originalText: 'Line 1' },
-          { start: 5, end: 10, originalText: 'Line 2' }
+          { start: 0, end: 5, originalText: 'Line 1', translatedTexts: [], isEnhancedSynced: false },
+          { start: 5, end: 10, originalText: 'Line 2', translatedTexts: [], isEnhancedSynced: false }
         ]
       }
     };
 
     const components = renderLyricsLines(mockLyrics, 200, true, 'normal', 0);
     expect(components).toHaveLength(2);
-    const firstComp = components[0] as React.ReactElement;
+    const firstComp = components[0] as React.ReactElement<{
+      syncedStart?: number;
+      syncedEnd?: number;
+      isActive?: boolean;
+    }>;
     expect(firstComp.props.syncedStart).toBe(0);
     expect(firstComp.props.syncedEnd).toBe(5);
     expect(firstComp.props.isActive).toBe(true);

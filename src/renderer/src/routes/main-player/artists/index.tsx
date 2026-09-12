@@ -283,7 +283,6 @@ function ArtistPage() {
                     index={index}
                     key={artist.artistId}
                     className="mb-4"
-                    songCount={artist.songCount}
                     selectAllHandler={selectAllHandler}
                     appearFromBottom={false}
                     {...artist}

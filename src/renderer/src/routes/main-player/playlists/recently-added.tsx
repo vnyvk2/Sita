@@ -282,7 +282,7 @@ function RecentlyAddedPlaylistInfoPage() {
               playlist={{
                 ...mapLegacyPlaylistToDto({
                   ...playlistData,
-                  songs: recentlyAddedSongs
+                  songs: recentlyAddedSongs.map((s) => s.songId)
                 }),
                 name: t('common.recentlyAdded', 'Recently Added')
               }}

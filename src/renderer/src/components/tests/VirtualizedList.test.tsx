@@ -412,11 +412,12 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
     });
 
     it('DEFAULT_SCROLL_SEEK_CONFIG should only enter on high-velocity flings (> 2500px/s)', () => {
-      expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(2600)).toBe(true);
-      expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(2400)).toBe(false);
-      expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(-2800)).toBe(true);
-      expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(200)).toBe(true);
-      expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(400)).toBe(false);
+      const dummyRange = { startIndex: 0, endIndex: 0 };
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(2600, dummyRange)).toBe(true);
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(2400, dummyRange)).toBe(false);
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(-2800, dummyRange)).toBe(true);
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(200, dummyRange)).toBe(true);
+      expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(400, dummyRange)).toBe(false);
     });
   });
 });

@@ -1,6 +1,5 @@
-import React, { memo } from 'react';
+import { memo } from 'react';
 
-import type { BatchSongItemResult } from '../../../../types/app';
 import Button from '../Button';
 
 export interface SaveProgressModalProps {

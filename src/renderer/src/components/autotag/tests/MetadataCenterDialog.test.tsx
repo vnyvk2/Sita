@@ -1,10 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 // @vitest-environment jsdom
-import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AlbumTagPreview } from '../../../../common/metadata/types';
+import type { AlbumTagPreview } from '@common/metadata/types';
 import { MetadataCenterDialog } from '../MetadataCenterDialog';
 
 // Mock useAlbumAutoTag
@@ -21,7 +20,7 @@ const mockPreview: AlbumTagPreview = {
     year: 2021
   },
   overallConfidence: 0.98,
-  confidenceLevel: 'High',
+  confidenceLevel: 'Excellent',
   provider: 'musicbrainz',
   providerReleaseId: 'mb-sour-1',
   warnings: [],
@@ -32,7 +31,7 @@ const mockPreview: AlbumTagPreview = {
       oldTitle: 'brutal (audio)',
       oldArtist: 'Olivia',
       confidence: 0.98,
-      confidenceLevel: 'High',
+      confidenceLevel: 'Excellent',
       why: 'Matched',
       reasons: [],
       applyTrack: true,

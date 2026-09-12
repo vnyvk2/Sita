@@ -66,7 +66,7 @@ export const GlobalFieldDiffTable: React.FC<GlobalFieldDiffTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {diffs.map((diff, idx) => {
+            {diffs.map((diff) => {
               const isSelected = selectedFields.has(diff.fieldId);
               const statusClass =
                 diff.status === 'changed'

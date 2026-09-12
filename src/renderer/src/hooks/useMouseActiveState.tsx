@@ -1,4 +1,12 @@
-import { type MutableRefObject, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 
 import debounce from '../utils/debounce';
 
@@ -44,6 +52,20 @@ const useMouseActiveState = (
     setIdleTimeouts();
   }, [activeTimeout, idleTimeout]);
 
+  const debouncedUpdatePosition = useMemo(
+    () =>
+      debounce((pos: { x: number; y: number }) => {
+        prevPositionRef.current = pos;
+      }, 100),
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      debouncedUpdatePosition.cancel();
+    };
+  }, [debouncedUpdatePosition]);
+
   const mouseMoveHandler = useCallback(
     (e: MouseEvent) => {
       const { clientX: newX, clientY: newY } = e;
@@ -55,11 +77,9 @@ const useMouseActiveState = (
           manageMouseMovement();
       } else manageMouseMovement();
 
-      return debounce(() => {
-        prevPositionRef.current = { x: e.clientX, y: e.clientY };
-      }, 100);
+      debouncedUpdatePosition({ x: e.clientX, y: e.clientY });
     },
-    [manageMouseMovement, range]
+    [manageMouseMovement, range, debouncedUpdatePosition]
   );
 
   const mouseLeaveHandler = useCallback(

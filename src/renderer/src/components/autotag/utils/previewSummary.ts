@@ -2,7 +2,7 @@ import type {
   AlbumTagPreview,
   MetadataFieldDiff,
   TrackMatchPreview
-} from '../../../../common/metadata/types';
+} from '@common/metadata/types';
 
 export interface ProviderContribution {
   providerId: string;

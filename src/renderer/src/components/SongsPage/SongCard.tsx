@@ -72,7 +72,6 @@ const SongCard = (props: SongCardProp) => {
   const {
     playSong,
     updateContextMenuData,
-    updateQueueData,
     addNewNotifications,
     changePromptMenuData,
     toggleIsFavorite,
@@ -651,7 +650,7 @@ const SongCard = (props: SongCardProp) => {
       } group/songCard relative mr-2 mb-2 aspect-2/1 max-w-[24rem] min-w-[15rem] overflow-hidden rounded-2xl border-[transparent] shadow-xl transition-[border-color,translate] duration-200 ease-out hover:-translate-y-0.5 ${
         className || ''
       } ${
-        isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs' && 'border-4'
+        isMultipleSelectionEnabled && 'border-4'
       } ${
         isAMultipleSelection &&
         'border-font-color-highlight! dark:border-dark-font-color-highlight!'
@@ -669,7 +668,7 @@ const SongCard = (props: SongCardProp) => {
         if (e.getModifierState('Shift') === true && selectAllHandler) selectAllHandler(songId);
         else if (e.getModifierState('Control') === true && !isMultipleSelectionEnabled)
           toggleMultipleSelections(!isAMultipleSelection, 'songs', [songId]);
-        else if (isMultipleSelectionEnabled && multipleSelectionsData.selectionType === 'songs')
+        else if (isMultipleSelectionEnabled)
           updateMultipleSelections(songId, 'songs', isAMultipleSelection ? 'remove' : 'add');
       }}
       title={isBlacklisted ? `'${title}' is blacklisted.` : undefined}
@@ -749,9 +748,7 @@ const SongCard = (props: SongCardProp) => {
           </div>
           <div className="play-btn-and-multiple-selection-checkbox-container">
             {isMultipleSelectionEnabled ? (
-              multipleSelectionsData.selectionType === 'songs' && (
-                <MultipleSelectionCheckbox id={songId} selectionType="songs" className="mr-1!" />
-              )
+              <MultipleSelectionCheckbox id={songId} selectionType="songs" className="mr-1!" />
             ) : (
               <Button
                 className={`!m-0 !rounded-none !border-0 bg-transparent !p-0 opacity-60 outline-offset-1 transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent ${

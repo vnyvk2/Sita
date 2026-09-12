@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/react';
-import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppUpdateContext, type AppUpdateContextType } from '../../../../contexts/AppUpdateContext';
@@ -101,13 +100,10 @@ describe('HomePage Insights Shortcut Button', () => {
     toggleRepeat: vi.fn(),
     toggleMutedState: vi.fn(),
     changeQueueCurrentSongIndex: vi.fn(),
-    reParseSong: vi.fn(),
-    toggleMiniPlayer: vi.fn(),
     toggleSongPlayback: vi.fn(),
-    skipSong: vi.fn(),
-    handleSongPlaybackError: vi.fn(),
-    updatePlaybackRate: vi.fn()
-  };
+    handleSkipBackwardClick: vi.fn(),
+    handleSkipForwardClick: vi.fn()
+  } as unknown as AppUpdateContextType;
 
   const HomePageComponent = Route.options.component!;
 

@@ -26,8 +26,8 @@ export function ArtistBioModal({
 
   const handleOpenSource = () => {
     if (bioUrl) {
-      if (window.api?.utils?.openLink) {
-        window.api.utils.openLink(bioUrl);
+      if (window.api?.settingsHelpers?.openInBrowser) {
+        window.api.settingsHelpers.openInBrowser(bioUrl);
       } else {
         window.open(bioUrl, '_blank');
       }

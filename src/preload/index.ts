@@ -44,7 +44,7 @@ import type {
   HistoryPeriod,
   ListeningAnalyticsData,
   LibraryAudioStatsData
-} from '../main/db/queries/analytics';
+} from '../common/analytics';
 import type {
   ArtistDiscographyPayload,
   ArtistOnlineProfilePayload,
@@ -835,7 +835,8 @@ const utils = {
   },
   showOpenDialog: (options?: unknown): Promise<string[]> =>
     ipcRenderer.invoke('utils/showOpenDialog', options),
-  openPath: (dirPath: string): void => ipcRenderer.send('app/revealFolderInFileExplorer', dirPath)
+  openPath: (dirPath: string): void => ipcRenderer.send('app/revealFolderInFileExplorer', dirPath),
+  openLink: (url: string): void => settingsHelpers.openInBrowser(url)
 };
 
 const libraryMetrics = {

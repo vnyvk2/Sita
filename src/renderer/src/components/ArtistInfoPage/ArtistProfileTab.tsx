@@ -43,8 +43,8 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
   };
 
   const handleOpenExternalLink = (url: string) => {
-    if (window.api?.utils?.openLink) {
-      window.api.utils.openLink(url);
+    if (window.api?.settingsHelpers?.openInBrowser) {
+      window.api.settingsHelpers.openInBrowser(url);
     } else {
       window.open(url, '_blank');
     }

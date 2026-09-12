@@ -1,9 +1,8 @@
 import { fireEvent, render } from '@testing-library/react';
 // @vitest-environment jsdom
-import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AppUpdateContext, AppUpdateContextType } from '../../contexts/AppUpdateContext';
+import { AppUpdateContext, type AppUpdateContextType } from '../../contexts/AppUpdateContext';
 import { Album } from './Album';
 
 // Mock router
@@ -41,7 +40,8 @@ describe('Album Context Menu Auto Tag', () => {
     artists: [{ artistId: 1, name: 'Test Artist' }],
     artworkPaths: {
       artworkPath: 'path/to/artwork',
-      optimizedArtworkPath: 'path/to/optimized'
+      optimizedArtworkPath: 'path/to/optimized',
+      isDefaultArtwork: false
     },
     songCount: 2,
     index: 0

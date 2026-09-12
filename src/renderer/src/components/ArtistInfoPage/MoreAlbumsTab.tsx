@@ -2,7 +2,7 @@ import { artistQuery } from '@renderer/queries/artists';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { InLibraryStatus, OnlineReleaseSummary } from 'src/types/artist_discography';
+import type { OnlineReleaseSummary } from 'src/types/artist_discography';
 
 import OnlineReleaseCard from './OnlineReleaseCard';
 

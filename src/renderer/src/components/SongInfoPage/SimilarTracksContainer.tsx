@@ -16,7 +16,6 @@ type Props = { songId: number };
 
 const SimilarTracksContainer = (props: Props) => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
-  const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
 
   const { createQueue, updateQueueData, addNewNotifications } = useContext(AppUpdateContext);

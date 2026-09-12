@@ -3,12 +3,11 @@
 import { SYNCED_LYRICS_REGEX } from '@common/isLyricsSynced';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
-import i18n from '../../i18n';
 import { useLyricsQuery } from '../../queries/lyrics';
 import { CloseIcon } from '../Icons/WindowIcons';
 import Img from '../Img';

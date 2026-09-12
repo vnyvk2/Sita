@@ -1,4 +1,5 @@
 import { SpecialPlaylists } from '@common/playlists.enum';
+import type { PlaylistDto } from '@common/collections/dtos';
 import type { TFunction } from 'i18next';
 
 import { CollectionClient } from '../../api/CollectionClient';
@@ -28,7 +29,7 @@ export async function buildSongPlaylistMenuItem(
     params;
 
   // 1. Fetch user-created root playlists (cached globally by TanStack Query)
-  let playlists = [];
+  let playlists: PlaylistDto[] = [];
   try {
     playlists = await queryClient.ensureQueryData(rootCollectionsOptions('aToZ'));
   } catch (err) {
@@ -85,10 +86,14 @@ export async function buildSongPlaylistMenuItem(
 
           try {
             if (isIncluded) {
-              await CollectionClient.removeSongs({
-                playlistId: playlist.id,
-                songIds: [singleSongId]
-              });
+              const entries = await CollectionClient.getEntries(playlist.id);
+              const matchingEntries = entries.filter((e) => e.songId === singleSongId);
+              if (matchingEntries.length > 0) {
+                await CollectionClient.removeSongs({
+                  playlistId: playlist.id,
+                  entryIds: matchingEntries.map((e) => e.id)
+                });
+              }
               addNewNotifications([
                 {
                   id: `removed-from-${playlist.id}-${singleSongId}`,

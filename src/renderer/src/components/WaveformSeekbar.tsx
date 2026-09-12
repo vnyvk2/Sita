@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState
 } from 'react';
@@ -222,9 +223,9 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     progressPercentRef.current = 0;
     drawCanvas();
 
-    if (typeof window.api?.getSongWaveform === 'function') {
-      window.api
-        .getSongWaveform(songId)
+    const getWaveform = window.api?.audioLibraryControls?.getSongWaveform;
+    if (typeof getWaveform === 'function') {
+      getWaveform(songId)
         .then((data) => {
           // Discard stale responses if song changed while in-flight
           if (requestSeqRef.current !== currentReqId) return;
@@ -366,22 +367,23 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
 
   // Debounced wheel scroll handler for interval scrubbing
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleWheelSeek = useCallback(
-    debounce((direction: 'up' | 'down') => {
-      const interval = preferences?.seekbarScrollInterval ?? 5;
-      const totalDuration = getEffectiveDuration();
-      const currentPos = progressPercentRef.current * totalDuration;
-      const nextPos =
-        direction === 'up'
-          ? Math.min(totalDuration, currentPos + interval)
-          : Math.max(0, currentPos - interval);
+  const handleWheelSeek = useMemo(
+    () =>
+      debounce((direction: 'up' | 'down') => {
+        const interval = preferences?.seekbarScrollInterval ?? 5;
+        const totalDuration = getEffectiveDuration();
+        const currentPos = progressPercentRef.current * totalDuration;
+        const nextPos =
+          direction === 'up'
+            ? Math.min(totalDuration, currentPos + interval)
+            : Math.max(0, currentPos - interval);
 
-      progressPercentRef.current =
-        totalDuration > 0 ? Math.min(1, Math.max(0, nextPos / totalDuration)) : 0;
-      updateSongPosition(nextPos);
-      onSeek?.(nextPos);
-      drawCanvas();
-    }, 100),
+        progressPercentRef.current =
+          totalDuration > 0 ? Math.min(1, Math.max(0, nextPos / totalDuration)) : 0;
+        updateSongPosition(nextPos);
+        onSeek?.(nextPos);
+        drawCanvas();
+      }, 100),
     [preferences?.seekbarScrollInterval, updateSongPosition, onSeek, drawCanvas, getEffectiveDuration]
   );
 

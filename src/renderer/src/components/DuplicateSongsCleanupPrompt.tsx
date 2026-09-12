@@ -60,30 +60,45 @@ const CATEGORY_ORDER: SongDuplicateCategory[] = [
 
 const SECTION_META: Record<
   SongDuplicateCategory,
-  { icon: string; titleKey: string; descriptionKey: string; accentClassName: string }
+  {
+    icon: string;
+    titleKey: string;
+    defaultTitle: string;
+    descriptionKey: string;
+    defaultDescription: string;
+    accentClassName: string;
+  }
 > = {
   EXACT_DUPLICATE: {
     icon: 'content_copy',
     titleKey: 'duplicateSongsSuggestion.exactDuplicates',
+    defaultTitle: 'Exact Duplicates',
     descriptionKey: 'duplicateSongsSuggestion.exactDuplicatesDesc',
+    defaultDescription: 'Identical audio files found in multiple locations.',
     accentClassName: 'bg-green-500/20 text-green-600 dark:text-green-400'
   },
   PROBABLE_DUPLICATE: {
     icon: 'help_outline',
     titleKey: 'duplicateSongsSuggestion.probableDuplicates',
+    defaultTitle: 'Probable Duplicates',
     descriptionKey: 'duplicateSongsSuggestion.probableDuplicatesDesc',
+    defaultDescription: 'Same track with similar duration and metadata.',
     accentClassName: 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
   },
   MANUAL_REVIEW: {
     icon: 'rate_review',
     titleKey: 'duplicateSongsSuggestion.needsReview',
+    defaultTitle: 'Needs Review',
     descriptionKey: 'duplicateSongsSuggestion.needsReviewDesc',
+    defaultDescription: 'Potential duplicates that require manual inspection.',
     accentClassName: 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
   },
   ALTERNATIVE_VERSION: {
     icon: 'alt_route',
     titleKey: 'duplicateSongsSuggestion.otherVersions',
+    defaultTitle: 'Other Versions',
     descriptionKey: 'duplicateSongsSuggestion.otherVersionsDesc',
+    defaultDescription: 'Different versions (live, acoustic, remasters) of songs in your library.',
     accentClassName: 'bg-violet-500/20 text-violet-600 dark:text-violet-400'
   }
 };
@@ -280,10 +295,16 @@ export const DuplicateSongsCleanupPrompt = () => {
     count: number;
     accentClassName?: string;
   }> = [
-    { id: 'ALL', label: t('duplicateSongsPrompt.all', 'All'), count: groups.length },
+    {
+      id: 'ALL',
+      label: (t as any)('duplicateSongsPrompt.all', { defaultValue: 'All' }) as string,
+      count: groups.length
+    },
     ...CATEGORY_ORDER.map((category) => ({
       id: category as TabFilter,
-      label: t(SECTION_META[category].titleKey),
+      label: (t as any)(SECTION_META[category].titleKey, {
+        defaultValue: SECTION_META[category].defaultTitle
+      }) as string,
       count: groupedByCategory.get(category)?.length ?? 0,
       accentClassName: SECTION_META[category].accentClassName
     })).filter((entry) => entry.count > 0)
@@ -381,15 +402,14 @@ export const DuplicateSongsCleanupPrompt = () => {
         </div>
         <p className="mt-1 text-xs text-black/60 dark:text-white/60">
           {groups.length > 0
-            ? t(
-                'duplicateSongsPrompt.subtitle',
-                { count: groups.length },
-                'The original copy is locked and kept safe. Verify the duplicate copies below before removing.'
-              )
-            : t(
-                'duplicateSongsPrompt.noDuplicates',
-                'No duplicate songs found — your library is clean!'
-              )}
+            ? (t as any)('duplicateSongsPrompt.subtitle', {
+                count: groups.length,
+                defaultValue:
+                  'The original copy is locked and kept safe. Verify the duplicate copies below before removing.'
+              })
+            : (t as any)('duplicateSongsPrompt.noDuplicates', {
+                defaultValue: 'No duplicate songs found — your library is clean!'
+              })}
         </p>
       </div>
 
@@ -455,7 +475,9 @@ export const DuplicateSongsCleanupPrompt = () => {
                     <span className={`material-icons-round text-[20px] ${meta.accentClassName}`}>
                       {meta.icon}
                     </span>
-                    <p className="text-base font-semibold">{t(meta.titleKey)}</p>
+                    <p className="text-base font-semibold">
+                      {(t as any)(meta.titleKey, { defaultValue: meta.defaultTitle })}
+                    </p>
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${meta.accentClassName}`}
                     >
@@ -490,7 +512,7 @@ export const DuplicateSongsCleanupPrompt = () => {
                     ))}
                 </div>
                 <p className="mb-2.5 text-xs text-black/60 dark:text-white/60">
-                  {t(meta.descriptionKey)}
+                  {(t as any)(meta.descriptionKey, { defaultValue: meta.defaultDescription })}
                 </p>
                 {categoryGroups.map((group) => (
                   <DuplicateGroupCard
@@ -562,7 +584,7 @@ interface GroupCardProps {
   onRemove: (group: SongDuplicateGroup) => void;
   onIgnore: (group: SongDuplicateGroup) => void;
   onSwapKeeper: (group: SongDuplicateGroup, newKeeperId: number) => void;
-  t: (key: string, options?: any) => string;
+  t: (key: any, options?: any) => string;
 }
 
 function DuplicateGroupCard({

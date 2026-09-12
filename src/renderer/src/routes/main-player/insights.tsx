@@ -13,7 +13,7 @@ import { analyticsQuery, type HistoryPeriod } from '@renderer/queries/analytics'
 import { queryClient } from '@renderer/queryClient';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 export const Route = createFileRoute('/main-player/insights')({
   component: InsightsPage,

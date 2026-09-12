@@ -1,9 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 // @vitest-environment jsdom
-import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { TrackMatchPreview } from '../../../../common/metadata/types';
+import type { TrackMatchPreview } from '@common/metadata/types';
 import { CompactReviewView } from '../CompactReviewView';
 
 describe('CompactReviewView Component', () => {
@@ -18,7 +17,7 @@ describe('CompactReviewView Component', () => {
       oldArtist: 'Olivia',
       oldTrackNumber: 1,
       confidence: 0.98,
-      confidenceLevel: 'High',
+      confidenceLevel: 'Excellent',
       why: 'Strong match',
       reasons: [],
       applyTrack: true,
@@ -72,7 +71,7 @@ describe('CompactReviewView Component', () => {
       oldArtist: 'Olivia Rodrigo',
       oldTrackNumber: 2,
       confidence: 0.99,
-      confidenceLevel: 'High',
+      confidenceLevel: 'Excellent',
       why: 'Exact match',
       reasons: [],
       applyTrack: true,
@@ -163,7 +162,7 @@ describe('CompactReviewView Component', () => {
         oldArtist: 'Dr. Dre, Snoop Dogg',
         oldTrackNumber: 1,
         confidence: 0.98,
-        confidenceLevel: 'High',
+        confidenceLevel: 'Excellent',
         why: 'Matched',
         reasons: [],
         applyTrack: true,
@@ -247,7 +246,7 @@ describe('CompactReviewView Component', () => {
         oldArtist: 'Dr. Dre, Snoop Dogg',
         oldTrackNumber: 1,
         confidence: 0.98,
-        confidenceLevel: 'High',
+        confidenceLevel: 'Excellent',
         why: 'Matched',
         reasons: [],
         applyTrack: true,
@@ -466,7 +465,7 @@ describe('CompactReviewView Component', () => {
         oldArtist: '',
         oldTrackNumber: 1,
         confidence: 0,
-        confidenceLevel: 'Low',
+        confidenceLevel: 'Poor',
         why: 'Not in local library',
         reasons: ['missing_locally'],
         applyTrack: false,

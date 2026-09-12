@@ -15,7 +15,7 @@ import { queryClient } from '@renderer/queryClient';
 import { updateRouteState } from '@renderer/store/routeStateStore';
 import { store } from '@renderer/store/store';
 import { lyricsSchema } from '@renderer/utils/zod/lyricsSchema';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useMemo, useRef, useState } from 'react';

@@ -59,6 +59,7 @@ export interface AlbumMetadata {
   label?: string;
   releaseType?: string;
   artwork?: ArtworkMetadata;
+  coverArtUrl?: string;
   discCount?: number;
   trackCount?: number;
   releaseId?: string;
