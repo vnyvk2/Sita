@@ -27,6 +27,19 @@ export class PlaylistRepository {
     return playlist || null;
   }
 
+  public async existsByName(name: string, trx: DB | DBTransaction = db): Promise<boolean> {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    const [playlist] = await trx
+      .select({ id: playlists.id })
+      .from(playlists)
+      .where(sql`LOWER(${playlists.name}) = LOWER(${trimmed})`)
+      .limit(1);
+
+    return Boolean(playlist);
+  }
+
+
   public async getSmartRule(playlistId: number, trx: DB | DBTransaction = db) {
     const [rule] = await trx
       .select()

@@ -34,8 +34,11 @@ import type {
   PlaylistImportIpcOptions,
   PlaylistImportAnalysis,
   PlaylistBatchExportOptions,
-  BatchExportResult
+  BatchExportResult,
+  BatchImportProgressPayload,
+  BatchImportSummaryResult
 } from '../common/collections/types';
+
 import type { MetadataProviderPreferences, MetadataSearchOptions } from '../common/metadata';
 import type {
   HistoryPeriod,
@@ -944,8 +947,20 @@ const collections = {
   analyze: (filePath?: string): Promise<PlaylistImportAnalysis | null> =>
     ipcRenderer.invoke('collections/analyze', filePath),
   import: (options?: PlaylistImportIpcOptions): Promise<void> =>
-    ipcRenderer.invoke('collections/import', options)
+    ipcRenderer.invoke('collections/import', options),
+  importBatch: (filePaths: string[]): Promise<BatchImportSummaryResult> =>
+    ipcRenderer.invoke('collections/import-batch', filePaths),
+  cancelImportBatch: (sessionId: string): Promise<boolean> =>
+    ipcRenderer.invoke('collections/import-batch-cancel', sessionId),
+  onBatchProgress: (callback: (progress: BatchImportProgressPayload) => void) => {
+    const handler = (_e: unknown, progress: BatchImportProgressPayload) => callback(progress);
+    ipcRenderer.on('playlistBatch/progress', handler);
+    return () => {
+      ipcRenderer.removeListener('playlistBatch/progress', handler);
+    };
+  }
 };
+
 
 const membership = {
   getMembers: (collection: { kind: string; id: string | number }, memberKind: string) =>
