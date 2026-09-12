@@ -346,7 +346,17 @@ function SongsPage() {
           title: canonicalQueueTitle
         });
       } else {
-        createQueue(queueSongIds, 'songs', false, undefined, true, contextualQueueTitle);
+        const targetIndex = queueSongIds.indexOf(currSongId);
+        if (targetIndex === -1) return;
+        createQueue(
+          queueSongIds,
+          'songs',
+          false,
+          undefined,
+          true,
+          contextualQueueTitle,
+          targetIndex
+        );
       }
     },
     [
