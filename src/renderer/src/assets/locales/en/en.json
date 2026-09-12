@@ -1202,7 +1202,11 @@
     "scanning": "Scanning library for duplicates…",
     "originalBadge": "Original (Keep)",
     "close": "Close",
-    "removeAllSelected": "Remove Selected ({{count}})"
+    "removeAllSelected": "Remove Selected ({{count}})",
+    "all": "All",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "keepInstead": "Keep this file instead"
   },
 
   "duplicateArtistsSuggestion": {
@@ -1307,6 +1311,10 @@
     "PLAYLIST_EXPORT_SUCCESS": "Exported `{{name}}` playlist successfully.",
     "PLAYLIST_EXPORT_FAILED": "Error occurred when exporting `{{name}}` playlist.",
     "PLAYLIST_IMPORT_SUCCESS": "Imported `{{name}}` playlist successfully.",
+    "PLAYLIST_IMPORT_BATCH_SUCCESS": "Imported {{imported}} of {{total}} playlists.",
+    "PLAYLIST_IMPORT_BATCH_FAILED": "Failed to import playlists.",
+    "PLAYLIST_IMPORT_BATCH_CANCELLED": "Playlist batch import cancelled.",
+    "PLAYLIST_IMPORT_BATCH_ALREADY_IN_PROGRESS": "A playlist batch import is already in progress.",
     "PLAYLIST_IMPORT_FAILED": "Failed to import the playlist.",
     "PLAYLIST_IMPORT_FAILED_DUE_TO_SONGS_OUTSIDE_LIBRARY": "Skipped $t(common.songWithCount, {\"count\":{{count}}}) that could not be found in your Nora library.",
     "PLAYLIST_IMPORT_FAILED_DUE_TO_INVALID_FILE_DATA": "Failed to import the playlist because user selected a file with invalid file data.",

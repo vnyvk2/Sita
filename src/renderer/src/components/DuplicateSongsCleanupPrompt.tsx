@@ -43,6 +43,8 @@ export interface ResolveDuplicatesResult {
   failed: Array<{ songId: number; error: string }>;
 }
 
+type TabFilter = 'ALL' | SongDuplicateCategory;
+
 // ---------------------------------------------------------------------------
 // Constants & helpers
 // ---------------------------------------------------------------------------
@@ -110,12 +112,30 @@ function qualityLabel(
   return format.toUpperCase();
 }
 
-/** Pre-ticks duplicate copies except the locked original (review groups: user decides). */
-function initialSelection(group: SongDuplicateGroup): number[] {
-  if (group.category === 'EXACT_DUPLICATE' || group.category === 'PROBABLE_DUPLICATE') {
-    return group.songs.filter((song) => song.id !== group.recommendedKeepId).map((song) => song.id);
+/**
+ * The effective keeper: the swapped choice if it is still a group member (a resolve/refetch can
+ * change membership), otherwise the engine recommendation. Swaps are session-only — no storage, no
+ * persistence.
+ */
+function getEffectiveKeeper(
+  group: SongDuplicateGroup,
+  swappedKeepers: Record<string, number>
+): number | null {
+  const swapped = swappedKeepers[group.groupKey];
+  if (swapped !== undefined && group.songs.some((song) => song.id === swapped)) {
+    return swapped;
   }
-  return [];
+  return group.recommendedKeepId;
+}
+
+/** Default selection: every copy except the (effective) keeper. */
+function defaultSelection(
+  group: SongDuplicateGroup,
+  swappedKeepers: Record<string, number>
+): number[] {
+  if (group.category !== 'EXACT_DUPLICATE' && group.category !== 'PROBABLE_DUPLICATE') return [];
+  const keeper = getEffectiveKeeper(group, swappedKeepers);
+  return group.songs.filter((song) => song.id !== keeper).map((song) => song.id);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +148,8 @@ export const DuplicateSongsCleanupPrompt = () => {
   const { t } = useTranslation();
 
   const [selections, setSelections] = useState<Record<string, number[]>>({});
+  const [swappedKeepers, setSwappedKeepers] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState<TabFilter>('ALL');
   const [moveToTrash, setMoveToTrash] = useState(true);
 
   // Runs on-demand when the prompt is open. When prompt is closed, 0 background queries.
@@ -140,9 +162,11 @@ export const DuplicateSongsCleanupPrompt = () => {
   useEffect(() => {
     const next: Record<string, number[]> = {};
     for (const group of groups) {
-      next[group.groupKey] = initialSelection(group);
+      next[group.groupKey] = defaultSelection(group, swappedKeepers);
     }
     setSelections(next);
+    // Swaps are preserved across refetches; getEffectiveKeeper guards validity against group membership
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups]);
 
   const resolveMutation = useMutation({
@@ -246,9 +270,29 @@ export const DuplicateSongsCleanupPrompt = () => {
 
   const isResolving = resolveMutation.isPending;
 
+  // Fall back to 'ALL' if the active category tab emptied out after a resolution
+  const effectiveTab: TabFilter =
+    activeTab === 'ALL' || (groupedByCategory.get(activeTab)?.length ?? 0) > 0 ? activeTab : 'ALL';
+
+  const tabEntries: Array<{
+    id: TabFilter;
+    label: string;
+    count: number;
+    accentClassName?: string;
+  }> = [
+    { id: 'ALL', label: t('duplicateSongsPrompt.all', 'All'), count: groups.length },
+    ...CATEGORY_ORDER.map((category) => ({
+      id: category as TabFilter,
+      label: t(SECTION_META[category].titleKey),
+      count: groupedByCategory.get(category)?.length ?? 0,
+      accentClassName: SECTION_META[category].accentClassName
+    })).filter((entry) => entry.count > 0)
+  ];
+
   const handleToggleSong = (group: SongDuplicateGroup, songId: number) => {
-    // The original is locked and can never be ticked
-    if (songId === group.recommendedKeepId && group.category !== 'MANUAL_REVIEW') return;
+    const keeper = getEffectiveKeeper(group, swappedKeepers);
+    // The (possibly swapped) original is locked and can never be ticked
+    if (group.category !== 'MANUAL_REVIEW' && keeper === songId) return;
     setSelections((prev) => {
       const current = prev[group.groupKey] ?? [];
       const next = current.includes(songId)
@@ -257,6 +301,49 @@ export const DuplicateSongsCleanupPrompt = () => {
       return { ...prev, [group.groupKey]: next };
     });
   };
+
+  const handleSwapKeeper = (group: SongDuplicateGroup, newKeeperId: number) => {
+    const keeper = getEffectiveKeeper(group, swappedKeepers);
+    if (keeper === null || keeper === newKeeperId) return;
+    setSwappedKeepers((prev) => ({ ...prev, [group.groupKey]: newKeeperId }));
+    setSelections((prev) => {
+      const next = new Set(prev[group.groupKey] ?? []);
+      next.add(keeper); // The demoted original becomes a deletion candidate
+      next.delete(newKeeperId); // The new keeper is locked and never selected
+      return { ...prev, [group.groupKey]: [...next] };
+    });
+  };
+
+  const handleSectionSelectAll = (groupsInSection: SongDuplicateGroup[]) => {
+    setSelections((prev) => {
+      const next = { ...prev };
+      for (const group of groupsInSection) {
+        const keeper = getEffectiveKeeper(group, swappedKeepers);
+        next[group.groupKey] = group.songs
+          .filter((song) => song.id !== keeper)
+          .map((song) => song.id);
+      }
+      return next;
+    });
+  };
+
+  const handleSectionDeselectAll = (groupsInSection: SongDuplicateGroup[]) => {
+    setSelections((prev) => {
+      const next = { ...prev };
+      for (const group of groupsInSection) next[group.groupKey] = [];
+      return next;
+    });
+  };
+
+  const isSectionFullySelected = (groupsInSection: SongDuplicateGroup[]): boolean =>
+    groupsInSection.every((group) => {
+      const keeper = getEffectiveKeeper(group, swappedKeepers);
+      const target = group.songs.filter((song) => song.id !== keeper).length;
+      return target > 0 && (selections[group.groupKey] ?? []).length === target;
+    });
+
+  const sectionHasSelection = (groupsInSection: SongDuplicateGroup[]): boolean =>
+    groupsInSection.some((group) => (selections[group.groupKey] ?? []).length > 0);
 
   const handleRemoveGroup = (group: SongDuplicateGroup) => {
     const songIds = selections[group.groupKey] ?? [];
@@ -280,7 +367,7 @@ export const DuplicateSongsCleanupPrompt = () => {
   return (
     <div className="flex max-h-[75vh] w-full flex-col">
       {/* Header */}
-      <div className="mb-4 shrink-0 border-b border-black/10 pb-3 dark:border-white/10">
+      <div className="mb-3 shrink-0 border-b border-black/10 pb-3 dark:border-white/10">
         <div className="flex items-center gap-2">
           <span className="material-icons-round text-font-color-highlight text-2xl">
             cleaning_services
@@ -297,7 +384,7 @@ export const DuplicateSongsCleanupPrompt = () => {
             ? t(
                 'duplicateSongsPrompt.subtitle',
                 { count: groups.length },
-                'The original copy is locked and kept safe. Verify the ticked copies below before removing.'
+                'The original copy is locked and kept safe. Verify the duplicate copies below before removing.'
               )
             : t(
                 'duplicateSongsPrompt.noDuplicates',
@@ -305,6 +392,27 @@ export const DuplicateSongsCleanupPrompt = () => {
               )}
         </p>
       </div>
+
+      {/* Category Tabs */}
+      {groups.length > 0 && (
+        <div className="mb-3 flex shrink-0 flex-wrap gap-1.5 border-b border-black/10 pb-3 dark:border-white/10">
+          {tabEntries.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`cursor-pointer rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                effectiveTab === tab.id
+                  ? (tab.accentClassName ??
+                    'bg-black/20 text-black dark:bg-white/25 dark:text-white')
+                  : 'bg-black/5 text-black/60 hover:bg-black/10 dark:bg-white/10 dark:text-white/60 dark:hover:bg-white/15'
+              }`}
+            >
+              {tab.label} ({tab.count})
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Body: Scrollable groups list */}
       <div className="flex-1 overflow-y-auto pr-1">
@@ -333,21 +441,53 @@ export const DuplicateSongsCleanupPrompt = () => {
           </div>
         ) : (
           CATEGORY_ORDER.map((category) => {
+            if (effectiveTab !== 'ALL' && effectiveTab !== category) return null;
             const categoryGroups = groupedByCategory.get(category);
             if (!categoryGroups || categoryGroups.length === 0) return null;
             const meta = SECTION_META[category];
+            const isReview = category === 'MANUAL_REVIEW';
+            const isVersionFamily = category === 'ALTERNATIVE_VERSION';
+
             return (
               <section key={category} className="mb-5 last:mb-0">
-                <div className="mb-1 flex items-center gap-2">
-                  <span className={`material-icons-round text-[20px] ${meta.accentClassName}`}>
-                    {meta.icon}
-                  </span>
-                  <p className="text-base font-semibold">{t(meta.titleKey)}</p>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${meta.accentClassName}`}
-                  >
-                    {categoryGroups.length}
-                  </span>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`material-icons-round text-[20px] ${meta.accentClassName}`}>
+                      {meta.icon}
+                    </span>
+                    <p className="text-base font-semibold">{t(meta.titleKey)}</p>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${meta.accentClassName}`}
+                    >
+                      {categoryGroups.length}
+                    </span>
+                  </div>
+
+                  {/* Bulk Select / Deselect controls */}
+                  {!isVersionFamily &&
+                    (isReview ? (
+                      sectionHasSelection(categoryGroups) ? (
+                        <BulkToggleButton
+                          label={t('duplicateSongsPrompt.deselectAll', 'Deselect All')}
+                          onClick={() => handleSectionDeselectAll(categoryGroups)}
+                          disabled={isResolving}
+                        />
+                      ) : null
+                    ) : (
+                      <BulkToggleButton
+                        label={
+                          isSectionFullySelected(categoryGroups)
+                            ? t('duplicateSongsPrompt.deselectAll', 'Deselect All')
+                            : t('duplicateSongsPrompt.selectAll', 'Select All')
+                        }
+                        onClick={() =>
+                          isSectionFullySelected(categoryGroups)
+                            ? handleSectionDeselectAll(categoryGroups)
+                            : handleSectionSelectAll(categoryGroups)
+                        }
+                        disabled={isResolving}
+                      />
+                    ))}
                 </div>
                 <p className="mb-2.5 text-xs text-black/60 dark:text-white/60">
                   {t(meta.descriptionKey)}
@@ -356,11 +496,13 @@ export const DuplicateSongsCleanupPrompt = () => {
                   <DuplicateGroupCard
                     key={group.groupKey}
                     group={group}
+                    keeperId={getEffectiveKeeper(group, swappedKeepers)}
                     selection={selections[group.groupKey] ?? []}
                     isResolving={isResolving}
                     onToggleSong={handleToggleSong}
                     onRemove={handleRemoveGroup}
                     onIgnore={(g) => ignoreMutation.mutate(g)}
+                    onSwapKeeper={handleSwapKeeper}
                     t={t}
                   />
                 ))}
@@ -413,25 +555,30 @@ export const DuplicateSongsCleanupPrompt = () => {
 
 interface GroupCardProps {
   group: SongDuplicateGroup;
+  keeperId: number | null;
   selection: number[];
   isResolving: boolean;
   onToggleSong: (group: SongDuplicateGroup, songId: number) => void;
   onRemove: (group: SongDuplicateGroup) => void;
   onIgnore: (group: SongDuplicateGroup) => void;
+  onSwapKeeper: (group: SongDuplicateGroup, newKeeperId: number) => void;
   t: (key: string, options?: any) => string;
 }
 
 function DuplicateGroupCard({
   group,
+  keeperId,
   selection,
   isResolving,
   onToggleSong,
   onRemove,
   onIgnore,
+  onSwapKeeper,
   t
 }: GroupCardProps) {
   const isVersionFamily = group.category === 'ALTERNATIVE_VERSION';
   const isReview = group.category === 'MANUAL_REVIEW';
+  const hasKeeperLogic = !isVersionFamily && !isReview;
   const canRemove =
     !isVersionFamily && selection.length > 0 && selection.length < group.songs.length;
 
@@ -465,7 +612,7 @@ function DuplicateGroupCard({
       {/* Song rows */}
       <div className="flex flex-col gap-1.5">
         {group.songs.map((song) => {
-          const isLockedOriginal = !isReview && song.id === group.recommendedKeepId;
+          const isLockedOriginal = hasKeeperLogic && song.id === keeperId;
           return (
             <div
               key={song.id}
@@ -510,6 +657,18 @@ function DuplicateGroupCard({
                   {formatDuration(song.durationSec)}
                 </span>
               </div>
+
+              {hasKeeperLogic && !isLockedOriginal && (
+                <button
+                  type="button"
+                  title={t('duplicateSongsPrompt.keepInstead', 'Keep this file instead')}
+                  onClick={() => onSwapKeeper(group, song.id)}
+                  disabled={isResolving}
+                  className="shrink-0 cursor-pointer rounded-full p-1 text-black/50 transition-colors hover:bg-black/10 hover:text-black dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
+                >
+                  <span className="material-icons-round text-[16px]">swap_vert</span>
+                </button>
+              )}
             </div>
           );
         })}
@@ -550,6 +709,27 @@ function DuplicateGroupCard({
         </div>
       )}
     </div>
+  );
+}
+
+function BulkToggleButton({
+  label,
+  onClick,
+  disabled
+}: {
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="shrink-0 cursor-pointer text-xs text-black/60 transition-colors hover:text-black hover:underline disabled:opacity-50 dark:text-white/60 dark:hover:text-white"
+    >
+      {label}
+    </button>
   );
 }
 
