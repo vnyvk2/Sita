@@ -40,6 +40,7 @@ import {
   addDefaultAppProtocolToFilePath,
   getPlaylistArtworkPath,
   getSongArtworkPath,
+  parseAlbumArtworks,
   parseSongArtworks,
   removeDefaultAppProtocolFromFilePath,
   resetArtworkCache,
@@ -115,6 +116,35 @@ describe('resolveFilePaths', () => {
     expect(paths.isDefaultArtwork).toBe(true);
     expect(paths.artworkPath).toContain('song-cover.webp');
     expect(paths.optimizedArtworkPath).toContain('song-cover.webp');
+  });
+
+  test('parseAlbumArtworks dirty-data case (Audit D2 / P6): selects latest artwork when multiple artworks are linked', () => {
+    const dirtyArtworks = [
+      // Older artwork links (e.g. from initial library import)
+      { id: 10, path: 'artworks/old_high.webp', isOptimized: false },
+      { id: 11, path: 'artworks/old_opt.webp', isOptimized: true },
+      // Newer artwork links (e.g. from subsequent auto-tag or metadata update)
+      { id: 25, path: 'artworks/new_high.webp', isOptimized: false },
+      { id: 26, path: 'artworks/new_opt.webp', isOptimized: true }
+    ];
+
+    const paths = parseAlbumArtworks(dirtyArtworks as never);
+
+    expect(paths.isDefaultArtwork).toBe(false);
+    // Highest ID non-optimized artwork must win
+    expect(paths.artworkPath).toContain('new_high.webp');
+    expect(paths.artworkPath).not.toContain('old_high.webp');
+    // Highest ID optimized artwork must win
+    expect(paths.optimizedArtworkPath).toContain('new_opt.webp');
+    expect(paths.optimizedArtworkPath).not.toContain('old_opt.webp');
+  });
+
+  test('parseAlbumArtworks falls back to default artwork when no artwork exists', () => {
+    const paths = parseAlbumArtworks([] as never);
+
+    expect(paths.isDefaultArtwork).toBe(true);
+    expect(paths.artworkPath).toContain('album-cover.webp');
+    expect(paths.optimizedArtworkPath).toContain('album-cover.webp');
   });
 
   test('getPlaylistArtworkPath returns history and favorites defaults', () => {

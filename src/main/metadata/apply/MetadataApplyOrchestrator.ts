@@ -362,6 +362,9 @@ export class MetadataApplyOrchestrator {
             })
           } as unknown as Parameters<typeof syncSongRelationalData>[0]['tags'],
           processedArtwork,
+          options: {
+            replaceAlbumArtwork: Boolean(m.artwork)
+          },
           trx
         });
 

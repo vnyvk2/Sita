@@ -2,6 +2,33 @@ import { syncAlbumArtworks } from '@main/db/queries/artworks';
 import { describe, expect, it, vi } from 'vitest';
 
 describe('syncAlbumArtworks (BUG-08 Preservation of LOCAL artwork)', () => {
+  const extractParams = (condition: any): number[] => {
+    const numbers: number[] = [];
+    const visited = new Set<any>();
+
+    const traverse = (node: any) => {
+      if (!node || typeof node !== 'object') {
+        if (typeof node === 'number') numbers.push(node);
+        return;
+      }
+      if (visited.has(node)) return;
+      visited.add(node);
+
+      if ('value' in node && typeof node.value === 'number') {
+        numbers.push(node.value);
+      }
+      if (Array.isArray(node)) {
+        for (const el of node) traverse(el);
+      } else {
+        if (node.queryChunks) traverse(node.queryChunks);
+        if (node.value) traverse(node.value);
+      }
+    };
+
+    traverse(condition);
+    return numbers;
+  };
+
   const createMockDb = (
     existingLinks: Array<{ artworkId: number; source: 'LOCAL' | 'REMOTE' }>
   ) => {
@@ -27,11 +54,11 @@ describe('syncAlbumArtworks (BUG-08 Preservation of LOCAL artwork)', () => {
       }),
       delete: vi.fn().mockReturnValue({
         where: vi.fn().mockImplementation((condition) => {
-          // Track deleted remote IDs
-          const remoteToRemove = existingLinks
-            .filter((l) => l.source === 'REMOTE')
-            .map((l) => l.artworkId);
-          deletedArtworkIds.push(...remoteToRemove);
+          const rawParams = extractParams(condition);
+          const matchingDeleted = existingLinks
+            .map((l) => l.artworkId)
+            .filter((id) => rawParams.includes(id));
+          deletedArtworkIds.push(...matchingDeleted);
           return Promise.resolve();
         })
       }),
@@ -103,5 +130,30 @@ describe('syncAlbumArtworks (BUG-08 Preservation of LOCAL artwork)', () => {
     expect(deletedArtworkIds).toEqual([]); // No deletions
     expect(insertedRecords).toEqual([]); // No additions
     expect(result).toEqual([{ artworkId: 101 }]);
+  });
+
+  it('Case 6: LOCAL + new LOCAL with replaceLocal: true -> Unlinks old LOCAL and adds new LOCAL', async () => {
+    const { mockTrx, deletedArtworkIds, insertedRecords } = createMockDb([
+      { artworkId: 101, source: 'LOCAL' }
+    ]);
+
+    const result = await syncAlbumArtworks(1, [201], mockTrx, { replaceLocal: true });
+
+    expect(deletedArtworkIds).toEqual([101]); // Old LOCAL is removed with opt-in replaceLocal
+    expect(insertedRecords).toEqual([{ albumId: 1, artworkId: 201 }]);
+    expect(result).toEqual([{ artworkId: 201 }]);
+  });
+
+  it('Case 7: LOCAL + REMOTE + new with replaceLocal: true -> Unlinks both old LOCAL and REMOTE and adds new', async () => {
+    const { mockTrx, deletedArtworkIds, insertedRecords } = createMockDb([
+      { artworkId: 101, source: 'LOCAL' },
+      { artworkId: 201, source: 'REMOTE' }
+    ]);
+
+    const result = await syncAlbumArtworks(1, [301], mockTrx, { replaceLocal: true });
+
+    expect(deletedArtworkIds).toEqual([101, 201]); // Both old LOCAL and REMOTE removed
+    expect(insertedRecords).toEqual([{ albumId: 1, artworkId: 301 }]);
+    expect(result).toEqual([{ artworkId: 301 }]);
   });
 });

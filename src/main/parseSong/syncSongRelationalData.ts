@@ -37,6 +37,7 @@ export interface SyncSongRelationalDataArgs {
   tags: SongTags;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   processedArtwork?: { existing?: any; payloads?: any };
+  options?: { replaceAlbumArtwork?: boolean };
   trx: DBTransaction;
 }
 
@@ -53,6 +54,7 @@ export const syncSongRelationalData = async ({
   song,
   tags,
   processedArtwork,
+  options,
   trx
 }: SyncSongRelationalDataArgs): Promise<{ artworkData: any | undefined }> => {
   // / / / / / SONG ARTWORK / / / / / / /
@@ -71,7 +73,9 @@ export const syncSongRelationalData = async ({
       // Invariant BUG-08: Synchronize album artwork for song's current album
       const songAlbumId = song.albums?.[0]?.album?.id;
       if (songAlbumId) {
-        await syncAlbumArtworks(songAlbumId, artworkIds, trx);
+        await syncAlbumArtworks(songAlbumId, artworkIds, trx, {
+          replaceLocal: Boolean(options?.replaceAlbumArtwork)
+        });
       }
     }
   }
@@ -203,7 +207,8 @@ export const syncSongRelationalData = async ({
           await syncAlbumArtworks(
             targetAlbumId,
             artworkData.map((art: any) => art.id),
-            trx
+            trx,
+            { replaceLocal: Boolean(options?.replaceAlbumArtwork) }
           );
         }
       }

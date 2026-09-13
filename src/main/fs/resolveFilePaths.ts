@@ -228,8 +228,14 @@ export const parseAlbumArtworks = (
   const isArtworkAvailable = artworks.length > 0;
 
   if (isArtworkAvailable) {
-    const highResImage = artworks.find((artwork) => !artwork.isOptimized) || artworks[0];
-    const optimizedImage = artworks.find((artwork) => artwork.isOptimized) || artworks[0];
+    // Contract (Audit D2 / P6):
+    // When multiple artworks exist (e.g. legacy dirty data from BUG-08 where a newly downloaded
+    // artwork was added without unlinking previous local artwork), deterministically sort descending
+    // by artwork ID (newest first). This guarantees the latest artwork wins by contract rather than
+    // relying on incidental query planner or index traversal ordering.
+    const sortedArtworks = [...artworks].sort((a, b) => b.id - a.id);
+    const highResImage = sortedArtworks.find((artwork) => !artwork.isOptimized) || sortedArtworks[0];
+    const optimizedImage = sortedArtworks.find((artwork) => artwork.isOptimized) || sortedArtworks[0];
 
     return {
       isDefaultArtwork: false,

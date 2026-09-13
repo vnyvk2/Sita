@@ -64,6 +64,7 @@ export const getAllAlbums = async (
       },
       songs: { with: { song: { columns: { id: true, title: true } } } },
       artworks: {
+        orderBy: (artworks, { desc }) => [desc(artworks.artworkId)],
         with: {
           artwork: {}
         }
@@ -201,6 +202,7 @@ export const getAlbumById = async (albumId: number, trx: DB | DBTransaction = db
       },
       songs: { with: { song: { columns: { id: true, title: true } } } },
       artworks: {
+        orderBy: (artworks, { desc }) => [desc(artworks.artworkId)],
         with: {
           artwork: {}
         }

@@ -88,10 +88,19 @@ export const syncSongArtworks = async (
     .where(eq(artworksSongs.songId, songId));
 };
 
+export interface SyncAlbumArtworksOptions {
+  /**
+   * When true, unlinks both LOCAL and REMOTE artworks that are not in artworksIds.
+   * Defaults to false, which preserves Invariant BUG-08 (only unlinking REMOTE artworks).
+   */
+  replaceLocal?: boolean;
+}
+
 export const syncAlbumArtworks = async (
   albumId: number,
   artworksIds: number[],
-  trx: DB | DBTransaction = db
+  trx: DB | DBTransaction = db,
+  options?: SyncAlbumArtworksOptions
 ) => {
   // 1. Get current artwork links for the album joined with artworks table
   const current = await trx
@@ -104,18 +113,23 @@ export const syncAlbumArtworks = async (
     .where(eq(albumsArtworks.albumId, albumId));
 
   const currentIds = current.map((row) => row.artworkId);
-  // Invariant BUG-08: Only remove REMOTE artworks that are not in the new artworksIds list.
-  // Preserves LOCAL-sourced artwork from being overwritten or destroyed.
-  const remoteToRemove = current
-    .filter((row) => row.source === 'REMOTE' && !artworksIds.includes(row.artworkId))
+  // Invariant BUG-08: By default, only remove REMOTE artworks that are not in the new artworksIds list,
+  // preserving LOCAL-sourced artwork from being overwritten or destroyed.
+  // When options?.replaceLocal is true (explicit user or auto-tag replacement), both LOCAL and REMOTE
+  // artworks not in the new artworksIds list are unlinked.
+  const toRemove = current
+    .filter(
+      (row) =>
+        (options?.replaceLocal || row.source === 'REMOTE') && !artworksIds.includes(row.artworkId)
+    )
     .map((row) => row.artworkId);
 
-  // 2. Remove outdated remote artwork links
-  if (remoteToRemove.length > 0) {
+  // 2. Remove outdated artwork links
+  if (toRemove.length > 0) {
     await trx
       .delete(albumsArtworks)
       .where(
-        and(eq(albumsArtworks.albumId, albumId), inArray(albumsArtworks.artworkId, remoteToRemove))
+        and(eq(albumsArtworks.albumId, albumId), inArray(albumsArtworks.artworkId, toRemove))
       );
   }
 
