@@ -362,7 +362,9 @@ export class MetadataBootstrap {
     workflowService.registerWorkflow(
       new ArtworkWorkflow(coverArtArchiveAdapter, discogsAdapter, musicBrainzAdapter)
     );
-    workflowService.registerWorkflow(new TrackWorkflow(musicBrainzAdapter));
+    workflowService.registerWorkflow(
+      new TrackWorkflow(musicBrainzAdapter, coverArtArchiveAdapter)
+    );
 
     const providerMergePolicy = new DefaultMetadataMergePolicy();
     const planner = new MetadataQueryPlanner(repository);

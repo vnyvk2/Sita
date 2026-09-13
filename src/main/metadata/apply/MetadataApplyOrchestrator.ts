@@ -116,8 +116,7 @@ export class MetadataApplyOrchestrator {
         if (outcome.success || outcome.deferred) {
           const hasArt =
             mutation.artwork?.buffer !== undefined ||
-            (mutation as unknown as { artworkUrl?: string }).artworkUrl !== undefined ||
-            mutation.fields.some((f) => f.fieldId === 'artworkUrl' || f.fieldId === 'artworkPath');
+            (mutation as unknown as { artworkUrl?: string }).artworkUrl !== undefined;
           if (hasArt && mutation.songId) {
             artworkSongIds.push(mutation.songId);
           }

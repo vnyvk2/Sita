@@ -571,13 +571,11 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
           fieldId: 'title',
           oldValue: seeded!.title,
           newValue: 'Updated Reactive Title'
-        },
-        {
-          fieldId: 'artworkUrl',
-          oldValue: null,
-          newValue: 'https://example.com/art.jpg'
         }
       ],
+      artwork: {
+        buffer: Buffer.from('fake-artwork-bytes')
+      },
       fileWrite: { deferredIfPlaying: false },
       undo: { description: 'Reactivity test' }
     };

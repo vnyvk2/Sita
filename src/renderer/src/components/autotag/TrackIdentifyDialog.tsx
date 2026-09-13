@@ -211,12 +211,35 @@ export function TrackIdentifyDialog({ isOpen, songs, onClose }: TrackIdentifyDia
                               className="accent-font-color-highlight dark:accent-dark-font-color-highlight rounded"
                             />
                           </td>
-                          <td className="py-2.5 capitalize font-medium text-font-color-dimmed dark:text-dark-font-color-dimmed">{diff.fieldId}</td>
+                          <td className="py-2.5 capitalize font-medium text-font-color-dimmed dark:text-dark-font-color-dimmed">
+                            {diff.fieldId === 'artworkUrl' ? 'Cover Art' : diff.fieldId}
+                          </td>
                           <td className="py-2.5 max-w-[120px] truncate pr-2 text-font-color-dimmed dark:text-dark-font-color-dimmed" title={String(diff.oldValue || '')}>
-                            {diff.oldValue || '-'}
+                            {diff.fieldId === 'artworkUrl' && diff.oldValue ? (
+                              <img
+                                src={
+                                  String(diff.oldValue).startsWith('http') ||
+                                  String(diff.oldValue).startsWith('atom')
+                                    ? String(diff.oldValue)
+                                    : `atom://${String(diff.oldValue)}`
+                                }
+                                alt="Current cover"
+                                className="w-10 h-10 object-cover rounded shadow-sm"
+                              />
+                            ) : (
+                              diff.oldValue || '-'
+                            )}
                           </td>
                           <td className="py-2.5 max-w-[120px] truncate" title={String(diff.suggestedValue || '')}>
-                            {diff.suggestedValue || '-'}
+                            {diff.fieldId === 'artworkUrl' && diff.suggestedValue ? (
+                              <img
+                                src={String(diff.suggestedValue)}
+                                alt="New cover"
+                                className="w-10 h-10 object-cover rounded shadow-sm"
+                              />
+                            ) : (
+                              diff.suggestedValue || '-'
+                            )}
                           </td>
                         </tr>
                       ))}

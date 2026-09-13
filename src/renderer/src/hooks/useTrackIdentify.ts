@@ -133,7 +133,8 @@ export function useTrackIdentify(
             trackNumber: currentSong.trackNo,
             discNumber: currentSong.discNo,
             year: currentSong.year,
-            duration: currentSong.duration
+            duration: currentSong.duration,
+            artworkPath: currentSong.artworkPath
           }
         ];
 

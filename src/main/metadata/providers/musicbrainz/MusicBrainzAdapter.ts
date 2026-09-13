@@ -419,6 +419,8 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       album?: string;
       year?: number;
       confidenceScore?: number;
+      releaseId?: string;
+      releaseGroupId?: string;
     }>
   > {
     const query = artist
@@ -426,27 +428,48 @@ export class MusicBrainzAdapter implements IMetadataProviderAdapter {
       : `recording:"${escapeLuceneValue(title)}"`;
     const recordings = await this.apiClient.searchRecordings(query, limit);
 
-    return recordings.map((r) => ({
-      id: r.id,
-      title: r.title,
-      artist: r['artist-credit']?.[0]?.name ?? r['artist-credit']?.[0]?.artist?.name,
-      album: r.releases?.[0]?.title,
-      year: r.releases?.[0]?.date ? parseInt(r.releases[0].date.substring(0, 4), 10) : undefined,
-      confidenceScore: typeof r.score === 'number' ? r.score / 100 : 0.8
-    }));
+    return recordings.map((r) => {
+      const primaryRelease = r.releases?.[0];
+      return {
+        id: r.id,
+        title: r.title,
+        artist: r['artist-credit']?.[0]?.name ?? r['artist-credit']?.[0]?.artist?.name,
+        album: primaryRelease?.title,
+        year: primaryRelease?.date ? parseInt(primaryRelease.date.substring(0, 4), 10) : undefined,
+        confidenceScore: typeof r.score === 'number' ? r.score / 100 : 0.8,
+        releaseId: primaryRelease?.id,
+        releaseGroupId: primaryRelease?.['release-group']?.id
+      };
+    });
   }
 
   public async resolveRecording(
     recordingId: string
-  ): Promise<{ id: string; title: string; artist?: string; trackNumber?: number } | null> {
+  ): Promise<{
+    id: string;
+    title: string;
+    artist?: string;
+    album?: string;
+    trackNumber?: number;
+    releaseId?: string;
+    releaseGroupId?: string;
+  } | null> {
     if (!recordingId) return null;
     const details = await this.apiClient.getRecordingById(recordingId);
     if (!details) return null;
 
+    const primaryRelease = details.releases?.[0];
+    const rawTrackNum = primaryRelease?.media?.[0]?.track?.[0]?.number;
+    const trackNumber = rawTrackNum ? parseInt(rawTrackNum, 10) : undefined;
+
     return {
       id: details.id,
       title: details.title,
-      artist: details['artist-credit']?.[0]?.name ?? details['artist-credit']?.[0]?.artist?.name
+      artist: details['artist-credit']?.[0]?.name ?? details['artist-credit']?.[0]?.artist?.name,
+      album: primaryRelease?.title,
+      trackNumber: isNaN(trackNumber!) ? undefined : trackNumber,
+      releaseId: primaryRelease?.id,
+      releaseGroupId: primaryRelease?.['release-group']?.id
     };
   }
 
