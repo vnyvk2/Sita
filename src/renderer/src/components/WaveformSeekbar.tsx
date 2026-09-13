@@ -6,6 +6,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState
 } from 'react';
@@ -577,10 +578,10 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     drawCanvas();
   };
 
-  // Debounced wheel scroll handler for interval scrubbing
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleWheelSeek = useCallback(
-    debounce((direction: 'up' | 'down') => {
+  // Stable debounced wheel scroll handler for interval scrubbing with unmount cleanup
+  const handleWheelSeekLatestRef = useRef<(direction: 'up' | 'down') => void>(() => {});
+  useEffect(() => {
+    handleWheelSeekLatestRef.current = (direction: 'up' | 'down') => {
       const interval = preferences?.seekbarScrollInterval ?? 5;
       const totalDuration = getEffectiveDuration();
       const currentPos = progressPercentRef.current * totalDuration;
@@ -594,9 +595,22 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
       updateSongPosition(nextPos);
       onSeek?.(nextPos);
       drawCanvas();
-    }, 100),
-    [preferences?.seekbarScrollInterval, updateSongPosition, onSeek, drawCanvas, getEffectiveDuration]
+    };
+  });
+
+  const handleWheelSeek = useMemo(
+    () =>
+      debounce((direction: 'up' | 'down') => {
+        handleWheelSeekLatestRef.current(direction);
+      }, 100),
+    []
   );
+
+  useEffect(() => {
+    return () => {
+      handleWheelSeek.cancel?.();
+    };
+  }, [handleWheelSeek]);
 
   const handleWheel = (e: ReactWheelEvent<HTMLDivElement>) => {
     e.preventDefault();
