@@ -69,6 +69,7 @@ import { MetadataProviderRuntime } from './runtime/MetadataProviderRuntime';
 import { MetadataSearchGateway } from './search/MetadataSearchGateway';
 import { AlbumAutoTagService } from './services/AlbumAutoTagService';
 import { AlbumMetadataService } from './services/AlbumMetadataService';
+import { CoverArtBufferService } from './services/CoverArtBufferService';
 import { MetadataApplyService } from './services/MetadataApplyService';
 import { MetadataPreferencesService } from './services/MetadataPreferencesService';
 import { MetadataWorkflowService } from './services/MetadataWorkflowService';
@@ -288,10 +289,12 @@ export class MetadataBootstrap {
 
     const albumMetadataService = new AlbumMetadataService(providerRuntime);
     const applyHistoryService = new MetadataHistoryService(new MetadataHistoryRepository());
+    const artworkDownloader = new ArtworkDownloaderService(caaPipeline);
+    const coverArtBufferService = new CoverArtBufferService(artworkDownloader);
     const orchestrator = new MetadataApplyOrchestrator({
       tagWriter: new TagWriterService(),
       historyService: applyHistoryService,
-      artworkDownloader: new ArtworkDownloaderService(caaPipeline),
+      artworkDownloader,
       getCurrentPlayingPath: () => getCurrentSongPath()
     });
     const applyService = new MetadataApplyService({
@@ -345,7 +348,8 @@ export class MetadataBootstrap {
 
     const workflowService = new MetadataWorkflowService({
       transactionManager,
-      orchestrator
+      orchestrator,
+      coverArtBufferService
     });
 
     workflowService.registerWorkflow(new AlbumWorkflow(albumMetadataService));

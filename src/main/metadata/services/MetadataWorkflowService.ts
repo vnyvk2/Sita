@@ -15,12 +15,14 @@ import type {
   WorkflowType
 } from '../workflows/MetadataWorkflow';
 import type { LocalSongInput } from './AlbumMetadataService';
+import type { CoverArtBufferService } from './CoverArtBufferService';
 import type { ApplyResult } from './MetadataApplyService';
 
 export interface MetadataWorkflowServiceOptions {
   transactionManager: MetadataTransactionManager;
   operationManager?: MetadataOperationManager;
   orchestrator?: MetadataApplyOrchestrator;
+  coverArtBufferService?: CoverArtBufferService;
 }
 
 export class MetadataWorkflowService extends EventEmitter {
@@ -28,11 +30,13 @@ export class MetadataWorkflowService extends EventEmitter {
   private readonly transactionManager: MetadataTransactionManager;
   private readonly activeOperations: Map<string, AbortController> = new Map();
   private readonly orchestrator?: MetadataApplyOrchestrator;
+  private readonly coverArtBufferService?: CoverArtBufferService;
 
   constructor(options: MetadataWorkflowServiceOptions) {
     super();
     this.transactionManager = options.transactionManager;
     this.orchestrator = options.orchestrator;
+    this.coverArtBufferService = options.coverArtBufferService;
   }
 
   public registerWorkflow(workflow: MetadataWorkflow): void {
@@ -143,24 +147,56 @@ export class MetadataWorkflowService extends EventEmitter {
     }
 
     const rawMutations = workflow.buildMutations(preview, selectedFieldIds);
-    const normalized = rawMutations.map((rm, idx) => ({
-      mutationId: `${operationId}:${String(rm.resourceId)}:${idx}`,
-      operationId,
-      songId: Number(rm.resourceId),
-      filePath: rm.filePath ?? '',
-      fields: rm.fieldMutations
-        .filter((fm) => fm.newValue !== undefined)
-        .map((fm) => ({
-          fieldId: fm.fieldId as ApplyFieldId,
-          oldValue: fm.oldValue ?? null,
-          newValue: fm.newValue as string | number,
-          providerId: fm.providerId,
-          confidenceScore: fm.confidenceScore
-        })),
-      ...(rm.artworkBuffer !== undefined && { artwork: { buffer: rm.artworkBuffer } }),
-      fileWrite: { deferredIfPlaying: true },
-      undo: { description: `Workflow ${workflowType} apply (${operationId})` }
-    }));
+
+    if (this.coverArtBufferService) {
+      for (const rm of rawMutations) {
+        if (!rm.artworkBuffer) {
+          const artField = rm.fieldMutations.find(
+            (fm) =>
+              (fm.fieldId === 'artworkUrl' || fm.fieldId === 'artworkPath') &&
+              typeof fm.newValue === 'string' &&
+              fm.newValue.startsWith('http')
+          );
+          const targetUrl =
+            (artField?.newValue as string | undefined) ??
+            preview.primaryCandidate?.coverArtUrl;
+          if (targetUrl) {
+            const buf = await this.coverArtBufferService.fetchBuffer(targetUrl);
+            if (buf) {
+              rm.artworkBuffer = buf;
+            }
+          }
+        }
+      }
+    }
+
+    const normalized = rawMutations.map((rm, idx) => {
+      const artField = rm.fieldMutations.find(
+        (fm) => fm.fieldId === 'artworkUrl' || fm.fieldId === 'artworkPath'
+      );
+      const targetUrl =
+        (artField?.newValue as string | undefined) ?? preview.primaryCandidate?.coverArtUrl;
+
+      return {
+        mutationId: `${operationId}:${String(rm.resourceId)}:${idx}`,
+        operationId,
+        songId: Number(rm.resourceId),
+        filePath: rm.filePath ?? '',
+        fields: rm.fieldMutations
+          .filter((fm) => fm.newValue !== undefined)
+          .map((fm) => ({
+            fieldId: fm.fieldId as ApplyFieldId,
+            oldValue: fm.oldValue ?? null,
+            newValue: fm.newValue as string | number,
+            providerId: fm.providerId,
+            confidenceScore: fm.confidenceScore
+          })),
+        ...(rm.artworkBuffer !== undefined && { artwork: { buffer: rm.artworkBuffer } }),
+        ...(targetUrl !== undefined && { artworkUrl: targetUrl }),
+        fileWrite: { deferredIfPlaying: true },
+        undo: { description: `Workflow ${workflowType} apply (${operationId})` }
+      };
+    });
 
     const orchRes = await this.orchestrator.execute(normalized);
 
