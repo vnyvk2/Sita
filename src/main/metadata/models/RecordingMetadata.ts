@@ -60,6 +60,7 @@ export interface ProviderMetadata {
   provider: MetadataProviderId;
   providerRecordingId?: string;
   providerReleaseId?: string;
+  releaseGroupId?: string;
   providerArtistId?: string;
   isrc?: string;
   label?: string;

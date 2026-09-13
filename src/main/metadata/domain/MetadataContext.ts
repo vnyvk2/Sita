@@ -7,6 +7,9 @@ export interface AlbumLookupQuery {
   albumTitle: string;
   artistName?: string;
   year?: number;
+  mbid?: string;
+  releaseId?: string;
+  releaseGroupId?: string;
 }
 
 export interface TrackLookupQuery {
@@ -14,6 +17,9 @@ export interface TrackLookupQuery {
   artistName?: string;
   albumTitle?: string;
   isrc?: string;
+  mbid?: string;
+  releaseId?: string;
+  releaseGroupId?: string;
 }
 
 export interface ArtistLookupQuery {

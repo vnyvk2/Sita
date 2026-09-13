@@ -364,4 +364,44 @@ describe('Provider Federation & Merge Engine Test Suite', () => {
     expect(contributions).toHaveLength(1);
     expect(candidates).toHaveLength(1);
   });
+
+  it('forwards releaseGroupId through MetadataResolutionManager and DefaultMetadataLookupGateway to adapter.fetchContribution', async () => {
+    const registry = new ProviderRegistry();
+    const caaAdapter = {
+      fetchContribution: vi.fn().mockResolvedValue({
+        providerId: 'coverartarchive',
+        confidenceScore: 0.95,
+        contributions: [
+          {
+            fieldId: 'artworkUrl',
+            providerId: 'coverartarchive',
+            value: 'https://coverartarchive.org/release-group/rg-123/front.jpg',
+            confidenceScore: 0.95
+          }
+        ]
+      })
+    };
+
+    registry.registerInstance('coverartarchive', caaAdapter as any);
+    const gateway = new DefaultMetadataLookupGateway(undefined, registry);
+    const resolutionManager = new MetadataResolutionManager({ lookupGateway: gateway, providerRegistry: registry });
+
+    const res = await resolutionManager.resolve({
+      operationId: 'op-rg-test',
+      targetResourceIds: [1],
+      albumTitle: 'Test Album',
+      artistName: 'Test Artist',
+      mbid: 'rel-mbid-456',
+      releaseGroupId: 'rg-123'
+    });
+
+    expect(caaAdapter.fetchContribution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mbid: 'rel-mbid-456',
+        releaseId: 'rel-mbid-456',
+        releaseGroupId: 'rg-123'
+      })
+    );
+    expect(res.mergedResult?.artworkUrl).toBe('https://coverartarchive.org/release-group/rg-123/front.jpg');
+  });
 });

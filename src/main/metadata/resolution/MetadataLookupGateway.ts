@@ -43,28 +43,40 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
     let artist: string | undefined;
     let mbid: string | undefined;
     let releaseId: string | undefined;
+    let releaseGroupId: string | undefined;
 
     if ('albumTitle' in requestQuery) {
-      const q = requestQuery as AlbumLookupQuery & { mbid?: string; releaseId?: string };
+      const q = requestQuery as AlbumLookupQuery & {
+        mbid?: string;
+        releaseId?: string;
+        releaseGroupId?: string;
+      };
       title = q.albumTitle;
       artist = q.artistName;
       mbid = q.mbid;
       releaseId = q.releaseId;
+      releaseGroupId = q.releaseGroupId;
     } else if ('trackTitle' in requestQuery) {
-      const q = requestQuery as TrackLookupQuery & { mbid?: string; releaseId?: string };
+      const q = requestQuery as TrackLookupQuery & {
+        mbid?: string;
+        releaseId?: string;
+        releaseGroupId?: string;
+      };
       title = q.trackTitle;
       artist = q.artistName;
       mbid = q.mbid;
       releaseId = q.releaseId;
+      releaseGroupId = q.releaseGroupId;
     }
 
-    if (!title && !mbid && !releaseId) return { contributions: [], candidates: [] };
+    if (!title && !mbid && !releaseId && !releaseGroupId) return { contributions: [], candidates: [] };
 
     const cacheKey = JSON.stringify({
       title: title ?? '',
       artist: artist ?? '',
       mbid: mbid ?? '',
-      releaseId: releaseId ?? ''
+      releaseId: releaseId ?? '',
+      releaseGroupId: releaseGroupId ?? ''
     });
     const existing = this.inFlightResolutions.get(cacheKey);
     if (existing) {
@@ -73,7 +85,7 @@ export class DefaultMetadataLookupGateway implements MetadataLookupGateway {
 
     const resolutionPromise = (async (): Promise<ProviderResolutionResult> => {
       const activeInstances = this.providerRegistry.getActiveInstances();
-      const query = { title, artist, mbid, releaseId };
+      const query = { title, artist, mbid, releaseId, releaseGroupId };
 
       // Parallel execution across all active providers with failure isolation
       const providerEntries = Array.from(activeInstances.entries());

@@ -19,6 +19,7 @@ export interface ResolutionRequest {
   artistName?: string;
   mbid?: string;
   releaseId?: string;
+  releaseGroupId?: string;
   canonicalContext?: CanonicalReleaseContext;
   policy?: MetadataPolicy;
 }
@@ -105,7 +106,8 @@ export class MetadataResolutionManager {
           albumTitle: request.albumTitle,
           artistName: request.artistName,
           mbid: targetMbid,
-          releaseId: targetMbid
+          releaseId: targetMbid,
+          releaseGroupId: request.releaseGroupId ?? request.canonicalContext?.releaseGroupId
         } as any,
         policy: request.policy,
         requestedAt: Date.now()

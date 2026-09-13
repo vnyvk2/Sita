@@ -50,6 +50,7 @@ export class MusicBrainzRecordingMapper {
       provider: 'musicbrainz',
       providerRecordingId: dto.id,
       providerReleaseId: primaryRelease?.id,
+      releaseGroupId: primaryRelease?.['release-group']?.id,
       providerArtistId: dto['artist-credit']?.[0]?.artist?.id,
       isrc: dto.isrcs?.[0],
       label: primaryRelease?.['label-info']?.[0]?.label?.name,
@@ -72,6 +73,7 @@ export class MusicBrainzRecordingMapper {
       ...candidate.provider,
       mbid: candidate.provider.providerRecordingId,
       musicBrainzRecordingId: candidate.provider.providerRecordingId,
+      releaseGroupId: candidate.provider.releaseGroupId,
       isrc: candidate.provider.isrc
     };
 
