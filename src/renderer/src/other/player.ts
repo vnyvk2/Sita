@@ -635,6 +635,8 @@ class AudioPlayer {
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
     this.clearAbLoop('DESTROY');
+    this.karaokeNode.destroy();
+    this.nightModeNode.destroy();
     this.crossfadeScheduler.cancel();
     this.cancelActiveFade();
     this.inFlightLoad = null;

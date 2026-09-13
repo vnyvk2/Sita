@@ -149,6 +149,14 @@ export class KaraokeNode {
   get level(): number {
     return this.currentLevel;
   }
+
+  /** Disconnect all internal nodes (call when tearing down the audio graph). */
+  destroy(): void {
+    this.input.disconnect();
+    this.dry.disconnect();
+    this.wet.disconnect();
+    this.output.disconnect();
+  }
 }
 
 export default KaraokeNode;
