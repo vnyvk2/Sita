@@ -194,7 +194,12 @@ function buildDrizzle(db: DatabaseSync) {
     }
   });
 
-  return { orm, preparedObj, withTxLock };
+  const clearCaches = () => {
+    arrayCache.clear();
+    objectCache.clear();
+  };
+
+  return { orm, preparedObj, withTxLock, clearCaches, getActiveTxLock: () => txLock };
 }
 
 export function openSqliteEngine(dbPath: string): SqliteEngine {
@@ -335,7 +340,7 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
     ddlMs = performance.now() - tDdl;
   }
 
-  const { orm, preparedObj, withTxLock } = buildDrizzle(db);
+  const { orm, preparedObj, withTxLock, clearCaches, getActiveTxLock } = buildDrizzle(db);
 
   const engine: SqliteEngine = {
     kind: 'sqlite',
@@ -356,6 +361,20 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
     withTxLock,
     close: async () => {
       const t = performance.now();
+      const activeLock = getActiveTxLock();
+      if (activeLock) {
+        try {
+          await Promise.race([
+            activeLock,
+            new Promise<void>((_, reject) =>
+              setTimeout(() => reject(new Error('Timed out waiting for txLock on close')), 5000)
+            )
+          ]);
+        } catch (error) {
+          logger.warn('[db] active transaction did not complete before close timeout', { error });
+        }
+      }
+      clearCaches();
       try {
         db.exec('PRAGMA optimize;');
       } catch (error) {
