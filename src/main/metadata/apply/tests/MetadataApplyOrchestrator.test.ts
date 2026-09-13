@@ -549,4 +549,45 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
       } catch {}
     }
   }, 15000);
+
+  it('dispatches onDataUpdate callbacks for updated songs, albums, and artworks upon successful apply', async () => {
+    const seeded = await db.query.songs.findFirst();
+    expect(seeded).toBeDefined();
+
+    const onDataUpdate = vi.fn();
+    const orchestrator = new MetadataApplyOrchestrator({
+      tagWriter: new TagWriterService(),
+      historyService: new MetadataHistoryService(new MetadataHistoryRepository()),
+      onDataUpdate
+    });
+
+    const mutation: NormalizedMutation = {
+      mutationId: 'reactivity-test-1',
+      operationId: 'op-reactivity',
+      songId: seeded!.id,
+      filePath: tempSongPath,
+      fields: [
+        {
+          fieldId: 'title',
+          oldValue: seeded!.title,
+          newValue: 'Updated Reactive Title'
+        },
+        {
+          fieldId: 'artworkUrl',
+          oldValue: null,
+          newValue: 'https://example.com/art.jpg'
+        }
+      ],
+      fileWrite: { deferredIfPlaying: false },
+      undo: { description: 'Reactivity test' }
+    };
+
+    const res = await orchestrator.execute([mutation]);
+    expect(res.success).toBe(true);
+
+    expect(onDataUpdate).toHaveBeenCalledWith('songs/artworks', [seeded!.id]);
+    expect(onDataUpdate).toHaveBeenCalledWith('songs/updatedSong', [seeded!.id]);
+    expect(onDataUpdate).toHaveBeenCalledWith('albums');
+  });
 });
+

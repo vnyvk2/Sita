@@ -18,12 +18,19 @@ import type { TagWritePayload, TagWriterService } from '../services/TagWriterSer
 import type { ArtworkDownloaderService } from '../transactions/ArtworkDownloaderService';
 import type { NormalizedMutation, OrchestratorResult } from './contract';
 
+export type DataUpdateCallback = (
+  dataType: string,
+  data?: number[],
+  message?: string
+) => void;
+
 export interface MetadataApplyOrchestratorOptions {
   tagWriter: TagWriterService;
   historyService: MetadataHistoryService;
   artworkDownloader?: ArtworkDownloaderService;
   /** Injected to avoid an import cycle with main.ts */
   getCurrentPlayingPath?: () => string | undefined;
+  onDataUpdate?: DataUpdateCallback;
 }
 
 /**
@@ -47,12 +54,14 @@ export class MetadataApplyOrchestrator {
   private readonly historyService: MetadataHistoryService;
   private readonly artworkDownloader?: ArtworkDownloaderService;
   private readonly getCurrentPlayingPath: () => string | undefined;
+  private readonly onDataUpdate?: DataUpdateCallback;
 
   constructor(options: MetadataApplyOrchestratorOptions) {
     this.tagWriter = options.tagWriter;
     this.historyService = options.historyService;
     this.artworkDownloader = options.artworkDownloader;
     this.getCurrentPlayingPath = options.getCurrentPlayingPath ?? (() => undefined);
+    this.onDataUpdate = options.onDataUpdate;
   }
 
   public execute(
@@ -79,6 +88,9 @@ export class MetadataApplyOrchestrator {
     const opId = mutations[0]?.operationId;
     const groupId =
       opId && opId !== 'default' ? `orch-group-${opId}` : `orch-group-${randomUUID()}`;
+    const committedSongIds: number[] = [];
+    const artworkSongIds: number[] = [];
+
     for (const mutation of mutations) {
       try {
         const outcome = await this.executeSingle(mutation, {
@@ -90,11 +102,25 @@ export class MetadataApplyOrchestrator {
             groupUpdated.push(upd);
           }
         });
-        if (outcome.deferred) result.deferredCount += 1;
-        else if (outcome.success) result.updatedCount += 1;
-        else {
+        if (outcome.deferred) {
+          result.deferredCount += 1;
+          committedSongIds.push(mutation.songId);
+        } else if (outcome.success) {
+          result.updatedCount += 1;
+          committedSongIds.push(mutation.songId);
+        } else {
           result.failedCount += 1;
           result.errors.push(outcome.error ?? 'Unknown orchestrator failure');
+        }
+
+        if (outcome.success || outcome.deferred) {
+          const hasArt =
+            mutation.artwork?.buffer !== undefined ||
+            (mutation as unknown as { artworkUrl?: string }).artworkUrl !== undefined ||
+            mutation.fields.some((f) => f.fieldId === 'artworkUrl' || f.fieldId === 'artworkPath');
+          if (hasArt && mutation.songId) {
+            artworkSongIds.push(mutation.songId);
+          }
         }
       } catch (err: unknown) {
         result.failedCount += 1;
@@ -117,6 +143,20 @@ export class MetadataApplyOrchestrator {
         previousSongs: groupPrev,
         updatedSongs: groupUpdated
       });
+    }
+
+    if (this.onDataUpdate && (result.updatedCount > 0 || result.deferredCount > 0)) {
+      try {
+        if (artworkSongIds.length > 0) {
+          this.onDataUpdate('songs/artworks', artworkSongIds);
+        }
+        if (committedSongIds.length > 0) {
+          this.onDataUpdate('songs/updatedSong', committedSongIds);
+          this.onDataUpdate('albums');
+        }
+      } catch (err) {
+        logger.warn('[MetadataApplyOrchestrator] Failed to dispatch dataUpdateEvent', { err });
+      }
     }
 
     result.success = result.failedCount === 0;

@@ -1,7 +1,7 @@
 import { libraryEventBus } from '@main/events/LibraryEventBus';
 
 import type { MetadataProviderId } from '../../common/metadata/types';
-import { getCurrentSongPath } from '../main';
+import { getCurrentSongPath, dataUpdateEvent } from '../main';
 import { RateLimiter, RetryPolicy, RequestPipeline } from '../platform/networking';
 import { PlatformBootstrap } from '../platform/PlatformBootstrap';
 import updateSongId3Tags from '../updateSong/updateSongId3Tags';
@@ -295,7 +295,10 @@ export class MetadataBootstrap {
       tagWriter: new TagWriterService(),
       historyService: applyHistoryService,
       artworkDownloader,
-      getCurrentPlayingPath: () => getCurrentSongPath()
+      getCurrentPlayingPath: () => getCurrentSongPath(),
+      onDataUpdate: (dataType, data, message) => {
+        dataUpdateEvent(dataType as any, data, message);
+      }
     });
     const applyService = new MetadataApplyService({
       historyService: applyHistoryService,
