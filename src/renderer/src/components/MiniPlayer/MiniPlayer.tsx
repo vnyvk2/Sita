@@ -4,7 +4,7 @@ import {
 } from '@common/miniPlayerConstants';
 import { settingsMutation, settingsQuery } from '@renderer/queries/settings';
 import { queryClient } from '@renderer/queryClient';
-import { store } from '@renderer/store/store';
+import { dispatch, store } from '@renderer/store/store';
 import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
@@ -16,6 +16,7 @@ import Button from '../Button';
 import LyricsIcon from '../Icons/LyricsIcon';
 import QueueIcon from '../Icons/QueueIcon';
 import Img from '../Img';
+import KaraokeSlider from '../KaraokeSlider';
 import SeekBarSlider from '../SeekBarSlider';
 import UpNextSongPopup from '../SongsControlsContainer/UpNextSongPopup';
 import VolumeSlider from '../VolumeSlider';
@@ -38,6 +39,11 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const volume = useStore(store, (state) => state.player.volume.value);
   const isRepeating = useStore(store, (state) => state.player.isRepeating);
   const isShuffling = useStore(store, (state) => state.player.isShuffling);
+  const isKaraoke = useStore(store, (state) => state.localStorage?.playback?.isKaraoke ?? false);
+  const karaokeLevel = useStore(
+    store,
+    (state) => state.localStorage?.playback?.karaokeLevel ?? 100
+  );
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const queueLength = useStore(
     store,
@@ -126,10 +132,12 @@ export default function MiniPlayer(props: MiniPlayerProps) {
   const [isQueueVisible, setIsQueueVisible] = useState(false);
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
+  const [isKaraokeHovered, setIsKaraokeHovered] = useState(false);
   const [queueDirection, setQueueDirection] = useState<'down' | 'up'>('down');
   const [searchDirection, setSearchDirection] = useState<'down' | 'up'>('down');
 
   const volumeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const karaokeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleVolumeMouseEnter = useCallback(() => {
     if (volumeHoverTimeoutRef.current) {
@@ -159,10 +167,41 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     }
   }, []);
 
+  const handleKaraokeMouseEnter = useCallback(() => {
+    if (karaokeHoverTimeoutRef.current) {
+      clearTimeout(karaokeHoverTimeoutRef.current);
+      karaokeHoverTimeoutRef.current = null;
+    }
+    setIsKaraokeHovered(true);
+  }, []);
+
+  const handleKaraokeMouseLeave = useCallback(() => {
+    if (karaokeHoverTimeoutRef.current) {
+      clearTimeout(karaokeHoverTimeoutRef.current);
+    }
+    karaokeHoverTimeoutRef.current = setTimeout(() => {
+      setIsKaraokeHovered(false);
+    }, 180);
+  }, []);
+
+  const handleKaraokeBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      if (karaokeHoverTimeoutRef.current) {
+        clearTimeout(karaokeHoverTimeoutRef.current);
+      }
+      karaokeHoverTimeoutRef.current = setTimeout(() => {
+        setIsKaraokeHovered(false);
+      }, 180);
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       if (volumeHoverTimeoutRef.current) {
         clearTimeout(volumeHoverTimeoutRef.current);
+      }
+      if (karaokeHoverTimeoutRef.current) {
+        clearTimeout(karaokeHoverTimeoutRef.current);
       }
     };
   }, []);
@@ -249,7 +288,7 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         minHeight: calculatedMinHeight
       });
     }
-  }, [pinnedControls]);
+  }, [pinnedControls, miniPlayerMode]);
 
   useEffect(() => {
     let rafId: number;
@@ -469,7 +508,15 @@ export default function MiniPlayer(props: MiniPlayerProps) {
             { id: 'toggleLove', label: t('player.likeDislike', 'Love') },
             { id: 'toggleShuffle', label: t('player.shuffle', 'Shuffle') },
             { id: 'toggleRepeat', label: t('player.repeat', 'Repeat') },
-            { id: 'toggleLyrics', label: t('player.lyrics', 'Show Lyrics') }
+            { id: 'toggleLyrics', label: t('player.lyrics', 'Show Lyrics') },
+            {
+              id: 'toggleKaraoke',
+              label: isKaraoke
+                ? t('player.disableKaraoke', 'Disable Karaoke Mode')
+                : t('player.enableKaraoke', 'Enable Karaoke Mode'),
+              type: 'checkbox',
+              checked: isKaraoke
+            }
           ]
         },
         {
@@ -561,6 +608,12 @@ export default function MiniPlayer(props: MiniPlayerProps) {
               label: t('player.playPause', 'Stop'),
               type: 'checkbox',
               checked: pinnedControls.includes('stop')
+            },
+            {
+              id: 'pin_karaoke',
+              label: t('player.karaoke', 'Karaoke Mode'),
+              type: 'checkbox',
+              checked: pinnedControls.includes('karaoke')
             }
           ]
         },
@@ -651,6 +704,12 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         case 'pin_stop':
           handleTogglePinnedControl('stop');
           break;
+        case 'toggleKaraoke':
+          dispatch({ type: 'TOGGLE_KARAOKE_MODE' });
+          break;
+        case 'pin_karaoke':
+          handleTogglePinnedControl('karaoke');
+          break;
       }
     },
     [
@@ -661,9 +720,9 @@ export default function MiniPlayer(props: MiniPlayerProps) {
       currentSongData.isKnownSource,
       toggleIsFavorite,
       isAFavorite,
-      isCurrentSongPlaying,
       toggleSongPlayback,
       toggleShuffling,
+      isKaraoke,
       settings?.isMiniPlayerAlwaysOnTop,
       toggleAlwaysOnTop,
       settings?.isMiniPlayerTaskbarHidden,
@@ -995,6 +1054,55 @@ export default function MiniPlayer(props: MiniPlayerProps) {
                     iconName="stop"
                     removeFocusOnClick
                   />
+                )}
+
+                {/* Optional: Karaoke Mode Toggle + vertical flyout slider */}
+                {pinnedControls.includes('karaoke') && (
+                  <div
+                    className="mini-optional-btn relative flex shrink-0 items-center justify-center"
+                    onMouseEnter={handleKaraokeMouseEnter}
+                    onMouseLeave={handleKaraokeMouseLeave}
+                    onFocus={handleKaraokeMouseEnter}
+                    onBlur={handleKaraokeBlur}
+                  >
+                    <Button
+                      className={`karaoke-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight m-0! rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
+                        isKaraoke ? 'after:opacity-100' : ''
+                      }`}
+                      tooltipLabel={`${t('player.karaokeTooltip', 'Toggle Karaoke Mode (Vocal Reducer)')}${
+                        isKaraoke ? ` (${Math.round(karaokeLevel)}%)` : ''
+                      }`}
+                      iconName="mic_off"
+                      iconClassName={`material-icons-round text-lg! transition-all ${
+                        isKaraoke
+                          ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! opacity-100'
+                          : 'text-font-color-white opacity-80 hover:opacity-100'
+                      }`}
+                      clickHandler={() => dispatch({ type: 'TOGGLE_KARAOKE_MODE' })}
+                      removeFocusOnClick
+                    />
+
+                    {/* Vertical Karaoke Popout Card (Absolute overlay - zero deck width contribution) */}
+                    <div
+                      className={`karaoke-flyout-card absolute bottom-full left-1/2 z-40 mb-2.5 flex -translate-x-1/2 flex-col items-center justify-center rounded-xl border border-white/10 bg-[rgba(24,24,28,0.95)] px-1.5 py-2 shadow-2xl backdrop-blur-md transition-all duration-200 ease-out before:absolute before:inset-x-0 before:top-full before:h-4 before:bg-transparent before:content-[''] ${
+                        isKaraokeHovered
+                          ? 'pointer-events-auto visible translate-y-0 scale-100 opacity-100'
+                          : 'pointer-events-none invisible translate-y-2 scale-95 opacity-0'
+                      }`}
+                    >
+                      <span className="text-font-color-white/70 mb-1.5 text-[10px] font-semibold select-none">
+                        {isKaraoke ? `${Math.round(karaokeLevel)}%` : '0%'}
+                      </span>
+                      <div className="relative flex h-28 w-6 items-center justify-center">
+                        <KaraokeSlider
+                          name="mini-player-karaoke-slider"
+                          id="miniPlayerKaraokeSlider"
+                          sliderOpacity={0.85}
+                          className="before:bg-font-color-white/50 hover:before:bg-font-color-highlight dark:before:bg-font-color-white/50 dark:hover:before:bg-dark-font-color-highlight absolute w-28 origin-center -rotate-90 appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Optional: Lyrics Toggle */}

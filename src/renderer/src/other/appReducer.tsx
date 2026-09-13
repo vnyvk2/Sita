@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react';
 
-import type { NightModePreset } from './audioFx/nightModeNode';
 import type { AbLoopState } from './abLoopController';
 import { normalizedKeys } from './appShortcuts';
+import type { NightModePreset } from './audioFx/nightModeNode';
 
 export interface AppReducer {
   localStorage: LocalStorage;
@@ -521,7 +521,15 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     isWaveformSeekbarEnabled: true,
     isExperimentalWorkspaceEnabled: false,
     customThemeOverrides: {},
-    alphabetScrubberPosition: 'off'
+    alphabetScrubberPosition: 'off',
+    playerBarControlsIn3Dots: {
+      miniPlayer: true,
+      fullscreen: true,
+      floatingLyrics: true,
+      audioFx: false,
+      karaoke: false,
+      queue: false
+    }
   },
   playback: {
     currentSong: {

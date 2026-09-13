@@ -631,6 +631,16 @@ declare global {
     isExperimentalWorkspaceEnabled?: boolean;
     customThemeOverrides?: Record<string, Record<string, string>>;
     alphabetScrubberPosition?: 'off' | 'top-horizontal' | 'left-vertical';
+    playerBarControlsIn3Dots?: PlayerBarControlsIn3Dots;
+  }
+
+  interface PlayerBarControlsIn3Dots {
+    miniPlayer?: boolean;
+    fullscreen?: boolean;
+    floatingLyrics?: boolean;
+    audioFx?: boolean;
+    karaoke?: boolean;
+    queue?: boolean;
   }
 
   interface SongIdsResult {
@@ -1300,6 +1310,7 @@ declare global {
     innerContextMenus?: ContextMenuItem[];
     handlerFunction: null | (() => void);
     isDisabled?: boolean;
+    preventClosingOnClick?: boolean;
   }
 
   // ? Data sorting related types

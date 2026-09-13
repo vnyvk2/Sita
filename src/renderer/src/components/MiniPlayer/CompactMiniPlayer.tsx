@@ -1,4 +1,4 @@
-import { store } from '@renderer/store/store';
+import { dispatch, store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 import {
   type TouchEvent,
@@ -18,11 +18,13 @@ import Button from '../Button';
 import LyricsIcon from '../Icons/LyricsIcon';
 import { CloseIcon, MinimizeIcon } from '../Icons/WindowIcons';
 import Img from '../Img';
+import KaraokeSlider from '../KaraokeSlider';
 import SeekBarSlider from '../SeekBarSlider';
 import VolumeSlider from '../VolumeSlider';
 
 const COMPACT_OPTIONAL_PRIORITY = [
   'love',
+  'karaoke',
   'volume',
   'queue',
   'search',
@@ -62,6 +64,11 @@ const CompactMiniPlayer = (props: Props) => {
   const volume = useStore(store, (state) => state.player.volume.value);
   const isRepeating = useStore(store, (state) => state.player.isRepeating);
   const isShuffling = useStore(store, (state) => state.player.isShuffling);
+  const isKaraoke = useStore(store, (state) => state.localStorage?.playback?.isKaraoke ?? false);
+  const karaokeLevel = useStore(
+    store,
+    (state) => state.localStorage?.playback?.karaokeLevel ?? 100
+  );
 
   const {
     toggleSongPlayback,
@@ -82,10 +89,12 @@ const CompactMiniPlayer = (props: Props) => {
 
   const [containerWidth, setContainerWidth] = useState(300);
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
+  const [isKaraokeHovered, setIsKaraokeHovered] = useState(false);
   const [songSecond, setSongSecond] = useState(0);
   const currentFloorSecondRef = useRef(0);
 
   const volumeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const karaokeHoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleVolumeMouseEnter = useCallback(() => {
     if (volumeHoverTimeoutRef.current) {
@@ -115,10 +124,41 @@ const CompactMiniPlayer = (props: Props) => {
     }
   }, []);
 
+  const handleKaraokeMouseEnter = useCallback(() => {
+    if (karaokeHoverTimeoutRef.current) {
+      clearTimeout(karaokeHoverTimeoutRef.current);
+      karaokeHoverTimeoutRef.current = null;
+    }
+    setIsKaraokeHovered(true);
+  }, []);
+
+  const handleKaraokeMouseLeave = useCallback(() => {
+    if (karaokeHoverTimeoutRef.current) {
+      clearTimeout(karaokeHoverTimeoutRef.current);
+    }
+    karaokeHoverTimeoutRef.current = setTimeout(() => {
+      setIsKaraokeHovered(false);
+    }, 180);
+  }, []);
+
+  const handleKaraokeBlur = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      if (karaokeHoverTimeoutRef.current) {
+        clearTimeout(karaokeHoverTimeoutRef.current);
+      }
+      karaokeHoverTimeoutRef.current = setTimeout(() => {
+        setIsKaraokeHovered(false);
+      }, 180);
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       if (volumeHoverTimeoutRef.current) {
         clearTimeout(volumeHoverTimeoutRef.current);
+      }
+      if (karaokeHoverTimeoutRef.current) {
+        clearTimeout(karaokeHoverTimeoutRef.current);
       }
     };
   }, []);
@@ -302,6 +342,53 @@ const CompactMiniPlayer = (props: Props) => {
               clickHandler={() => toggleIsFavorite(!isAFavorite)}
               removeFocusOnClick
             />
+          )}
+
+          {visibleOptionalControls.includes('karaoke') && (
+            <div
+              className="compact-karaoke-container relative flex shrink-0 items-center justify-center"
+              onMouseEnter={handleKaraokeMouseEnter}
+              onMouseLeave={handleKaraokeMouseLeave}
+              onFocus={handleKaraokeMouseEnter}
+              onBlur={handleKaraokeBlur}
+            >
+              <Button
+                className={`karaoke-btn text-font-color-white after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight m-0! h-fit shrink-0 cursor-pointer rounded-none! border-0! bg-transparent! p-1! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity focus-visible:outline! dark:bg-transparent! ${
+                  isKaraoke ? 'after:opacity-100' : ''
+                }`}
+                tooltipLabel={`${t('player.karaokeTooltip', 'Toggle Karaoke Mode (Vocal Reducer)')}${
+                  isKaraoke ? ` (${Math.round(karaokeLevel)}%)` : ''
+                }`}
+                iconName="mic_off"
+                iconClassName={`material-icons-round text-lg! opacity-80 transition-opacity hover:opacity-100 ${
+                  isKaraoke
+                    ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! opacity-100'
+                    : 'text-font-color-white dark:text-font-color-white'
+                }`}
+                clickHandler={() => dispatch({ type: 'TOGGLE_KARAOKE_MODE' })}
+                removeFocusOnClick
+              />
+
+              {/* Horizontal Karaoke Flyout Card (Absolute overlay extending leftwards into metadata area) */}
+              <div
+                className={`karaoke-flyout-card absolute top-1/2 right-full z-40 mr-1.5 flex -translate-y-1/2 items-center gap-1.5 rounded-full border border-white/10 bg-[rgba(20,20,24,0.96)] px-2.5 py-1 shadow-2xl backdrop-blur-md transition-all duration-200 ease-out before:absolute before:inset-y-0 before:left-full before:w-3 before:bg-transparent before:content-[''] ${
+                  isKaraokeHovered
+                    ? 'pointer-events-auto visible translate-x-0 scale-100 opacity-100'
+                    : 'pointer-events-none invisible translate-x-2 scale-95 opacity-0'
+                }`}
+              >
+                <span className="text-font-color-white/80 min-w-[26px] text-right text-[10px] font-semibold tabular-nums select-none">
+                  {isKaraoke ? `${Math.round(karaokeLevel)}%` : '0%'}
+                </span>
+                <div className="flex w-20 items-center">
+                  <KaraokeSlider
+                    name="compact-karaoke-slider"
+                    id="compactKaraokeSlider"
+                    className="h-4 w-20 appearance-none bg-transparent! p-0 outline-hidden focus-visible:outline!"
+                  />
+                </div>
+              </div>
+            </div>
           )}
 
           {visibleOptionalControls.includes('volume') && (

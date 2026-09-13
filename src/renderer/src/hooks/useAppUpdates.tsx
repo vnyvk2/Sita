@@ -1,21 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { lazy } from 'react';
 
 import { releaseNotes, version } from '../../../../package.json';
 import { store } from '../store/store';
 import isLatestVersion from '../utils/isLatestVersion';
-import storage from '../utils/localStorage';
 import log from '../utils/log';
 import { parseChangelog } from '../utils/parseChangelog';
 
-const ReleaseNotesPrompt = lazy(
-  () => import('../components/ReleaseNotesPrompt/ReleaseNotesPrompt')
-);
-
 /** Dependencies required by the useAppUpdates hook. */
 export interface AppUpdatesDependencies {
-  /** Function to show/hide prompt menu with content */
-  changePromptMenuData: (
+  /** Optional function to show/hide prompt menu with content */
+  changePromptMenuData?: (
     isVisible?: boolean,
     prompt?: React.ReactNode | null,
     className?: string
@@ -69,15 +63,7 @@ export interface AppUpdatesDependencies {
  * @returns Object with update management functions
  */
 export function useAppUpdates(dependencies: AppUpdatesDependencies) {
-  const { changePromptMenuData, isOnline, isEnabled = true } = dependencies;
-
-  /**
-   * Latest `isEnabled` value readable from async resolutions. A changelog fetch started before
-   * entering mini mode must not spawn its release-notes prompt over a passive presentation mode
-   * when it settles afterwards.
-   */
-  const isEnabledRef = useRef(isEnabled);
-  isEnabledRef.current = isEnabled;
+  const { isOnline, isEnabled = true } = dependencies;
 
   /**
    * Tracks whether the one-time post-startup changelog check has been scheduled. Without this,
@@ -122,24 +108,10 @@ export function useAppUpdates(dependencies: AppUpdatesDependencies) {
           updateAppUpdatesState(isThereAnAppUpdate ? 'OLD' : 'LATEST');
 
           if (isThereAnAppUpdate) {
-            // Check if user has chosen to skip notification for this version
-            const noUpdateNotificationForNewUpdate = storage.preferences.getPreferences(
-              'noUpdateNotificationForNewUpdate'
-            );
-            const isUpdateIgnored = noUpdateNotificationForNewUpdate !== res.latestVersion.version;
-
             log('client has new updates', {
               isThereAnAppUpdate,
-              noUpdateNotificationForNewUpdate,
-              isUpdateIgnored
+              latestVersion: res.latestVersion.version
             });
-
-            // Show release notes prompt if update not ignored AND update activity
-            // is still enabled at resolution time (mini mode may have been
-            // entered while the fetch was in flight).
-            if (isUpdateIgnored && isEnabledRef.current) {
-              changePromptMenuData(true, <ReleaseNotesPrompt />, 'release-notes px-8 py-4');
-            }
           } else {
             console.log('client is up-to-date.');
           }
@@ -154,7 +126,7 @@ export function useAppUpdates(dependencies: AppUpdatesDependencies) {
       updateAppUpdatesState('NO_NETWORK_CONNECTION');
       console.log(`couldn't check for app updates. Check the network connection.`);
     }
-  }, [changePromptMenuData, updateAppUpdatesState]);
+  }, [updateAppUpdatesState]);
 
   useEffect(
     () => {

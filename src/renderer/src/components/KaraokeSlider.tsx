@@ -8,6 +8,7 @@ type Props = {
   id?: string;
   name?: string;
   className?: string;
+  sliderOpacity?: number;
 };
 
 const KaraokeSlider = (props: Props) => {
@@ -16,18 +17,18 @@ const KaraokeSlider = (props: Props) => {
     store,
     (state) => state.localStorage?.playback?.karaokeLevel ?? 100
   );
-  const isKaraoke = useStore(
-    store,
-    (state) => state.localStorage?.playback?.isKaraoke ?? false
-  );
+  const isKaraoke = useStore(store, (state) => state.localStorage?.playback?.isKaraoke ?? false);
 
-  const { id = 'karaokeSlider', name = 'player-karaoke-slider', className } = props;
+  const { id = 'karaokeSlider', name = 'player-karaoke-slider', className, sliderOpacity } = props;
   const sliderRef = useRef<HTMLInputElement>(null);
 
   const displayLevel = isKaraoke ? karaokeLevel : 0;
   const sliderCssProperties: CSSProperties = {
     '--volume-before-width': `${displayLevel}%`
   } as CSSProperties;
+  if (sliderOpacity !== undefined) {
+    (sliderCssProperties as Record<string, unknown>)['--slider-opacity'] = `${sliderOpacity}`;
+  }
 
   const changeLevel = (value: number) => {
     dispatch({ type: 'UPDATE_KARAOKE_LEVEL', data: value });

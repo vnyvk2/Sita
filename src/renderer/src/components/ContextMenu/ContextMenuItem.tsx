@@ -162,7 +162,9 @@ const ContextMenuItem = (props: ContextMenuItem) => {
             setIsOpen((prev) => !prev);
           } else if (props.handlerFunction) {
             props.handlerFunction();
-            updateContextMenuData(false, []);
+            if (!props.preventClosingOnClick) {
+              updateContextMenuData(false, []);
+            }
           }
         }}
       >
