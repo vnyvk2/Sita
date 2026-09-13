@@ -264,15 +264,8 @@ export class MetadataApplyService {
         groupUndo: { description: `AutoTag applied for ${albumTitle}` }
       });
 
-      if (orchRes.updatedCount > 0 || orchRes.deferredCount > 0) {
-        try {
-          const { resetArtworkCache } = await import('../../fs/resolveFilePaths');
-          resetArtworkCache('songArtworks');
-          resetArtworkCache('albumArtworks');
-        } catch {
-          // Ignored in isolated testing environments
-        }
-      }
+      // Note: MetadataApplyOrchestrator internally resets artwork caches based on actual artwork mutations.
+      // We don't need to do it here, which prevents over-invalidation when only text fields are updated.
 
       return {
         success: orchRes.success,
@@ -308,14 +301,8 @@ export class MetadataApplyService {
     }
 
     if (totalFailed === 0 && totalUpdated > 0) {
-      // Target invalidation for song and album artwork caches
-      try {
-        const { resetArtworkCache } = await import('../../fs/resolveFilePaths');
-        resetArtworkCache('songArtworks');
-        resetArtworkCache('albumArtworks');
-      } catch {
-        // Ignored in isolated testing environments
-      }
+      // Note: MetadataApplyOrchestrator internally resets artwork caches based on actual artwork mutations.
+      // We don't need to do it here, which prevents over-invalidation when only text fields are updated.
     }
 
     return {

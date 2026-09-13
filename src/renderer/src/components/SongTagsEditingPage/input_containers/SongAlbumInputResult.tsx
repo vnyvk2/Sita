@@ -18,12 +18,14 @@ const SongAlbumInputResult = (props: Props) => {
         updateSongInfo((prevData) => {
           return {
             ...prevData,
-            album: {
-              title: albumData.title,
-              albumId: albumData.albumId,
-              noOfSongs: albumData.noOfSongs ? albumData.noOfSongs + 1 : 1,
-              artworkPath: albumData.artworkPath
-            }
+            albums: [
+              {
+                title: albumData.title,
+                albumId: albumData.albumId,
+                noOfSongs: albumData.noOfSongs ? albumData.noOfSongs + 1 : 1,
+                artworkPath: albumData.artworkPath
+              }
+            ]
           };
         });
         updateAlbumKeyword('');

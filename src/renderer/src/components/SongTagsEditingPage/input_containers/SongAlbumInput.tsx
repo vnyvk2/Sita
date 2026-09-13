@@ -66,7 +66,7 @@ const SongAlbumInput = (props: Props) => {
                   updateSongInfo((prevData) => {
                     return {
                       ...prevData,
-                      album: undefined
+                      albums: [] // Explicitly clear the albums array to trigger unlinking
                     };
                   });
                 }}
@@ -112,23 +112,27 @@ const SongAlbumInput = (props: Props) => {
                     if (albumKeyword.toLowerCase() === result.title.toLowerCase()) {
                       return {
                         ...prevData,
-                        album: {
-                          title: result.title,
-                          albumId: result.albumId,
-                          noOfSongs: result.noOfSongs ? result.noOfSongs + 1 : 1,
-                          artworkPath: result.artworkPath
-                        }
+                        albums: [
+                          {
+                            title: result.title,
+                            albumId: result.albumId,
+                            noOfSongs: result.noOfSongs ? result.noOfSongs + 1 : 1,
+                            artworkPath: result.artworkPath
+                          }
+                        ]
                       };
                     }
                   }
                 } else {
                   return {
                     ...prevData,
-                    album: {
-                      title: albumKeyword,
-                      noOfSongs: 1,
-                      albumId: undefined
-                    }
+                    albums: [
+                      {
+                        title: albumKeyword,
+                        noOfSongs: 1,
+                        albumId: undefined
+                      }
+                    ]
                   };
                 }
                 return prevData;

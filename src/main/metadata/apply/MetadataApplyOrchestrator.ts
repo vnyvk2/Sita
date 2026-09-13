@@ -114,10 +114,7 @@ export class MetadataApplyOrchestrator {
         }
 
         if (outcome.success || outcome.deferred) {
-          const hasArt =
-            mutation.artwork?.buffer !== undefined ||
-            (mutation as unknown as { artworkUrl?: string }).artworkUrl !== undefined;
-          if (hasArt && mutation.songId) {
+          if (outcome.appliedArtwork && mutation.songId) {
             artworkSongIds.push(mutation.songId);
           }
         }
@@ -253,7 +250,7 @@ export class MetadataApplyOrchestrator {
       albumTitle?: string;
       onSnapshots?: (prev: SongMetadataSnapshot, updated: SongMetadataSnapshot) => void;
     }
-  ): Promise<{ success: boolean; deferred?: boolean; error?: string }> {
+  ): Promise<{ success: boolean; deferred?: boolean; error?: string; appliedArtwork?: boolean }> {
     // ── Phase 0: pre-state + artwork ──────────────────────────────────────
     const currentRow = await getSongById(m.songId);
     if (!currentRow) return { success: false, error: `Song ${m.songId} not found` };
@@ -366,7 +363,9 @@ export class MetadataApplyOrchestrator {
               artists: [{ name: String(this.fieldNew(m, 'artist')) }]
             }),
             ...(this.fieldNew(m, 'album') !== undefined && {
-              albums: [{ title: String(this.fieldNew(m, 'album')) }]
+              albums: String(this.fieldNew(m, 'album')).trim() === ''
+                ? []
+                : [{ title: String(this.fieldNew(m, 'album')) }]
             }),
             ...(this.fieldNew(m, 'genre') !== undefined && {
               genres: [{ name: String(this.fieldNew(m, 'genre')) }]
@@ -483,7 +482,11 @@ export class MetadataApplyOrchestrator {
       logger.info('[Orchestrator] deferred file write for currently-playing song', {
         songPath: normalizedTarget
       });
-      return { success: true, deferred: true };
+      return {
+        success: true,
+        deferred: true,
+        appliedArtwork: Boolean(artworkBuffer && artworkBuffer.length > 0)
+      };
     }
 
     const writeRes = await this.tagWriter.writeTags(payload);
@@ -512,10 +515,14 @@ export class MetadataApplyOrchestrator {
       await this.historyService.confirmUndo(`orch-${m.mutationId}`).catch(() => undefined);
       return {
         success: false,
-        error: `File write failed for ${writeRes.filePath}: ${writeRes.error}`
+        error: `File write failed for ${writeRes.filePath}: ${writeRes.error}`,
+        appliedArtwork: Boolean(artworkBuffer && artworkBuffer.length > 0)
       };
     }
 
-    return { success: true };
+    return { 
+      success: true, 
+      appliedArtwork: Boolean(artworkBuffer && artworkBuffer.length > 0) 
+    };
   }
 }

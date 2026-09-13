@@ -263,7 +263,12 @@ export function useAlbumAutoTag(
     } else if (res.provider === 'musicbrainz') {
       setArtworkSource('coverartarchive');
     } else {
-      setArtworkSource((res.provider as ArtworkSourceOption) || 'coverartarchive');
+      const validOnlineSources = new Set(['discogs', 'coverartarchive', 'musicbrainz', 'local']);
+      if (validOnlineSources.has(res.provider)) {
+        setArtworkSource(res.provider as ArtworkSourceOption);
+      } else {
+        setArtworkSource('coverartarchive');
+      }
     }
   }, []);
 

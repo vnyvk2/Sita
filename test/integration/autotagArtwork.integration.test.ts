@@ -80,12 +80,12 @@ describe('AutoTag Artwork Pipeline (Phase 3 Integration Gate)', () => {
       expect(preview.matches).toHaveLength(1);
       const match = preview.matches[0];
 
-      // Invariant BUG-07: suggestedMetadata and fieldDiffs MUST use artworkPath
-      expect(match.suggestedMetadata.artworkPath).toBe(
+      // Invariant BUG-07: suggestedMetadata and fieldDiffs MUST use artworkUrl
+      expect(match.suggestedMetadata.artworkUrl).toBe(
         'https://coverartarchive.org/release-group/rg-mbid-999/front.jpg'
       );
       expect(match.fieldDiffs).toHaveLength(1);
-      expect(match.fieldDiffs[0].fieldId).toBe('artworkPath');
+      expect(match.fieldDiffs[0].fieldId).toBe('artworkUrl');
       expect(match.fieldDiffs[0].suggestedValue).toBe(
         'https://coverartarchive.org/release-group/rg-mbid-999/front.jpg'
       );
