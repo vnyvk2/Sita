@@ -21,6 +21,7 @@ import { MetadataHistoryService } from '../../history/MetadataHistoryService';
 import { AlbumAutoTagService } from '../../services/AlbumAutoTagService';
 import { MetadataApplyService } from '../../services/MetadataApplyService';
 import { TagWriterService } from '../../services/TagWriterService';
+import * as resolveFilePaths from '@main/fs/resolveFilePaths';
 import type { NormalizedMutation } from '../contract';
 import { MetadataApplyOrchestrator } from '../MetadataApplyOrchestrator';
 
@@ -667,5 +668,42 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
       .where(eq(albumsArtworks.albumId, album.id));
     expect(albumArtLinks.length).toBeGreaterThan(0);
   });
+
+  it('Step 4 Cache Invalidation: invalidates songArtworks and albumArtworks cache when artwork is applied', async () => {
+    const spyResetCache = vi.spyOn(resolveFilePaths, 'resetArtworkCache');
+
+    const seeded = await db.query.songs.findFirst();
+    expect(seeded).toBeDefined();
+
+    const orchestrator = new MetadataApplyOrchestrator({
+      tagWriter: new TagWriterService(),
+      historyService: new MetadataHistoryService(new MetadataHistoryRepository(db)),
+      getCurrentPlayingPath: () => undefined
+    });
+
+    const mutation: NormalizedMutation = {
+      mutationId: `op-cache:${seeded!.id}`,
+      operationId: 'op-cache',
+      songId: seeded!.id,
+      filePath: tempSongPath,
+      fields: [],
+      artwork: {
+        buffer: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          'base64'
+        )
+      },
+      fileWrite: { deferredIfPlaying: false },
+      undo: { description: 'Artwork cache test' }
+    };
+
+    const res = await orchestrator.execute([mutation]);
+    expect(res.success).toBe(true);
+
+    expect(spyResetCache).toHaveBeenCalledWith('songArtworks');
+    expect(spyResetCache).toHaveBeenCalledWith('albumArtworks');
+    spyResetCache.mockRestore();
+  });
 });
+
 

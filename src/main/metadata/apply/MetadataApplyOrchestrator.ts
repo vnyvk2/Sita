@@ -144,6 +144,17 @@ export class MetadataApplyOrchestrator {
       });
     }
 
+    // Reset artwork caches so URL timestamp parameters change and UI refreshes immediately
+    if (artworkSongIds.length > 0) {
+      try {
+        const { resetArtworkCache } = await import('@main/fs/resolveFilePaths');
+        resetArtworkCache('songArtworks');
+        resetArtworkCache('albumArtworks');
+      } catch (cacheErr) {
+        logger.warn('[MetadataApplyOrchestrator] Failed to reset artwork cache', { cacheErr });
+      }
+    }
+
     if (this.onDataUpdate && (result.updatedCount > 0 || result.deferredCount > 0)) {
       try {
         if (artworkSongIds.length > 0) {

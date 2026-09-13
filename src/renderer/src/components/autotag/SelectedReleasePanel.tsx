@@ -31,7 +31,7 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
       {/* Left: Artwork & Source Selector */}
       <div className="flex flex-col items-center gap-1.5">
         <div className="bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/40 dark:border-dark-background-color-3/40 relative flex h-[134px] w-[134px] items-center justify-center overflow-hidden rounded-lg border shadow-sm">
-          {artworkUrl && artworkSource !== 'local' ? (
+          {artworkUrl && replaceArtwork && artworkSource !== 'local' ? (
             <img
               src={artworkUrl}
               alt="Cover Art"
@@ -43,7 +43,9 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
           ) : (
             <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed flex flex-col items-center gap-1">
               <span className="text-3xl">🎵</span>
-              <span className="text-xs font-medium">No Cover</span>
+              <span className="text-xs font-medium">
+                {artworkSource === 'local' || !replaceArtwork ? 'Keep Existing' : 'No Cover'}
+              </span>
             </div>
           )}
         </div>
@@ -117,30 +119,47 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
             <span className="text-font-color-black dark:text-font-color-white font-semibold">
               Artwork Source:
             </span>
-            <label
-              className={`flex cursor-pointer items-center gap-1.5 ${artworkSource === 'musicbrainz' ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}
-            >
-              <input
-                type="radio"
-                name="artworkSource"
-                value="musicbrainz"
-                checked={artworkSource === 'musicbrainz'}
-                onChange={() => onArtworkSourceChange('musicbrainz')}
-              />
-              MusicBrainz
-            </label>
-            <label
-              className={`flex cursor-pointer items-center gap-1.5 ${artworkSource === 'coverartarchive' ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}
-            >
-              <input
-                type="radio"
-                name="artworkSource"
-                value="coverartarchive"
-                checked={artworkSource === 'coverartarchive'}
-                onChange={() => onArtworkSourceChange('coverartarchive')}
-              />
-              Cover Art Archive
-            </label>
+            {preview.provider === 'discogs' ? (
+              <label
+                className={`flex cursor-pointer items-center gap-1.5 ${artworkSource === 'discogs' ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}
+              >
+                <input
+                  type="radio"
+                  name="artworkSource"
+                  value="discogs"
+                  checked={artworkSource === 'discogs'}
+                  onChange={() => onArtworkSourceChange('discogs')}
+                />
+                Discogs
+              </label>
+            ) : (
+              <>
+                <label
+                  className={`flex cursor-pointer items-center gap-1.5 ${artworkSource === 'coverartarchive' ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}
+                >
+                  <input
+                    type="radio"
+                    name="artworkSource"
+                    value="coverartarchive"
+                    checked={artworkSource === 'coverartarchive'}
+                    onChange={() => onArtworkSourceChange('coverartarchive')}
+                  />
+                  Cover Art Archive
+                </label>
+                <label
+                  className={`flex cursor-pointer items-center gap-1.5 ${artworkSource === 'musicbrainz' ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}
+                >
+                  <input
+                    type="radio"
+                    name="artworkSource"
+                    value="musicbrainz"
+                    checked={artworkSource === 'musicbrainz'}
+                    onChange={() => onArtworkSourceChange('musicbrainz')}
+                  />
+                  MusicBrainz
+                </label>
+              </>
+            )}
             <label
               className={`flex cursor-pointer items-center gap-1.5 ${artworkSource === 'local' ? 'text-font-color-black dark:text-font-color-white font-semibold' : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'}`}
             >

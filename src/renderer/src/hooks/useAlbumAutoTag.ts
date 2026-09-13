@@ -23,7 +23,7 @@ import { metadataApi } from '../services/metadataApi';
 export type AutoTagStep = 'search' | 'preview' | 'applying' | 'complete';
 export type PreviewFilterOption = 'all' | 'changed' | 'matched' | 'low_confidence' | 'warnings';
 export type PreviewSortOption = 'trackNumber' | 'confidence' | 'title';
-export type ArtworkSourceOption = 'musicbrainz' | 'coverartarchive' | 'local';
+export type ArtworkSourceOption = 'musicbrainz' | 'coverartarchive' | 'discogs' | 'local';
 
 export interface GlobalFieldDiff {
   fieldId: string;
@@ -252,11 +252,18 @@ export function useAlbumAutoTag(
     setSelectedFieldMap(newFieldMap);
     setUserEditedValues(newEdits);
 
-    // Set artwork source based on provider
-    if (res.provider === 'musicbrainz') {
-      setArtworkSource('musicbrainz');
-    } else {
+    // Set artwork source based on candidate provider and available online artwork
+    const hasOnlineArtwork = Boolean(
+      res.album.artwork?.primaryPath || res.album.artwork?.onlineUrls?.[0]
+    );
+    if (!hasOnlineArtwork) {
       setArtworkSource('local');
+    } else if (res.provider === 'discogs') {
+      setArtworkSource('discogs');
+    } else if (res.provider === 'musicbrainz') {
+      setArtworkSource('coverartarchive');
+    } else {
+      setArtworkSource((res.provider as ArtworkSourceOption) || 'coverartarchive');
     }
   }, []);
 
@@ -534,7 +541,10 @@ export function useAlbumAutoTag(
         album: payloadAlbum,
         matches: effectiveMatches
       };
-      const effectiveReplaceArtwork = replaceArtwork && selectedGlobalFields.has('artwork');
+      const effectiveReplaceArtwork =
+        replaceArtwork &&
+        selectedGlobalFields.has('artwork') &&
+        artworkSource !== 'local';
       const suggestedGenre =
         preview.album.genre ||
         preview.matches
@@ -556,10 +566,9 @@ export function useAlbumAutoTag(
 
       const options: ApplyPreviewOptions = {
         replaceArtwork: effectiveReplaceArtwork,
-        artworkUrl:
-          !effectiveReplaceArtwork || artworkSource === 'local'
-            ? undefined
-            : preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0],
+        artworkUrl: !effectiveReplaceArtwork
+          ? undefined
+          : preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0],
         globalMutations,
         operationId
       };
