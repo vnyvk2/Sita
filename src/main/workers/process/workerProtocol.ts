@@ -193,6 +193,13 @@ export interface EvtTracksParsedBatch {
   cancelled?: boolean;
 }
 
+export interface EvtTracksParsedFailed {
+  protocolVersion: typeof MEDIA_WORKER_PROTOCOL_VERSION;
+  type: 'EVT_TRACKS_PARSED_FAILED';
+  taskId: string;
+  error: string;
+}
+
 // Phase C4: Persistent asset generation events
 export type EvtAssetComplete =
   | {
@@ -224,6 +231,7 @@ export type WorkerToMainEvent =
   | EvtWalkProgress
   | EvtWalkComplete
   | EvtTracksParsedBatch
+  | EvtTracksParsedFailed
   | EvtAssetComplete;
 
 // ============================================================================

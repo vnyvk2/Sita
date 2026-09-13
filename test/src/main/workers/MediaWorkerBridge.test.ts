@@ -916,5 +916,78 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
       expect(forkMock).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('Worker Terminal States & Failure Protocol (Fix 2)', () => {
+    it('EVT_TRACKS_PARSED_FAILED should reject the parse task with the error message', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_PARSE_TRACK_BATCH']
+      });
+      await startPromise;
+
+      const onBatch = vi.fn().mockResolvedValue(undefined);
+      const parsePromise = bridge.parseTrackBatchStream(
+        [{ songPath: 'C:/Music/test.mp3' }],
+        { onBatch }
+      );
+
+      const parseCommand = mockProcess.postMessage.mock.calls.find(
+        (c) => (c[0] as any).type === 'CMD_PARSE_TRACK_BATCH'
+      )![0] as any;
+      const taskId = parseCommand.taskId;
+
+      // Simulate worker failure event
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_TRACKS_PARSED_FAILED',
+        taskId,
+        error: 'Backpressure safety timeout (30s) waiting for CMD_ACK_BATCH'
+      });
+
+      await expect(parsePromise).rejects.toThrow(
+        'Worker batch parsing failed: Backpressure safety timeout (30s)'
+      );
+    });
+
+    it('EVT_TRACKS_PARSED_BATCH with cancelled: true should resolve cleanly as cancelled', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING', 'CMD_PARSE_TRACK_BATCH']
+      });
+      await startPromise;
+
+      const onBatch = vi.fn().mockResolvedValue(undefined);
+      const parsePromise = bridge.parseTrackBatchStream(
+        [{ songPath: 'C:/Music/test.mp3' }],
+        { onBatch }
+      );
+
+      const parseCommand = mockProcess.postMessage.mock.calls.find(
+        (c) => (c[0] as any).type === 'CMD_PARSE_TRACK_BATCH'
+      )![0] as any;
+      const taskId = parseCommand.taskId;
+
+      // Simulate user cancellation terminal event
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_TRACKS_PARSED_BATCH',
+        taskId,
+        batchId: -1,
+        isLastBatch: true,
+        tracks: [],
+        errors: [],
+        cancelled: true
+      });
+
+      const result = await parsePromise;
+      expect(result.cancelled).toBe(true);
+    });
+  });
 });
 

@@ -12,6 +12,7 @@ import {
   isValidProtocolEnvelope,
   type EvtAssetComplete,
   type EvtTracksParsedBatch,
+  type EvtTracksParsedFailed,
   type EvtWalkComplete,
   type EvtWalkProgress,
   type MainToWorkerCommand,
@@ -825,6 +826,19 @@ export class MediaWorkerBridge extends EventEmitter {
         break;
       }
 
+      case 'EVT_TRACKS_PARSED_FAILED': {
+        const failEvt = event as EvtTracksParsedFailed;
+        const parseTask = this.activeParseResolvers.get(failEvt.taskId);
+        if (parseTask) {
+          parseTask.reject(
+            new Error(
+              `[MediaWorkerBridge] Worker batch parsing failed: ${failEvt.error}. Committed ${parseTask.totalParsed} tracks before failure.`
+            )
+          );
+        }
+        break;
+      }
+
       case 'EVT_TRACKS_PARSED_BATCH': {
         const batchEvt = event as EvtTracksParsedBatch;
         const parseTask = this.activeParseResolvers.get(batchEvt.taskId);
@@ -865,25 +879,14 @@ export class MediaWorkerBridge extends EventEmitter {
               }
 
               if (batchEvt.isLastBatch || batchEvt.cancelled) {
-                if (batchEvt.cancelled && !batchEvt.isLastBatch) {
-                  // Worker-initiated cancellation (e.g., backpressure timeout).
-                  // REJECT so the caller can fall back to local processing for remaining tracks.
-                  parseTask.reject(
-                    new Error(
-                      `[MediaWorkerBridge] Worker batch parsing was cancelled (timeout or worker failure). ` +
-                        `Committed ${parseTask.totalParsed} tracks before cancellation.`
-                    )
-                  );
-                } else {
-                  if (!batchEvt.cancelled) {
-                    this.onTaskCompletedSuccessfully();
-                  }
-                  parseTask.resolve({
-                    totalParsed: parseTask.totalParsed,
-                    totalErrors: parseTask.totalErrors,
-                    cancelled: Boolean(batchEvt.cancelled)
-                  });
+                if (!batchEvt.cancelled) {
+                  this.onTaskCompletedSuccessfully();
                 }
+                parseTask.resolve({
+                  totalParsed: parseTask.totalParsed,
+                  totalErrors: parseTask.totalErrors,
+                  cancelled: Boolean(batchEvt.cancelled)
+                });
               }
             })
             .catch((err) => {
