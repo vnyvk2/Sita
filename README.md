@@ -17,14 +17,14 @@
 [![Linter: Oxlint](https://img.shields.io/badge/Linter-Oxlint-ff69b4?style=for-the-badge)](https://oxc.rs/)
 [![Tests: Vitest](https://img.shields.io/badge/Tests-Vitest-729b1b?style=for-the-badge&logo=vitest&logoColor=white)](https://vitest.dev/)
 
-[✨ Key Features](#-key-features) • [📸 Visual Gallery](#-visual-gallery) • [🏛 Architecture & Tech Stack](#-architecture--tech-stack) • [⚡ Performance & Scale](#-performance--scale) • [🛠 Build From Source](#-build-from-source) • [⌨️ Keyboard Shortcuts](#-keyboard-shortcuts) • [🤝 Heritage & Credits](#-heritage--credits) • [Changelog](CHANGELOG.md)
+[✨ Key Features](#-key-features) • [📸 Visual Gallery](#-visual-gallery) • [🏛 Architecture & Tech Stack](#-architecture--tech-stack) • [🛠 Build From Source](#-build-from-source) • [⌨️ Keyboard Shortcuts](#-keyboard-shortcuts) • [🤝 Heritage & Credits](#-heritage--credits) • [Changelog](CHANGELOG.md)
 
 </div>
 
 ---
 
 > [!IMPORTANT]
-> **Fork & Heritage Notice:** **Sita** is an advanced, high-performance fork of the open-source [Nora Music Player](https://github.com/Sandakan/Nora) originally created by [Sandakan Nipunajith](https://github.com/Sandakan) (inspired by [Oto Music](https://play.google.com/store/apps/details?id=com.piyush.music)). Sita heavily expands upon the original foundation with a native `node:sqlite` database engine, dedicated `utilityProcess` multi-worker pool architecture, multi-queue tab orchestration with canonical library projections, 200-bin peak waveform audio seekbars, an Audiophile Vault with listening analytics, circadian rhythm tracking, real-time Theme Layer Inspector, and robust transactional metadata auto-tagging.
+> **Fork & Heritage Notice:** **Sita** is an advanced, high-performance fork of the open-source [Nora Music Player](https://github.com/Sandakan/Nora) originally created by [Sandakan Nipunajith](https://github.com/Sandakan) (inspired by [Oto Music](https://play.google.com/store/apps/details?id=com.piyush.music)). Sita heavily expands upon the original foundation with a native `node:sqlite` database engine, dedicated `utilityProcess` multi-worker pool architecture, multi-queue tab orchestration with canonical library projections, 200-bin peak waveform audio seekbars, real-time DSP Karaoke vocal reducer with LR4 crossover filtering, A-B loop repetition, an Audiophile Vault with listening analytics, circadian rhythm tracking, real-time Theme Layer Inspector, and robust transactional metadata auto-tagging.
 
 ---
 
@@ -76,6 +76,9 @@ _ID-first windowed hydration, 200-bin peak waveform seekbar & gapless playback_
 
 - **Streaming File Protocol:** Custom audio streaming protocol utilizing native backpressure (`Readable.toWeb`), byte-range slicing (`206 Partial Content`), and Chromium media range caching.
 - **200-Bin Peak Waveform Seekbar:** Real-time interactive waveform seekbar offering precision seeking and visual audio feedback.
+- **Real-Time DSP Karaoke Mode (Vocal Reducer):** High-precision zero-latency center-channel vocal reduction powered by a parallel Linkwitz-Riley 4th-order (LR4) crossover filter topology. Suppresses centered lead vocals within the human voice midrange (220 Hz – 6,000 Hz) while phase-independently preserving punchy bass foundation (< 220 Hz) and high-frequency sparkle (> 6,000 Hz). Includes instant one-click toggle, real-time vocal attenuation slider (0–100%), and optional quick-access placement in the player bar.
+- **A-B Loop Practice Mode:** Seamless segment looper with visual pin indicators on the waveform seekbar, gap-aware turnaround, and direct lyric line loop synchronization (`[` / `]` / `\`) for practice and transcription.
+- **Audio FX & Night Mode:** Integrated audio effects modal featuring a dynamic range compressor (Night Mode) for comfortable night-time listening without jarring volume spikes.
 - **EBU R128 / ITU-R BS.1770-4 Loudness Normalization:** Pure ReplayGain analysis engine with album-level loudness aggregation and decoupled playback volume policy.
 - **Interactive Duration / Remaining Toggle:** Click the duration indicator in the main player bar, Fullscreen Player, or Theatre mode to toggle between total elapsed duration and remaining countdown time.
 - **Seamless Playback Transitions:** Configurable volume fade on play/pause and gapless audio sequencing.
@@ -101,6 +104,9 @@ _ID-first windowed hydration, 200-bin peak waveform seekbar & gapless playback_
 
 - **Multi-Format Native Tagging:** Powered by `node-taglib-sharp` with full read/write support for `MP3`, `FLAC`, `M4A`, `OGG`, `WAV`, `AAC`, `OPUS`, and `M4R`.
 - **Multi-Provider AutoTag Resolution:** Automated identification and metadata fetching from **MusicBrainz** (Recording MBID & ISRC extraction), **Cover Art Archive** (with release-group fallbacks), **Last.fm**, and **Spotify**.
+- **Intelligent Duplicate Song Detection & Resolution:** Multi-criteria audio fingerprinting and metadata matching engine that discovers exact and fuzzy track duplicates, complete with bitrate-aware keeper recommendations, category filters, and safe bulk cleanup.
+- **Multi-Playlist Batch Import:** Drag-and-drop or file-dialog batch importing for `.m3u` and `.m3u8` playlists with automatic path reconciliation and library mapping.
+- **Bulk & Manual Language Tagging:** Multi-song language assignment, clearing, and override synchronization across physical ID3 tags and relational storage.
 - **Multi-Genre Tokenizer & Normalizer:** Centralized multi-genre delimiter parsing (`parseGenreList`) and localized guidance during tag diff previews.
 - **Transactional Safety & Reversibility:** Atomic tag writing with deferred write coalescing for playing tracks and full rollback support via [`MetadataTransactionManager`](src/main/metadata/transactions/MetadataTransactionManager.ts).
 - **Typo-Resistant Fuzzy Search:** High-performance fuzzy matching across songs, artists, albums, and genres.
@@ -129,9 +135,11 @@ _ID-first windowed hydration, 200-bin peak waveform seekbar & gapless playback_
 - **Adaptive Dynamic Themes:** Dynamically extracts vibrant color palettes directly from the currently playing track's cover art.
 - **Floating Heart Burst Animations:** Fluid GPU-accelerated particle burst animations on favorite toggles with optimistic state updates.
 
-### 🪟 Compact Mini Player
+### 🪟 Compact Mini Player & Player Bar Customization
 
-- **Dedicated Mini Player (`Ctrl+Shift+N`):** Ultra-sleek, compact desktop overlay with playback controls, volume slider, interactive seekbar, and synchronized lyrics snippet.
+- **Dedicated Mini Player (`Ctrl+Shift+N`) & Mini Mode (`Ctrl+N`):** Ultra-sleek, compact desktop overlay with playback controls, volume slider, interactive seekbar, and synchronized lyrics snippet.
+- **Desktop Floating Lyrics (`Ctrl+Shift+L`):** Transparent, always-on-top desktop overlay displaying synchronized lyrics anywhere on your screen.
+- **Configurable Player Bar 3-Dots Menu:** Choose which controls appear directly on the main player bar and which are consolidated into the 3-dots context menu (Mini Player, Fullscreen, Floating Lyrics, Audio FX, Karaoke, Queue).
 
 ### 🌐 Scrobbling & Social Integrations
 
@@ -220,20 +228,6 @@ graph TD
 
 ---
 
-## ⚡ Performance & Scale
-
-Sita was systematically benchmarked and engineered to conquer massive personal library bottlenecks:
-
-| Performance Metric        | Traditional Architecture | Sita Windowed Hydration Architecture                    |
-| ------------------------- | ------------------------ | ------------------------------------------------------- |
-| **50,000 Tracks Payload** | 51.3 MB JSON payload     | **~199 KB windowed slice + ~10 KB IDs**                 |
-| **IPC Transfer Duration** | 11,500 – 33,000 ms       | **< 15 ms instantaneous transfer**                      |
-| **Renderer Heap Memory**  | ~480+ MB (linear growth) | **Flat ~14.5 MB stable heap**                           |
-| **Tag Extraction Impact** | Froze UI during scans    | **0 ms UI lockup (100% offloaded to `utilityProcess`)** |
-| **Database Overhead**     | Heavy bundle footprint   | **0 MB extra dependencies (native `node:sqlite`)**      |
-
----
-
 ## 🛠 Build From Source
 
 ### Prerequisites
@@ -245,8 +239,8 @@ Sita was systematically benchmarked and engineered to conquer massive personal l
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/vnyvk2/Nora.git Sita
-cd Sita
+git clone https://github.com/vnyvk2/sita.git
+cd sita
 ```
 
 ### 2. Install Dependencies
@@ -300,11 +294,15 @@ npm run build:linux
 | <kbd>Ctrl</kbd> + <kbd>→</kbd> / <kbd>Ctrl</kbd> + <kbd>←</kbd> | Skip to Next / Previous track               |
 | <kbd>Ctrl</kbd> + <kbd>↑</kbd> / <kbd>Ctrl</kbd> + <kbd>↓</kbd> | Increase / Decrease audio volume            |
 | <kbd>Ctrl</kbd> + <kbd>M</kbd>                                  | Mute / Unmute audio                         |
+| <kbd>[</kbd> / <kbd>]</kbd>                                     | Set A-B Loop Start (A) / End (B) point      |
+| <kbd>\\</kbd>                                                   | Clear A-B Loop                              |
+| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd>               | Toggle Desktop Floating Lyrics              |
 | <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>N</kbd>               | Open / Toggle Compact Mini Player           |
 | <kbd>Alt</kbd> + <kbd>Q</kbd>                                   | Toggle Queue panel & multi-queue view       |
 | <kbd>Ctrl</kbd> + <kbd>L</kbd>                                  | Open Lyrics view                            |
 | <kbd>F11</kbd>                                                  | Toggle Fullscreen Player mode               |
 | <kbd>Ctrl</kbd> + <kbd>F</kbd>                                  | Focus global library search bar             |
+| <kbd>Ctrl</kbd> + <kbd>/</kbd>                                  | Open In-App Keyboard Shortcuts dialog       |
 | <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Y</kbd> | Undo / Redo last playlist or library action |
 
 ---
