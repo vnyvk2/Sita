@@ -6,7 +6,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState
 } from 'react';
@@ -14,7 +13,6 @@ import {
 import { AppUpdateContext } from '../contexts/AppUpdateContext';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import calculateTime from '../utils/calculateTime';
-import debounce from '../utils/debounce';
 
 type Props = {
   id?: string;
@@ -390,6 +388,10 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
   );
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (wheelTimerRef.current) {
+      clearTimeout(wheelTimerRef.current);
+      wheelTimerRef.current = null;
+    }
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
@@ -578,47 +580,40 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     drawCanvas();
   };
 
-  // Stable debounced wheel scroll handler for interval scrubbing with unmount cleanup
-  const handleWheelSeekLatestRef = useRef<(direction: 'up' | 'down') => void>(() => {});
-  useEffect(() => {
-    handleWheelSeekLatestRef.current = (direction: 'up' | 'down') => {
-      const interval = preferences?.seekbarScrollInterval ?? 5;
-      const totalDuration = getEffectiveDuration();
-      const currentPos = progressPercentRef.current * totalDuration;
-      const nextPos =
-        direction === 'up'
-          ? Math.min(totalDuration, currentPos + interval)
-          : Math.max(0, currentPos - interval);
-
-      progressPercentRef.current =
-        totalDuration > 0 ? Math.min(1, Math.max(0, nextPos / totalDuration)) : 0;
-      updateSongPosition(nextPos);
-      onSeek?.(nextPos);
-      drawCanvas();
-    };
-  });
-
-  const handleWheelSeek = useMemo(
-    () =>
-      debounce((direction: 'up' | 'down') => {
-        handleWheelSeekLatestRef.current(direction);
-      }, 100),
-    []
-  );
+  // Wheel scroll handler for interval scrubbing with immediate visual feedback and debounced audio update
+  const wheelTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
-      handleWheelSeek.cancel?.();
+      if (wheelTimerRef.current) {
+        clearTimeout(wheelTimerRef.current);
+        wheelTimerRef.current = null;
+      }
     };
-  }, [handleWheelSeek]);
+  }, []);
 
   const handleWheel = (e: ReactWheelEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (e.deltaY < 0) {
-      handleWheelSeek('up');
-    } else {
-      handleWheelSeek('down');
+    const interval = preferences?.seekbarScrollInterval ?? 5;
+    const totalDuration = getEffectiveDuration();
+    const currentPos = progressPercentRef.current * totalDuration;
+    const nextPos =
+      e.deltaY < 0
+        ? Math.min(totalDuration, currentPos + interval)
+        : Math.max(0, currentPos - interval);
+
+    progressPercentRef.current =
+      totalDuration > 0 ? Math.min(1, Math.max(0, nextPos / totalDuration)) : 0;
+    onSeek?.(nextPos);
+    drawCanvas();
+
+    if (wheelTimerRef.current) {
+      clearTimeout(wheelTimerRef.current);
     }
+    wheelTimerRef.current = setTimeout(() => {
+      updateSongPosition(nextPos);
+      wheelTimerRef.current = null;
+    }, 120);
   };
 
   return (

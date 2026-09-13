@@ -79,7 +79,7 @@ const FullScreenPlayer = () => {
           fallbackSrc={DefaultSongCover}
           loading="eager"
           alt="Song Cover"
-          className={`h-full w-full object-cover shadow-lg blur-none brightness-[.25]! transition-[filter] delay-100 duration-200 ease-in-out ${isLyricsVisible ? 'blur-[2rem]!' : 'blur-none'}`}
+          className="h-full w-full object-cover shadow-lg blur-[2rem]! brightness-[.25]! transition-[filter] delay-100 duration-200 ease-in-out"
         />
         {/* Accent aurora washes above the blurred art - compositor-only drifts,
             paused via [data-fx-paused] while playback is paused */}
