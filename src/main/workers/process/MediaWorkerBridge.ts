@@ -161,8 +161,17 @@ export class MediaWorkerBridge extends EventEmitter {
   // demand by the next task; supervision and crash recovery are unaffected.
   private lastWorkerActivityAt = Date.now();
   private idleCheckTimer: NodeJS.Timeout | null = null;
+  private terminationPromise: Promise<void> | null = null;
   private static readonly IDLE_CHECK_INTERVAL_MS = 10_000;
   private static readonly DEFAULT_IDLE_SHUTDOWN_MS = 25_000;
+
+  private hasPendingTasks(): boolean {
+    return (
+      this.activeWalkResolvers.size > 0 ||
+      this.activeParseResolvers.size > 0 ||
+      this.activeAssetResolvers.size > 0
+    );
+  }
 
   public getState(): MediaWorkerState {
     return this.state;
@@ -190,15 +199,12 @@ export class MediaWorkerBridge extends EventEmitter {
     const idleShutdownMs = this.getIdleShutdownMs();
     if (idleShutdownMs <= 0) return;
     this.idleCheckTimer = setInterval(() => {
-      if (this.state !== 'READY') return;
-      if (
-        this.activeWalkResolvers.size > 0 ||
-        this.activeParseResolvers.size > 0 ||
-        this.activeAssetResolvers.size > 0
-      ) {
-        return;
-      }
+      if (this.state !== 'READY' || this.hasPendingTasks()) return;
       if (Date.now() - this.lastWorkerActivityAt < idleShutdownMs) return;
+
+      // Re-validate state and task activity immediately before firing termination
+      if (this.state !== 'READY' || this.hasPendingTasks()) return;
+
       logger.info('[MediaWorkerBridge] Worker idle past threshold; shutting down utilityProcess.', {
         idleMs: Date.now() - this.lastWorkerActivityAt,
         idleShutdownMs
@@ -261,11 +267,24 @@ export class MediaWorkerBridge extends EventEmitter {
    * existing in-flight startup promise if already launching.
    */
   public async start(timeoutMs = 5000): Promise<void> {
-    if (this.state === 'READY') return;
-    if (this.state === 'DRAINING' || this.state === 'TERMINATED') {
-      logger.warn(`[MediaWorkerBridge] start() ignored: bridge is in ${this.state} state.`);
-      return;
+    if (this.state === 'READY' && this.childProcess) return;
+
+    if (this.state === 'DRAINING') {
+      logger.info(
+        '[MediaWorkerBridge] start() called while DRAINING. Awaiting worker termination before respawning...'
+      );
+      if (this.terminationPromise) {
+        await this.terminationPromise.catch(() => {});
+      }
     }
+
+    if (this.state === 'TERMINATED') {
+      // The bridge is a reusable singleton; transition back to UNINITIALIZED to allow respawning
+      this.state = 'UNINITIALIZED';
+    }
+
+    if (this.state === 'READY' && this.childProcess) return;
+
     if (this.startPromise) return this.startPromise;
 
     this.startPromise = this.executeStart(timeoutMs).finally(() => {
@@ -1062,10 +1081,14 @@ export class MediaWorkerBridge extends EventEmitter {
       return;
     }
 
+    if (this.terminationPromise) {
+      return this.terminationPromise;
+    }
+
     logger.info('[MediaWorkerBridge] Terminating media worker...');
     this.state = 'DRAINING';
 
-    return new Promise<void>((resolve) => {
+    this.terminationPromise = new Promise<void>((resolve) => {
       let resolved = false;
 
       const finish = () => {
@@ -1110,7 +1133,11 @@ export class MediaWorkerBridge extends EventEmitter {
         clearTimeout(timer);
         finish();
       }
+    }).finally(() => {
+      this.terminationPromise = null;
     });
+
+    return this.terminationPromise;
   }
 }
 

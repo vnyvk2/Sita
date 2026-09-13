@@ -837,4 +837,84 @@ describe('MediaWorkerBridge (Phase C1 Scaffolding)', () => {
       expect(resolvedPath).toContain('mediaWorker.js');
     });
   });
+
+  describe('DRAINING Race & Idle Re-validation (Fix 3)', () => {
+    it('start() called while bridge is DRAINING should await termination and respawn cleanly', async () => {
+      // 1. Initial start
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING']
+      });
+      await startPromise;
+      expect(bridge.getState()).toBe('READY');
+
+      // 2. Trigger terminate (transitions to DRAINING)
+      const termPromise = bridge.terminate(2000);
+      expect(bridge.getState()).toBe('DRAINING');
+
+      // 3. Setup second process for respawn
+      const secondMockProcess = new MockUtilityProcess();
+      forkMock.mockReturnValue(secondMockProcess);
+
+      // 4. Concurrent start() during DRAINING
+      const respawnPromise = bridge.start(2000);
+
+      // 5. Worker exits to complete drain
+      mockProcess.simulateExit(0);
+      await termPromise;
+
+      // 6. Simulate EVT_READY on second process
+      secondMockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 67890,
+        supportedOps: ['CMD_PING']
+      });
+
+      await respawnPromise;
+      expect(bridge.getState()).toBe('READY');
+      expect(bridge.getWorkerPid()).toBe(67890);
+    });
+
+    it('multiple concurrent start() calls during DRAINING should serialize behind single respawn', async () => {
+      const startPromise = bridge.start(2000);
+      mockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 12345,
+        supportedOps: ['CMD_PING']
+      });
+      await startPromise;
+
+      const termPromise = bridge.terminate(2000);
+      expect(bridge.getState()).toBe('DRAINING');
+
+      const secondMockProcess = new MockUtilityProcess();
+      forkMock.mockReturnValue(secondMockProcess);
+
+      // Launch 3 concurrent start calls
+      const p1 = bridge.start(2000);
+      const p2 = bridge.start(2000);
+      const p3 = bridge.start(2000);
+
+      mockProcess.simulateExit(0);
+      await termPromise;
+
+      secondMockProcess.simulateWorkerMessage({
+        protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+        type: 'EVT_READY',
+        pid: 67890,
+        supportedOps: ['CMD_PING']
+      });
+
+      await Promise.all([p1, p2, p3]);
+      expect(bridge.getState()).toBe('READY');
+      // Fork should only have been called twice (initial + 1 respawn, not 3)
+      expect(forkMock).toHaveBeenCalledTimes(2);
+    });
+  });
 });
+
