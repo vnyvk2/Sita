@@ -24,6 +24,8 @@ export interface LocalSongInput {
   genre?: string;
   trackNumber?: number;
   discNumber?: number;
+  artworkPath?: string;
+  artworkUrl?: string;
 }
 
 export interface ScoreBreakdown {

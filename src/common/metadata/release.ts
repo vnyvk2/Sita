@@ -19,6 +19,8 @@ export interface AutoTagSongInput {
   genre?: string;
   isrc?: string;
   musicBrainzRecordingId?: string;
+  artworkPath?: string;
+  artworkUrl?: string;
 }
 
 export type LocalSongInput = AutoTagSongInput;

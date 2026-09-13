@@ -18,7 +18,7 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
   public readonly displayName = 'Artwork Auto Tag';
 
   public readonly supportedFields: WorkflowSupportedField[] = [
-    { fieldId: 'artworkPath', displayName: 'Cover Art', category: 'artwork', defaultEnabled: true }
+    { fieldId: 'artworkUrl', displayName: 'Cover Art', category: 'artwork', defaultEnabled: true }
   ];
 
   public readonly preferredProviders: MetadataProviderId[] = ['coverartarchive', 'discogs'];
@@ -141,13 +141,13 @@ export class ArtworkWorkflow extends BaseMetadataWorkflow {
         title: local.title,
         artist: local.artist,
         album: local.album,
-        artworkPath: coverArtUrl
+        artworkUrl: coverArtUrl
       },
       confidence: 0.9,
       fieldDiffs: [
         MetadataDiffBuilder.createFieldDiff({
           fieldId: 'artworkUrl',
-          oldVal: undefined,
+          oldVal: local.artworkPath,
           newVal: coverArtUrl,
           providerId,
           confidenceScore: 0.9

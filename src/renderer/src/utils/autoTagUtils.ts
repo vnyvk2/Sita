@@ -17,6 +17,7 @@ export interface SongDataForAutoTag {
   year?: number;
   path: string;
   duration?: number;
+  artworkPath?: string;
 }
 
 /**
@@ -45,7 +46,8 @@ export async function resolveAutoTagSongs(
     discNo: s.discNo,
     year: s.year,
     path: s.path,
-    duration: s.duration
+    duration: s.duration,
+    artworkPath: s.artworkPaths?.artworkPath
   }));
 }
 
@@ -120,7 +122,8 @@ export async function updateMissingArtworkForSongs(
           trackNumber: song.trackNo,
           discNumber: song.discNo,
           year: song.year,
-          duration: song.duration
+          duration: song.duration,
+          artworkPath: song.artworkPath
         }
       ];
 
@@ -137,7 +140,7 @@ export async function updateMissingArtworkForSongs(
         const res = await metadataApi.workflowApplyPreview(
           'artwork',
           preview,
-          ['artworkPath'],
+          ['artworkUrl', 'artworkPath'],
           undefined,
           opId
         );

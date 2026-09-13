@@ -102,7 +102,13 @@ export abstract class BaseMetadataWorkflow implements MetadataWorkflow {
     preview: MetadataPreview,
     selectedFieldIds?: string[]
   ): ResourceMutationPayload[] {
-    const fieldsToApply = new Set(selectedFieldIds ?? this.supportedFields.map((f) => f.fieldId));
+    const rawSelected = selectedFieldIds ?? this.supportedFields.map((f) => f.fieldId);
+    const fieldsToApply = new Set<string>();
+    for (const id of rawSelected) {
+      fieldsToApply.add(id);
+      if (id === 'artworkUrl') fieldsToApply.add('artworkPath');
+      if (id === 'artworkPath') fieldsToApply.add('artworkUrl');
+    }
 
     return preview.matches.map((m) => ({
       resourceId: m.localSongId,
