@@ -1,11 +1,61 @@
-import { type CSSProperties, useContext, useEffect, useState } from 'react';
+import { type CSSProperties, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useStore } from '@tanstack/react-store';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { type AudioFxOptions, type AudioFxPresetType } from '../../other/audioFx/types';
+import type AudioPlayer from '../../other/player';
+import { dispatch, store } from '../../store/store';
 import Button from '../Button';
 import Checkbox from '../Checkbox';
+
+const NIGHT_MODE_METER_SCALE_DB = 24; // 0 … 24 dB meter range
+
+function NightModeReductionMeter({ player }: { player: AudioPlayer }) {
+  const { t } = useTranslation();
+  const fillRef = useRef<HTMLDivElement>(null);
+  const readoutRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    let rafId = 0;
+    const tick = () => {
+      // DynamicsCompressorNode.reduction is negative or 0 dB (e.g. -6.4 dB)
+      const db = Math.abs(player.getNightModeReduction());
+      const pct = Math.min(100, Math.max(0, (db / NIGHT_MODE_METER_SCALE_DB) * 100));
+      if (fillRef.current) {
+        fillRef.current.style.width = `${pct}%`;
+      }
+      if (readoutRef.current) {
+        readoutRef.current.textContent = db >= 0.1 ? `-${db.toFixed(1)} dB` : '0.0 dB';
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [player]);
+
+  return (
+    <div className="flex items-center gap-2 pt-0.5">
+      <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-[10px] font-medium shrink-0">
+        {t('audioFx.nightModeReduction', 'Gain Reduction')}:
+      </span>
+      <div className="bg-background-color-2/80 dark:bg-dark-background-color-2/80 relative h-2 flex-1 overflow-hidden rounded-full">
+        <div
+          ref={fillRef}
+          className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 transition-[width] duration-75 ease-out"
+          style={{ width: '0%' }}
+        />
+      </div>
+      <span
+        ref={readoutRef}
+        className="text-font-color-dimmed dark:text-dark-font-color-dimmed w-14 font-mono text-[10px] text-right"
+      >
+        0.0 dB
+      </span>
+    </div>
+  );
+}
 
 const AudioFxModal = () => {
   const { t } = useTranslation();
@@ -13,6 +63,22 @@ const AudioFxModal = () => {
   const { changePromptMenuData } = useContext(AppUpdateContext);
 
   const [currentFx, setCurrentFx] = useState<AudioFxOptions>(() => player.getAudioFx());
+  const isKaraoke = useStore(
+    store,
+    (state) => state.localStorage?.playback?.isKaraoke ?? false
+  );
+  const karaokeLevel = useStore(
+    store,
+    (state) => state.localStorage?.playback?.karaokeLevel ?? 100
+  );
+  const isNightMode = useStore(
+    store,
+    (state) => state.localStorage?.playback?.isNightMode ?? false
+  );
+  const nightModePreset = useStore(
+    store,
+    (state) => state.localStorage?.playback?.nightModePreset ?? 'standard'
+  );
 
   useEffect(() => {
     const onFxChange = (updatedFx: unknown) => {
@@ -182,7 +248,7 @@ const AudioFxModal = () => {
           </div>
 
           {/* Pitch Lock Option */}
-          <div className="border-background-color-2/60 bg-background-color-2/20 dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/20 mt-auto rounded-lg border p-2.5">
+          <div className="border-background-color-2/60 bg-background-color-2/20 dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/20 rounded-lg border p-2.5">
             <Checkbox
               id="audiofx-preserve-pitch"
               isChecked={currentFx.preservesPitch}
@@ -196,6 +262,50 @@ const AudioFxModal = () => {
               When checked, vocals maintain their original pitch when speed is changed. Uncheck for
               classic vinyl/tape pitch shifts (authentic nightcore & slowed).
             </p>
+          </div>
+
+          {/* Night Listening Mode (Dynamic Normalizer) */}
+          <div className="border-background-color-2/60 bg-background-color-2/20 dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/20 mt-auto rounded-lg border p-2.5">
+            <Checkbox
+              id="audiofx-night-mode"
+              isChecked={isNightMode}
+              checkedStateUpdateFunction={() => dispatch({ type: 'TOGGLE_NIGHT_MODE' })}
+              labelContent={t('audioFx.nightModeTitle', 'Night Listening Mode (Dynamic Normalizer)')}
+            />
+            <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 pl-7 text-[10px]">
+              {t(
+                'audioFx.nightModeDescription',
+                'Evens out dynamic range between quiet intros/dialogue and loud drops for comfortable late-night listening.'
+              )}
+            </p>
+
+            {isNightMode && (
+              <div className="mt-2.5 flex flex-col gap-2 pl-7">
+                {/* Preset Pills */}
+                <div className="flex items-center gap-1.5">
+                  {(['gentle', 'standard', 'strong'] as const).map((preset) => {
+                    const isActive = nightModePreset === preset;
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => dispatch({ type: 'SET_NIGHT_MODE_PRESET', data: preset })}
+                        className={`cursor-pointer rounded-md px-2.5 py-1 text-xs font-semibold capitalize transition-all ${
+                          isActive
+                            ? 'bg-font-color-highlight text-font-color-white dark:bg-dark-font-color-highlight dark:text-font-color-black shadow-2xs'
+                            : 'border-background-color-2/80 bg-background-color-2/40 text-font-color-black hover:bg-background-color-2 dark:border-dark-background-color-2/80 dark:bg-dark-background-color-2/40 dark:text-font-color-white dark:hover:bg-dark-background-color-2/70 border'
+                        }`}
+                      >
+                        {t(`audioFx.nightMode.${preset}`, preset)}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Live Gain Reduction Meter */}
+                <NightModeReductionMeter player={player} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -322,6 +432,54 @@ const AudioFxModal = () => {
               <span>-6.0 dB</span>
               <span>+6.0 dB</span>
             </div>
+          </div>
+
+          {/* Karaoke / Vocal Reducer Option */}
+          <div className="border-background-color-2/60 bg-background-color-2/20 dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/20 mt-auto rounded-lg border p-2.5">
+            <Checkbox
+              id="audiofx-karaoke-mode"
+              isChecked={isKaraoke}
+              checkedStateUpdateFunction={() => dispatch({ type: 'TOGGLE_KARAOKE_MODE' })}
+              labelContent={t('audioFx.karaokeTitle', 'Karaoke Mode (Vocal Reducer)')}
+            />
+            <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 pl-7 text-[10px]">
+              {t(
+                'audioFx.karaokeDescription',
+                'Suppresses center-panned lead vocals in real-time while preserving instruments, bass, and stereo imaging.'
+              )}
+            </p>
+            {isKaraoke && (
+              <div className="mt-2.5 flex flex-col gap-1 pl-7">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-font-color-black dark:text-font-color-white font-medium">
+                    {t('player.karaokeLevel', 'Vocal Reduction')}
+                  </span>
+                  <span className="bg-font-color-highlight/10 text-font-color-highlight dark:bg-dark-font-color-highlight/20 dark:text-dark-font-color-highlight rounded-md px-2 py-0.5 font-mono text-xs font-semibold">
+                    {karaokeLevel}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={karaokeLevel}
+                  onChange={(e) =>
+                    dispatch({
+                      type: 'UPDATE_KARAOKE_LEVEL',
+                      data: parseInt(e.target.value, 10)
+                    })
+                  }
+                  className={sliderClasses}
+                  style={{ '--seek-before-width': `${karaokeLevel}%` } as CSSProperties}
+                  title={`${karaokeLevel}%`}
+                />
+                <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed flex w-full justify-between text-[10px] opacity-80">
+                  <span>0% (Original)</span>
+                  <span>100% (Full Cut)</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -93,3 +93,8 @@ src/renderer/src/assets/app_icons/icon_20.svg
 
 temp/
 
+# Showcase artworks, scratchpads & generator scripts
+resources/other/sita_showcase_*.webp
+resources/screenshots/
+scratch/
+scripts/generate-showcase-artworks.mjs

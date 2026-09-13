@@ -33,6 +33,7 @@ export const Route = createFileRoute('/main-player/lyrics/')({
 function LyricsPage() {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const currentSongData = useStore(store, (state) => state.currentSongData);
+  const abLoop = useStore(store, (state) => state.player.abLoop);
 
   const { t } = useTranslation();
   const { isAutoScrolling, from } = Route.useSearch();
@@ -143,9 +144,10 @@ function LyricsPage() {
       currentSongData.duration,
       isAutoScrolling,
       'normal',
-      activeLineIndex
+      activeLineIndex,
+      abLoop
     );
-  }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex]);
+  }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex, abLoop]);
 
   // const showOnlineLyrics = useCallback(
   //   (

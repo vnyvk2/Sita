@@ -9,17 +9,32 @@ import { renderLyricsLines } from '../lyricsUtils';
 
 const translationCallsByLine: Record<number, number> = {};
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: any) => {
-      if (options?.start !== undefined) {
-        // Track translation calls per line start timestamp to verify component execution
-        translationCallsByLine[options.start] = (translationCallsByLine[options.start] || 0) + 1;
-      }
-      return key;
-    }
+vi.mock('../../../hooks/useAudioPlayer', () => ({
+  useAudioPlayer: () => ({
+    setAbLoopRange: vi.fn(),
+    setAbLoopPointA: vi.fn(),
+    setAbLoopPointB: vi.fn(),
+    clearAbLoop: vi.fn(),
+    getAbLoopState: () => ({ phase: 'idle', pointA: null, pointB: null }),
+    seek: vi.fn()
   })
 }));
+
+vi.mock('react-i18next', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, any>>();
+  return {
+    ...actual,
+    useTranslation: () => ({
+      t: (key: string, options?: any) => {
+        if (options?.start !== undefined) {
+          // Track translation calls per line start timestamp to verify component execution
+          translationCallsByLine[options.start] = (translationCallsByLine[options.start] || 0) + 1;
+        }
+        return key;
+      }
+    })
+  };
+});
 
 const mockAppContext: Partial<AppUpdateContextType> = {
   updateSongPosition: vi.fn(),
@@ -114,7 +129,7 @@ describe('LyricLine Memoization Boundary (Phase L1)', () => {
     expect(translationCallsByLine[10]).toBe(1);
   });
 
-  it('renderLyricsLines delivers scalar syncedStart and syncedEnd props', () => {
+  it('renderLyricsLines delivers scalar syncedStart, syncedEnd, and loop props', () => {
     const mockLyrics: SongLyrics = {
       title: 'Test Song',
       source: 'IN_SONG_LYRICS',
@@ -135,7 +150,13 @@ describe('LyricLine Memoization Boundary (Phase L1)', () => {
       }
     };
 
-    const components = renderLyricsLines(mockLyrics, 200, true, 'normal', 0);
+    const activeLoop: AbLoopState = {
+      phase: 'active',
+      pointA: 5.0,
+      pointB: 10.0
+    };
+
+    const components = renderLyricsLines(mockLyrics, 200, true, 'normal', 0, activeLoop);
     expect(components).toHaveLength(2);
     const firstComp = components[0] as React.ReactElement<{
       syncedStart?: number;
@@ -144,6 +165,70 @@ describe('LyricLine Memoization Boundary (Phase L1)', () => {
     }>;
     expect(firstComp.props.syncedStart).toBe(0);
     expect(firstComp.props.syncedEnd).toBe(5);
-    expect(firstComp.props.isActive).toBe(true);
+    expect(firstComp.props.isInAbLoop).toBe(false);
+
+    const secondComp = components[1] as React.ReactElement;
+    expect(secondComp.props.syncedStart).toBe(5);
+    expect(secondComp.props.syncedEnd).toBe(10);
+    expect(secondComp.props.isInAbLoop).toBe(true);
+    expect(secondComp.props.isLoopStart).toBe(true);
+  });
+
+  it('proves React.memo preserves unchanged lines when an A-B loop activates', () => {
+    translationCallsByLine[0] = 0;
+    translationCallsByLine[5] = 0;
+    translationCallsByLine[10] = 0;
+
+    function TestLoopContainer() {
+      const [loopActive, setLoopActive] = useState(false);
+
+      return (
+        <div>
+          <button onClick={() => setLoopActive(true)}>Activate Loop on Line 1</button>
+          <LyricLine
+            index={0}
+            lyric="Line 0"
+            syncedStart={0}
+            syncedEnd={5}
+            isInAbLoop={false}
+          />
+          <LyricLine
+            index={1}
+            lyric="Line 1"
+            syncedStart={5}
+            syncedEnd={10}
+            isInAbLoop={loopActive}
+            isLoopStart={loopActive}
+          />
+          <LyricLine
+            index={2}
+            lyric="Line 2"
+            syncedStart={10}
+            syncedEnd={15}
+            isInAbLoop={false}
+          />
+        </div>
+      );
+    }
+
+    renderWithContext(<TestLoopContainer />);
+
+    // Initial mount: all 3 lines execute once
+    expect(translationCallsByLine[0]).toBe(1);
+    expect(translationCallsByLine[5]).toBe(1);
+    expect(translationCallsByLine[10]).toBe(1);
+
+    // Activate loop on Line 1 only
+    const btn = screen.getByText('Activate Loop on Line 1');
+    act(() => {
+      btn.click();
+    });
+
+    // Line 0 unchanged -> React.memo bails out!
+    expect(translationCallsByLine[0]).toBe(1);
+    // Line 1 changed -> executed again (count >= 2)
+    expect(translationCallsByLine[5]).toBeGreaterThanOrEqual(2);
+    // Line 2 unchanged -> React.memo bails out!
+    expect(translationCallsByLine[10]).toBe(1);
   });
 });

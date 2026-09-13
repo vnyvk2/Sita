@@ -4,7 +4,7 @@ import path from 'path';
 
 import { collectGarbageArtworks } from '@main/core/garbageCollector';
 import { db } from '@main/db/db';
-import { waveforms } from '@main/db/schema';
+import { songs, waveforms } from '@main/db/schema';
 import logger from '@main/logger';
 import { isAnErrorWithCode } from '@main/utils/isAnErrorWithCode';
 import {
@@ -51,7 +51,14 @@ export class GarbageCollectionJob implements Job {
 
       logger.info('Starting garbage collection for orphaned waveforms');
       const removedWaveforms = await this.collectGarbageWaveforms();
+      if (this.isCancelled()) return;
       logger.info(`Garbage collection completed. Removed ${removedWaveforms} orphaned waveforms.`);
+
+      logger.info('Starting garbage collection for orphaned loudness blocks');
+      const removedLoudnessBlocks = await this.collectGarbageLoudnessBlocks();
+      logger.info(
+        `Garbage collection completed. Removed ${removedLoudnessBlocks} orphaned loudness blocks.`
+      );
     } catch (error) {
       logger.error('Garbage collection job failed', { error });
       throw error;
@@ -198,6 +205,65 @@ export class GarbageCollectionJob implements Job {
       return removedCount;
     } catch (error) {
       logger.error('Failed to collect garbage waveforms', { error });
+      throw error;
+    }
+  }
+
+  private async collectGarbageLoudnessBlocks(): Promise<number> {
+    try {
+      const loudnessDir = path.join(app.getPath('userData'), 'loudness_blocks');
+
+      let files: string[] = [];
+      try {
+        files = await fs.readdir(loudnessDir);
+      } catch (e) {
+        if (isAnErrorWithCode(e) && e.code === 'ENOENT') return 0;
+        throw e;
+      }
+
+      const now = Date.now();
+      let removedCount = 0;
+
+      const dbSongs = await db.select({ id: songs.id }).from(songs);
+      const validSongIds = new Set(dbSongs.map((s) => s.id));
+
+      for (const file of files) {
+        if (this.isCancelled()) return removedCount;
+        const filePath = path.join(loudnessDir, file);
+
+        if (file.endsWith('.tmp')) {
+          const stats = await fs.stat(filePath).catch(() => null);
+          if (stats && now - stats.mtimeMs > 60_000) {
+            await fs.unlink(filePath).catch((err) => {
+              logger.warn(`Failed to delete stale loudness block tmp file ${filePath}`, {
+                error: err
+              });
+            });
+            removedCount++;
+          }
+          continue;
+        }
+
+        if (file.endsWith('_v1.bin')) {
+          const idStr = file.slice(0, -'_v1.bin'.length);
+          const songId = Number(idStr);
+          if (Number.isFinite(songId) && !validSongIds.has(songId)) {
+            const stats = await fs.stat(filePath).catch(() => null);
+            if (stats && now - stats.mtimeMs > 60_000) {
+              await fs.unlink(filePath).catch((err) => {
+                logger.warn(`Failed to delete orphaned loudness block ${filePath}`, {
+                  error: err
+                });
+              });
+              removedCount++;
+            }
+          }
+        }
+      }
+
+      return removedCount;
+    } catch (error) {
+      logger.error('Failed to collect garbage loudness blocks', { error });
       throw error;
     }
   }

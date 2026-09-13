@@ -1,4 +1,4 @@
-import { store } from '@renderer/store/store';
+import { dispatch, store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 /* eslint-disable jsx-a11y/no-static-element-interactions */
@@ -12,6 +12,7 @@ import Button from '../Button';
 import QueueIcon from '../Icons/QueueIcon';
 import NavLink from '../NavLink';
 import VolumeSlider from '../VolumeSlider';
+import KaraokeSlider from '../KaraokeSlider';
 
 const AppShortcutsPrompt = lazy(() => import('../SettingsPage/AppShortcutsPrompt'));
 const AudioFxModal = lazy(() => import('./AudioFxModal'));
@@ -23,6 +24,14 @@ const OtherSongControlsContainer = () => {
   const audioFxPreset = useStore(
     store,
     (state) => state.localStorage?.playback?.audioFx?.preset ?? 'normal'
+  );
+  const isKaraoke = useStore(
+    store,
+    (state) => state.localStorage?.playback?.isKaraoke ?? false
+  );
+  const karaokeLevel = useStore(
+    store,
+    (state) => state.localStorage?.playback?.karaokeLevel ?? 100
   );
 
   const { updatePlayerType, toggleMutedState, updateContextMenuData, changePromptMenuData } =
@@ -78,6 +87,14 @@ const OtherSongControlsContainer = () => {
             iconName: 'subtitles',
             iconClassName: 'material-icons-round-outlined mr-2',
             handlerFunction: () => window.api.windowControls.toggleFloatingLyrics()
+          },
+          {
+            label: isKaraoke
+              ? t('player.disableKaraoke', 'Disable Karaoke Mode')
+              : t('player.enableKaraoke', 'Enable Karaoke Mode'),
+            iconName: 'mic_off',
+            iconClassName: 'material-icons-round-outlined mr-2',
+            handlerFunction: () => dispatch({ type: 'TOGGLE_KARAOKE_MODE' })
           },
           { label: '', isContextMenuItemSeperator: true, handlerFunction: () => true },
           {
@@ -181,6 +198,33 @@ const OtherSongControlsContainer = () => {
         iconClassName="material-icons-round text-xl text-font-color-black opacity-60 hover:opacity-80 dark:text-font-color-white"
         clickHandler={() => window.api.windowControls.toggleFloatingLyrics()}
       />
+
+      <div className="group/karaoke relative flex items-center">
+        <Button
+          className={`karaoke-btn text-font-color-black text-opacity-60 after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight relative rounded-none! border-0! bg-transparent p-0! outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:outline! lg:hidden dark:bg-transparent dark:hover:bg-transparent ${
+            isKaraoke ? 'after:opacity-100' : ''
+          }`}
+          ariaPressed={isKaraoke}
+          tooltipLabel={`${t('player.karaokeTooltip', 'Toggle Karaoke Mode (Vocal Reducer)')}${isKaraoke ? ` (${Math.round(karaokeLevel)}%)` : ''}`}
+          iconName="mic_off"
+          iconClassName={`material-icons-round text-xl transition-all ${
+            isKaraoke
+              ? 'text-font-color-highlight! dark:text-dark-font-color-highlight! opacity-100 scale-105'
+              : 'text-font-color-black opacity-60 hover:opacity-80 dark:text-font-color-white'
+          }`}
+          clickHandler={() => dispatch({ type: 'TOGGLE_KARAOKE_MODE' })}
+        />
+
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out lg:hidden ${
+            isKaraoke
+              ? 'max-w-[5.5rem] min-w-[3.5rem] opacity-100 ml-2 mr-6'
+              : 'max-w-0 opacity-0 mr-6 group-hover/karaoke:max-w-[5.5rem] group-hover/karaoke:min-w-[3.5rem] group-hover/karaoke:opacity-100 group-hover/karaoke:ml-2'
+          }`}
+        >
+          <KaraokeSlider name="player-karaoke-slider" id="karaokeSlider" />
+        </div>
+      </div>
 
       <Button
         className={`volume-btn after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight !mr-2 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent ${

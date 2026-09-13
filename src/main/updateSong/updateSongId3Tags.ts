@@ -7,6 +7,9 @@ import sharp from 'sharp';
 import { generateLocalArtworkBuffer } from '../filesystem/artworkBuffers';
 export { generateLocalArtworkBuffer };
 
+import { normalizeLanguageName } from '@common/languages';
+import { and, eq } from 'drizzle-orm';
+
 import { appPreferences } from '../../../package.json';
 import { parseGenreList } from '../../common/genreUtils';
 import parseLyrics from '../../common/parseLyrics';
@@ -22,6 +25,7 @@ import {
   getSongById,
   updateSongBasicFields
 } from '../db/queries/songs';
+import { metadataOverrides } from '../db/schema';
 import { DEFAULT_FILE_URL } from '../filesystem';
 import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
 import { getArtistArtworkPath, getSongArtworkPath } from '../fs/resolveFilePaths';
@@ -34,6 +38,7 @@ import {
   updateSongsOutsideLibraryData
 } from '../main';
 import { MetadataPendingWritesRepository } from '../metadata/history/MetadataPendingWritesRepository';
+import { MetadataOverrideSerializer } from '../metadata/repository/models/MetadataOverrideSerializer';
 import { createTempArtwork, processArtworkFiles } from '../other/artworks';
 import generatePalette from '../other/generatePalette';
 import { syncSongRelationalData } from '../parseSong/syncSongRelationalData';
@@ -55,6 +60,7 @@ export type TagData = {
   trackNumber?: number;
   discNumber?: number;
   year?: number;
+  language?: string;
   artwork?: Picture;
   /**
    * Base64-encoded artwork for DEFERRED writes. The durable pending table is jsonb - a taglib
@@ -131,6 +137,14 @@ export const savePendingMetadataUpdates = async (currentSongPath = '', forceSave
               file.tag.isrc = tags.isrc;
             } else if (file.tag.isrc) {
               file.tag.isrc = '';
+            }
+          }
+          if (tags.language !== undefined) {
+            const tagWithLanguages = file.tag as unknown as { languages?: string[] };
+            if (tags.language) {
+              tagWithLanguages.languages = [tags.language];
+            } else {
+              tagWithLanguages.languages = [];
             }
           }
 
@@ -241,6 +255,7 @@ const mergeTagData = (base: TagData, incoming: TagData): TagData => {
   if (incoming.musicBrainzRecordingId !== undefined)
     merged.musicBrainzRecordingId = incoming.musicBrainzRecordingId;
   if (incoming.isrc !== undefined) merged.isrc = incoming.isrc;
+  if (incoming.language !== undefined) merged.language = incoming.language;
   return merged;
 };
 
@@ -894,7 +909,8 @@ const updateSongId3TagsOfUnknownSource = async (
         trackNumber: newSongTags.trackNumber,
         year: newSongTags.releasedYear,
         artwork: artworkPicture,
-        lyrics: lyricsText
+        lyrics: lyricsText,
+        language: newSongTags.language
       };
 
       // Persist immediately unless this exact song is currently playing, in
@@ -964,6 +980,10 @@ const updateSongId3Tags = async (
   isKnownSource = true
 ) => {
   const result: UpdateSongDataResult = { success: false };
+
+  if (tags.language !== undefined) {
+    tags.language = tags.language.trim() ? normalizeLanguageName(tags.language) : '';
+  }
 
   if (!isKnownSource) {
     try {
@@ -1065,10 +1085,49 @@ const updateSongId3Tags = async (
           trackNumber: tags.trackNumber,
           discNumber: tags.discNumber,
           musicBrainzRecordingId: tags.musicBrainzRecordingId,
-          isrc: tags.isrc
+          isrc: tags.isrc,
+          language: tags.language
         },
         trx
       );
+
+      // / / / / / METADATA OVERRIDES FOR LANGUAGE / / / / / / /
+      if (tags.language !== undefined) {
+        if (tags.language) {
+          const serialized = MetadataOverrideSerializer.serializeValue(tags.language);
+          await trx
+            .insert(metadataOverrides)
+            .values({
+              entityKind: 'song',
+              entityId: String(songId),
+              fieldId: 'language',
+              ...serialized,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            })
+            .onConflictDoUpdate({
+              target: [
+                metadataOverrides.entityKind,
+                metadataOverrides.entityId,
+                metadataOverrides.fieldId
+              ],
+              set: {
+                ...serialized,
+                updatedAt: new Date()
+              }
+            });
+        } else {
+          await trx
+            .delete(metadataOverrides)
+            .where(
+              and(
+                eq(metadataOverrides.entityKind, 'song'),
+                eq(metadataOverrides.entityId, String(songId)),
+                eq(metadataOverrides.fieldId, 'language')
+              )
+            );
+        }
+      }
 
       // / / / / / RELATIONAL SYNC (artworks, artists, album, genres) / / / / / / /
       // P1 extraction: verbatim behavior now lives in syncSongRelationalData
@@ -1102,7 +1161,8 @@ const updateSongId3Tags = async (
       artwork,
       lyrics: lyricsText,
       musicBrainzRecordingId: tags.musicBrainzRecordingId,
-      isrc: tags.isrc
+      isrc: tags.isrc,
+      language: tags.language
     };
 
     // Add to pending queue for file write

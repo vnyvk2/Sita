@@ -6,14 +6,13 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useRef,
   useState
 } from 'react';
 
 import { AppUpdateContext } from '../contexts/AppUpdateContext';
+import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import calculateTime from '../utils/calculateTime';
-import debounce from '../utils/debounce';
 
 type Props = {
   id?: string;
@@ -54,6 +53,8 @@ function generateSynthesizedWaveform(seed: number, count = WAVEFORM_RESOLUTION):
  * churn during continuous playback.
  */
 const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
+  const player = useAudioPlayer();
+  const abLoop = useStore(store, (state) => state.player.abLoop);
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const { updateSongPosition } = useContext(AppUpdateContext);
@@ -64,6 +65,12 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
   const peaksRef = useRef<Float32Array | null>(null);
   const durationRef = useRef(currentSongData.duration || 0);
   durationRef.current = currentSongData.duration || 0;
+
+  const shiftDragStartPosRef = useRef<number | null>(null);
+  const isShiftDraggingRef = useRef(false);
+  const draggedMarkerRef = useRef<'A' | 'B' | null>(null);
+  const localPreviewRangeRef = useRef<{ a: number; b: number } | null>(null);
+  const [cursorStyle, setCursorStyle] = useState<string>('pointer');
 
   const getEffectiveDuration = useCallback((): number => {
     return durationRef.current || store.state.currentSongData?.duration || 0;
@@ -205,8 +212,85 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
       }
     }
 
+    // Draw A-B Loop highlight band & markers
+    const totalDuration = getEffectiveDuration();
+    const preview = localPreviewRangeRef.current;
+    let curA: number | null = null;
+    let curB: number | null = null;
+    let isLoopActive = false;
+
+    if (preview) {
+      curA = preview.a;
+      curB = preview.b;
+      isLoopActive = true;
+    } else if (abLoop?.phase === 'active' && abLoop.pointA !== null && abLoop.pointB !== null) {
+      curA = abLoop.pointA;
+      curB = abLoop.pointB;
+      isLoopActive = true;
+    } else if (abLoop?.phase === 'armed' && abLoop.pointA !== null) {
+      curA = abLoop.pointA;
+      curB = null;
+      isLoopActive = false;
+    }
+
+    if (isLoopActive && curA !== null && curB !== null && totalDuration > 0) {
+      const startPct = Math.max(0, Math.min(1, curA / totalDuration));
+      const endPct = Math.max(0, Math.min(1, curB / totalDuration));
+      const xA = startPct * width;
+      const xB = endPct * width;
+      const bandW = Math.max(2, xB - xA);
+
+      ctx.save();
+      ctx.fillStyle = `hsl(${highlightColorRaw} / 0.20)`;
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(xA, 1, bandW, height - 2, 3);
+      } else {
+        ctx.fillRect(xA, 1, bandW, height - 2);
+      }
+      ctx.fill();
+      ctx.restore();
+    }
+
+    const drawMarker = (markerX: number, label: string) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = `hsl(${highlightColorRaw})`;
+      ctx.lineWidth = 1.5;
+      ctx.moveTo(markerX, 0);
+      ctx.lineTo(markerX, height);
+      ctx.stroke();
+
+      const badgeW = 14;
+      const badgeH = 13;
+      const badgeX = Math.max(0, Math.min(width - badgeW, markerX - badgeW / 2));
+      ctx.fillStyle = `hsl(${highlightColorRaw})`;
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(badgeX, 0, badgeW, badgeH, [0, 0, 3, 3]);
+      } else {
+        ctx.fillRect(badgeX, 0, badgeW, badgeH);
+      }
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, badgeX + badgeW / 2, badgeH / 2 + 1);
+      ctx.restore();
+    };
+
+    if (curA !== null && totalDuration > 0) {
+      const xA = (curA / totalDuration) * width;
+      drawMarker(xA, 'A');
+    }
+
+    if (curB !== null && totalDuration > 0) {
+      const xB = (curB / totalDuration) * width;
+      drawMarker(xB, 'B');
+    }
+
     ctx.restore();
-  }, []);
+  }, [abLoop, getEffectiveDuration]);
 
   // Fetch waveform when songId changes with stale request protection
   useEffect(() => {
@@ -272,6 +356,10 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     return () => document.removeEventListener('player/positionChange', handlePositionChange);
   }, [handlePositionChange]);
 
+  useEffect(() => {
+    drawCanvas();
+  }, [abLoop, drawCanvas]);
+
   // ResizeObserver for responsive high-DPI redraws
   useEffect(() => {
     const container = containerRef.current;
@@ -300,15 +388,68 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
   );
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (wheelTimerRef.current) {
+      clearTimeout(wheelTimerRef.current);
+      wheelTimerRef.current = null;
+    }
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const clickX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const totalDuration = getEffectiveDuration();
+    const pct = rect.width > 0 ? clickX / rect.width : 0;
+    const targetPos = pct * totalDuration;
+
+    // 1. Check if clicking near active Marker A or B
+    if (abLoop && totalDuration > 0) {
+      if (abLoop.pointA !== null) {
+        const xA = (abLoop.pointA / totalDuration) * rect.width;
+        if (Math.abs(clickX - xA) <= 8) {
+          draggedMarkerRef.current = 'A';
+          localPreviewRangeRef.current = {
+            a: abLoop.pointA,
+            b: abLoop.pointB ?? totalDuration
+          };
+          try {
+            (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
+          } catch {}
+          return;
+        }
+      }
+      if (abLoop.phase === 'active' && abLoop.pointB !== null) {
+        const xB = (abLoop.pointB / totalDuration) * rect.width;
+        if (Math.abs(clickX - xB) <= 8) {
+          draggedMarkerRef.current = 'B';
+          localPreviewRangeRef.current = {
+            a: abLoop.pointA ?? 0,
+            b: abLoop.pointB
+          };
+          try {
+            (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
+          } catch {}
+          return;
+        }
+      }
+    }
+
+    // 2. Shift + PointerDown = Drag to select A-B Loop range
+    if (e.shiftKey) {
+      isShiftDraggingRef.current = true;
+      shiftDragStartPosRef.current = targetPos;
+      localPreviewRangeRef.current = { a: targetPos, b: targetPos };
+      try {
+        (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
+      } catch {}
+      drawCanvas();
+      return;
+    }
+
+    // 3. Normal seek scrub
     isDraggingRef.current = true;
     try {
       (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
-    } catch {
-      // Ignore unsupported pointer capture
-    }
+    } catch {}
 
-    const targetPos = calculateSeekFromEvent(e.clientX);
-    const totalDuration = getEffectiveDuration();
     progressPercentRef.current =
       totalDuration > 0 ? Math.min(1, Math.max(0, targetPos / totalDuration)) : 0;
     drawCanvas();
@@ -320,15 +461,57 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     const rect = container.getBoundingClientRect();
     const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const pct = rect.width > 0 ? x / rect.width : 0;
+    const totalDuration = getEffectiveDuration();
 
     hoverPercentRef.current = pct;
     isHoveredRef.current = true;
+
+    // Handle marker fine-tuning drag
+    if (draggedMarkerRef.current && localPreviewRangeRef.current) {
+      const currentPos = pct * totalDuration;
+      if (draggedMarkerRef.current === 'A') {
+        const b = localPreviewRangeRef.current.b;
+        localPreviewRangeRef.current = { a: Math.min(currentPos, b - 0.25), b };
+      } else {
+        const a = localPreviewRangeRef.current.a;
+        localPreviewRangeRef.current = { a, b: Math.max(currentPos, a + 0.25) };
+      }
+      drawCanvas();
+      return;
+    }
+
+    // Handle Shift+drag range creation
+    if (isShiftDraggingRef.current && shiftDragStartPosRef.current !== null) {
+      const currentPos = pct * totalDuration;
+      localPreviewRangeRef.current = {
+        a: Math.min(shiftDragStartPosRef.current, currentPos),
+        b: Math.max(shiftDragStartPosRef.current, currentPos)
+      };
+      drawCanvas();
+      return;
+    }
 
     if (isDraggingRef.current) {
       progressPercentRef.current = pct;
     }
 
-    const totalDuration = getEffectiveDuration();
+    // Update cursor if hovering near marker
+    if (totalDuration > 0 && abLoop) {
+      let isNearMarker = false;
+      if (abLoop.pointA !== null) {
+        const xA = (abLoop.pointA / totalDuration) * rect.width;
+        if (Math.abs(x - xA) <= 8) isNearMarker = true;
+      }
+      if (abLoop.phase === 'active' && abLoop.pointB !== null) {
+        const xB = (abLoop.pointB / totalDuration) * rect.width;
+        if (Math.abs(x - xB) <= 8) isNearMarker = true;
+      }
+      const newCursor = isNearMarker ? 'ew-resize' : 'pointer';
+      if (cursorStyle !== newCursor) {
+        setCursorStyle(newCursor);
+      }
+    }
+
     const hoverTimeSec = pct * totalDuration;
     const timeObj = calculateTime(hoverTimeSec);
     setTooltipState({
@@ -341,13 +524,44 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
   };
 
   const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    // 1. Finish marker handle drag
+    if (draggedMarkerRef.current) {
+      try {
+        (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
+      } catch {}
+      if (localPreviewRangeRef.current) {
+        player.setAbLoopRange(localPreviewRangeRef.current.a, localPreviewRangeRef.current.b);
+      }
+      draggedMarkerRef.current = null;
+      localPreviewRangeRef.current = null;
+      drawCanvas();
+      return;
+    }
+
+    // 2. Finish Shift+drag range creation
+    if (isShiftDraggingRef.current) {
+      isShiftDraggingRef.current = false;
+      try {
+        (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
+      } catch {}
+      if (
+        localPreviewRangeRef.current &&
+        localPreviewRangeRef.current.b - localPreviewRangeRef.current.a >= 0.25
+      ) {
+        player.setAbLoopRange(localPreviewRangeRef.current.a, localPreviewRangeRef.current.b);
+      }
+      shiftDragStartPosRef.current = null;
+      localPreviewRangeRef.current = null;
+      drawCanvas();
+      return;
+    }
+
+    // 3. Normal seek release
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
       try {
         (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
-      } catch {
-        // Ignore unsupported pointer release
-      }
+      } catch {}
       const finalPos = calculateSeekFromEvent(e.clientX);
       const totalDuration = getEffectiveDuration();
       progressPercentRef.current =
@@ -361,39 +575,45 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
   const handlePointerLeave = () => {
     isHoveredRef.current = false;
     hoverPercentRef.current = null;
+    setCursorStyle('pointer');
     setTooltipState((prev) => ({ ...prev, visible: false }));
     drawCanvas();
   };
 
-  // Debounced wheel scroll handler for interval scrubbing
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const handleWheelSeek = useMemo(
-    () =>
-      debounce((direction: 'up' | 'down') => {
-        const interval = preferences?.seekbarScrollInterval ?? 5;
-        const totalDuration = getEffectiveDuration();
-        const currentPos = progressPercentRef.current * totalDuration;
-        const nextPos =
-          direction === 'up'
-            ? Math.min(totalDuration, currentPos + interval)
-            : Math.max(0, currentPos - interval);
+  // Wheel scroll handler for interval scrubbing with immediate visual feedback and debounced audio update
+  const wheelTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-        progressPercentRef.current =
-          totalDuration > 0 ? Math.min(1, Math.max(0, nextPos / totalDuration)) : 0;
-        updateSongPosition(nextPos);
-        onSeek?.(nextPos);
-        drawCanvas();
-      }, 100),
-    [preferences?.seekbarScrollInterval, updateSongPosition, onSeek, drawCanvas, getEffectiveDuration]
-  );
+  useEffect(() => {
+    return () => {
+      if (wheelTimerRef.current) {
+        clearTimeout(wheelTimerRef.current);
+        wheelTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleWheel = (e: ReactWheelEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (e.deltaY < 0) {
-      handleWheelSeek('up');
-    } else {
-      handleWheelSeek('down');
+    const interval = preferences?.seekbarScrollInterval ?? 5;
+    const totalDuration = getEffectiveDuration();
+    const currentPos = progressPercentRef.current * totalDuration;
+    const nextPos =
+      e.deltaY < 0
+        ? Math.min(totalDuration, currentPos + interval)
+        : Math.max(0, currentPos - interval);
+
+    progressPercentRef.current =
+      totalDuration > 0 ? Math.min(1, Math.max(0, nextPos / totalDuration)) : 0;
+    onSeek?.(nextPos);
+    drawCanvas();
+
+    if (wheelTimerRef.current) {
+      clearTimeout(wheelTimerRef.current);
     }
+    wheelTimerRef.current = setTimeout(() => {
+      updateSongPosition(nextPos);
+      wheelTimerRef.current = null;
+    }, 120);
   };
 
   return (
@@ -401,7 +621,8 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
       ref={containerRef}
       id={id}
       data-name={name}
-      className={`waveform-seekbar-container group relative flex h-7 w-full cursor-pointer items-center select-none ${className}`.trim()}
+      style={{ cursor: cursorStyle }}
+      className={`waveform-seekbar-container group relative flex h-7 w-full items-center select-none ${className}`.trim()}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

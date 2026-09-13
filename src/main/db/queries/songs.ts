@@ -16,6 +16,7 @@ import { parseSongArtworks } from '@main/fs/resolveFilePaths';
 import logger from '@main/logger';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
 import { and, asc, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm';
+
 import { titleToBucket } from '../../../common/titleToBucket';
 
 export interface RawFlatSongRow {
@@ -512,6 +513,7 @@ export interface UpdateSongBasicFieldsData {
   diskNumber?: number | null;
   musicBrainzRecordingId?: string | null;
   isrc?: string | null;
+  language?: string | null;
 }
 
 export const updateSongBasicFields = async (
@@ -539,6 +541,9 @@ export const updateSongBasicFields = async (
   }
   if (data.isrc !== undefined) {
     updatePayload.isrc = data.isrc || null;
+  }
+  if (data.language !== undefined) {
+    updatePayload.language = data.language || null;
   }
 
   if (Object.keys(updatePayload).length === 0) {
@@ -1125,7 +1130,8 @@ export interface SongListFacets {
 
 export const getSongListFacets = async (trx: DB | DBTransaction = db): Promise<SongListFacets> => {
   // rawAll: object rows (drizzle proxy .all() returns positional arrays for raw SQL)
-  const languagesResult = await rawAll<{ val: string }>(sql`
+  const languagesResult = await rawAll<{ val: string }>(
+    sql`
     SELECT DISTINCT val FROM (
       SELECT language AS val FROM songs WHERE language IS NOT NULL AND trim(language) <> ''
       UNION
@@ -1135,7 +1141,9 @@ export const getSongListFacets = async (trx: DB | DBTransaction = db): Promise<S
           AND ${metadataOverrides.stringValue} IS NOT NULL
           AND trim(${metadataOverrides.stringValue}) <> ''
     ) t ORDER BY val ASC
-  `);
+  `,
+    trx
+  );
 
   const genresResult = await trx
     .select({ name: genres.name })

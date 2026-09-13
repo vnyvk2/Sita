@@ -11,6 +11,7 @@ class ListeningDataSession {
   passedFullListenRange: boolean;
   passedScrobblingRange: boolean;
   isKnownSource: boolean;
+  isAbLoopActive: boolean;
   seconds: number;
   skipEndRange: ReturnType<typeof calculateTime>;
   listenEndRange: ReturnType<typeof calculateTime>;
@@ -35,6 +36,7 @@ class ListeningDataSession {
     this.passedSkipRange = false;
     this.passedFullListenRange = false;
     this.passedScrobblingRange = false;
+    this.isAbLoopActive = false;
     this.seconds = 0;
     this.seeks = [];
     this.startTime = new Date();
@@ -86,7 +88,7 @@ class ListeningDataSession {
         console.warn(`${this.songId} will be added to scrobble list if enabled.`);
         window.api.audioLibraryControls.scrobbleSong(this.songId, this.startTime.getTime() / 1000);
       }
-      if (!this.isPaused) {
+      if (!this.isPaused && !this.isAbLoopActive) {
         this.seconds += 1;
       }
     }, 1000);

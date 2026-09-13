@@ -1,4 +1,6 @@
-import { useCallback, useRef } from 'react';
+import { store } from '@renderer/store/store';
+import { useStore } from '@tanstack/react-store';
+import { useCallback, useEffect, useRef } from 'react';
 
 import ListeningDataSession from '../other/listeningDataSession';
 
@@ -31,6 +33,15 @@ export function useListeningData(player: HTMLAudioElement) {
   // Track the current listening session
   const recordRef = useRef<ListeningDataSession>(undefined);
 
+  // Sync A-B loop active status to pause wall-clock seconds accumulation
+  const isAbLoopActive = useStore(store, (state) => state.player.abLoop?.phase === 'active');
+
+  useEffect(() => {
+    if (recordRef.current) {
+      recordRef.current.isAbLoopActive = isAbLoopActive;
+    }
+  }, [isAbLoopActive]);
+
   /**
    * Records listening data for a song.
    *
@@ -58,6 +69,7 @@ export function useListeningData(player: HTMLAudioElement) {
 
         // Create new listening session
         const listeningDataSession = new ListeningDataSession(songId, duration, isKnownSource);
+        listeningDataSession.isAbLoopActive = store.state.player.abLoop?.phase === 'active';
         listeningDataSession.recordListeningData();
 
         // Set up event listeners for the session
@@ -81,11 +93,13 @@ export function useListeningData(player: HTMLAudioElement) {
           { signal: listeningDataSession.abortController.signal }
         );
 
-        // Track seek events
+        // Track seek events (ignore during active A-B loop to prevent analytics pollution)
         player.addEventListener(
           'seeked',
           () => {
-            listeningDataSession.addSeekPosition = player.currentTime;
+            if (!listeningDataSession.isAbLoopActive) {
+              listeningDataSession.addSeekPosition = player.currentTime;
+            }
           },
           { signal: listeningDataSession.abortController.signal }
         );

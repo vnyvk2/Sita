@@ -30,6 +30,7 @@ if (!parentPort) {
 const activeTaskControllers = new Map<string, AbortController>();
 const activeTaskPromises = new Map<string, Promise<unknown>>();
 const pendingBatchAcks = new Map<string, () => void>();
+const userCancelledTasks = new Set<string>();
 let isDraining = false;
 
 function postToMain(event: WorkerToMainEvent): void {
@@ -186,17 +187,31 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
           });
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
-          postToMain({
-            protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
-            type: 'EVT_TRACKS_PARSED_BATCH',
-            taskId: cmd.taskId,
-            batchId: -1,
-            isLastBatch: true,
-            tracks: [],
-            errors: [{ path: '', error: msg }],
-            cancelled: controller.signal.aborted
-          });
+          const isUserCancel =
+            userCancelledTasks.has(cmd.taskId) ||
+            (controller.signal.aborted && controller.signal.reason === 'user_cancel');
+
+          if (isUserCancel) {
+            postToMain({
+              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+              type: 'EVT_TRACKS_PARSED_BATCH',
+              taskId: cmd.taskId,
+              batchId: -1,
+              isLastBatch: true,
+              tracks: [],
+              errors: [],
+              cancelled: true
+            });
+          } else {
+            postToMain({
+              protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
+              type: 'EVT_TRACKS_PARSED_FAILED',
+              taskId: cmd.taskId,
+              error: msg
+            });
+          }
         } finally {
+          userCancelledTasks.delete(cmd.taskId);
           activeTaskControllers.delete(cmd.taskId);
           activeTaskPromises.delete(cmd.taskId);
           // Defensive cleanup: unblock and delete any remaining pending batch acks for this task
@@ -225,9 +240,10 @@ async function handleCommand(cmd: MainToWorkerCommand): Promise<void> {
     }
 
     case 'CMD_CANCEL_TASK': {
+      userCancelledTasks.add(cmd.taskId);
       const controller = activeTaskControllers.get(cmd.taskId);
       if (controller) {
-        controller.abort();
+        controller.abort('user_cancel');
         // NOTE: Do not delete activeTaskControllers here.
         // The executing task's finally block owns registration cleanup.
       }

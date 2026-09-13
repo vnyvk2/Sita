@@ -9,24 +9,36 @@ import PlayerQueue from './playerQueue';
 import type { QueuesManager } from './queuesManager';
 import { computeEffectiveReplayGain } from './replayGainCalculator';
 import { CrossfadeScheduler, type CrossfadeDelegate } from './crossfade/CrossfadeScheduler';
+import KaraokeNode from './audioFx/karaokeNode';
+import { NightModeNode, type NightModePreset } from './audioFx/nightModeNode';
+import {
+  AbLoopController,
+  type AbLoopState,
+  type SetPointResult
+} from './abLoopController';
 
 const DEBUG_PLAYER = false;
 
 const logPlayer = (...args: unknown[]) => {
-  if (!DEBUG_PLAYER) return;
-  console.debug(...args);
+  if (DEBUG_PLAYER) {
+    console.log(...args);
+  }
 };
 
 const AUDIO_FADE_DURATION = 250;
 
 type PlayerEventType =
-  | 'timeUpdate'
-  | 'durationChange'
   | 'play'
   | 'pause'
-  | 'error'
+  | 'timeUpdate'
+  | 'durationChange'
   | 'seeking'
   | 'seeked'
+  | 'ended'
+  | 'error'
+  | 'volumeChange'
+  | 'mutedChange'
+  | 'repeatChange'
   | 'repeatOne'
   | 'repeatAll'
   | 'playbackComplete'
@@ -37,7 +49,10 @@ type PlayerEventType =
   | 'repeatModeChange'
   | 'queueChange'
   | 'queueMetadataChange'
-  | 'audioFxChange';
+  | 'audioFxChange'
+  | 'karaokeChange'
+  | 'nightModeChange'
+  | 'abLoopChange';
 
 type PlayerEventCallback<T = unknown> = (data: T) => void;
 
@@ -77,6 +92,8 @@ class AudioPlayer {
   fxLowPassNode: BiquadFilterNode;
   nightcoreTrebleBoostNode: BiquadFilterNode;
   safetyLimiterNode: DynamicsCompressorNode;
+  karaokeNode: KaraokeNode;
+  nightModeNode: NightModeNode;
   gainNode: GainNode;
 
   private isConvolverConnected = false;
@@ -110,6 +127,10 @@ class AudioPlayer {
   private preloadedSongData: AudioPlayerData | null = null;
   private isCrossfading: boolean = false;
   private suppressQueuePositionLoad: boolean = false;
+  private abLoopController: AbLoopController;
+  private loopJumpPending: boolean = false;
+  private loopPredictionTimerId: ReturnType<typeof setTimeout> | null = null;
+  private loopRafId: number | null = null;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -168,6 +189,8 @@ class AudioPlayer {
     this.safetyLimiterNode.release.value = 0.15;
 
     this.gainNode = this.currentContext.createGain();
+    this.karaokeNode = new KaraokeNode(this.currentContext);
+    this.nightModeNode = new NightModeNode(this.currentContext);
 
     this.currentVolume = this.audioA.volume;
 
@@ -176,6 +199,7 @@ class AudioPlayer {
     this.setupQueueIntegration();
     this.setupAudioEventListeners();
     this.crossfadeScheduler = new CrossfadeScheduler(this.createCrossfadeDelegate());
+    this.abLoopController = new AbLoopController();
 
     const savedFx = storage.playback.getPlaybackOptions('audioFx');
     if (savedFx) {
@@ -282,6 +306,11 @@ class AudioPlayer {
   private setupAudioEventListenersFor(element: HTMLAudioElement, slot: 'A' | 'B') {
     element.addEventListener('ended', () => {
       if (this.activeSlot === slot) {
+        if (this.abLoopController.isActive()) {
+          this.executeLoopSeek(this.abLoopController.pointA!);
+          element.play().catch(() => {});
+          return;
+        }
         this.crossfadeScheduler.cancel();
         this.handleSongEnd();
       } else {
@@ -294,7 +323,12 @@ class AudioPlayer {
     element.addEventListener('timeupdate', () => {
       if (this.activeSlot === slot) {
         this.emit('timeUpdate', element.currentTime);
-        this.crossfadeScheduler.onTimeUpdate(element.currentTime);
+        if (this.abLoopController.phase !== 'active') {
+          this.crossfadeScheduler.onTimeUpdate(element.currentTime);
+        }
+        if (this.abLoopController.isActive()) {
+          this.checkLoopTurnaround();
+        }
       }
     });
 
@@ -345,6 +379,7 @@ class AudioPlayer {
 
     element.addEventListener('seeked', () => {
       if (this.activeSlot === slot) {
+        this.loopJumpPending = false;
         this.emit('seeked', element.currentTime);
       }
     });
@@ -355,6 +390,7 @@ class AudioPlayer {
    * Auto-resumes playback for the next song.
    */
   private async handleSongEnd() {
+    this.clearAbLoop('SONG_END');
     logPlayer('[AudioPlayer.handleSongEnd]', { repeatMode: this.repeatMode });
 
     if (this.repeatMode === 'one') {
@@ -491,6 +527,7 @@ class AudioPlayer {
             : (options?.updateStore !== false);
 
         this.currentSongData = songData;
+        this.clearAbLoop('TRACK_LOAD');
         this.applyReplayGain();
 
         // Ensure active slot is at full gain and standby is muted
@@ -597,6 +634,9 @@ class AudioPlayer {
 
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
+    this.clearAbLoop('DESTROY');
+    this.karaokeNode.destroy();
+    this.nightModeNode.destroy();
     this.crossfadeScheduler.cancel();
     this.cancelActiveFade();
     this.inFlightLoad = null;
@@ -765,10 +805,22 @@ class AudioPlayer {
     this.wetGainNode.connect(this.nightcoreTrebleBoostNode);
     this.isConvolverConnected = false;
 
-    // 4. Treble boost -> Safety Limiter -> Master Gain -> Destination
-    this.nightcoreTrebleBoostNode.connect(this.safetyLimiterNode);
+    // 4. Treble boost -> Karaoke Node -> Night Mode Node -> Safety Limiter -> Master Gain -> Destination
+    this.nightcoreTrebleBoostNode.connect(this.karaokeNode.input);
+    this.karaokeNode.output.connect(this.nightModeNode.input);
+    this.nightModeNode.output.connect(this.safetyLimiterNode);
     this.safetyLimiterNode.connect(this.gainNode);
     this.gainNode.connect(this.currentContext.destination);
+
+    const savedKaraoke = storage.playback.getPlaybackOptions('isKaraoke') ?? false;
+    const savedKaraokeLevel = storage.playback.getPlaybackOptions('karaokeLevel') ?? 100;
+    this.karaokeNode.setEnabled(savedKaraoke, true, savedKaraokeLevel);
+
+    const savedNightMode = storage.playback.getPlaybackOptions('isNightMode') ?? false;
+    const savedNightModePreset =
+      storage.playback.getPlaybackOptions('nightModePreset') ?? 'standard';
+    this.nightModeNode.setPreset(savedNightModePreset, true);
+    this.nightModeNode.setEnabled(savedNightMode, true);
   }
 
   public applyAudioFx(options?: AudioFxOptions) {
@@ -934,6 +986,22 @@ class AudioPlayer {
           this.lastPreampDb = rg.preampDb;
           this.lastPreventClipping = rg.preventClipping;
           this.applyReplayGain();
+        }
+
+        const isKaraoke = localStorage?.playback?.isKaraoke ?? false;
+        const karaokeLevel = localStorage?.playback?.karaokeLevel ?? 100;
+        if (isKaraoke !== this.isKaraokeEnabled() || karaokeLevel !== this.getKaraokeLevel()) {
+          this.setKaraoke(isKaraoke, karaokeLevel, false);
+        }
+
+        const isNightMode = localStorage?.playback?.isNightMode ?? false;
+        const nightModePreset =
+          (localStorage?.playback?.nightModePreset as NightModePreset) ?? 'standard';
+        if (
+          isNightMode !== this.isNightModeEnabled() ||
+          nightModePreset !== this.getNightModePreset()
+        ) {
+          this.setNightMode(isNightMode, nightModePreset, false);
         }
       }
     });
@@ -1219,6 +1287,7 @@ class AudioPlayer {
         this.standbyAudio.src = '';
         this.activeFadeGain.gain.value = 1.0;
         this.isCrossfading = false;
+        this.clearAbLoop('CROSSFADE_COMPLETE');
         if (this.currentSongData && this.currentSongData.songId === incomingTrackId) {
           this.emit('recordListening', {
             songId: this.currentSongData.songId,
@@ -1263,6 +1332,102 @@ class AudioPlayer {
     };
   }
 
+  // ========== A-B LOOP INTERNAL WATCHERS & ENGINE ==========
+
+  /**
+   * Private turnaround seek that directly assigns audio.currentTime,
+   * completely bypassing public seek() to avoid recursive loop clearing
+   * and redundant crossfade cancellation.
+   */
+  private executeLoopSeek(targetTime: number) {
+    if (this.loopJumpPending) return;
+    this.loopJumpPending = true;
+    try {
+      if (this.audio.readyState > 0) {
+        this.audio.currentTime = targetTime;
+      }
+    } catch (err) {
+      logPlayer('[AudioPlayer.executeLoopSeek] Failed:', err);
+    }
+  }
+
+  private checkLoopTurnaround() {
+    if (!this.abLoopController.isActive()) return;
+    const check = this.abLoopController.checkLoop(this.audio.currentTime);
+    if (check.shouldSeek) {
+      this.executeLoopSeek(check.targetTime);
+      this.schedulePredictionTimer();
+    }
+  }
+
+  private startLoopWatchers() {
+    this.stopLoopWatchers();
+    if (!this.abLoopController.isActive() || this.paused) return;
+
+    // Layer 1: High-frequency rAF loop while active
+    const rafTick = () => {
+      if (!this.abLoopController.isActive() || this.paused) {
+        this.loopRafId = null;
+        return;
+      }
+      this.checkLoopTurnaround();
+      this.loopRafId = requestAnimationFrame(rafTick);
+    };
+    this.loopRafId = requestAnimationFrame(rafTick);
+
+    // Layer 2: Self-rescheduling prediction timer for background resilience
+    this.schedulePredictionTimer();
+  }
+
+  private stopLoopWatchers() {
+    if (this.loopRafId !== null) {
+      cancelAnimationFrame(this.loopRafId);
+      this.loopRafId = null;
+    }
+    if (this.loopPredictionTimerId !== null) {
+      clearTimeout(this.loopPredictionTimerId);
+      this.loopPredictionTimerId = null;
+    }
+    this.loopJumpPending = false;
+  }
+
+  private schedulePredictionTimer() {
+    if (this.loopPredictionTimerId !== null) {
+      clearTimeout(this.loopPredictionTimerId);
+      this.loopPredictionTimerId = null;
+    }
+
+    if (!this.abLoopController.isActive() || this.paused) return;
+
+    const pointB = this.abLoopController.pointB;
+    if (pointB === null) return;
+
+    const current = this.audio.currentTime;
+    const rate = this.audio.playbackRate || 1.0;
+    const remainingSec = Math.max(0, (pointB - current) / rate);
+    const delayMs = Math.round(remainingSec * 1000);
+
+    this.loopPredictionTimerId = setTimeout(() => {
+      this.loopPredictionTimerId = null;
+      if (!this.abLoopController.isActive() || this.paused) return;
+
+      const check = this.abLoopController.checkLoop(this.audio.currentTime);
+      if (check.shouldSeek) {
+        this.executeLoopSeek(check.targetTime);
+        this.schedulePredictionTimer();
+      } else {
+        // Timer fired slightly early due to jitter; self-reschedule
+        this.schedulePredictionTimer();
+      }
+    }, delayMs);
+  }
+
+  private syncAbLoopStateToStore() {
+    const state = this.abLoopController.state;
+    dispatch({ type: 'SET_AB_LOOP_STATE', data: state });
+    this.emit('abLoopChange', state);
+  }
+
   // ========== PUBLIC PLAYBACK CONTROLS ==========
 
   /** Starts or resumes audio playback with fade-in effect. */
@@ -1276,11 +1441,15 @@ class AudioPlayer {
       return;
     }
     await this.audio.play();
+    if (this.abLoopController.isActive()) {
+      this.startLoopWatchers();
+    }
     return this.fadeInAudio();
   }
 
   /** Pauses audio playback with fade-out effect. */
   async pause() {
+    this.stopLoopWatchers();
     if (this.isCrossfading) {
       this.crossfadeScheduler.pauseFade();
       this.audio.pause();
@@ -1320,6 +1489,9 @@ class AudioPlayer {
    */
   seek(time: number) {
     this.crossfadeScheduler.cancel();
+    if (this.abLoopController.isPositionOutside(time)) {
+      this.clearAbLoop('SEEK_OUTSIDE');
+    }
     try {
       if (this.audio.readyState > 0) {
         this.audio.currentTime = time;
@@ -1571,6 +1743,170 @@ class AudioPlayer {
   set playbackRate(value: number) {
     this.audioA.playbackRate = value;
     this.audioB.playbackRate = value;
+  }
+
+  /**
+   * Sets the karaoke (vocal reducer) state.
+   */
+  public setKaraoke(enabled: boolean, level?: number, immediate = false): void {
+    if (this.karaokeNode) {
+      this.karaokeNode.setEnabled(enabled, immediate, level);
+      storage.playback.setPlaybackOptions('isKaraoke', enabled);
+      if (level !== undefined) {
+        storage.playback.setPlaybackOptions('karaokeLevel', level);
+      }
+      this.emit('karaokeChange', { enabled, level: this.karaokeNode.level });
+    }
+  }
+
+  /**
+   * Sets the vocal reduction level (0 to 100).
+   */
+  public setKaraokeLevel(level: number, immediate = false): void {
+    if (this.karaokeNode) {
+      this.karaokeNode.setLevel(level, immediate);
+      storage.playback.setPlaybackOptions('karaokeLevel', level);
+      this.emit('karaokeChange', { enabled: this.karaokeNode.enabled, level });
+    }
+  }
+
+  /**
+   * Toggles the karaoke mode on or off.
+   */
+  public toggleKaraoke(enabled?: boolean): boolean {
+    const nextState = enabled ?? !this.isKaraokeEnabled();
+    this.setKaraoke(nextState, undefined, false);
+    return nextState;
+  }
+
+  /**
+   * Returns whether karaoke mode is currently enabled.
+   */
+  public isKaraokeEnabled(): boolean {
+    return this.karaokeNode ? this.karaokeNode.enabled : false;
+  }
+
+  /**
+   * Returns current karaoke vocal reduction level (0 to 100).
+   */
+  public getKaraokeLevel(): number {
+    return this.karaokeNode ? this.karaokeNode.level : 100;
+  }
+
+  /**
+   * Sets the night mode (smart dynamic volume compressor) state.
+   */
+  public setNightMode(enabled: boolean, preset?: NightModePreset, immediate = false): void {
+    if (this.nightModeNode) {
+      if (preset) {
+        this.nightModeNode.setPreset(preset, immediate);
+        storage.playback.setPlaybackOptions('nightModePreset', preset);
+      }
+      this.nightModeNode.setEnabled(enabled, immediate);
+      storage.playback.setPlaybackOptions('isNightMode', enabled);
+      this.emit('nightModeChange', { enabled, preset: this.nightModeNode.getPreset() });
+    }
+  }
+
+  /**
+   * Sets the night mode compressor profile preset.
+   */
+  public setNightModePreset(preset: NightModePreset, immediate = false): void {
+    if (this.nightModeNode) {
+      this.nightModeNode.setPreset(preset, immediate);
+      storage.playback.setPlaybackOptions('nightModePreset', preset);
+      this.emit('nightModeChange', { enabled: this.nightModeNode.isEnabled(), preset });
+    }
+  }
+
+  /**
+   * Returns whether night mode is currently enabled.
+   */
+  public isNightModeEnabled(): boolean {
+    return this.nightModeNode ? this.nightModeNode.isEnabled() : false;
+  }
+
+  /**
+   * Returns the current night mode preset profile.
+   */
+  public getNightModePreset(): NightModePreset {
+    return this.nightModeNode ? this.nightModeNode.getPreset() : 'standard';
+  }
+
+  /**
+   * Returns current live gain reduction in dB (negative float under compression, 0 when idle).
+   */
+  public getNightModeReduction(): number {
+    return this.nightModeNode ? this.nightModeNode.getReduction() : 0;
+  }
+
+  // ========== A-B LOOP PUBLIC CONTROLS ==========
+
+  /**
+   * Sets Point A (loop start). Transitions to 'armed'.
+   * Does NOT cancel crossfade (arming only).
+   */
+  public setAbLoopPointA(time?: number): SetPointResult {
+    const target = time !== undefined ? time : this.currentTime;
+    const res = this.abLoopController.setPointA(target, this.duration);
+    if (res.changed) {
+      this.syncAbLoopStateToStore();
+    }
+    return res;
+  }
+
+  /**
+   * Sets Point B (loop end). Requires Point A to be set.
+   * Cancels in-flight crossfade on activation to prevent collision.
+   */
+  public setAbLoopPointB(time?: number): SetPointResult {
+    const target = time !== undefined ? time : this.currentTime;
+    const res = this.abLoopController.setPointB(target, this.duration);
+    if (res.success && this.abLoopController.isActive()) {
+      this.crossfadeScheduler.cancel();
+      if (!this.paused) {
+        this.startLoopWatchers();
+      }
+    }
+    if (res.changed) {
+      this.syncAbLoopStateToStore();
+    }
+    return res;
+  }
+
+  /**
+   * Sets both Point A and Point B atomically (e.g. from waveform Shift+Drag).
+   * Direction-agnostic. Cancels in-flight crossfade on activation.
+   */
+  public setAbLoopRange(start: number, end: number): SetPointResult {
+    const res = this.abLoopController.setRange(start, end, this.duration);
+    if (res.success && this.abLoopController.isActive()) {
+      this.crossfadeScheduler.cancel();
+      if (!this.paused) {
+        this.startLoopWatchers();
+      }
+    }
+    if (res.changed) {
+      this.syncAbLoopStateToStore();
+    }
+    return res;
+  }
+
+  /**
+   * Clears the active loop or armed state.
+   */
+  public clearAbLoop(reason?: string): void {
+    const res = this.abLoopController.clear();
+    if (res.changed) {
+      this.stopLoopWatchers();
+      this.syncAbLoopStateToStore();
+      logPlayer('[AudioPlayer.clearAbLoop]', { reason });
+    }
+  }
+
+  /** Gets current A-B loop state. */
+  public getAbLoopState(): AbLoopState {
+    return this.abLoopController.state;
   }
 }
 

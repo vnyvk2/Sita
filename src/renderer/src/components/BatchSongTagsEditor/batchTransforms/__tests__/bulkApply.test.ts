@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import type { BatchTrackRow } from '../../types';
 import { bulkApply } from '../bulkApply';
@@ -94,5 +94,48 @@ describe('batchTransforms — bulkApply', () => {
     expect(r1.dirtyFields.has('album')).toBe(true);
     expect(r1.dirtyFields.has('genres')).toBe(true);
     expect(r1.dirtyFields.has('year')).toBe(true);
+  });
+
+  it('sets normalized language across selected rows and marks dirty', () => {
+    const rows = [createMockRow(1), createMockRow(2)];
+    const context: BatchTransformContext = {
+      rows,
+      selectedSongIds: new Set([1]),
+      sortedSongIds: [1, 2]
+    };
+
+    const result = bulkApply(context, {
+      operations: [{ type: 'set', field: 'language', value: '  telugu  ' }]
+    });
+
+    const r1 = result.rows.find((r) => r.songId === 1)!;
+    const r2 = result.rows.find((r) => r.songId === 2)!;
+
+    expect(r1.draft.language).toBe('Telugu');
+    expect(r1.dirtyFields.has('language')).toBe(true);
+
+    // Row 2 unselected
+    expect(r2.draft.language).toBeUndefined();
+    expect(r2.dirtyFields.has('language')).toBe(false);
+  });
+
+  it('clears language with sentinel empty string and marks dirty', () => {
+    const row = createMockRow(1);
+    row.original.language = 'Telugu';
+    row.draft.language = 'Telugu';
+
+    const context: BatchTransformContext = {
+      rows: [row],
+      selectedSongIds: new Set([1]),
+      sortedSongIds: [1]
+    };
+
+    const result = bulkApply(context, {
+      operations: [{ type: 'clear', field: 'language' }]
+    });
+
+    const r1 = result.rows[0];
+    expect(r1.draft.language).toBe('');
+    expect(r1.dirtyFields.has('language')).toBe(true);
   });
 });

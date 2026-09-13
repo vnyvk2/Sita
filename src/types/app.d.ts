@@ -255,6 +255,13 @@ declare global {
 
   type PlayerTypes = 'normal' | 'mini' | 'full';
 
+  type AbLoopPhase = 'idle' | 'armed' | 'active';
+  interface AbLoopState {
+    phase: AbLoopPhase;
+    pointA: number | null;
+    pointB: number | null;
+  }
+
   type PlayerVolume = { isMuted: boolean; value: number };
   interface Player {
     isCurrentSongPlaying: boolean;
@@ -264,6 +271,7 @@ declare global {
     isShuffling: boolean;
     isPlayerStalled: boolean;
     playbackRate: number;
+    abLoop: AbLoopState;
   }
 
   type SongSkipReason = 'USER_SKIP' | 'PLAYER_SKIP';
@@ -659,6 +667,10 @@ declare global {
     crossfade?: {
       duration: number;
     };
+    isKaraoke?: boolean;
+    karaokeLevel?: number;
+    isNightMode?: boolean;
+    nightModePreset?: 'gentle' | 'standard' | 'strong';
   }
 
   type EqualizerBandFilters =
@@ -1507,6 +1519,13 @@ declare global {
     musicBrainzRecordingId?: string;
     isrc?: string;
     path?: string;
+    /**
+     * Language edit signal:
+     *   undefined = field not edited (skip entirely)
+     *   ''        = explicit clear (delete override, null column, clear tag)
+     *   non-empty = set value
+     */
+    language?: string;
   }
 
   interface SongOutsideLibraryData {

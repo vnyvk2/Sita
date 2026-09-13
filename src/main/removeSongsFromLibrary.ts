@@ -1,4 +1,7 @@
+import fs from 'fs/promises';
 import path from 'path';
+
+import { app } from 'electron';
 
 import { db } from './db/db';
 import { unlinkSongFromAlbum, getAlbumSongIds, deleteAlbum } from './db/queries/albums';
@@ -75,6 +78,18 @@ const removeSong = async (song: SavableSongData) => {
     // Delete the song itself. The ON DELETE CASCADE will handle artworksSongs.
     await removeSongById(Number(song.songId), trx);
   });
+
+  // Clean up persistent cached loudness blocks for the deleted song
+  try {
+    const loudnessBlockPath = path.join(
+      app.getPath('userData'),
+      'loudness_blocks',
+      `${song.songId}_v1.bin`
+    );
+    await fs.unlink(loudnessBlockPath).catch(() => {});
+  } catch {
+    // Best-effort cleanup
+  }
 
   logger.debug(`'${path.basename(song.path)}' song removed from the library.`);
   return { song };

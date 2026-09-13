@@ -1,6 +1,11 @@
 import path from 'path';
 
+import { normalizeLanguageName } from '@common/languages';
+import { db } from '@main/db/db';
 import { getSongByIdForSongMetadata } from '@main/db/queries/songs';
+import { metadataOverrides } from '@main/db/schema';
+import { extractLanguageFromTag } from '@main/parseSong/detectLanguage';
+import { and, eq } from 'drizzle-orm';
 import { File } from 'node-taglib-sharp';
 
 import { appPreferences } from '../../../package.json';
@@ -159,6 +164,25 @@ const sendSongMetadata = async (
       const releasedYear = Number(songMetadata?.year) || song.year || undefined;
       const artworks = song.artworks.map((a) => a.artwork);
 
+      const userOverride = await db.query.metadataOverrides.findFirst({
+        where: and(
+          eq(metadataOverrides.entityKind, 'song'),
+          eq(metadataOverrides.entityId, String(songId)),
+          eq(metadataOverrides.fieldId, 'language')
+        )
+      });
+
+      const resolvedLanguage =
+        (typeof userOverride?.stringValue === 'string' && userOverride.stringValue.trim() !== ''
+          ? userOverride.stringValue.trim()
+          : undefined) ??
+        (typeof song.language === 'string' && song.language.trim() !== ''
+          ? song.language.trim()
+          : undefined) ??
+        extractLanguageFromTag(songMetadata);
+
+      const language = resolvedLanguage ? normalizeLanguageName(resolvedLanguage) : undefined;
+
       const res: SongTags = {
         title,
         artists: tagArtists,
@@ -172,7 +196,8 @@ const sendSongMetadata = async (
         trackNumber,
         isLyricsSavePending: isLyricsSavePending(song.path),
         isMetadataSavePending: isMetadataUpdatesPending(song.path),
-        path: song.path
+        path: song.path,
+        language
       };
 
       console.log('[STAGE 5: sendSongMetadata] Final Payload returning to IPC:', {
@@ -222,7 +247,8 @@ const sendSongMetadata = async (
             // synchronizedLyrics: getSynchronizedLyricsFromSongID3Tags(songTags),
             // unsynchronizedLyrics: getUnsynchronizedLyricsFromSongID3Tags(songTags),
             artworkPath: songOutsideLibraryData.artworkPath,
-            duration: songOutsideLibraryData.duration
+            duration: songOutsideLibraryData.duration,
+            language: extractLanguageFromTag(songMetadata)
           };
           return res;
         }

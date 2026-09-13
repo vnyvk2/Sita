@@ -5,6 +5,7 @@ import { useCallback, useContext, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import useHeartBurst from '../../hooks/useHeartBurst';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
@@ -16,6 +17,8 @@ const SongControlsAndSeekbarContainer = () => {
     select: (loc) => loc.pathname.startsWith('/main-player/lyrics')
   });
   const { history } = useRouter();
+  const player = useAudioPlayer();
+  const abLoop = useStore(store, (state) => state.player.abLoop);
   const isLyricsDrawerOpen = useStore(store, (state) => state.isLyricsDrawerOpen);
   const isAFavorite = useStore(store, (state) => state.currentSongData.isAFavorite);
   const isKnownSource = useStore(store, (state) => state.currentSongData.isKnownSource);
@@ -37,6 +40,18 @@ const SongControlsAndSeekbarContainer = () => {
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { isBursting, triggerBurst } = useHeartBurst();
+
+  const handleAbLoopClick = useCallback(() => {
+    if (!player) return;
+    const phase = abLoop?.phase ?? 'idle';
+    if (phase === 'idle') {
+      player.setAbLoopPointA();
+    } else if (phase === 'armed') {
+      player.setAbLoopPointB();
+    } else {
+      player.clearAbLoop('BUTTON_CLICK');
+    }
+  }, [player, abLoop]);
 
   const handleFavoriteClick = useCallback(() => {
     if (!isKnownSource) return;
@@ -129,6 +144,29 @@ const SongControlsAndSeekbarContainer = () => {
           }`}
           clickHandler={() => toggleRepeat()}
         />
+
+        <button
+          type="button"
+          className={`ab-loop-btn group after:bg-font-color-highlight dark:after:bg-dark-font-color-highlight relative !m-0 flex h-7 min-w-[28px] items-center justify-center !border-0 bg-transparent px-1 !p-0 text-xs font-semibold outline-offset-1 transition-all hover:bg-transparent focus-visible:!outline dark:bg-transparent dark:hover:bg-transparent ${
+            abLoop?.phase === 'active'
+              ? 'active text-font-color-highlight dark:text-dark-font-color-highlight opacity-100 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-100'
+              : abLoop?.phase === 'armed'
+                ? 'text-font-color-highlight dark:text-dark-font-color-highlight opacity-90 animate-pulse'
+                : 'opacity-60 hover:opacity-80'
+          }`}
+          title={
+            abLoop?.phase === 'active'
+              ? t('player.clearLoop', 'Clear A-B Loop')
+              : abLoop?.phase === 'armed'
+                ? t('player.setLoopB', 'Set Loop End (B)')
+                : t('player.setLoopA', 'Set Loop Start (A)')
+          }
+          onClick={handleAbLoopClick}
+        >
+          <span className="tracking-tighter">
+            {abLoop?.phase === 'armed' ? 'A→B' : 'A-B'}
+          </span>
+        </button>
 
         <button
           type="button"

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,6 +16,7 @@ let migratePglite: any;
 import { openSqliteEngine, getEngine as _unused } from '@main/db/sqlite/engine';
 void _unused;
 import { exportDatabase, importDatabase, db as singletonDb, getEngine } from '@main/db/db';
+import { rawAll, rawGet, rawRun } from '@main/db/sqlite/raw';
 import * as schema from '@main/db/schema';
 import {
   artists,
@@ -441,5 +442,91 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
 
     await repairedEngine.close();
     fs.rmSync(v3Tmp, { recursive: true, force: true });
+  });
+
+  describe('Fix 1: raw helpers through the tx lock', () => {
+    it('concurrent rawRun (no trx) queues behind active orm.transaction until commit', async () => {
+      let txHolding = true;
+      let rawExecuted = false;
+
+      const txPromise = engine.orm.transaction(async (trx: any) => {
+        await trx.insert(genres).values({ name: 'Tx Genre' });
+        // Hold transaction open across an async boundary
+        while (txHolding) {
+          await new Promise((r) => setTimeout(r, 10));
+        }
+      });
+
+      // Concurrent rawRun (no trx passed)
+      const rawPromise = (async () => {
+        await rawRun(sql`INSERT INTO genres (name) VALUES ('Raw Genre')`);
+        rawExecuted = true;
+      })();
+
+      // Wait a tick: transaction is holding, rawRun must not have executed yet
+      await new Promise((r) => setTimeout(r, 40));
+      expect(rawExecuted).toBe(false);
+
+      // Now release transaction
+      txHolding = false;
+      await txPromise;
+      await rawPromise;
+
+      expect(rawExecuted).toBe(true);
+      const allGenres = await rawAll<{ name: string }>(
+        sql`SELECT name FROM genres WHERE name IN ('Tx Genre', 'Raw Genre')`
+      );
+      expect(allGenres).toHaveLength(2);
+    });
+
+    it('rollback case: the queued raw write executes after the abort and persists', async () => {
+      let txHolding = true;
+
+      const abortTxPromise = engine.orm
+        .transaction(async (trx: any) => {
+          await trx.insert(genres).values({ name: 'Aborted Tx Genre' });
+          while (txHolding) {
+            await new Promise((r) => setTimeout(r, 10));
+          }
+          throw new Error('Forced Rollback');
+        })
+        .catch(() => {});
+
+      const rawPromise = (async () => {
+        await rawRun(sql`INSERT INTO genres (name) VALUES ('Persistent Raw Genre')`);
+      })();
+
+      // Release transaction to fail
+      await new Promise((r) => setTimeout(r, 20));
+      txHolding = false;
+      await abortTxPromise;
+      await rawPromise;
+
+      const abortedRow = await rawGet<{ name: string }>(
+        sql`SELECT name FROM genres WHERE name = 'Aborted Tx Genre'`
+      );
+      const persistentRow = await rawGet<{ name: string }>(
+        sql`SELECT name FROM genres WHERE name = 'Persistent Raw Genre'`
+      );
+
+      expect(abortedRow).toBeUndefined();
+      expect(persistentRow?.name).toBe('Persistent Raw Genre');
+    });
+
+    it('rawRun(q, trx) inside a transaction completes without deadlock and sees tx-local state', async () => {
+      await engine.orm.transaction(async (trx: any) => {
+        await rawRun(sql`INSERT INTO genres (name) VALUES ('Tx-Local Genre')`, trx);
+        const inside = await rawGet<{ name: string }>(
+          sql`SELECT name FROM genres WHERE name = 'Tx-Local Genre'`,
+          trx
+        );
+        expect(inside?.name).toBe('Tx-Local Genre');
+      });
+
+      const after = await rawGet<{ name: string }>(
+        sql`SELECT name FROM genres WHERE name = 'Tx-Local Genre'`
+      );
+      expect(after?.name).toBe('Tx-Local Genre');
+    });
   });
 });

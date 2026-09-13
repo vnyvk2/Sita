@@ -206,4 +206,40 @@ describe('WaveformSeekbar Component', () => {
     // It should seek to 160s, NOT the background 20s
     expect(updateSongPosition).toHaveBeenCalledWith(160);
   });
+
+  it('handles wheel scroll to scrub interval and debounces updateSongPosition', async () => {
+    vi.useFakeTimers();
+    const updateSongPosition = vi.fn();
+    const onSeek = vi.fn();
+
+    await act(async () => {
+      render(
+        <AppUpdateContext.Provider
+          value={{ updateSongPosition } as unknown as AppUpdateContextType}
+        >
+          <WaveformSeekbar id="test-waveform" name="test-waveform" onSeek={onSeek} />
+        </AppUpdateContext.Provider>
+      );
+    });
+
+    const container = document.querySelector('.waveform-seekbar-container') as HTMLDivElement;
+    expect(container).not.toBeNull();
+
+    // Scroll up (negative deltaY = forward by interval 5s from 0s)
+    fireEvent.wheel(container, { deltaY: -100 });
+
+    // Visual feedback should be immediate
+    expect(onSeek).toHaveBeenCalledWith(5);
+    // Audio update is debounced, should not have fired yet
+    expect(updateSongPosition).not.toHaveBeenCalled();
+
+    // Fast-forward debounce timer (120ms)
+    act(() => {
+      vi.advanceTimersByTime(150);
+    });
+
+    expect(updateSongPosition).toHaveBeenCalledWith(5);
+    vi.useRealTimers();
+  });
 });
+

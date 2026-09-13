@@ -139,6 +139,11 @@
     "unmute": "Unmute",
     "currentQueue": "Current queue (Ctrl + Q)",
     "adjustPlaybackSpeed": "Adjust playback speed",
+    "setLoopA": "Set loop start (Point A) ([)",
+    "setLoopB": "Set loop end (Point B) (])",
+    "clearLoop": "Clear A-B loop (\\)",
+    "karaoke": "Karaoke Mode",
+    "karaokeTooltip": "Toggle Karaoke Mode (Vocal Reducer)",
     "showCurrentQueue": "Show current queue",
     "showMiniPlayer": "Show Mini Player",
     "showCompactPlayer": "Show Compact Player",
@@ -735,6 +740,11 @@
     "expandToFullPage": "Expand to full page",
     "dockToSidePanel": "Dock to side panel",
     "noSongPlaying": "No song playing",
+    "loopThisLine": "Loop this line",
+    "setLoopStart": "Set as Loop Start (A)",
+    "setLoopEnd": "Set as Loop End (B)",
+    "clearLoop": "Clear A-B Loop",
+    "loopingSnippet": "Looping: \"{{snippet}}\"",
 
     "lyricsLoading": "Looking for lyrics",
     "lyricsLoadingDescription": "Hang on... We're looking everywhere...",
@@ -1035,6 +1045,9 @@
     "upPlaybackRate": "Increase playback rate by 0.05x",
     "downPlaybackRate": "Decrease playback rate by 0.05x",
     "resetPlaybackRate": "Reset playback rate to 1x",
+    "setLoopA": "Set loop start (Point A)",
+    "setLoopB": "Set loop end (Point B)",
+    "clearLoop": "Clear A-B loop",
 
     "navigation": "Navigation",
     "goHome": "Go to Home",
@@ -1250,6 +1263,9 @@
     "alreadyInPage": "You are already in the current page.",
     "playbackRateChanged": "Playback rate changed to {{val}} x",
     "playbackRateReset": "Playback rate has been reset to 1x",
+    "loopArmed": "Loop Point A set at {{val}}",
+    "loopActive": "Looping {{a}} → {{b}}",
+    "loopCleared": "A-B Loop cleared",
     "playbackPausedDueToSongDeletion": "Current song playback paused because the song was deleted.",
     "languageChanged": "Changed app language successfully."
   },
@@ -1396,6 +1412,16 @@
     "reverbDecay": "Reverb Decay",
     "lowPassCutoff": "Tone Damping (Cutoff)",
     "trebleBoost": "Treble Boost",
+    "karaokeTitle": "Karaoke Mode (Vocal Reducer)",
+    "karaokeDescription": "Suppresses center-panned lead vocals in real-time while preserving instruments, bass, and stereo imaging.",
+    "nightModeTitle": "Night Listening Mode (Dynamic Normalizer)",
+    "nightModeDescription": "Evens out dynamic range between quiet intros/dialogue and loud drops for comfortable late-night listening.",
+    "nightModeReduction": "Gain Reduction",
+    "nightMode": {
+      "gentle": "Gentle",
+      "standard": "Standard",
+      "strong": "Strong"
+    },
     "reset": "Reset to Default"
   },
 

@@ -6,6 +6,7 @@ import { useNavigate, useRouter } from '@tanstack/react-router';
 import { lazy, useCallback, useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import calculateTime from '../utils/calculateTime';
 import storage from '../utils/localStorage';
 import { useAudioPlayer } from './useAudioPlayer';
 import { useOverlayNavigation } from './useOverlayNavigation';
@@ -36,6 +37,9 @@ export const MINI_ALLOWED_SHORTCUT_KEYS = new Set([
   'appShortcutsPrompt.upPlaybackRate',
   'appShortcutsPrompt.downPlaybackRate',
   'appShortcutsPrompt.resetPlaybackRate',
+  'appShortcutsPrompt.setLoopA',
+  'appShortcutsPrompt.setLoopB',
+  'appShortcutsPrompt.clearLoop',
   'appShortcutsPrompt.openMiniPlayer',
   'appShortcutsPrompt.openCompactPlayer',
   'appShortcutsPrompt.goToQueue',
@@ -155,6 +159,22 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
         'mediaSession' in navigator
       ) {
         return;
+      }
+
+      // Quick Escape key clear for active/armed A-B Loop
+      if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        if (player.getAbLoopState().phase !== 'idle') {
+          e.preventDefault();
+          player.clearAbLoop('ESCAPE_KEY');
+          addNewNotifications([
+            {
+              id: 'abLoop',
+              iconName: 'repeat',
+              content: t('notifications.loopCleared', 'A-B Loop cleared')
+            }
+          ]);
+          return;
+        }
       }
 
       const shortcuts = storage.keyboardShortcuts
@@ -297,6 +317,62 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
               }
             ]);
             break;
+          case 'appShortcutsPrompt.setLoopA': {
+            const res = player.setAbLoopPointA();
+            if (res.success) {
+              const timeObj = calculateTime(player.currentTime);
+              addNewNotifications([
+                {
+                  id: 'abLoop',
+                  iconName: 'repeat',
+                  content: t('notifications.loopArmed', {
+                    val: `${timeObj.minutes}:${timeObj.seconds}`,
+                    defaultValue: `Loop Point A set at ${timeObj.minutes}:${timeObj.seconds}`
+                  })
+                }
+              ]);
+            }
+            break;
+          }
+          case 'appShortcutsPrompt.setLoopB': {
+            const res = player.setAbLoopPointB();
+            if (res.success) {
+              const state = player.getAbLoopState();
+              const timeA = calculateTime(state.pointA ?? 0);
+              const timeB = calculateTime(state.pointB ?? 0);
+              addNewNotifications([
+                {
+                  id: 'abLoop',
+                  iconName: 'repeat',
+                  content: t('notifications.loopActive', {
+                    a: `${timeA.minutes}:${timeA.seconds}`,
+                    b: `${timeB.minutes}:${timeB.seconds}`,
+                    defaultValue: `Looping ${timeA.minutes}:${timeA.seconds} → ${timeB.minutes}:${timeB.seconds}`
+                  })
+                }
+              ]);
+            } else if (res.reason) {
+              addNewNotifications([
+                {
+                  id: 'abLoopError',
+                  iconName: 'warning',
+                  content: res.reason
+                }
+              ]);
+            }
+            break;
+          }
+          case 'appShortcutsPrompt.clearLoop': {
+            player.clearAbLoop('SHORTCUT');
+            addNewNotifications([
+              {
+                id: 'abLoop',
+                iconName: 'repeat',
+                content: t('notifications.loopCleared', 'A-B Loop cleared')
+              }
+            ]);
+            break;
+          }
           case 'appShortcutsPrompt.goToSearch':
             // In mini mode the main-player router is unmounted; route to the
             // mini player's own search surface instead.

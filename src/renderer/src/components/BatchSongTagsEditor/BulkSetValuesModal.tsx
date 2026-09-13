@@ -1,7 +1,9 @@
+import { normalizeLanguageName } from '@common/languages';
 import { memo, useState } from 'react';
 
 import Button from '../Button';
 import type { BulkFieldOperation } from './batchTransforms/types';
+import LanguageCombobox from './LanguageCombobox';
 import type { EditableField } from './types';
 
 export interface BulkSetValuesModalProps {
@@ -14,7 +16,7 @@ export interface BulkSetValuesModalProps {
 interface FieldConfig {
   field: EditableField;
   label: string;
-  type: 'text' | 'number';
+  type: 'text' | 'number' | 'language';
   placeholder: string;
 }
 
@@ -23,6 +25,12 @@ const FIELDS: FieldConfig[] = [
   { field: 'album', label: 'Album', type: 'text', placeholder: 'e.g. Greatest Hits' },
   { field: 'albumArtists', label: 'Album Artist(s)', type: 'text', placeholder: 'e.g. Queen' },
   { field: 'genres', label: 'Genre(s)', type: 'text', placeholder: 'e.g. Rock, Classic Rock' },
+  {
+    field: 'language',
+    label: 'Language',
+    type: 'language',
+    placeholder: 'Select or type language...'
+  },
   { field: 'year', label: 'Year', type: 'number', placeholder: 'e.g. 2024' },
   { field: 'discNumber', label: 'Disc #', type: 'number', placeholder: 'e.g. 1' },
   { field: 'composer', label: 'Composer', type: 'text', placeholder: 'e.g. Freddie Mercury' }
@@ -43,7 +51,8 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
     trackNumber: false,
     discNumber: false,
     year: false,
-    composer: false
+    composer: false,
+    language: false
   });
 
   const [values, setValues] = useState<Record<EditableField, string>>({
@@ -55,7 +64,8 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
     trackNumber: '',
     discNumber: '',
     year: '',
-    composer: ''
+    composer: '',
+    language: ''
   });
 
   const [clearFlags, setClearFlags] = useState<Record<EditableField, boolean>>({
@@ -67,12 +77,28 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
     trackNumber: false,
     discNumber: false,
     year: false,
-    composer: false
+    composer: false,
+    language: false
   });
 
-  if (!isOpen) return null;
-
   const enabledFieldCount = Object.values(activeFields).filter(Boolean).length;
+
+  const canApply = (() => {
+    if (enabledFieldCount === 0) return false;
+    for (const { field } of FIELDS) {
+      if (activeFields[field]) {
+        if (clearFlags[field]) return true;
+        if (field === 'language') {
+          if (values.language.trim()) return true;
+        } else if (values[field].trim()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  })();
+
+  if (!isOpen) return null;
 
   const handleApply = () => {
     const operations: BulkFieldOperation[] = [];
@@ -82,7 +108,16 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
         if (clearFlags[field]) {
           operations.push({ type: 'clear', field });
         } else {
-          operations.push({ type: 'set', field, value: values[field] });
+          // If language is set, require a non-empty string (clearing requires explicit clear flag)
+          if (field === 'language') {
+            const trimmed = values.language.trim();
+            if (!trimmed) {
+              continue;
+            }
+            operations.push({ type: 'set', field, value: normalizeLanguageName(trimmed) });
+          } else {
+            operations.push({ type: 'set', field, value: values[field] });
+          }
         }
       }
     }
@@ -159,15 +194,23 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
 
                 {isEnabled && !isClear && (
                   <div className="mt-2.5">
-                    <input
-                      type={type}
-                      value={values[field]}
-                      placeholder={placeholder}
-                      onChange={(e) => {
-                        setValues((prev) => ({ ...prev, [field]: e.target.value }));
-                      }}
-                      className="border-background-color-2 bg-background-color-1 text-font-color-black focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 dark:text-font-color-white dark:focus:border-dark-font-color-highlight w-full rounded-lg border px-3 py-1.5 text-xs focus:outline-none"
-                    />
+                    {type === 'language' ? (
+                      <LanguageCombobox
+                        value={values.language}
+                        placeholder={placeholder}
+                        onChange={(val) => setValues((prev) => ({ ...prev, language: val }))}
+                      />
+                    ) : (
+                      <input
+                        type={type}
+                        value={values[field]}
+                        placeholder={placeholder}
+                        onChange={(e) => {
+                          setValues((prev) => ({ ...prev, [field]: e.target.value }));
+                        }}
+                        className="border-background-color-2 bg-background-color-1 text-font-color-black focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 dark:text-font-color-white dark:focus:border-dark-font-color-highlight w-full rounded-lg border px-3 py-1.5 text-xs focus:outline-none"
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -189,7 +232,7 @@ export const BulkSetValuesModal = memo(function BulkSetValuesModal({
             <Button
               label={`Apply to ${selectedCount} Tracks`}
               clickHandler={handleApply}
-              isDisabled={enabledFieldCount === 0}
+              isDisabled={!canApply}
               className="bg-font-color-highlight dark:bg-dark-font-color-highlight cursor-pointer rounded-lg px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
             />
           </div>

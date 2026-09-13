@@ -7,7 +7,8 @@ export function renderLyricsLines(
   songDuration: number,
   isAutoScrolling = true,
   playerType: 'normal' | 'full' | 'mini' | 'drawer' = 'normal',
-  activeLineIndex: number | null = null
+  activeLineIndex: number | null = null,
+  abLoop?: AbLoopState | null
 ): ReactNode[] {
   if (!lyrics?.lyrics) return [];
   const { isSynced, parsedLyrics, offset = 0 } = lyrics.lyrics;
@@ -17,6 +18,32 @@ export function renderLyricsLines(
       const { originalText } = lyric;
       const start = (lyric?.start || 0) + offset;
       const end = (lyric.end === Number.POSITIVE_INFINITY ? songDuration : lyric.end || 0) + offset;
+
+      const prevLine = index > 0 ? parsedLyrics[index - 1] : undefined;
+      const prevLineEnd = prevLine
+        ? (prevLine.end === Number.POSITIVE_INFINITY ? songDuration : prevLine.end || 0) + offset
+        : undefined;
+
+      const nextLine = index < parsedLyrics.length - 1 ? parsedLyrics[index + 1] : undefined;
+      const nextLineStart = nextLine ? (nextLine.start || 0) + offset : undefined;
+
+      const lineMid = (start + end) / 2;
+      const isInAbLoop = Boolean(
+        abLoop &&
+        abLoop.phase === 'active' &&
+        abLoop.pointA !== null &&
+        abLoop.pointB !== null &&
+        lineMid >= abLoop.pointA &&
+        lineMid <= abLoop.pointB
+      );
+
+      const isLoopStart = Boolean(
+        isInAbLoop &&
+        abLoop &&
+        abLoop.pointA !== null &&
+        start <= abLoop.pointA + 0.25 &&
+        end > abLoop.pointA
+      );
 
       return (
         <LyricLine
@@ -28,6 +55,11 @@ export function renderLyricsLines(
           translatedLyricLines={lyric.translatedTexts}
           syncedStart={start}
           syncedEnd={end}
+          prevLineEnd={prevLineEnd}
+          nextLineStart={nextLineStart}
+          songDuration={songDuration}
+          isInAbLoop={isInAbLoop}
+          isLoopStart={isLoopStart}
           isAutoScrolling={isAutoScrolling}
           convertedLyric={lyric.romanizedText}
         />

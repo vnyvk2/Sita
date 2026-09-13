@@ -93,4 +93,41 @@ if (typeof window !== 'undefined') {
       saveUserData: vi.fn().mockResolvedValue(undefined)
     }
   };
+
+  window.AudioContext = class {
+    createGain() {
+      return {
+        gain: { value: 1, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
+        connect: vi.fn(),
+        disconnect: vi.fn()
+      };
+    }
+    createChannelSplitter() { return { connect: vi.fn(), disconnect: vi.fn() }; }
+    createChannelMerger() { return { connect: vi.fn(), disconnect: vi.fn() }; }
+    createBiquadFilter() {
+      return {
+        frequency: { value: 0 },
+        Q: { value: 0 },
+        gain: { value: 0 },
+        type: 'lowpass',
+        connect: vi.fn(),
+        disconnect: vi.fn()
+      };
+    }
+    createDynamicsCompressor() {
+      return {
+        threshold: { value: 0 },
+        knee: { value: 0 },
+        ratio: { value: 1 },
+        attack: { value: 0 },
+        release: { value: 0 },
+        reduction: 0,
+        connect: vi.fn(),
+        disconnect: vi.fn()
+      };
+    }
+    createMediaElementSource() { return { connect: vi.fn(), disconnect: vi.fn() }; }
+    createConvolver() { return { connect: vi.fn(), disconnect: vi.fn(), buffer: null }; }
+    close() { return Promise.resolve(); }
+  } as any;
 }
