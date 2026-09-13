@@ -7,7 +7,15 @@ import { File } from 'node-taglib-sharp';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '../../../db/db';
-import { songs, metadataUndoSnapshots } from '../../../db/schema';
+import {
+  songs,
+  albums,
+  albumsSongs,
+  albumsArtists,
+  albumsArtworks,
+  artists,
+  metadataUndoSnapshots
+} from '../../../db/schema';
 import { MetadataHistoryRepository } from '../../history/MetadataHistoryRepository';
 import { MetadataHistoryService } from '../../history/MetadataHistoryService';
 import { AlbumAutoTagService } from '../../services/AlbumAutoTagService';
@@ -586,6 +594,78 @@ describe('MetadataApplyOrchestrator — single authoritative transition', () => 
     expect(onDataUpdate).toHaveBeenCalledWith('songs/artworks', [seeded!.id]);
     expect(onDataUpdate).toHaveBeenCalledWith('songs/updatedSong', [seeded!.id]);
     expect(onDataUpdate).toHaveBeenCalledWith('albums');
+  });
+
+  it('preserves album, album artist, and albumsArtworks when applying artwork-only mutation (D1 / B1 / B2)', async () => {
+    const seeded = await db.query.songs.findFirst();
+    expect(seeded).toBeDefined();
+
+    // Create album and link song
+    const [album] = await db
+      .insert(albums)
+      .values({ title: 'Preserved Album Title' })
+      .returning();
+    await db.insert(albumsSongs).values({ albumId: album.id, songId: seeded!.id });
+
+    // Create album artist and link to album
+    const [artist] = await db
+      .insert(artists)
+      .values({ name: 'Preserved Album Artist' })
+      .returning();
+    await db.insert(albumsArtists).values({ albumId: album.id, artistId: artist.id });
+
+    const orchestrator = new MetadataApplyOrchestrator({
+      tagWriter: new TagWriterService(),
+      historyService: new MetadataHistoryService(new MetadataHistoryRepository(db)),
+      getCurrentPlayingPath: () => undefined
+    });
+
+    // Artwork-only mutation: fields is empty, artwork buffer provided
+    const mutation: NormalizedMutation = {
+      mutationId: `op-art-only:${seeded!.id}`,
+      operationId: 'op-art-only',
+      songId: seeded!.id,
+      filePath: tempSongPath,
+      fields: [],
+      artwork: {
+        // Valid 1x1 transparent PNG buffer to allow sharp/jimp pipeline to execute cleanly
+        buffer: Buffer.from(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+          'base64'
+        )
+      },
+      fileWrite: { deferredIfPlaying: false },
+      undo: { description: 'Artwork only apply' }
+    };
+
+    const res = await orchestrator.execute([mutation]);
+    expect(res.success).toBe(true);
+
+    // 1. Song remains linked to the album
+    const refreshedSong = await db.query.songs.findFirst({
+      where: eq(songs.id, seeded!.id),
+      with: { albums: { with: { album: { with: { artists: { with: { artist: true } } } } } } }
+    });
+    expect(refreshedSong?.albums).toHaveLength(1);
+    expect(refreshedSong?.albums[0].album.id).toBe(album.id);
+    expect(refreshedSong?.albums[0].album.title).toBe('Preserved Album Title');
+
+    // 2. Album artist is completely preserved (not wiped or "Unknown")
+    expect(refreshedSong?.albums[0].album.artists).toHaveLength(1);
+    expect(refreshedSong?.albums[0].album.artists[0].artist.name).toBe('Preserved Album Artist');
+
+    // 3. Album entity exists in DB
+    const albumRow = await db.query.albums.findFirst({
+      where: eq(albums.id, album.id)
+    });
+    expect(albumRow).toBeDefined();
+
+    // 4. albums_artworks link exists for the album!
+    const albumArtLinks = await db
+      .select()
+      .from(albumsArtworks)
+      .where(eq(albumsArtworks.albumId, album.id));
+    expect(albumArtLinks.length).toBeGreaterThan(0);
   });
 });
 

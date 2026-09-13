@@ -129,86 +129,94 @@ export const syncSongRelationalData = async ({
   }
 
   // / / / / / SONG ALBUM / / / / / /
-  if (tags.albums && tags.albums.length > 0) {
-    // Get current album
-    const currentAlbum = song.albums?.[0]?.album;
+  // Contract (Audit D1 / B2):
+  // - tags.albums === undefined: Field omitted / partial update (e.g. artwork-only or track title edit) -> NO-OP.
+  //   Preserves current album linkage and prevents accidental cascade deletion of the album entity.
+  // - tags.albums.length > 0: Link to existing or create new album.
+  // - tags.albums.length === 0 (explicit empty array []): User explicitly removed the album in tag editor ->
+  //   unlink song from current album and delete the album only if no songs remain.
+  if (Array.isArray(tags.albums)) {
+    if (tags.albums.length > 0) {
+      // Get current album
+      const currentAlbum = song.albums?.[0]?.album;
 
-    let targetAlbumId: number | undefined;
+      let targetAlbumId: number | undefined;
 
-    if (tags.albums[0].albumId) {
-      // Link to existing album
-      const albumId = Number(tags.albums[0].albumId);
-      targetAlbumId = albumId;
+      if (tags.albums[0].albumId) {
+        // Link to existing album
+        const albumId = Number(tags.albums[0].albumId);
+        targetAlbumId = albumId;
 
-      if (currentAlbum && currentAlbum.id !== albumId) {
-        // Unlink from old album
-        await unlinkSongFromAlbum(currentAlbum.id, songId, trx);
-
-        // Check if old album should be deleted (no more songs)
-        const albumSongIds = await getAlbumSongIds(currentAlbum.id, trx);
-        if (albumSongIds.length === 0) {
-          await deleteAlbum(currentAlbum.id, trx);
-        }
-      }
-
-      if (!currentAlbum || currentAlbum.id !== albumId) {
-        await linkSongToAlbum(albumId, songId, trx);
-      }
-    } else if (tags.albums[0].title) {
-      // Create new album or link by title
-      const albumTitle = tags.albums[0].title.trim();
-      if (albumTitle) {
-        const existingAlbum = await getAlbumWithTitle(albumTitle, trx);
-
-        if (existingAlbum) {
-          targetAlbumId = existingAlbum.id;
-        } else {
-          const newAlbum = await createAlbum({ title: albumTitle }, trx);
-          targetAlbumId = newAlbum.id;
-        }
-
-        // Unlink from old album only if target is a different album
-        if (currentAlbum && currentAlbum.id !== targetAlbumId) {
+        if (currentAlbum && currentAlbum.id !== albumId) {
+          // Unlink from old album
           await unlinkSongFromAlbum(currentAlbum.id, songId, trx);
 
-          // Safe cascade pattern: Verify no remaining songs before deletion
+          // Check if old album should be deleted (no more songs)
           const albumSongIds = await getAlbumSongIds(currentAlbum.id, trx);
           if (albumSongIds.length === 0) {
             await deleteAlbum(currentAlbum.id, trx);
           }
         }
 
-        if (!currentAlbum || currentAlbum.id !== targetAlbumId) {
-          await linkSongToAlbum(targetAlbumId, songId, trx);
+        if (!currentAlbum || currentAlbum.id !== albumId) {
+          await linkSongToAlbum(albumId, songId, trx);
+        }
+      } else if (tags.albums[0].title) {
+        // Create new album or link by title
+        const albumTitle = tags.albums[0].title.trim();
+        if (albumTitle) {
+          const existingAlbum = await getAlbumWithTitle(albumTitle, trx);
+
+          if (existingAlbum) {
+            targetAlbumId = existingAlbum.id;
+          } else {
+            const newAlbum = await createAlbum({ title: albumTitle }, trx);
+            targetAlbumId = newAlbum.id;
+          }
+
+          // Unlink from old album only if target is a different album
+          if (currentAlbum && currentAlbum.id !== targetAlbumId) {
+            await unlinkSongFromAlbum(currentAlbum.id, songId, trx);
+
+            // Safe cascade pattern: Verify no remaining songs before deletion
+            const albumSongIds = await getAlbumSongIds(currentAlbum.id, trx);
+            if (albumSongIds.length === 0) {
+              await deleteAlbum(currentAlbum.id, trx);
+            }
+          }
+
+          if (!currentAlbum || currentAlbum.id !== targetAlbumId) {
+            await linkSongToAlbum(targetAlbumId, songId, trx);
+          }
         }
       }
-    }
 
-    // Relational Sync: Ensure all song artists and artworks are linked to the target album
-    if (targetAlbumId) {
-      const updatedSongState = await getSongById(songId, trx);
-      const songArtistIds = updatedSongState?.artists?.map((a: any) => a.artist.id) ?? [];
-      for (const artistId of songArtistIds) {
-        await linkArtistToAlbum(targetAlbumId, artistId, trx);
+      // Relational Sync: Ensure all song artists and artworks are linked to the target album
+      if (targetAlbumId) {
+        const updatedSongState = await getSongById(songId, trx);
+        const songArtistIds = updatedSongState?.artists?.map((a: any) => a.artist.id) ?? [];
+        for (const artistId of songArtistIds) {
+          await linkArtistToAlbum(targetAlbumId, artistId, trx);
+        }
+
+        if (processedArtwork && artworkData && artworkData.length > 0) {
+          await syncAlbumArtworks(
+            targetAlbumId,
+            artworkData.map((art: any) => art.id),
+            trx
+          );
+        }
       }
+    } else if (song.albums && song.albums.length > 0) {
+      // User explicitly removed the album (empty array passed)
+      const currentAlbum = song.albums[0].album;
+      await unlinkSongFromAlbum(currentAlbum.id, songId, trx);
 
-      if (processedArtwork && artworkData && artworkData.length > 0) {
-        await syncAlbumArtworks(
-          targetAlbumId,
-          artworkData.map((art: any) => art.id),
-          trx
-        );
+      // Safe cascade pattern: Verify no remaining songs before deletion
+      const albumSongIds = await getAlbumSongIds(currentAlbum.id, trx);
+      if (albumSongIds.length === 0) {
+        await deleteAlbum(currentAlbum.id, trx);
       }
-    }
-  } else if (song.albums && song.albums.length > 0) {
-    // User removed the album
-    const currentAlbum = song.albums[0].album;
-    await unlinkSongFromAlbum(currentAlbum.id, songId, trx);
-
-    // Safe cascade pattern: Verify no remaining songs before deletion
-    const albumSongIds = await getAlbumSongIds(currentAlbum.id, trx);
-    if (albumSongIds.length === 0) {
-      await deleteAlbum(currentAlbum.id, trx);
     }
   }
 
