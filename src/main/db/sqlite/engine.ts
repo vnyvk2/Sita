@@ -42,6 +42,7 @@ export interface SqliteEngine {
   all: (sql: string, params?: unknown[]) => Record<string, unknown>[];
   get: (sql: string, params?: unknown[]) => Record<string, unknown> | undefined;
   close: () => Promise<number>;
+  withTxLock: <T>(fn: () => Promise<T>) => Promise<T>;
 }
 
 function buildDrizzle(db: DatabaseSync) {
@@ -119,10 +120,28 @@ function buildDrizzle(db: DatabaseSync) {
     }
   };
 
+  const wrapTrx = (tx: any) => {
+    tx._engine = (orm as any)._engine;
+    tx._isTransaction = true;
+    if (typeof tx.transaction === 'function') {
+      const origNested = tx.transaction.bind(tx);
+      tx.transaction = (nestedFn: any, nestedConfig: any) =>
+        origNested((nestedTx: any) => {
+          wrapTrx(nestedTx);
+          return nestedFn(nestedTx);
+        }, nestedConfig);
+    }
+  };
+
   const originalTransaction = orm.transaction.bind(orm);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (orm as any).transaction = (fn: any, config: any) =>
-    withTxLock(() => originalTransaction(fn, config));
+    withTxLock(() =>
+      originalTransaction((tx: any) => {
+        wrapTrx(tx);
+        return fn(tx);
+      }, config)
+    );
 
   const guardBareStatement = (builder: any): any => {
     if (!builder || (typeof builder !== 'object' && typeof builder !== 'function')) return builder;
@@ -175,7 +194,7 @@ function buildDrizzle(db: DatabaseSync) {
     }
   });
 
-  return { orm, preparedObj };
+  return { orm, preparedObj, withTxLock };
 }
 
 export function openSqliteEngine(dbPath: string): SqliteEngine {
@@ -316,7 +335,7 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
     ddlMs = performance.now() - tDdl;
   }
 
-  const { orm, preparedObj } = buildDrizzle(db);
+  const { orm, preparedObj, withTxLock } = buildDrizzle(db);
 
   const engine: SqliteEngine = {
     kind: 'sqlite',
@@ -334,6 +353,7 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
       preparedObj(sql).all(...(params as never[])) as Record<string, unknown>[],
     get: (sql, params = []) =>
       preparedObj(sql).get(...(params as never[])) as Record<string, unknown> | undefined,
+    withTxLock,
     close: async () => {
       const t = performance.now();
       try {

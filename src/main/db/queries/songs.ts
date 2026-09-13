@@ -1130,7 +1130,8 @@ export interface SongListFacets {
 
 export const getSongListFacets = async (trx: DB | DBTransaction = db): Promise<SongListFacets> => {
   // rawAll: object rows (drizzle proxy .all() returns positional arrays for raw SQL)
-  const languagesResult = await rawAll<{ val: string }>(sql`
+  const languagesResult = await rawAll<{ val: string }>(
+    sql`
     SELECT DISTINCT val FROM (
       SELECT language AS val FROM songs WHERE language IS NOT NULL AND trim(language) <> ''
       UNION
@@ -1140,7 +1141,9 @@ export const getSongListFacets = async (trx: DB | DBTransaction = db): Promise<S
           AND ${metadataOverrides.stringValue} IS NOT NULL
           AND trim(${metadataOverrides.stringValue}) <> ''
     ) t ORDER BY val ASC
-  `);
+  `,
+    trx
+  );
 
   const genresResult = await trx
     .select({ name: genres.name })
