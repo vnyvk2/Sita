@@ -21,7 +21,7 @@ import { playlistSearchSchema } from '@renderer/utils/zod/playlistSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Suspense, lazy, useCallback, useContext, useEffect, useMemo } from 'react';
+import { Suspense, lazy, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
@@ -46,6 +46,12 @@ const MergePlaylistsPrompt = lazy(
 );
 const PlaylistBatchExportSettingsPrompt = lazy(
   () => import('@renderer/components/PlaylistsPage/PlaylistBatchExportSettingsPrompt')
+);
+const MissingSongsCheckerPrompt = lazy(
+  () => import('@renderer/components/PlaylistsPage/MissingSongsCheckerPrompt')
+);
+const SpotifyToM3uConverterPrompt = lazy(
+  () => import('@renderer/components/PlaylistsPage/SpotifyToM3uConverterPrompt')
 );
 
 const MIN_ITEM_WIDTH = 175;
@@ -126,6 +132,133 @@ function PlaylistsPage() {
       );
     },
     [updateContextMenuData, createNewPlaylist, navigate, t]
+  );
+
+  const [pinnedTools, setPinnedTools] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('nora:playlists-pinned-tools');
+      return saved ? JSON.parse(saved) : { checkMissing: false, convertSpotify: false };
+    } catch {
+      return { checkMissing: false, convertSpotify: false };
+    }
+  });
+
+  const menuCoordsRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const openToolsContextMenu = useCallback(
+    (clientX: number, clientY: number, activePinned = pinnedTools) => {
+      menuCoordsRef.current = { x: clientX, y: clientY };
+
+      const handleToggle = (key: 'checkMissing' | 'convertSpotify') => {
+        const updated = {
+          ...activePinned,
+          [key]: !activePinned[key]
+        };
+        try {
+          localStorage.setItem('nora:playlists-pinned-tools', JSON.stringify(updated));
+        } catch (err) {
+          console.error(err);
+        }
+        setPinnedTools(updated);
+        openToolsContextMenu(menuCoordsRef.current.x, menuCoordsRef.current.y, updated);
+      };
+
+      updateContextMenuData(
+        true,
+        [
+          {
+            label: t('playlistsPage.checkMissingSongs', 'Check Missing Songs'),
+            iconName: 'rule',
+            handlerFunction: () =>
+              changePromptMenuData(
+                true,
+                <Suspense fallback={null}>
+                  <MissingSongsCheckerPrompt onClose={() => changePromptMenuData(false, <></>)} />
+                </Suspense>
+              )
+          },
+          {
+            label: t('playlistsPage.convertSpotifyToM3u', 'Convert Spotify to M3U'),
+            iconName: 'transform',
+            handlerFunction: () =>
+              changePromptMenuData(
+                true,
+                <Suspense fallback={null}>
+                  <SpotifyToM3uConverterPrompt onClose={() => changePromptMenuData(false, <></>)} />
+                </Suspense>
+              )
+          },
+          {
+            label: '',
+            isContextMenuItemSeperator: true,
+            handlerFunction: () => true
+          },
+          {
+            label: t('playlistsPage.pinToToolbar', 'Pin to Toolbar'),
+            iconName: 'push_pin',
+            iconClassName: 'material-icons-round mr-2 opacity-70',
+            handlerFunction: () => true,
+            innerContextMenus: [
+              {
+                label: t('playlistsPage.checkMissingSongs', 'Check Missing Songs'),
+                iconName: activePinned.checkMissing ? 'check_box' : 'check_box_outline_blank',
+                iconClassName: `material-icons-round mr-2 ${
+                  activePinned.checkMissing
+                    ? 'text-font-color-highlight! dark:text-dark-font-color-highlight!'
+                    : 'opacity-50'
+                }`,
+                preventClosingOnClick: true,
+                handlerFunction: () => handleToggle('checkMissing')
+              },
+              {
+                label: t('playlistsPage.convertSpotifyToM3u', 'Convert Spotify to M3U'),
+                iconName: activePinned.convertSpotify ? 'check_box' : 'check_box_outline_blank',
+                iconClassName: `material-icons-round mr-2 ${
+                  activePinned.convertSpotify
+                    ? 'text-font-color-highlight! dark:text-dark-font-color-highlight!'
+                    : 'opacity-50'
+                }`,
+                preventClosingOnClick: true,
+                handlerFunction: () => handleToggle('convertSpotify')
+              }
+            ]
+          }
+        ],
+        clientX,
+        clientY
+      );
+    },
+    [updateContextMenuData, pinnedTools, changePromptMenuData, t]
+  );
+
+  const handleUnpinButtonContextMenu = useCallback(
+    (e: React.MouseEvent, key: 'checkMissing' | 'convertSpotify') => {
+      e.preventDefault();
+      e.stopPropagation();
+      updateContextMenuData(
+        true,
+        [
+          {
+            label: t('playlistsPage.unpinFromToolbar', 'Unpin from Toolbar'),
+            iconName: 'push_pin',
+            iconClassName:
+              'material-icons-round mr-2 text-font-color-highlight! dark:text-dark-font-color-highlight!',
+            handlerFunction: () => {
+              const updated = { ...pinnedTools, [key]: false };
+              try {
+                localStorage.setItem('nora:playlists-pinned-tools', JSON.stringify(updated));
+              } catch (err) {
+                console.error(err);
+              }
+              setPinnedTools(updated);
+            }
+          }
+        ],
+        e.clientX,
+        e.clientY
+      );
+    },
+    [pinnedTools, updateContextMenuData, t]
   );
 
   return (
@@ -278,11 +411,56 @@ function PlaylistsPage() {
               }}
               tooltipLabel={t('playlistsPage.importPlaylists', 'Import Playlists')}
             />
+            {pinnedTools.checkMissing && (
+              <Button
+                label="Check Missing Songs"
+                className="check-missing-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                iconName="rule"
+                clickHandler={() =>
+                  changePromptMenuData(
+                    true,
+                    <Suspense fallback={null}>
+                      <MissingSongsCheckerPrompt onClose={() => changePromptMenuData(false, <></>)} />
+                    </Suspense>
+                  )
+                }
+                onContextMenu={(e) => handleUnpinButtonContextMenu(e, 'checkMissing')}
+                tooltipLabel="Check missing songs from Spotify/M3U (Right-click to unpin)"
+              />
+            )}
+            {pinnedTools.convertSpotify && (
+              <Button
+                label="Convert Spotify to M3U"
+                className="convert-spotify-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+                iconName="transform"
+                clickHandler={() =>
+                  changePromptMenuData(
+                    true,
+                    <Suspense fallback={null}>
+                      <SpotifyToM3uConverterPrompt onClose={() => changePromptMenuData(false, <></>)} />
+                    </Suspense>
+                  )
+                }
+                onContextMenu={(e) => handleUnpinButtonContextMenu(e, 'convertSpotify')}
+                tooltipLabel="Convert a Spotify Playlist URL to an M3U file (Right-click to unpin)"
+              />
+            )}
             <Button
               label={t(`playlistsPage.addPlaylist`)}
               className="add-new-playlist-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
               iconName="add"
               clickHandler={handleAddPlaylistClick}
+            />
+            <Button
+              className="playlist-tools-more-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
+              iconName="more_vert"
+              clickHandler={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                openToolsContextMenu(rect.left, rect.bottom);
+              }}
+              tooltipLabel="More Playlist Tools"
             />
             <Dropdown
               name="playlistsSortDropdown"

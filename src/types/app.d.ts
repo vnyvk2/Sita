@@ -591,6 +591,7 @@ declare global {
     artists: boolean;
     albums: boolean;
     insights?: boolean;
+    online?: boolean;
   }
 
   interface Preferences {

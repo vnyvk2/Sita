@@ -119,7 +119,7 @@ const AudioPlaybackSettings = () => {
           <div className="description">{t('settingsPage.enableWaveformSeekbarDescription')}</div>
           <Checkbox
             id="toggleEnableWaveformSeekbar"
-            isChecked={preferences?.isWaveformSeekbarEnabled ?? true}
+            isChecked={preferences?.isWaveformSeekbarEnabled ?? false}
             checkedStateUpdateFunction={(state) => {
               storage.preferences.setPreferences('isWaveformSeekbarEnabled', state);
               dispatch({ type: 'TOGGLE_WAVEFORM_SEEKBAR', data: state });

@@ -507,7 +507,8 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
       folders: true,
       artists: true,
       albums: true,
-      insights: true
+      insights: true,
+      online: true
     },
     themePreset: 'default',
     lyricsBackground: 'default',
@@ -518,7 +519,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     showEqualizerOnTracklist: true,
     reduceVisualEffectsOnBattery: false,
     ambientParticles: false,
-    isWaveformSeekbarEnabled: true,
+    isWaveformSeekbarEnabled: false,
     isExperimentalWorkspaceEnabled: false,
     customThemeOverrides: {},
     alphabetScrubberPosition: 'off',

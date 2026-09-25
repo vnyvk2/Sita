@@ -167,6 +167,7 @@ const Sidebar = memo(() => {
 
   const filteredLinkData = useMemo(() => {
     return linkData.filter((link) => {
+      if (link.id === 'Online' && visibleSideTabs?.online === false) return false;
       if (link.id === 'Folders' && visibleSideTabs?.folders === false) return false;
       if (link.id === 'Artists' && visibleSideTabs?.artists === false) return false;
       if (link.id === 'Albums' && visibleSideTabs?.albums === false) return false;

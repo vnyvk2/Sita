@@ -51,10 +51,11 @@ const PlaylistBatchExportSettingsPrompt = (props: PlaylistBatchExportSettingsPro
   }, []);
 
   const handleBrowseDirectory = async () => {
-    const dirs = await window.api.utils.showOpenDialog({
+    const result: any = await window.api.utils.showOpenDialog({
       title: 'Select Destination Folder for Batch Export',
       properties: ['openDirectory', 'createDirectory']
     });
+    const dirs = result?.filePaths || result;
     if (dirs && dirs.length > 0) {
       setDestinationDir(dirs[0]);
     }

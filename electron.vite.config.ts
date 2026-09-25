@@ -43,6 +43,11 @@ export default defineConfig({
     }
   },
   renderer: {
+    server: {
+      fs: {
+        strict: false
+      }
+    },
     build: {
       minify: true,
       sourcemap: true,

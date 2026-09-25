@@ -184,7 +184,8 @@ const PreferencesSettings = () => {
                     folders: true,
                     artists: true,
                     albums: true,
-                    insights: true
+                    insights: true,
+                    online: true
                   };
                   storage.preferences.setPreferences('visibleSideTabs', {
                     ...current,
@@ -202,7 +203,8 @@ const PreferencesSettings = () => {
                     folders: true,
                     artists: true,
                     albums: true,
-                    insights: true
+                    insights: true,
+                    online: true
                   };
                   storage.preferences.setPreferences('visibleSideTabs', {
                     ...current,
@@ -220,7 +222,8 @@ const PreferencesSettings = () => {
                     folders: true,
                     artists: true,
                     albums: true,
-                    insights: true
+                    insights: true,
+                    online: true
                   };
                   storage.preferences.setPreferences('visibleSideTabs', {
                     ...current,
@@ -238,7 +241,8 @@ const PreferencesSettings = () => {
                     folders: true,
                     artists: true,
                     albums: true,
-                    insights: true
+                    insights: true,
+                    online: true
                   };
                   storage.preferences.setPreferences('visibleSideTabs', {
                     ...current,
@@ -256,7 +260,8 @@ const PreferencesSettings = () => {
                     folders: true,
                     artists: true,
                     albums: true,
-                    insights: true
+                    insights: true,
+                    online: true
                   };
                   storage.preferences.setPreferences('visibleSideTabs', {
                     ...current,
@@ -264,6 +269,25 @@ const PreferencesSettings = () => {
                   });
                 }}
                 labelContent={t('sideBar.insights', { defaultValue: 'Insights' })}
+              />
+              <Checkbox
+                id="toggleSidebarTabOnline"
+                isChecked={preferences?.visibleSideTabs?.online ?? true}
+                checkedStateUpdateFunction={(state) => {
+                  const current = preferences?.visibleSideTabs ?? {
+                    genres: true,
+                    folders: true,
+                    artists: true,
+                    albums: true,
+                    insights: true,
+                    online: true
+                  };
+                  storage.preferences.setPreferences('visibleSideTabs', {
+                    ...current,
+                    online: state
+                  });
+                }}
+                labelContent={t('sideBar.online', { defaultValue: 'Online' })}
               />
             </div>
           </div>

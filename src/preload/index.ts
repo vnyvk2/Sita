@@ -947,6 +947,8 @@ const collections = {
     ipcRenderer.invoke('collections/export-batch', playlistIds, options),
   analyze: (filePath?: string): Promise<PlaylistImportAnalysis | null> =>
     ipcRenderer.invoke('collections/analyze', filePath),
+  preview: (filePath: string, options?: any): Promise<any> =>
+    ipcRenderer.invoke('playlistImport:preview', filePath, options),
   import: (options?: PlaylistImportIpcOptions): Promise<void> =>
     ipcRenderer.invoke('collections/import', options),
   importBatch: (filePaths: string[]): Promise<BatchImportSummaryResult> =>
