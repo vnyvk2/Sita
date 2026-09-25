@@ -446,5 +446,152 @@ describe('WorkspaceToolbar', () => {
       expect(rightCol.kind).toBe('tabs');
       expect(rightCol.tabs).toContain(visualizerPanel?.id);
     });
+
+    it('adds playlists panel on the left side of router-view by default with Auto target position', () => {
+      workspaceActions.switchWorkspace(DEFAULT_PRESET.id);
+      render(<WorkspaceToolbar />);
+
+      const addBtn = screen.getByText('Add Panel');
+      fireEvent.click(addBtn);
+
+      // Verify Auto button is present
+      expect(screen.getByRole('button', { name: 'Auto' })).toBeDefined();
+
+      // Click Playlists
+      const playlistsOption = screen.getByText('Playlists');
+      fireEvent.click(playlistsOption);
+
+      const ws = workspaceStore.state.workspaces[DEFAULT_PRESET.id];
+      const playlistPanel = Object.values(ws.panels).find((p) => p.type === 'playlists');
+      expect(playlistPanel).toBeDefined();
+
+      // Root should be a split with playlists on the left (index 0) and router-view on the right
+      expect(ws.root.kind).toBe('split');
+      const splitRoot = ws.root as any;
+      expect(splitRoot.children[0].panel).toBe(playlistPanel?.id);
+      expect(splitRoot.children[1].panel).toBe('p_main_default');
+    });
+
+    it('adds playlists panel on the right if user explicitly chooses Right target position', () => {
+      workspaceActions.switchWorkspace(DEFAULT_PRESET.id);
+      render(<WorkspaceToolbar />);
+
+      const addBtn = screen.getByText('Add Panel');
+      fireEvent.click(addBtn);
+
+      // Explicitly select "Right"
+      const rightBtn = screen.getByRole('button', { name: 'Right' });
+      fireEvent.click(rightBtn);
+
+      // Click Playlists
+      const playlistsOption = screen.getByText('Playlists');
+      fireEvent.click(playlistsOption);
+
+      const ws = workspaceStore.state.workspaces[DEFAULT_PRESET.id];
+      const playlistPanel = Object.values(ws.panels).find((p) => p.type === 'playlists');
+      expect(playlistPanel).toBeDefined();
+
+      // Root should have router-view at index 0 and playlists at index 1
+      expect(ws.root.kind).toBe('split');
+      const splitRoot = ws.root as any;
+      expect(splitRoot.children[0].panel).toBe('p_main_default');
+      expect(splitRoot.children[1].panel).toBe(playlistPanel?.id);
+    });
+
+    it('preserves left-side playlists panel and router-view when opening two tabs on the right', () => {
+      workspaceActions.switchWorkspace(DEFAULT_PRESET.id);
+      render(<WorkspaceToolbar />);
+
+      // Step 1: Add Playlists (Auto -> docks left)
+      fireEvent.click(screen.getByText('Add Panel'));
+      fireEvent.click(screen.getByText('Playlists'));
+
+      let ws = workspaceStore.state.workspaces[DEFAULT_PRESET.id];
+      const playlistPanel = Object.values(ws.panels).find((p) => p.type === 'playlists');
+      expect(playlistPanel).toBeDefined();
+
+      // Step 2: User sets Target Position to 'As Tab' and adds Queue
+      fireEvent.click(screen.getByText('Add Panel'));
+      fireEvent.click(screen.getByRole('button', { name: 'As Tab' }));
+      fireEvent.click(screen.getByText('Queue'));
+
+      ws = workspaceStore.state.workspaces[DEFAULT_PRESET.id];
+      const queuePanel = Object.values(ws.panels).find((p) => p.type === 'queue');
+      expect(queuePanel).toBeDefined();
+
+      // Ensure playlists panel is still at index 0 and router-view is intact at index 1
+      expect(ws.root.kind).toBe('split');
+      let splitRoot = ws.root as any;
+      expect(splitRoot.children[0].panel).toBe(playlistPanel?.id);
+      expect(splitRoot.children[1].panel).toBe('p_main_default');
+      expect(splitRoot.children[2].panel).toBe(queuePanel?.id);
+
+      // Step 3: User adds Lyrics (position 'As Tab')
+      fireEvent.click(screen.getByText('Add Panel'));
+      fireEvent.click(screen.getByRole('button', { name: 'As Tab' }));
+      fireEvent.click(screen.getByText('Lyrics'));
+
+      ws = workspaceStore.state.workspaces[DEFAULT_PRESET.id];
+      const lyricsPanel = Object.values(ws.panels).find((p) => p.type === 'lyrics');
+      expect(lyricsPanel).toBeDefined();
+
+      // Playlists MUST still be on the left (index 0)
+      splitRoot = ws.root as any;
+      expect(splitRoot.children[0].panel).toBe(playlistPanel?.id);
+      // Router view MUST still be the center view (index 1)
+      expect(splitRoot.children[1].panel).toBe('p_main_default');
+      // Queue and Lyrics MUST be grouped into tabs on the right (index 2)
+      expect(splitRoot.children[2].kind).toBe('tabs');
+      expect(splitRoot.children[2].tabs).toContain(queuePanel?.id);
+      expect(splitRoot.children[2].tabs).toContain(lyricsPanel?.id);
+      expect(splitRoot.children[2].tabs).not.toContain('p_main_default');
+    });
+
+    it('groups consecutive right-hand tools into tabs in Auto mode without disturbing left panel', () => {
+      workspaceActions.switchWorkspace(DEFAULT_PRESET.id);
+      render(<WorkspaceToolbar />);
+
+      // Step 1: Add Playlists (Auto -> left)
+      fireEvent.click(screen.getByText('Add Panel'));
+      fireEvent.click(screen.getByText('Playlists'));
+
+      // Step 2: Add Queue with position Auto -> docks right
+      fireEvent.click(screen.getByText('Add Panel'));
+      fireEvent.click(screen.getByText('Queue'));
+
+      // Step 3: Add Lyrics with position Auto -> automatically tabs into Queue on right
+      fireEvent.click(screen.getByText('Add Panel'));
+      fireEvent.click(screen.getByText('Lyrics'));
+
+      const ws = workspaceStore.state.workspaces[DEFAULT_PRESET.id];
+      const playlistPanel = Object.values(ws.panels).find((p) => p.type === 'playlists');
+      const queuePanel = Object.values(ws.panels).find((p) => p.type === 'queue');
+      const lyricsPanel = Object.values(ws.panels).find((p) => p.type === 'lyrics');
+
+      expect(playlistPanel).toBeDefined();
+      expect(queuePanel).toBeDefined();
+      expect(lyricsPanel).toBeDefined();
+
+      const splitRoot = ws.root as any;
+      expect(splitRoot.children[0].panel).toBe(playlistPanel?.id);
+      expect(splitRoot.children[1].panel).toBe('p_main_default');
+      expect(splitRoot.children[2].kind).toBe('tabs');
+      expect(splitRoot.children[2].tabs).toEqual([queuePanel?.id, lyricsPanel?.id]);
+    });
+  });
+
+  describe('Sidebar Toggle in Toolbar', () => {
+    it('displays "Show Sidebar" when sidebarMode is hidden and clicking expands it', () => {
+      dndStore.setState((s) => ({ ...s, sidebarMode: 'hidden' }));
+      render(<WorkspaceToolbar />);
+
+      const toggleBtn = screen.getByTitle('Sidebar is hidden. Click to expand sidebar.');
+      expect(toggleBtn).toBeDefined();
+      expect(screen.getByText('Show Sidebar')).toBeDefined();
+
+      // Click to cycle
+      fireEvent.click(toggleBtn);
+      expect(dndStore.state.sidebarMode).toBe('expanded');
+    });
   });
 });

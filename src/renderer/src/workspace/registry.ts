@@ -64,6 +64,7 @@ export const PANEL_DEFINITIONS: Record<PanelType, PanelDefinition> = {
     title: 'Playlists',
     icon: 'featured_play_list',
     kind: 'widget',
+    singleton: true,
     minSize: { w: 140 },
     defaultWeight: 0.11,
     component: lazy(() => import('./panels/PlaylistsPanel/PlaylistsPanel'))

@@ -1,6 +1,12 @@
 import { Store } from '@tanstack/store';
 
-import { applyLayoutOp, findAllTabGroups, findTabGroupContainingPanel, generateRandomId } from './ops';
+import {
+  applyLayoutOp,
+  findRightsideSecondaryPanel,
+  findRightsideTabGroup,
+  findTabGroupContainingPanel,
+  generateRandomId
+} from './ops';
 import { loadWorkspaceState, saveWorkspaceStateDebounced } from './persistence';
 import { DEFAULT_PRESET } from './presets/default';
 import { MUSICBEE_PRESET } from './presets/musicbee';
@@ -359,7 +365,7 @@ export const workspaceActions = {
       const routerViewId = routerPanel ? routerPanel.id : Object.keys(activeWs.panels)[0];
       if (!routerViewId) return;
 
-      if (type === 'playlists') {
+      if (type === 'playlists' || type === 'navigation') {
         workspaceActions.dispatchOp({
           t: 'panel.insert',
           type,
@@ -371,11 +377,7 @@ export const workspaceActions = {
           }
         });
       } else {
-        const tabGroups = findAllTabGroups(activeWs.root);
-        const targetTabGroup =
-          tabGroups.find(
-            (tg) => !tg.tabs.some((tabId) => activeWs.panels[tabId]?.type === 'playlists')
-          ) ?? tabGroups[0];
+        const targetTabGroup = findRightsideTabGroup(activeWs);
 
         if (targetTabGroup) {
           workspaceActions.dispatchOp({
@@ -387,17 +389,15 @@ export const workspaceActions = {
             }
           });
         } else {
-          const secondaryPanel = Object.values(activeWs.panels).find(
-            (p) => p.type !== 'router-view' && p.type !== 'playlists'
-          );
+          const secondaryRightPanel = findRightsideSecondaryPanel(activeWs);
 
-          if (secondaryPanel) {
+          if (secondaryRightPanel) {
             workspaceActions.dispatchOp({
               t: 'panel.insert',
               type,
               at: {
                 k: 'tab-into',
-                tabsId: secondaryPanel.id
+                tabsId: secondaryRightPanel.id
               }
             });
           } else {

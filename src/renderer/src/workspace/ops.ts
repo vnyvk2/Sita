@@ -3,6 +3,7 @@ import type {
   DropTarget,
   LayoutNode,
   LayoutOp,
+  PanelInstance,
   PanelInstanceId,
   PanelRefNode,
   PanelType,
@@ -252,6 +253,155 @@ export function findAllTabGroups(root: LayoutNode, out: TabGroupNode[] = []): Ta
     }
   }
   return out;
+}
+
+/**
+ * Finds the primary TabGroup located strictly on the right side of router-view in an x-split,
+ * ensuring left-side panels (like playlists or navigation) are never targeted.
+ */
+export function findRightsideTabGroup(ws: Workspace): TabGroupNode | null {
+  const routerPanel = Object.values(ws.panels).find((p) => p.type === 'router-view');
+  if (!routerPanel) return null;
+
+  if (ws.root.kind === 'split' && ws.root.axis === 'x') {
+    const routerIdx = ws.root.children.findIndex((c) =>
+      collectAllPanelIds(c).has(routerPanel.id)
+    );
+    if (routerIdx !== -1) {
+      for (let i = routerIdx + 1; i < ws.root.children.length; i++) {
+        const tgs = findAllTabGroups(ws.root.children[i]);
+        if (tgs.length > 0) return tgs[0];
+      }
+    }
+  }
+
+  // Fallback: search for any TabGroup that does not contain router-view, playlists, or navigation
+  const allTgs = findAllTabGroups(ws.root);
+  return (
+    allTgs.find(
+      (tg) =>
+        !tg.tabs.some((tabId) => {
+          const type = ws.panels[tabId]?.type;
+          return type === 'playlists' || type === 'navigation' || type === 'router-view';
+        })
+    ) ?? null
+  );
+}
+
+/**
+ * Finds a standalone secondary panel strictly on the right side of router-view in an x-split
+ * (candidate to convert into a TabGroup), ensuring left-side panels are never targeted.
+ */
+export function findRightsideSecondaryPanel(ws: Workspace): PanelInstance | null {
+  const routerPanel = Object.values(ws.panels).find((p) => p.type === 'router-view');
+  if (!routerPanel) return null;
+
+  if (ws.root.kind === 'split' && ws.root.axis === 'x') {
+    const routerIdx = ws.root.children.findIndex((c) =>
+      collectAllPanelIds(c).has(routerPanel.id)
+    );
+    if (routerIdx !== -1) {
+      for (let i = routerIdx + 1; i < ws.root.children.length; i++) {
+        const child = ws.root.children[i];
+        if (child.kind === 'panel') {
+          const p = ws.panels[child.panel];
+          if (p && p.type !== 'router-view' && p.type !== 'playlists' && p.type !== 'navigation') {
+            return p;
+          }
+        }
+      }
+    }
+  }
+
+  // Fallback: search for any mounted tool panel that is not router-view or left-side navigation
+  const panels = Object.values(ws.panels);
+  return (
+    panels.find(
+      (p) => p.type !== 'router-view' && p.type !== 'playlists' && p.type !== 'navigation'
+    ) ?? null
+  );
+}
+
+/**
+ * Normalizes and guards drop targets to uphold structural invariants:
+ * - router-view must NEVER be converted into a TabGroup or hidden. If target is tab-into router-view,
+ *   it redirects to a right-side TabGroup, a right-side secondary panel, or a split-into on the right.
+ * - Left-side singleton panels (playlists, navigation) must NEVER be converted into a TabGroup
+ *   by an incoming tool widget.
+ */
+export function resolveSafeDropTarget(
+  ws: Workspace,
+  at: DropTarget,
+  movingPanelId?: string
+): DropTarget {
+  if (at.k === 'tab-into') {
+    const targetPanel = ws.panels[at.tabsId];
+    if (targetPanel?.type === 'router-view') {
+      const rightTg = findRightsideTabGroup(ws);
+      if (rightTg && rightTg.id !== at.tabsId) {
+        return { ...at, tabsId: rightTg.id };
+      }
+      const rightSecondary = findRightsideSecondaryPanel(ws);
+      if (rightSecondary && rightSecondary.id !== movingPanelId && rightSecondary.id !== targetPanel.id) {
+        return { ...at, tabsId: rightSecondary.id };
+      }
+      return {
+        k: 'split-into',
+        targetPanelId: targetPanel.id,
+        axis: 'x',
+        before: false
+      };
+    }
+
+    if (targetPanel?.type === 'playlists' || targetPanel?.type === 'navigation') {
+      const rightTg = findRightsideTabGroup(ws);
+      if (rightTg && rightTg.id !== at.tabsId) {
+        return { ...at, tabsId: rightTg.id };
+      }
+      const rightSecondary = findRightsideSecondaryPanel(ws);
+      if (rightSecondary && rightSecondary.id !== movingPanelId) {
+        return { ...at, tabsId: rightSecondary.id };
+      }
+      const routerPanel = Object.values(ws.panels).find((p) => p.type === 'router-view');
+      if (routerPanel) {
+        return {
+          k: 'split-into',
+          targetPanelId: routerPanel.id,
+          axis: 'x',
+          before: false
+        };
+      }
+    }
+
+    const targetTg = findTabGroupNode(ws.root, at.tabsId);
+    if (targetTg) {
+      const containsProtected = targetTg.tabs.some((tid) => {
+        const t = ws.panels[tid]?.type;
+        return t === 'router-view' || t === 'playlists' || t === 'navigation';
+      });
+      if (containsProtected) {
+        const rightTg = findRightsideTabGroup(ws);
+        if (rightTg && rightTg.id !== targetTg.id) {
+          return { ...at, tabsId: rightTg.id };
+        }
+        const rightSecondary = findRightsideSecondaryPanel(ws);
+        if (rightSecondary && rightSecondary.id !== movingPanelId) {
+          return { ...at, tabsId: rightSecondary.id };
+        }
+        const routerPanel = Object.values(ws.panels).find((p) => p.type === 'router-view');
+        if (routerPanel) {
+          return {
+            k: 'split-into',
+            targetPanelId: routerPanel.id,
+            axis: 'x',
+            before: false
+          };
+        }
+      }
+    }
+  }
+
+  return at;
 }
 
 export function getNodeDepth(

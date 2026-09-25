@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { dndStore, workspaceActions } from '../store';
+import { resolveSafeDropTarget } from '../ops';
+import { dndStore, workspaceActions, workspaceStore } from '../store';
 import type { DropEdge, DropTarget, NodeId, PanelInstanceId, VisualDropTarget } from '../types';
 
 export function calculateDropEdge(rect: DOMRect, clientX: number, clientY: number): DropEdge {
@@ -138,10 +139,12 @@ export function usePanelDragDrop(panelId: PanelInstanceId, sourceNodeId?: NodeId
                   before: false
                 };
               }
+              const activeWs = workspaceStore.state.workspaces[workspaceStore.state.active];
+              const safeAt = activeWs ? resolveSafeDropTarget(activeWs, at, panelId) : at;
               workspaceActions.dispatchOp({
                 t: 'panel.move',
                 panelId,
-                at
+                at: safeAt
               });
             }
           } finally {

@@ -162,12 +162,19 @@ describe('LyricLine Memoization Boundary (Phase L1)', () => {
       syncedStart?: number;
       syncedEnd?: number;
       isActive?: boolean;
+      isInAbLoop?: boolean;
     }>;
     expect(firstComp.props.syncedStart).toBe(0);
     expect(firstComp.props.syncedEnd).toBe(5);
     expect(firstComp.props.isInAbLoop).toBe(false);
 
-    const secondComp = components[1] as React.ReactElement;
+    const secondComp = components[1] as React.ReactElement<{
+      syncedStart?: number;
+      syncedEnd?: number;
+      isActive?: boolean;
+      isInAbLoop?: boolean;
+      isLoopStart?: boolean;
+    }>;
     expect(secondComp.props.syncedStart).toBe(5);
     expect(secondComp.props.syncedEnd).toBe(10);
     expect(secondComp.props.isInAbLoop).toBe(true);

@@ -4,7 +4,10 @@ import { memo, useCallback, useEffect, useState, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import storage from '@renderer/utils/localStorage';
-import { findAllTabGroups } from '../ops';
+import {
+  findRightsideSecondaryPanel,
+  findRightsideTabGroup
+} from '../ops';
 import { DEFAULT_PRESET } from '../presets/default';
 import { MUSICBEE_PRESET } from '../presets/musicbee';
 import { PANEL_DEFINITIONS, getMountedPanelTypes } from '../registry';
@@ -73,7 +76,7 @@ export const WorkspaceToolbar: FC = memo(() => {
   const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
   const activeWs = workspaces[activeId];
 
-  const [addPosition, setAddPosition] = useState<'left' | 'right' | 'tab'>('right');
+  const [addPosition, setAddPosition] = useState<'auto' | 'left' | 'right' | 'tab'>('auto');
   const mountedTypes = activeWs ? getMountedPanelTypes(activeWs) : new Set<PanelType>();
 
   useEffect(() => {
@@ -115,45 +118,69 @@ export const WorkspaceToolbar: FC = memo(() => {
       const routerViewId = routerPanel ? routerPanel.id : Object.keys(activeWs.panels)[0];
       if (!routerViewId) return;
 
-      if (addPosition === 'tab') {
-        const tabGroups = findAllTabGroups(activeWs.root);
-        const targetTabGroup =
-          tabGroups.find(
-            (tg) => !tg.tabs.some((tabId) => activeWs.panels[tabId]?.type === 'playlists')
-          ) ?? tabGroups[0];
+      const isLeftTool = type === 'playlists' || type === 'navigation';
 
-        if (targetTabGroup) {
+      const effectivePosition =
+        addPosition === 'auto'
+          ? isLeftTool
+            ? 'left'
+            : 'auto-right'
+          : addPosition;
+
+      if (effectivePosition === 'left' || (isLeftTool && addPosition === 'auto')) {
+        // Dock to the left of router-view
+        workspaceActions.dispatchOp({
+          t: 'panel.insert',
+          type,
+          at: {
+            k: 'split-into',
+            targetPanelId: routerViewId,
+            axis: 'x',
+            before: true
+          }
+        });
+      } else if (effectivePosition === 'tab' || effectivePosition === 'auto-right') {
+        const rightTabGroup = findRightsideTabGroup(activeWs);
+        if (rightTabGroup) {
           workspaceActions.dispatchOp({
             t: 'panel.insert',
             type,
             at: {
               k: 'tab-into',
-              tabsId: targetTabGroup.id
+              tabsId: rightTabGroup.id
             }
           });
         } else {
-          const secondaryPanel = Object.values(activeWs.panels).find(
-            (p) => p.type !== 'router-view' && p.type !== 'playlists'
-          );
-          workspaceActions.dispatchOp({
-            t: 'panel.insert',
-            type,
-            at: {
-              k: 'tab-into',
-              tabsId: secondaryPanel ? secondaryPanel.id : routerViewId
-            }
-          });
+          const secondaryRightPanel = findRightsideSecondaryPanel(activeWs);
+          if (secondaryRightPanel) {
+            workspaceActions.dispatchOp({
+              t: 'panel.insert',
+              type,
+              at: {
+                k: 'tab-into',
+                tabsId: secondaryRightPanel.id
+              }
+            });
+          } else {
+            // First right tool: create the right-hand column split
+            workspaceActions.dispatchOp({
+              t: 'panel.insert',
+              type,
+              at: {
+                k: 'split-into',
+                targetPanelId: routerViewId,
+                axis: 'x',
+                before: false
+              }
+            });
+          }
         }
-      } else if (addPosition === 'right') {
+      } else {
+        // Explicit 'right' position
         const rootSplit =
           activeWs.root.kind === 'split' && activeWs.root.axis === 'x' ? activeWs.root : null;
         if (rootSplit && rootSplit.children.length >= 4) {
-          const tabGroups = findAllTabGroups(activeWs.root);
-          const rightTabGroup =
-            tabGroups.find(
-              (tg) => !tg.tabs.some((tabId) => activeWs.panels[tabId]?.type === 'playlists')
-            ) ?? tabGroups[0];
-
+          const rightTabGroup = findRightsideTabGroup(activeWs);
           if (rightTabGroup) {
             workspaceActions.dispatchOp({
               t: 'panel.insert',
@@ -167,16 +194,14 @@ export const WorkspaceToolbar: FC = memo(() => {
             return;
           }
 
-          const secondaryPanel = Object.values(activeWs.panels).find(
-            (p) => p.type !== 'router-view' && p.type !== 'playlists'
-          );
-          if (secondaryPanel) {
+          const secondaryRightPanel = findRightsideSecondaryPanel(activeWs);
+          if (secondaryRightPanel) {
             workspaceActions.dispatchOp({
               t: 'panel.insert',
               type,
               at: {
                 k: 'tab-into',
-                tabsId: secondaryPanel.id
+                tabsId: secondaryRightPanel.id
               }
             });
             setIsPanelMenuOpen(false);
@@ -192,17 +217,6 @@ export const WorkspaceToolbar: FC = memo(() => {
             targetPanelId: routerViewId,
             axis: 'x',
             before: false
-          }
-        });
-      } else {
-        workspaceActions.dispatchOp({
-          t: 'panel.insert',
-          type,
-          at: {
-            k: 'split-into',
-            targetPanelId: routerViewId,
-            axis: 'x',
-            before: true
           }
         });
       }
@@ -386,17 +400,29 @@ export const WorkspaceToolbar: FC = memo(() => {
           <button
             type="button"
             onClick={() => workspaceActions.cycleSidebarMode()}
-            title={`Sidebar is ${sidebarMode}. Click to cycle (Expanded -> Compact -> Hidden).`}
-            className="text-font-color-dimmed hover:bg-stone-200/50 hover:text-font-color-black dark:hover:bg-stone-800/50 dark:hover:text-font-color-white flex h-7 cursor-pointer items-center gap-1 rounded-lg border border-stone-200/60 px-2 text-xs transition-colors dark:border-stone-700/60"
+            title={
+              sidebarMode === 'hidden'
+                ? 'Sidebar is hidden. Click to expand sidebar.'
+                : sidebarMode === 'compact'
+                  ? 'Sidebar is compact. Click to hide sidebar.'
+                  : 'Sidebar is expanded. Click to collapse to icons.'
+            }
+            className={`hover:bg-stone-200/50 hover:text-font-color-black dark:hover:bg-stone-800/50 dark:hover:text-font-color-white flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-xs transition-colors ${
+              sidebarMode === 'hidden'
+                ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
+                : 'border-stone-200/60 text-font-color-dimmed dark:border-stone-700/60'
+            }`}
           >
             <span className="material-symbols-rounded text-accent text-sm">
               {sidebarMode === 'hidden'
-                ? 'dock_to_left'
+                ? 'left_panel_open'
                 : sidebarMode === 'compact'
                   ? 'left_panel_open'
                   : 'dock_to_left'}
             </span>
-            <span className="text-[11px] font-medium capitalize hidden sm:inline">{sidebarMode}</span>
+            <span className="text-[11px] font-medium capitalize hidden sm:inline">
+              {sidebarMode === 'hidden' ? 'Show Sidebar' : sidebarMode}
+            </span>
           </button>
 
           {/* Add Panel Menu */}
@@ -416,6 +442,17 @@ export const WorkspaceToolbar: FC = memo(() => {
                   Target Position
                 </div>
                 <div className="mb-2 flex items-center justify-between rounded-lg bg-stone-100 p-0.5 dark:bg-stone-800">
+                  <button
+                    type="button"
+                    onClick={() => setAddPosition('auto')}
+                    className={`flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all cursor-pointer ${
+                      addPosition === 'auto'
+                        ? 'bg-white text-accent shadow-xs dark:bg-dark-background-color-1'
+                        : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
+                    }`}
+                  >
+                    Auto
+                  </button>
                   <button
                     type="button"
                     onClick={() => setAddPosition('left')}

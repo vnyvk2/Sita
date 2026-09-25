@@ -32,7 +32,7 @@ const NavigationControlsContainer = (props: Props) => {
         <Button
           iconName={
             sidebarMode === 'hidden'
-              ? 'dock_to_left'
+              ? 'left_panel_open'
               : sidebarMode === 'compact'
               ? 'left_panel_open'
               : 'dock_to_left'
@@ -41,7 +41,7 @@ const NavigationControlsContainer = (props: Props) => {
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           className={`toggleSidebarBtn app-region-no-drag hover:bg-background-color-2 hover:text-font-color-highlight dark:hover:bg-dark-background-color-2 dark:hover:text-dark-font-color-highlight flex h-fit cursor-pointer rounded-md! border-0! bg-transparent px-2! py-1! outline-offset-1 transition-all! dark:bg-transparent ${
             sidebarMode === 'hidden'
-              ? 'text-font-color-dimmed opacity-60'
+              ? 'text-accent font-semibold ring-1 ring-accent/40 bg-accent/10'
               : 'text-accent font-semibold'
           } ${bodyBackgroundImage && 'text-font-color-white! hover:text-font-color-highlight!'}`}
           clickHandler={() => workspaceActions.cycleSidebarMode()}
