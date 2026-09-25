@@ -24,6 +24,8 @@ import {
   type SongSortTypes
 } from '@renderer/components/SongsPage/SongOptions';
 import TitleContainer from '@renderer/components/TitleContainer';
+import { CompactListHeader } from '@renderer/components/SongsPage/CompactListHeader';
+import { SubFilterToolbar } from '@renderer/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import {
@@ -49,11 +51,13 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { ListRange, VirtuosoHandle } from 'react-virtuoso';
 
 const SensitiveActionConfirmPrompt = lazy(
   () => import('@renderer/components/SensitiveActionConfirmPrompt')
@@ -87,6 +91,7 @@ type PlaylistRowProps = {
   provided?: DraggableProvided;
   isDragging?: boolean;
   buildContextMenuItems: (item: PlaylistRowSong, index: number) => ContextMenuItem[];
+  isCompact?: boolean;
 };
 
 type PlaylistVirtuosoContext = {
@@ -94,6 +99,7 @@ type PlaylistVirtuosoContext = {
   playlistSongs: PlaylistRowSong[];
   filteredSongs: PlaylistRowSong[];
   isDraggingActive: boolean;
+  isCompact: boolean;
 };
 
 const HeightPreservingItem = memo(function HeightPreservingItem({
@@ -106,7 +112,8 @@ const HeightPreservingItem = memo(function HeightPreservingItem({
   item?: unknown;
   context?: unknown;
 }) {
-  const size = props['data-known-size'] ?? 60;
+  const isCompact = (context as PlaylistVirtuosoContext | undefined)?.isCompact;
+  const size = props['data-known-size'] ?? (isCompact ? 38 : 60);
   return (
     <div {...props} style={{ ...props.style, minHeight: size, boxSizing: 'border-box' }}>
       {children}
@@ -128,6 +135,7 @@ const PlaylistHeader = memo(function PlaylistHeader({
         songs={context.playlistSongs}
         filteredSongs={context.filteredSongs}
       />
+      {context.isCompact && <CompactListHeader />}
     </div>
   );
 });
@@ -152,7 +160,8 @@ const PlaylistRow = memo(
     selectAllHandler,
     provided,
     isDragging = false,
-    buildContextMenuItems
+    buildContextMenuItems,
+    isCompact = false
   }: PlaylistRowProps) => {
     const additionalContextMenuItems = useMemo(
       () => buildContextMenuItems(item, index),
@@ -171,6 +180,7 @@ const PlaylistRow = memo(
         {...item}
         trackNo={undefined}
         additionalContextMenuItems={additionalContextMenuItems}
+        isCompact={isCompact}
       />
     );
   }
@@ -187,6 +197,35 @@ function PlaylistInfoPage() {
     (state) => state.localStorage.sortingStates?.playlistDetailPage || 'customOrder'
   );
   const preferences = useStore(store, (state) => state.localStorage.preferences);
+  const isCompactSongView = useStore(
+    store,
+    (state) => Boolean(state.localStorage.preferences.isCompactSongView)
+  );
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
+  const preToggleAnchorIndexRef = useRef<number | null>(null);
+
+  const handleListRangeChange = useCallback((range: ListRange) => {
+    latestVisibleRangeRef.current = range;
+  }, []);
+
+  const handleToggleCompactView = useCallback(() => {
+    preToggleAnchorIndexRef.current = latestVisibleRangeRef.current?.startIndex ?? 0;
+    storage.preferences.setPreferences('isCompactSongView', !isCompactSongView);
+  }, [isCompactSongView]);
+
+  useLayoutEffect(() => {
+    if (preToggleAnchorIndexRef.current === null) return;
+    const targetIndex = preToggleAnchorIndexRef.current;
+    preToggleAnchorIndexRef.current = null;
+
+    virtuosoRef.current?.scrollToIndex({
+      index: targetIndex,
+      align: 'start',
+      behavior: 'auto'
+    });
+  }, [isCompactSongView]);
+
   const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue, playSong } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -349,9 +388,10 @@ function PlaylistInfoPage() {
       playlistData,
       playlistSongs,
       filteredSongs,
-      isDraggingActive
+      isDraggingActive,
+      isCompact: isCompactSongView
     }),
-    [playlistData, playlistSongs, filteredSongs, isDraggingActive]
+    [playlistData, playlistSongs, filteredSongs, isDraggingActive, isCompactSongView]
   );
 
   const handleReorder = useCallback(
@@ -837,22 +877,6 @@ function PlaylistInfoPage() {
         ]}
         dropdowns={[
           {
-            name: 'playlistPageLanguageDropdown',
-            type: `${t('common.language', 'Language')} :`,
-            value: language,
-            options: languageDropdownOptions,
-            onChange: (e) => {
-              const val = e.currentTarget.value;
-              navigate({
-                search: (prev) => ({
-                  ...prev,
-                  language: val === 'all' ? undefined : val
-                })
-              });
-            },
-            isDisabled: !(playlistData.itemCount > 0)
-          },
-          {
             name: 'songsPageFilterDropdown',
             type: `${t('common.filterBy')} :`,
             value: filteringOrder,
@@ -875,6 +899,33 @@ function PlaylistInfoPage() {
           }
         ]}
       />
+      <div className="pr-4">
+        <SubFilterToolbar
+          context="playlist"
+          isCompact={isCompactSongView}
+          onToggleCompact={handleToggleCompactView}
+          language={language}
+          languageOptions={languageDropdownOptions}
+          onLanguageChange={(val) => {
+            navigate({
+              search: (prev) => ({
+                ...prev,
+                language: val === 'all' ? undefined : val
+              })
+            });
+          }}
+          hasActiveSubFilters={Boolean(language && language !== 'all')}
+          onClearSubFilters={() => {
+            navigate({
+              search: (prev) => ({
+                ...prev,
+                language: undefined
+              })
+            });
+          }}
+          isLibraryEmpty={playlistSongs.length === 0}
+        />
+      </div>
       {filteredSongs.length > 0 &&
         (reorderEnabled ? (
           <DragDropContext
@@ -906,20 +957,23 @@ function PlaylistInfoPage() {
                     provided={provided}
                     isDragging={renderCloneSnapshot.isDragging}
                     buildContextMenuItems={getContextMenuItems}
+                    isCompact={isCompactSongView}
                   />
                 );
               }}
             >
               {(droppableProvided) => (
                 <VirtualizedList
+                  ref={virtuosoRef}
                   data={filteredSongs}
-                  fixedItemHeight={60}
+                  fixedItemHeight={isCompactSongView ? 38 : 60}
                   scrollerRef={droppableProvided.innerRef}
                   scrollKey={scrollKey}
                   scrollSeekConfiguration={false}
                   increaseViewportBy={{ top: 800, bottom: 800 }}
                   context={virtuosoContext}
                   components={virtuosoComponents}
+                  onChange={handleListRangeChange}
                   computeItemKey={(index, item) =>
                     item?.entryId ? `entry-${item.entryId}` : `row-${index}`
                   }
@@ -942,6 +996,7 @@ function PlaylistInfoPage() {
                             draggableSnapshot.isDragging && !draggableSnapshot.isDropAnimating
                           }
                           buildContextMenuItems={getContextMenuItems}
+                          isCompact={isCompactSongView}
                         />
                       )}
                     </Draggable>
@@ -952,11 +1007,13 @@ function PlaylistInfoPage() {
           </DragDropContext>
         ) : (
           <VirtualizedList
+            ref={virtuosoRef}
             data={filteredSongs}
-            fixedItemHeight={60}
+            fixedItemHeight={isCompactSongView ? 38 : 60}
             scrollKey={scrollKey}
             context={virtuosoContext}
             components={virtuosoComponents}
+            onChange={handleListRangeChange}
             computeItemKey={(index, item) =>
               item?.entryId ? `entry-${item.entryId}` : `row-${index}`
             }
@@ -969,6 +1026,7 @@ function PlaylistInfoPage() {
                 onPlayClick={handleSongPlayBtnClick}
                 selectAllHandler={selectAllHandler}
                 buildContextMenuItems={getContextMenuItems}
+                isCompact={isCompactSongView}
               />
             )}
           />

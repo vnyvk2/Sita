@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useStore } from '@tanstack/react-store';
 import { store } from '@renderer/store/store';
 
@@ -8,6 +8,8 @@ export interface SongPreferences {
   isAnimationDisabled: boolean;
   doNotShowBlacklistSongConfirm: boolean;
   bodyBackgroundImage: boolean;
+  isCompactSongView: boolean;
+  pinnedSubFilterTools: string[];
 }
 
 export const defaultSongPreferences: SongPreferences = {
@@ -15,7 +17,9 @@ export const defaultSongPreferences: SongPreferences = {
   showEqualizerOnTracklist: true,
   isAnimationDisabled: false,
   doNotShowBlacklistSongConfirm: false,
-  bodyBackgroundImage: false
+  bodyBackgroundImage: false,
+  isCompactSongView: false,
+  pinnedSubFilterTools: ['compactView', 'language', 'genre']
 };
 
 export const SongPreferencesContext = createContext<SongPreferences>(defaultSongPreferences);
@@ -44,6 +48,14 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
     (state) => Boolean(state.localStorage?.preferences?.doNotShowBlacklistSongConfirm)
   );
   const bodyBackgroundImage = useStore(store, (state) => Boolean(state.bodyBackgroundImage));
+  const isCompactSongView = useStore(
+    store,
+    (state) => Boolean(state.localStorage?.preferences?.isCompactSongView)
+  );
+  const pinnedSubFilterTools = useStore(
+    store,
+    (state) => state.localStorage?.preferences?.pinnedSubFilterTools ?? defaultSongPreferences.pinnedSubFilterTools
+  );
 
   const value = useMemo(
     () => ({
@@ -51,14 +63,18 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
       showEqualizerOnTracklist,
       isAnimationDisabled,
       doNotShowBlacklistSongConfirm,
-      bodyBackgroundImage
+      bodyBackgroundImage,
+      isCompactSongView,
+      pinnedSubFilterTools
     }),
     [
       showTrackNumberAsSongIndex,
       showEqualizerOnTracklist,
       isAnimationDisabled,
       doNotShowBlacklistSongConfirm,
-      bodyBackgroundImage
+      bodyBackgroundImage,
+      isCompactSongView,
+      pinnedSubFilterTools
     ]
   );
 

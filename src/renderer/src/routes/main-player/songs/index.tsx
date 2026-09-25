@@ -9,6 +9,8 @@ import PageSearchInput from '@renderer/components/PageSearchInput';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
+import { CompactListHeader } from '@renderer/components/SongsPage/CompactListHeader';
+import { SubFilterToolbar } from '@renderer/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
@@ -33,7 +35,16 @@ import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { lazy, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ListRange, VirtuosoHandle } from 'react-virtuoso';
 
@@ -96,6 +107,30 @@ function SongsPage() {
     store,
     (state) => state.localStorage.preferences.alphabetScrubberPosition ?? 'off'
   );
+  const isCompactSongView = useStore(
+    store,
+    (state) => Boolean(state.localStorage.preferences.isCompactSongView)
+  );
+  const preToggleAnchorIndexRef = useRef<number | null>(null);
+  const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
+
+  const handleToggleCompactView = useCallback(() => {
+    preToggleAnchorIndexRef.current = latestVisibleRangeRef.current?.startIndex ?? 0;
+    storage.preferences.setPreferences('isCompactSongView', !isCompactSongView);
+  }, [isCompactSongView]);
+
+  useLayoutEffect(() => {
+    if (preToggleAnchorIndexRef.current === null) return;
+    const targetIndex = preToggleAnchorIndexRef.current;
+    preToggleAnchorIndexRef.current = null;
+
+    virtuosoRef.current?.scrollToIndex({
+      index: targetIndex,
+      align: 'start',
+      behavior: 'auto'
+    });
+  }, [isCompactSongView]);
+
   // Single parent-level subscription passed to all Song rows via prop,
   // eliminating ~25 per-row store subscriptions in the hot scrolling path.
   const hasBodyBackgroundImage = useStore(store, (state) => Boolean(state.bodyBackgroundImage));
@@ -379,7 +414,8 @@ function SongsPage() {
 
   const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
     listIdentity,
-    initialIndex: initialScrollIndex
+    initialIndex: initialScrollIndex,
+    isCompactView: isCompactSongView
   });
 
   const renderSong = useCallback(
@@ -393,18 +429,20 @@ function SongsPage() {
             onPlayClick={handleSongPlayBtnClick}
             selectAllHandler={selectAllHandler}
             hasBodyBackgroundImage={hasBodyBackgroundImage}
+            isCompact={isCompactSongView}
             {...song}
           />
         );
       }
-      return <SongRowSkeleton index={index} />;
+      return <SongRowSkeleton index={index} isCompact={isCompactSongView} />;
     },
     [
       getItem,
       isSongIndexingEnabled,
       handleSongPlayBtnClick,
       selectAllHandler,
-      hasBodyBackgroundImage
+      hasBodyBackgroundImage,
+      isCompactSongView
     ]
   );
 
@@ -420,6 +458,7 @@ function SongsPage() {
 
   const handleListRangeChange = useCallback(
     (range: ListRange) => {
+      latestVisibleRangeRef.current = range;
       onRangeChange(range);
       if (alphabetEntries.length === 0) return;
 
@@ -676,107 +715,70 @@ function SongsPage() {
         </div>
       </div>
 
-      <div className="sub-filters-container mb-4 flex flex-wrap items-center gap-2 pr-4 text-xs md:text-sm">
-        <Dropdown
-          name="songsPageLanguageDropdown"
-          type={`${t('common.language', 'Language')} :`}
-          value={language}
-          options={languageDropdownOptions}
-          onChange={(e) => {
-            navigate({
-              search: (prev) => ({
-                ...prev,
-                language: e.currentTarget.value === 'all' ? undefined : e.currentTarget.value
-              })
-            });
-          }}
-        />
-        <Dropdown
-          name="songsPageGenreDropdown"
-          type={`${t('common.genre', 'Genre')} :`}
-          value={genre}
-          options={genreDropdownOptions}
-          onChange={(e) => {
-            navigate({
-              search: (prev) => ({
-                ...prev,
-                genre: e.currentTarget.value === 'all' ? undefined : e.currentTarget.value
-              })
-            });
-          }}
-        />
-        <Button
-          key="fav-artists-filter-btn"
-          className={`fav-artists-filter-btn rounded-3xl px-3 py-1 text-xs md:text-sm ${
-            onlyFavoriteArtists
-              ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
-              : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50'
-          }`}
-          iconName={onlyFavoriteArtists ? 'star' : 'star_outline'}
-          label={t('common.favoriteArtists', 'Favorite Artists')}
-          clickHandler={() => {
-            navigate({
-              search: (prev) => ({
-                ...prev,
-                onlyFavoriteArtists: prev.onlyFavoriteArtists ? undefined : true
-              })
-            });
-          }}
-        />
-        <Button
-          key="fav-albums-filter-btn"
-          className={`fav-albums-filter-btn rounded-3xl px-3 py-1 text-xs md:text-sm ${
-            onlyFavoriteAlbums
-              ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
-              : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50'
-          }`}
-          iconName={onlyFavoriteAlbums ? 'album' : 'album'}
-          label={t('common.favoriteAlbums', 'Favorite Albums')}
-          clickHandler={() => {
-            navigate({
-              search: (prev) => ({
-                ...prev,
-                onlyFavoriteAlbums: prev.onlyFavoriteAlbums ? undefined : true
-              })
-            });
-          }}
-        />
-        {hasActiveSubFilters && (
-          <Button
-            key="clear-sub-filters-btn"
-            className="clear-sub-filters-btn ml-1 text-xs opacity-75 hover:opacity-100"
-            iconName="filter_alt_off"
-            tooltipLabel={t('common.clearFilters', 'Clear sub-filters')}
-            clickHandler={() => {
-              navigate({
-                search: (prev) => ({
-                  ...prev,
-                  language: undefined,
-                  genre: undefined,
-                  onlyFavoriteArtists: undefined,
-                  onlyFavoriteAlbums: undefined
-                })
-              });
-            }}
-          />
-        )}
-        {!isLibraryEmpty && (
-          <Button
-            key="clear-duplicates-btn"
-            className="clear-duplicates-btn bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 rounded-3xl px-3 py-1 text-xs md:text-sm"
-            iconName="cleaning_services"
-            label={t('duplicateSongsPrompt.openButton', 'Clear Duplicates')}
-            clickHandler={() => {
-              changePromptMenuData(
-                true,
-                <DuplicateSongsCleanupPrompt />,
-                'w-[1100px] max-w-[94vw]',
-                { scrollBehavior: 'content' }
-              );
-            }}
-          />
-        )}
-      </div>
+      <SubFilterToolbar
+        context="songs"
+        isCompact={isCompactSongView}
+        onToggleCompact={handleToggleCompactView}
+        language={language}
+        languageOptions={languageDropdownOptions}
+        onLanguageChange={(val) => {
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              language: val === 'all' ? undefined : val
+            })
+          });
+        }}
+        genre={genre}
+        genreOptions={genreDropdownOptions}
+        onGenreChange={(val) => {
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              genre: val === 'all' ? undefined : val
+            })
+          });
+        }}
+        onlyFavoriteArtists={onlyFavoriteArtists}
+        onToggleFavoriteArtists={() => {
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              onlyFavoriteArtists: prev.onlyFavoriteArtists ? undefined : true
+            })
+          });
+        }}
+        onlyFavoriteAlbums={onlyFavoriteAlbums}
+        onToggleFavoriteAlbums={() => {
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              onlyFavoriteAlbums: prev.onlyFavoriteAlbums ? undefined : true
+            })
+          });
+        }}
+        hasActiveSubFilters={hasActiveSubFilters}
+        onClearSubFilters={() => {
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              language: undefined,
+              genre: undefined,
+              onlyFavoriteArtists: undefined,
+              onlyFavoriteAlbums: undefined
+            })
+          });
+        }}
+        isLibraryEmpty={isLibraryEmpty}
+        onClearDuplicates={() => {
+          changePromptMenuData(
+            true,
+            <DuplicateSongsCleanupPrompt />,
+            'w-[1100px] max-w-[94vw]',
+            { scrollBehavior: 'content' }
+          );
+        }}
+      />
 
       {isFilteredEmpty ? (
         <div className="no-songs-search-container text-font-color-black dark:text-font-color-white my-12 flex h-64 w-full flex-col items-center justify-center text-center">
@@ -836,15 +838,18 @@ function SongsPage() {
                 onSelectLetter={handleSelectLetter}
               />
             )}
-            <div className="h-full min-w-0 flex-1">
-              <VirtualizedList
-                ref={virtuosoRef}
-                data={filteredSongIds}
-                fixedItemHeight={60}
-                scrollKey={scrollKey}
-                itemContent={renderSong}
-                onChange={handleListRangeChange}
-              />
+            <div className="flex h-full min-w-0 flex-1 flex-col">
+              {isCompactSongView && <CompactListHeader />}
+              <div className="min-h-0 flex-1">
+                <VirtualizedList
+                  ref={virtuosoRef}
+                  data={filteredSongIds}
+                  fixedItemHeight={isCompactSongView ? 38 : 60}
+                  scrollKey={scrollKey}
+                  itemContent={renderSong}
+                  onChange={handleListRangeChange}
+                />
+              </div>
             </div>
           </div>
         </div>

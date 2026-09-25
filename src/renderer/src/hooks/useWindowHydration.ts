@@ -47,12 +47,15 @@ export function useWindowHydration(
     initialIndex?: number;
     /** When true (default), fetches lightweight compact row projection optimized for table scrolling */
     compact?: boolean;
+    /** When true, adapts lookahead window overscan for 38px high-density compact row rendering */
+    isCompactView?: boolean;
   }
 ) {
   const {
     enabled = true,
-    extraRowsBefore = 75,
-    extraRowsAfter = 150,
+    isCompactView = false,
+    extraRowsBefore = isCompactView ? 120 : 75,
+    extraRowsAfter = isCompactView ? 240 : 150,
     keyPrefix = 'songs',
     listIdentity = 'default',
     initialIndex = 0,

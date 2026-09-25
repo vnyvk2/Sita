@@ -633,6 +633,8 @@ declare global {
     customThemeOverrides?: Record<string, Record<string, string>>;
     alphabetScrubberPosition?: 'off' | 'top-horizontal' | 'left-vertical';
     playerBarControlsIn3Dots?: PlayerBarControlsIn3Dots;
+    isCompactSongView?: boolean;
+    pinnedSubFilterTools?: string[];
   }
 
   interface PlayerBarControlsIn3Dots {
