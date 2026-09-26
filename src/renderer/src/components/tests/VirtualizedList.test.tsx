@@ -419,5 +419,28 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
       expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(200, dummyRange)).toBe(true);
       expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(400, dummyRange)).toBe(false);
     });
+
+    it('passes fixedItemHeight to Virtuoso and updates when row height changes', () => {
+      const dummyData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+      const { rerender } = render(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      expect(lastVirtuosoProps.fixedItemHeight).toBe(60);
+
+      rerender(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={38}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      expect(lastVirtuosoProps.fixedItemHeight).toBe(38);
+    });
   });
 });

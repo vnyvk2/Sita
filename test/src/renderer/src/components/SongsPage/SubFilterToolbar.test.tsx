@@ -4,15 +4,15 @@ import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { store } from '../../../../../../src/renderer/src/store/store';
-import {
-  SubFilterToolbar,
-  type SubFilterToolbarProps
-} from '../../../../../../src/renderer/src/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
 import {
   getValidPinnedTools,
   SUB_FILTER_TOOLS
 } from '../../../../../../src/renderer/src/components/SongsPage/SubFilterToolbar/subFilterRegistry';
+import {
+  SubFilterToolbar,
+  type SubFilterToolbarProps
+} from '../../../../../../src/renderer/src/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
+import { store } from '../../../../../../src/renderer/src/store/store';
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>();
@@ -67,10 +67,16 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
       isCompact: false,
       onToggleCompact: vi.fn(),
       language: 'all',
-      languageOptions: [{ label: 'All Languages', value: 'all' }, { label: 'English', value: 'en' }],
+      languageOptions: [
+        { label: 'All Languages', value: 'all' },
+        { label: 'English', value: 'en' }
+      ],
       onLanguageChange: vi.fn(),
       genre: 'all',
-      genreOptions: [{ label: 'All Genres', value: 'all' }, { label: 'Rock', value: 'rock' }],
+      genreOptions: [
+        { label: 'All Genres', value: 'all' },
+        { label: 'Rock', value: 'rock' }
+      ],
       onGenreChange: vi.fn(),
       onlyFavoriteArtists: false,
       onToggleFavoriteArtists: vi.fn(),
@@ -124,7 +130,9 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
     });
 
     it('shows Clear filters button when hasActiveSubFilters is true', () => {
-      const { rerender } = render(<SubFilterToolbar {...defaultProps} hasActiveSubFilters={false} />);
+      const { rerender } = render(
+        <SubFilterToolbar {...defaultProps} hasActiveSubFilters={false} />
+      );
       expect(screen.queryByTitle(/clear sub-filters/i)).toBeNull();
 
       rerender(<SubFilterToolbar {...defaultProps} hasActiveSubFilters={true} />);
@@ -133,6 +141,57 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
 
       fireEvent.click(clearBtn);
       expect(defaultProps.onClearSubFilters).toHaveBeenCalledTimes(1);
+    });
+
+    it('ensures sub-filters-container has overflow-visible and z-20 so dropdown is not clipped', () => {
+      const { container } = render(<SubFilterToolbar {...defaultProps} />);
+      const toolbarDiv = container.querySelector('.sub-filters-container');
+      expect(toolbarDiv).toBeDefined();
+      expect(toolbarDiv?.className).toContain('overflow-visible');
+      expect(toolbarDiv?.className).toContain('z-20');
+      expect(toolbarDiv?.className).not.toContain('overflow-hidden');
+    });
+
+    it('toggles 3-dots menu closed when clicking the 3-dots button again', () => {
+      render(<SubFilterToolbar {...defaultProps} />);
+
+      const moreBtn = screen.getByTitle(/more tools/i);
+      // Open
+      fireEvent.click(moreBtn);
+      expect(screen.getByText(/toolbar tools/i)).toBeDefined();
+
+      // Close by clicking the button again
+      fireEvent.click(moreBtn);
+      expect(screen.queryByText(/toolbar tools/i)).toBeNull();
+    });
+
+    it('closes 3-dots menu on outside mousedown', () => {
+      render(
+        <div>
+          <div data-testid="outside-element">Outside</div>
+          <SubFilterToolbar {...defaultProps} />
+        </div>
+      );
+
+      const moreBtn = screen.getByTitle(/more tools/i);
+      fireEvent.click(moreBtn);
+      expect(screen.getByText(/toolbar tools/i)).toBeDefined();
+
+      // Click outside
+      fireEvent.mouseDown(screen.getByTestId('outside-element'));
+      expect(screen.queryByText(/toolbar tools/i)).toBeNull();
+    });
+
+    it('closes 3-dots menu on Escape key press', () => {
+      render(<SubFilterToolbar {...defaultProps} />);
+
+      const moreBtn = screen.getByTitle(/more tools/i);
+      fireEvent.click(moreBtn);
+      expect(screen.getByText(/toolbar tools/i)).toBeDefined();
+
+      // Press Escape
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByText(/toolbar tools/i)).toBeNull();
     });
   });
 });

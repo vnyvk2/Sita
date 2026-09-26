@@ -1,11 +1,11 @@
-import { memo, useCallback, useEffect, useRef, useState, type FC, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useStore } from '@tanstack/react-store';
-
 import Button from '@renderer/components/Button';
 import Dropdown, { type DropdownOption } from '@renderer/components/Dropdown';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
+import { useStore } from '@tanstack/react-store';
+import { memo, useCallback, useEffect, useRef, useState, type FC, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+
 import {
   SUB_FILTER_TOOLS,
   getValidPinnedTools,
@@ -103,7 +103,7 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="compact-view-pill"
-            className={`compact-view-pill rounded-3xl px-3 py-1 text-xs md:text-sm transition-colors cursor-pointer shrink-0 ${
+            className={`compact-view-pill shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs transition-colors md:text-sm ${
               isCompact
                 ? 'bg-accent text-font-color-white font-medium shadow-xs'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
@@ -144,7 +144,7 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="fav-artists-filter-btn"
-            className={`fav-artists-filter-btn rounded-3xl px-3 py-1 text-xs md:text-sm shrink-0 cursor-pointer ${
+            className={`fav-artists-filter-btn shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm ${
               onlyFavoriteArtists
                 ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
@@ -159,7 +159,7 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="fav-albums-filter-btn"
-            className={`fav-albums-filter-btn rounded-3xl px-3 py-1 text-xs md:text-sm shrink-0 cursor-pointer ${
+            className={`fav-albums-filter-btn shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm ${
               onlyFavoriteAlbums
                 ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
@@ -174,7 +174,7 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="clear-duplicates-btn"
-            className="clear-duplicates-btn bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 rounded-3xl px-3 py-1 text-xs md:text-sm shrink-0 cursor-pointer"
+            className="clear-duplicates-btn bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm"
             iconName="cleaning_services"
             label={t('duplicateSongsPrompt.openButton', 'Clear Duplicates')}
             clickHandler={onClearDuplicates}
@@ -187,10 +187,10 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
 
   return (
     <div
-      className={`sub-filters-container relative mb-3 flex items-center gap-2 pr-4 text-xs md:text-sm flex-nowrap overflow-hidden ${className}`}
+      className={`sub-filters-container relative z-20 mb-3 flex flex-nowrap items-center gap-2 overflow-visible pr-4 text-xs md:text-sm ${className}`}
     >
       {/* Pinned pills rendered directly in the bar */}
-      <div className="flex items-center gap-2 overflow-x-hidden flex-nowrap shrink min-w-0">
+      <div className="flex min-w-0 shrink flex-nowrap items-center gap-2 overflow-x-hidden">
         {pinnedTools.map((toolId) => renderToolPill(toolId))}
       </div>
 
@@ -198,7 +198,7 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
       {hasActiveSubFilters && onClearSubFilters && (
         <Button
           key="clear-sub-filters-btn"
-          className="clear-sub-filters-btn text-xs opacity-75 hover:opacity-100 shrink-0 cursor-pointer"
+          className="clear-sub-filters-btn shrink-0 cursor-pointer text-xs opacity-75 hover:opacity-100"
           iconName="filter_alt_off"
           tooltipLabel={t('common.clearFilters', 'Clear sub-filters')}
           clickHandler={onClearSubFilters}
@@ -206,22 +206,22 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
       )}
 
       {/* 3-dots more tools menu */}
-      <div className="relative shrink-0 ml-auto" ref={menuContainerRef}>
+      <div className="relative ml-auto shrink-0" ref={menuContainerRef}>
         <Button
           key="sub-filters-more-btn"
-          className={`sub-filters-more-btn p-1.5 rounded-full transition-colors cursor-pointer ${
+          className={`sub-filters-more-btn mr-0! cursor-pointer rounded-full border-0! p-1.5 transition-colors ${
             isMenuOpen
               ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-accent'
               : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-background-color-2 dark:hover:bg-dark-background-color-2'
           }`}
           iconName="more_vert"
-          tooltipLabel={t('common.moreTools', 'More tools & customize')}
+          tooltipLabel={isMenuOpen ? undefined : t('common.moreTools', 'More tools & customize')}
           clickHandler={() => setIsMenuOpen((prev) => !prev)}
         />
 
         {isMenuOpen && (
-          <div className="absolute right-0 top-full mt-1.5 z-50 min-w-64 rounded-xl border border-background-color-2 bg-background-color-1 p-2 shadow-xl dark:border-dark-background-color-2 dark:bg-dark-background-color-1">
-            <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-font-color-dimmed opacity-70">
+          <div className="border-background-color-2 bg-background-color-1 dark:border-dark-background-color-2 dark:bg-dark-background-color-1 absolute top-full right-0 z-50 mt-1.5 min-w-64 rounded-xl border p-2 shadow-xl">
+            <div className="text-font-color-dimmed mb-2 px-2 text-[10px] font-semibold tracking-wider uppercase opacity-70">
               {t('common.toolbarTools', 'Toolbar Tools & Pins')}
             </div>
 
@@ -232,11 +232,11 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
                 return (
                   <div
                     key={tool.id}
-                    className="flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-font-color-black transition-colors hover:bg-background-color-2/60 dark:text-font-color-white dark:hover:bg-dark-background-color-2/50"
+                    className="text-font-color-black hover:bg-background-color-2/60 dark:text-font-color-white dark:hover:bg-dark-background-color-2/50 flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors"
                   >
                     <button
                       type="button"
-                      className="flex flex-1 items-center gap-2 text-left cursor-pointer outline-none"
+                      className="flex flex-1 cursor-pointer items-center gap-2 text-left outline-none"
                       onClick={() => {
                         if (tool.id === 'compactView') {
                           onToggleCompact();
@@ -253,24 +253,28 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
                       <span className="material-icons-round text-base opacity-75">{tool.icon}</span>
                       <span className="font-medium">{t(tool.labelKey, tool.defaultLabel)}</span>
                       {tool.id === 'compactView' && isCompact && (
-                        <span className="ml-1 text-[10px] font-semibold text-accent">(Active)</span>
+                        <span className="text-accent ml-1 text-[10px] font-semibold">(Active)</span>
                       )}
                       {tool.id === 'favoriteArtists' && onlyFavoriteArtists && (
-                        <span className="ml-1 text-[10px] font-semibold text-accent">(Active)</span>
+                        <span className="text-accent ml-1 text-[10px] font-semibold">(Active)</span>
                       )}
                       {tool.id === 'favoriteAlbums' && onlyFavoriteAlbums && (
-                        <span className="ml-1 text-[10px] font-semibold text-accent">(Active)</span>
+                        <span className="text-accent ml-1 text-[10px] font-semibold">(Active)</span>
                       )}
                     </button>
 
                     {/* Pin / Unpin button */}
                     <button
                       type="button"
-                      title={isPinned ? t('common.unpin', 'Unpin from toolbar') : t('common.pin', 'Pin to toolbar')}
-                      className={`ml-2 p-1 rounded-md transition-colors cursor-pointer ${
+                      title={
+                        isPinned
+                          ? t('common.unpin', 'Unpin from toolbar')
+                          : t('common.pin', 'Pin to toolbar')
+                      }
+                      className={`ml-2 cursor-pointer rounded-md p-1 transition-colors ${
                         isPinned
                           ? 'text-accent hover:bg-accent/10'
-                          : 'text-font-color-dimmed opacity-40 hover:opacity-100 hover:bg-background-color-2 dark:hover:bg-dark-background-color-2'
+                          : 'text-font-color-dimmed hover:bg-background-color-2 dark:hover:bg-dark-background-color-2 opacity-40 hover:opacity-100'
                       }`}
                       onClick={(e) => togglePin(tool.id, e)}
                     >

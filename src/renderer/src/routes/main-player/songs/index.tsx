@@ -6,10 +6,10 @@ import DuplicateSongsCleanupPrompt from '@renderer/components/DuplicateSongsClea
 import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
+import { CompactListHeader } from '@renderer/components/SongsPage/CompactListHeader';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
-import { CompactListHeader } from '@renderer/components/SongsPage/CompactListHeader';
 import { SubFilterToolbar } from '@renderer/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
@@ -107,9 +107,8 @@ function SongsPage() {
     store,
     (state) => state.localStorage.preferences.alphabetScrubberPosition ?? 'off'
   );
-  const isCompactSongView = useStore(
-    store,
-    (state) => Boolean(state.localStorage.preferences.isCompactSongView)
+  const isCompactSongView = useStore(store, (state) =>
+    Boolean(state.localStorage.preferences.isCompactSongView)
   );
   const preToggleAnchorIndexRef = useRef<number | null>(null);
   const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
@@ -174,7 +173,7 @@ function SongsPage() {
 
   const scrollKey = useMemo(
     () =>
-      `songs-list:${sortingOrder}:${filteringOrder}:${keyword || ''}:${genre || 'all'}:${language || 'all'}:${onlyFavoriteArtists}:${onlyFavoriteAlbums}`,
+      `songs-list:${sortingOrder}:${filteringOrder}:${keyword || ''}:${genre || 'all'}:${language || 'all'}:${onlyFavoriteArtists}:${onlyFavoriteAlbums}:${isCompactSongView ? 'compact' : 'standard'}`,
     [
       sortingOrder,
       filteringOrder,
@@ -182,7 +181,8 @@ function SongsPage() {
       genre,
       language,
       onlyFavoriteArtists,
-      onlyFavoriteAlbums
+      onlyFavoriteAlbums,
+      isCompactSongView
     ]
   );
 
@@ -771,12 +771,9 @@ function SongsPage() {
         }}
         isLibraryEmpty={isLibraryEmpty}
         onClearDuplicates={() => {
-          changePromptMenuData(
-            true,
-            <DuplicateSongsCleanupPrompt />,
-            'w-[1100px] max-w-[94vw]',
-            { scrollBehavior: 'content' }
-          );
+          changePromptMenuData(true, <DuplicateSongsCleanupPrompt />, 'w-[1100px] max-w-[94vw]', {
+            scrollBehavior: 'content'
+          });
         }}
       />
 
@@ -842,6 +839,7 @@ function SongsPage() {
               {isCompactSongView && <CompactListHeader />}
               <div className="min-h-0 flex-1">
                 <VirtualizedList
+                  key={isCompactSongView ? 'compact' : 'standard'}
                   ref={virtuosoRef}
                   data={filteredSongIds}
                   fixedItemHeight={isCompactSongView ? 38 : 60}

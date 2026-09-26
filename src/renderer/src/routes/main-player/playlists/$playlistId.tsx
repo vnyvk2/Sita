@@ -15,6 +15,7 @@ import { type DropdownOption } from '@renderer/components/Dropdown';
 import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
+import { CompactListHeader } from '@renderer/components/SongsPage/CompactListHeader';
 import Song from '@renderer/components/SongsPage/Song';
 import {
   canReorder,
@@ -23,9 +24,8 @@ import {
   songFilterOptions,
   type SongSortTypes
 } from '@renderer/components/SongsPage/SongOptions';
-import TitleContainer from '@renderer/components/TitleContainer';
-import { CompactListHeader } from '@renderer/components/SongsPage/CompactListHeader';
 import { SubFilterToolbar } from '@renderer/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
+import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import {
@@ -197,9 +197,8 @@ function PlaylistInfoPage() {
     (state) => state.localStorage.sortingStates?.playlistDetailPage || 'customOrder'
   );
   const preferences = useStore(store, (state) => state.localStorage.preferences);
-  const isCompactSongView = useStore(
-    store,
-    (state) => Boolean(state.localStorage.preferences.isCompactSongView)
+  const isCompactSongView = useStore(store, (state) =>
+    Boolean(state.localStorage.preferences.isCompactSongView)
   );
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
@@ -249,8 +248,8 @@ function PlaylistInfoPage() {
 
   const scrollKey = useMemo(
     () =>
-      `playlist-songs:${playlistId}:${sortingOrder}:${filteringOrder}:${language || 'all'}:${keyword || ''}`,
-    [playlistId, sortingOrder, filteringOrder, language, keyword]
+      `playlist-songs:${playlistId}:${sortingOrder}:${filteringOrder}:${language || 'all'}:${keyword || ''}:${isCompactSongView ? 'compact' : 'standard'}`,
+    [playlistId, sortingOrder, filteringOrder, language, keyword, isCompactSongView]
   );
 
   useEffect(() => {
@@ -964,6 +963,7 @@ function PlaylistInfoPage() {
             >
               {(droppableProvided) => (
                 <VirtualizedList
+                  key={isCompactSongView ? 'compact' : 'standard'}
                   ref={virtuosoRef}
                   data={filteredSongs}
                   fixedItemHeight={isCompactSongView ? 38 : 60}
@@ -1007,6 +1007,7 @@ function PlaylistInfoPage() {
           </DragDropContext>
         ) : (
           <VirtualizedList
+            key={isCompactSongView ? 'compact' : 'standard'}
             ref={virtuosoRef}
             data={filteredSongs}
             fixedItemHeight={isCompactSongView ? 38 : 60}

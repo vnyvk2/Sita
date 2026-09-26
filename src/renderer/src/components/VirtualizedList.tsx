@@ -1,5 +1,13 @@
 import { useDebouncedCallback } from '@tanstack/react-pacer';
-import { type CSSProperties, type ReactNode, forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  forwardRef,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import {
   Virtuoso,
   type Components,
@@ -247,6 +255,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
 
   return (
     <Virtuoso
+      key={`virtuoso-h-${fixedItemHeight}`}
       style={
         useWindowScroll
           ? { ...style }
