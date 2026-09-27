@@ -93,8 +93,12 @@ export function getValidPinnedTools(
   const allowedIds = new Set(allowed.map((t) => t.id));
 
   if (Array.isArray(storedTools)) {
-    const valid = storedTools.filter((id): id is SubFilterToolId => allowedIds.has(id as SubFilterToolId));
-    if (valid.length > 0) return valid;
+    const validSet = new Set(
+      storedTools.filter((id): id is SubFilterToolId => allowedIds.has(id as SubFilterToolId))
+    );
+    if (validSet.size > 0) {
+      return allowed.map((t) => t.id).filter((id) => validSet.has(id));
+    }
   }
 
   return allowed.filter((t) => t.pinnedByDefault).map((t) => t.id);

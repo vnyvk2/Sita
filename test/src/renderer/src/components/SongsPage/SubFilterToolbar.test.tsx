@@ -59,6 +59,14 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
       const fallback = getValidPinnedTools('songs', ['invalidTool1', 'invalidTool2']);
       expect(fallback).toEqual(['compactView', 'language', 'genre']);
     });
+
+    it('restores original canonical position even if stored preferences are out of order', () => {
+      // Stored in scrambled order
+      const scrambled = ['clearDuplicates', 'genre', 'compactView', 'favoriteArtists'];
+      const songsPinned = getValidPinnedTools('songs', scrambled);
+      // Canonical order defined in SUB_FILTER_TOOLS: compactView, genre, favoriteArtists, clearDuplicates
+      expect(songsPinned).toEqual(['compactView', 'genre', 'favoriteArtists', 'clearDuplicates']);
+    });
   });
 
   describe('SubFilterToolbar component', () => {
@@ -191,6 +199,52 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
 
       // Should now be pinned in store
       expect(store.state.localStorage.preferences.pinnedSubFilterTools).toContain('language');
+    });
+
+    it('restores tool to its original position when unpinned and re-pinned', () => {
+      // Start with standard default pinned: compactView, language, genre
+      store.setState((prev) => ({
+        ...prev,
+        localStorage: {
+          ...prev.localStorage,
+          preferences: {
+            ...prev.localStorage.preferences,
+            pinnedSubFilterTools: ['compactView', 'language', 'genre']
+          }
+        }
+      }));
+
+      const { rerender } = render(<SubFilterToolbar {...defaultProps} />);
+
+      const moreBtn = screen.getByTitle(/more tools/i);
+      fireEvent.click(moreBtn);
+
+      // Find language row and click its pin button to unpin it
+      const languageRow = screen.getByText('Language').closest('div');
+      expect(languageRow).toBeDefined();
+      const languagePinBtn = languageRow?.querySelector('button[title*="pin" i]') as HTMLButtonElement;
+      expect(languagePinBtn).toBeDefined();
+
+      fireEvent.click(languagePinBtn);
+
+      // Verify language is unpinned in store: ['compactView', 'genre']
+      expect(store.state.localStorage.preferences.pinnedSubFilterTools).toEqual([
+        'compactView',
+        'genre'
+      ]);
+
+      // Re-render toolbar with updated state
+      rerender(<SubFilterToolbar {...defaultProps} />);
+
+      // Now click pin button to re-pin language
+      fireEvent.click(languagePinBtn);
+
+      // Verify language was placed into its ORIGINAL position (index 1 between compactView and genre)
+      expect(store.state.localStorage.preferences.pinnedSubFilterTools).toEqual([
+        'compactView',
+        'language',
+        'genre'
+      ]);
     });
 
     it('toggles 3-dots menu closed when clicking the 3-dots button again', () => {

@@ -57,16 +57,17 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
   const togglePin = useCallback(
     (id: SubFilterToolId, e?: React.MouseEvent) => {
       e?.stopPropagation();
-      const current = new Set(pinnedTools);
+      const baseList = Array.isArray(storedPinned) ? storedPinned : pinnedTools;
+      const current = new Set<SubFilterToolId>(baseList as SubFilterToolId[]);
       if (current.has(id)) {
         current.delete(id);
       } else {
         current.add(id);
       }
-      const nextList = Array.from(current);
+      const nextList = SUB_FILTER_TOOLS.map((t) => t.id).filter((toolId) => current.has(toolId));
       storage.preferences.setPreferences('pinnedSubFilterTools', nextList);
     },
-    [pinnedTools]
+    [storedPinned, pinnedTools]
   );
 
   // Close menu on outside click or Escape key
