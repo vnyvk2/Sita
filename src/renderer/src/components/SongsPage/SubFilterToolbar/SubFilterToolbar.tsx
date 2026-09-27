@@ -119,6 +119,7 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
           <div key="language-pill" className="shrink-0">
             <Dropdown
               name="songsPageLanguageDropdown"
+              className="ml-0!"
               type={`${t('common.language', 'Language')} :`}
               value={language}
               options={languageOptions as DropdownOption<string>[]}
@@ -132,6 +133,7 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
           <div key="genre-pill" className="shrink-0">
             <Dropdown
               name="songsPageGenreDropdown"
+              className="ml-0!"
               type={`${t('common.genre', 'Genre')} :`}
               value={genre}
               options={genreOptions as DropdownOption<string>[]}
@@ -187,10 +189,10 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
 
   return (
     <div
-      className={`sub-filters-container relative z-20 mb-3 flex flex-nowrap items-center gap-2 overflow-visible pr-4 text-xs md:text-sm ${className}`}
+      className={`sub-filters-container relative z-20 mb-3 flex flex-wrap items-center gap-2 overflow-visible pr-4 text-xs md:text-sm ${className}`}
     >
       {/* Pinned pills rendered directly in the bar */}
-      <div className="flex min-w-0 shrink flex-nowrap items-center gap-2 overflow-x-hidden">
+      <div className="flex min-w-0 shrink flex-wrap items-center gap-2 overflow-visible">
         {pinnedTools.map((toolId) => renderToolPill(toolId))}
       </div>
 
@@ -247,6 +249,10 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
                         } else if (tool.id === 'clearDuplicates' && onClearDuplicates) {
                           onClearDuplicates();
                           setIsMenuOpen(false);
+                        } else if (tool.id === 'language' || tool.id === 'genre') {
+                          if (!isPinned) {
+                            togglePin(tool.id);
+                          }
                         }
                       }}
                     >

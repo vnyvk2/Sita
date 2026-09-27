@@ -197,6 +197,7 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
   return (
     <div
       ref={containerRef}
+      role="none"
       className={`dropdown-container relative ml-4 inline-flex shrink-0 ${className ?? ''}`}
       onKeyDown={handleMenuKeyDown}
     >
@@ -284,7 +285,10 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
             </div>
           )}
 
-          <div className="flex flex-col gap-0.5" role="none">
+          <div
+            className="flex max-h-[min(22rem,calc(100vh-140px))] flex-col gap-0.5 overflow-y-auto pr-0.5"
+            role="none"
+          >
             {options.map((option, idx) => {
               if (option.isDivider) {
                 return (

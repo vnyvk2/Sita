@@ -143,13 +143,53 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
       expect(defaultProps.onClearSubFilters).toHaveBeenCalledTimes(1);
     });
 
-    it('ensures sub-filters-container has overflow-visible and z-20 so dropdown is not clipped', () => {
+    it('ensures sub-filters-container and pinned pills container have overflow-visible and z-20 so dropdown is not clipped', () => {
       const { container } = render(<SubFilterToolbar {...defaultProps} />);
       const toolbarDiv = container.querySelector('.sub-filters-container');
       expect(toolbarDiv).toBeDefined();
       expect(toolbarDiv?.className).toContain('overflow-visible');
       expect(toolbarDiv?.className).toContain('z-20');
       expect(toolbarDiv?.className).not.toContain('overflow-hidden');
+
+      // Verify the inner pinned container does not have overflow-x-hidden
+      const pinnedContainer = toolbarDiv?.firstElementChild as HTMLElement;
+      expect(pinnedContainer).toBeDefined();
+      expect(pinnedContainer?.className).toContain('overflow-visible');
+      expect(pinnedContainer?.className).not.toContain('overflow-x-hidden');
+
+      // Verify dropdown containers within toolbar have ml-0! for clean pill alignment
+      const languageDropdown = container.querySelector('.dropdown-container');
+      expect(languageDropdown?.className).toContain('ml-0!');
+    });
+
+    it('clicking an unpinned tool row in 3-dots menu pins it to the toolbar', () => {
+      // Setup store with only compactView pinned
+      store.setState((prev) => ({
+        ...prev,
+        localStorage: {
+          ...prev.localStorage,
+          preferences: {
+            ...prev.localStorage.preferences,
+            pinnedSubFilterTools: ['compactView']
+          }
+        }
+      }));
+
+      render(<SubFilterToolbar {...defaultProps} />);
+
+      const moreBtn = screen.getByTitle(/more tools/i);
+      fireEvent.click(moreBtn);
+
+      // Language should be unpinned currently
+      const languageRow = screen.getByText('Language').closest('button');
+      expect(languageRow).toBeDefined();
+
+      if (languageRow) {
+        fireEvent.click(languageRow);
+      }
+
+      // Should now be pinned in store
+      expect(store.state.localStorage.preferences.pinnedSubFilterTools).toContain('language');
     });
 
     it('toggles 3-dots menu closed when clicking the 3-dots button again', () => {

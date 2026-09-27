@@ -113,23 +113,6 @@ function SongsPage() {
   const preToggleAnchorIndexRef = useRef<number | null>(null);
   const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
 
-  const handleToggleCompactView = useCallback(() => {
-    preToggleAnchorIndexRef.current = latestVisibleRangeRef.current?.startIndex ?? 0;
-    storage.preferences.setPreferences('isCompactSongView', !isCompactSongView);
-  }, [isCompactSongView]);
-
-  useLayoutEffect(() => {
-    if (preToggleAnchorIndexRef.current === null) return;
-    const targetIndex = preToggleAnchorIndexRef.current;
-    preToggleAnchorIndexRef.current = null;
-
-    virtuosoRef.current?.scrollToIndex({
-      index: targetIndex,
-      align: 'start',
-      behavior: 'auto'
-    });
-  }, [isCompactSongView]);
-
   // Single parent-level subscription passed to all Song rows via prop,
   // eliminating ~25 per-row store subscriptions in the hot scrolling path.
   const hasBodyBackgroundImage = useStore(store, (state) => Boolean(state.bodyBackgroundImage));
@@ -173,7 +156,7 @@ function SongsPage() {
 
   const scrollKey = useMemo(
     () =>
-      `songs-list:${sortingOrder}:${filteringOrder}:${keyword || ''}:${genre || 'all'}:${language || 'all'}:${onlyFavoriteArtists}:${onlyFavoriteAlbums}:${isCompactSongView ? 'compact' : 'standard'}`,
+      `songs-list:${sortingOrder}:${filteringOrder}:${keyword || ''}:${genre || 'all'}:${language || 'all'}:${onlyFavoriteArtists}:${onlyFavoriteAlbums}`,
     [
       sortingOrder,
       filteringOrder,
@@ -181,10 +164,40 @@ function SongsPage() {
       genre,
       language,
       onlyFavoriteArtists,
-      onlyFavoriteAlbums,
-      isCompactSongView
+      onlyFavoriteAlbums
     ]
   );
+
+  const handleToggleCompactView = useCallback(() => {
+    const currentAnchor =
+      latestVisibleRangeRef.current?.startIndex ??
+      (scrollKey ? scrollRegistry.getIndex(scrollKey) : 0) ??
+      0;
+    preToggleAnchorIndexRef.current = currentAnchor;
+    if (scrollKey) {
+      scrollRegistry.set(scrollKey, { index: currentAnchor });
+    }
+    storage.preferences.setPreferences('isCompactSongView', !isCompactSongView);
+  }, [isCompactSongView, scrollKey]);
+
+  useLayoutEffect(() => {
+    if (preToggleAnchorIndexRef.current === null) return;
+    const targetIndex = preToggleAnchorIndexRef.current;
+    preToggleAnchorIndexRef.current = null;
+
+    virtuosoRef.current?.scrollToIndex({
+      index: targetIndex,
+      align: 'start',
+      behavior: 'auto'
+    });
+    requestAnimationFrame(() => {
+      virtuosoRef.current?.scrollToIndex({
+        index: targetIndex,
+        align: 'start',
+        behavior: 'auto'
+      });
+    });
+  }, [isCompactSongView]);
 
   const songIdsParams = useMemo(
     () => ({

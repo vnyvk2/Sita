@@ -39,6 +39,7 @@ import { songQuery } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
+import { scrollRegistry } from '@renderer/utils/scrollStore';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -208,23 +209,6 @@ function PlaylistInfoPage() {
     latestVisibleRangeRef.current = range;
   }, []);
 
-  const handleToggleCompactView = useCallback(() => {
-    preToggleAnchorIndexRef.current = latestVisibleRangeRef.current?.startIndex ?? 0;
-    storage.preferences.setPreferences('isCompactSongView', !isCompactSongView);
-  }, [isCompactSongView]);
-
-  useLayoutEffect(() => {
-    if (preToggleAnchorIndexRef.current === null) return;
-    const targetIndex = preToggleAnchorIndexRef.current;
-    preToggleAnchorIndexRef.current = null;
-
-    virtuosoRef.current?.scrollToIndex({
-      index: targetIndex,
-      align: 'start',
-      behavior: 'auto'
-    });
-  }, [isCompactSongView]);
-
   const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue, playSong } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -248,9 +232,40 @@ function PlaylistInfoPage() {
 
   const scrollKey = useMemo(
     () =>
-      `playlist-songs:${playlistId}:${sortingOrder}:${filteringOrder}:${language || 'all'}:${keyword || ''}:${isCompactSongView ? 'compact' : 'standard'}`,
-    [playlistId, sortingOrder, filteringOrder, language, keyword, isCompactSongView]
+      `playlist-songs:${playlistId}:${sortingOrder}:${filteringOrder}:${language || 'all'}:${keyword || ''}`,
+    [playlistId, sortingOrder, filteringOrder, language, keyword]
   );
+
+  const handleToggleCompactView = useCallback(() => {
+    const currentAnchor =
+      latestVisibleRangeRef.current?.startIndex ??
+      (scrollKey ? scrollRegistry.getIndex(scrollKey) : 0) ??
+      0;
+    preToggleAnchorIndexRef.current = currentAnchor;
+    if (scrollKey) {
+      scrollRegistry.set(scrollKey, { index: currentAnchor });
+    }
+    storage.preferences.setPreferences('isCompactSongView', !isCompactSongView);
+  }, [isCompactSongView, scrollKey]);
+
+  useLayoutEffect(() => {
+    if (preToggleAnchorIndexRef.current === null) return;
+    const targetIndex = preToggleAnchorIndexRef.current;
+    preToggleAnchorIndexRef.current = null;
+
+    virtuosoRef.current?.scrollToIndex({
+      index: targetIndex,
+      align: 'start',
+      behavior: 'auto'
+    });
+    requestAnimationFrame(() => {
+      virtuosoRef.current?.scrollToIndex({
+        index: targetIndex,
+        align: 'start',
+        behavior: 'auto'
+      });
+    });
+  }, [isCompactSongView]);
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
