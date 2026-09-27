@@ -87,11 +87,12 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
       onClearSubFilters: vi.fn()
     };
 
-    it('renders pinned Compact View button and calls onToggleCompact on click', () => {
+    it('renders pinned Compact View button with only symbol and calls onToggleCompact on click', () => {
       render(<SubFilterToolbar {...defaultProps} />);
 
       const compactBtn = screen.getByRole('button', { name: /compact view/i });
       expect(compactBtn).toBeDefined();
+      expect(compactBtn.querySelector('.button-label-text')).toBeNull();
 
       fireEvent.click(compactBtn);
       expect(defaultProps.onToggleCompact).toHaveBeenCalledTimes(1);
@@ -107,9 +108,9 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
 
       // Verify popup content
       expect(screen.getByText(/toolbar tools/i)).toBeDefined();
-      expect(screen.getByText('Clear Duplicates')).toBeDefined();
-      expect(screen.getByText('Favorite Artists')).toBeDefined();
-      expect(screen.getByText('Favorite Albums')).toBeDefined();
+      expect(screen.getByText('Clear Dups')).toBeDefined();
+      expect(screen.getByText('Fav Artists')).toBeDefined();
+      expect(screen.getByText('Fav Albums')).toBeDefined();
     });
 
     it('in playlist context, 3-dots menu only exposes playlist-compatible tools', () => {
@@ -123,9 +124,9 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
       expect(screen.getAllByText('Language').length).toBeGreaterThan(0);
 
       // Songs-only tools are NOT present
-      expect(screen.queryByText('Clear Duplicates')).toBeNull();
-      expect(screen.queryByText('Favorite Artists')).toBeNull();
-      expect(screen.queryByText('Favorite Albums')).toBeNull();
+      expect(screen.queryByText('Clear Dups')).toBeNull();
+      expect(screen.queryByText('Fav Artists')).toBeNull();
+      expect(screen.queryByText('Fav Albums')).toBeNull();
       expect(screen.queryByText('Genre')).toBeNull();
     });
 

@@ -61,24 +61,24 @@ export const SUB_FILTER_TOOLS: SubFilterToolDefinition[] = [
   },
   {
     id: 'favoriteArtists',
-    labelKey: 'common.favoriteArtists',
-    defaultLabel: 'Favorite Artists',
+    labelKey: 'common.favArtists',
+    defaultLabel: 'Fav Artists',
     icon: 'star',
     pinnedByDefault: false,
     contexts: ['songs']
   },
   {
     id: 'favoriteAlbums',
-    labelKey: 'common.favoriteAlbums',
-    defaultLabel: 'Favorite Albums',
+    labelKey: 'common.favAlbums',
+    defaultLabel: 'Fav Albums',
     icon: 'album',
     pinnedByDefault: false,
     contexts: ['songs']
   },
   {
     id: 'clearDuplicates',
-    labelKey: 'duplicateSongsPrompt.openButton',
-    defaultLabel: 'Clear Duplicates',
+    labelKey: 'duplicateSongsPrompt.openButtonShort',
+    defaultLabel: 'Clear Dups',
     icon: 'cleaning_services',
     pinnedByDefault: false,
     contexts: ['songs']

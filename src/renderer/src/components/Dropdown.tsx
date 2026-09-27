@@ -9,6 +9,7 @@ import {
   useRef,
   useState
 } from 'react';
+import { twMerge } from 'tailwind-merge';
 
 export interface DropdownOption<T extends string> {
   label: string;
@@ -22,15 +23,28 @@ export interface DropdownProp<T extends string> {
   id?: string;
   name: string;
   className?: string;
+  triggerClassName?: string;
   options: DropdownOption<T>[];
   value: T;
   onChange: (_e: ChangeEvent<HTMLSelectElement>) => void;
   isDisabled?: boolean;
   type?: string;
+  showTypeInTrigger?: boolean;
 }
 
 function Dropdown<T extends string>(props: DropdownProp<T>) {
-  const { id, className, name, value, onChange, options, isDisabled = false, type = '' } = props;
+  const {
+    id,
+    className,
+    triggerClassName,
+    name,
+    value,
+    onChange,
+    options,
+    isDisabled = false,
+    type = '',
+    showTypeInTrigger = true
+  } = props;
 
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -241,18 +255,21 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
           disabled={isDisabled}
           onClick={toggleOpen}
           onKeyDown={handleTriggerKeyDown}
-          className={`flex h-10 w-52 cursor-pointer items-center justify-between gap-2 rounded-lg border-[3px] px-3 text-sm font-medium backdrop-blur-xs transition-[border-color,background-color] duration-150 ease-in-out outline-none select-none ${
-            isOpen
-              ? 'border-font-color-highlight! bg-background-color-2/50 text-font-color-highlight dark:border-dark-font-color-highlight! dark:bg-dark-background-color-2/50 dark:text-dark-font-color-highlight'
-              : 'border-background-color-2 bg-background-color-2/25 text-font-color-black hover:border-background-color-3 hover:bg-background-color-2/50 focus-visible:border-font-color-highlight-2 focus-visible:bg-background-color-2/50 dark:border-dark-background-color-2 dark:bg-dark-background-color-2/25 dark:text-font-color-white dark:hover:border-dark-background-color-3 dark:hover:bg-dark-background-color-2/50 dark:focus-visible:border-dark-font-color-highlight-2 dark:focus-visible:bg-dark-background-color-2/50'
-          } ${
-            isDisabled
-              ? 'cursor-not-allowed! opacity-50! brightness-90! backdrop-blur-none! transition-none!'
-              : 'active:scale-[0.99]'
-          }`}
+          className={twMerge(
+            `flex h-10 w-52 cursor-pointer items-center justify-between gap-2 rounded-lg border-[3px] px-3 text-sm font-medium backdrop-blur-xs transition-[border-color,background-color] duration-150 ease-in-out outline-none select-none ${
+              isOpen
+                ? 'border-font-color-highlight! bg-background-color-2/50 text-font-color-highlight dark:border-dark-font-color-highlight! dark:bg-dark-background-color-2/50 dark:text-dark-font-color-highlight'
+                : 'border-background-color-2 bg-background-color-2/25 text-font-color-black hover:border-background-color-3 hover:bg-background-color-2/50 focus-visible:border-font-color-highlight-2 focus-visible:bg-background-color-2/50 dark:border-dark-background-color-2 dark:bg-dark-background-color-2/25 dark:text-font-color-white dark:hover:border-dark-background-color-3 dark:hover:bg-dark-background-color-2/50 dark:focus-visible:border-dark-font-color-highlight-2 dark:focus-visible:bg-dark-background-color-2/50'
+            } ${
+              isDisabled
+                ? 'cursor-not-allowed! opacity-50! brightness-90! backdrop-blur-none! transition-none!'
+                : 'active:scale-[0.99]'
+            }`,
+            triggerClassName
+          )}
         >
           <span className="truncate">
-            {type ? `${type} ` : ''}
+            {type && showTypeInTrigger ? `${type} ` : ''}
             {selectedOption?.label ?? name}
           </span>
           <span

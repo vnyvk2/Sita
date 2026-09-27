@@ -103,13 +103,13 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="compact-view-pill"
-            className={`compact-view-pill shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs transition-colors md:text-sm ${
+            className={`compact-view-pill mr-0! shrink-0 cursor-pointer rounded-3xl px-2.5 py-1 text-xs transition-colors md:text-sm ${
               isCompact
                 ? 'bg-accent text-font-color-white font-medium shadow-xs'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
             }`}
             iconName="table_rows"
-            label={t('common.compactView', 'Compact View')}
+            tooltipLabel={t('common.compactView', 'Compact View')}
             clickHandler={onToggleCompact}
           />
         );
@@ -120,7 +120,9 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
             <Dropdown
               name="songsPageLanguageDropdown"
               className="ml-0!"
+              triggerClassName="h-auto py-1 px-3 w-auto min-w-[6.5rem] max-w-[12rem] rounded-3xl border-0 bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 text-xs md:text-sm font-normal"
               type={`${t('common.language', 'Language')} :`}
+              showTypeInTrigger={false}
               value={language}
               options={languageOptions as DropdownOption<string>[]}
               onChange={(e) => onLanguageChange(e.currentTarget.value)}
@@ -134,7 +136,9 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
             <Dropdown
               name="songsPageGenreDropdown"
               className="ml-0!"
+              triggerClassName="h-auto py-1 px-3 w-auto min-w-[6.5rem] max-w-[12rem] rounded-3xl border-0 bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 text-xs md:text-sm font-normal"
               type={`${t('common.genre', 'Genre')} :`}
+              showTypeInTrigger={false}
               value={genre}
               options={genreOptions as DropdownOption<string>[]}
               onChange={(e) => onGenreChange(e.currentTarget.value)}
@@ -146,13 +150,14 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="fav-artists-filter-btn"
-            className={`fav-artists-filter-btn shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm ${
+            className={`fav-artists-filter-btn mr-0! shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm ${
               onlyFavoriteArtists
                 ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
             }`}
             iconName={onlyFavoriteArtists ? 'star' : 'star_outline'}
-            label={t('common.favoriteArtists', 'Favorite Artists')}
+            label={t('common.favArtists', 'Fav Artists')}
+            tooltipLabel={t('common.favArtists', 'Fav Artists')}
             clickHandler={onToggleFavoriteArtists}
           />
         );
@@ -161,13 +166,14 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="fav-albums-filter-btn"
-            className={`fav-albums-filter-btn shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm ${
+            className={`fav-albums-filter-btn mr-0! shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm ${
               onlyFavoriteAlbums
                 ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
             }`}
             iconName="album"
-            label={t('common.favoriteAlbums', 'Favorite Albums')}
+            label={t('common.favAlbums', 'Fav Albums')}
+            tooltipLabel={t('common.favAlbums', 'Fav Albums')}
             clickHandler={onToggleFavoriteAlbums}
           />
         );
@@ -176,9 +182,10 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="clear-duplicates-btn"
-            className="clear-duplicates-btn bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm"
+            className="clear-duplicates-btn mr-0! bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm"
             iconName="cleaning_services"
-            label={t('duplicateSongsPrompt.openButton', 'Clear Duplicates')}
+            label={t('duplicateSongsPrompt.openButtonShort', 'Clear Dups')}
+            tooltipLabel={t('duplicateSongsPrompt.openButtonShort', 'Clear Dups')}
             clickHandler={onClearDuplicates}
           />
         );
