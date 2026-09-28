@@ -93,6 +93,9 @@ export function getValidPinnedTools(
   const allowedIds = new Set(allowed.map((t) => t.id));
 
   if (Array.isArray(storedTools)) {
+    // If the user explicitly saved an empty array, honor their choice to have an empty pinned toolbar
+    if (storedTools.length === 0) return [];
+
     const validSet = new Set(
       storedTools.filter((id): id is SubFilterToolId => allowedIds.has(id as SubFilterToolId))
     );

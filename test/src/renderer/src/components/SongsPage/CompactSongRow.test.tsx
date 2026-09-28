@@ -248,4 +248,87 @@ describe('CompactSongRow & CompactListHeader', () => {
     const checkbox = screen.getByRole('checkbox');
     expect(checkbox).toBeDefined();
   });
+
+  it('attaches dragHandleProps to root container div and NOT to indicator slot', () => {
+    const mockProvided = {
+      draggableProps: { 'data-testid': 'mock-draggable' } as any,
+      dragHandleProps: { 'data-testid': 'mock-drag-handle' } as any,
+      innerRef: vi.fn()
+    };
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <AppUpdateContext.Provider value={mockContextValue}>
+          <CompactSongRow {...sampleSongData} index={0} provided={mockProvided} />
+        </AppUpdateContext.Provider>
+      </QueryClientProvider>
+    );
+
+    const rootRow = container.querySelector('.compact-song-row');
+    expect(rootRow).toBeDefined();
+    expect(rootRow?.getAttribute('data-testid')).toBe('mock-drag-handle');
+
+    const indicatorSlot = container.querySelector('.compact-indicator-slot');
+    expect(indicatorSlot).toBeDefined();
+    expect(indicatorSlot?.getAttribute('data-testid')).toBeNull();
+  });
+
+  it('context menu supports full batch actions and multi-selection parity with StandardSongRow', async () => {
+    // 1. Setup multi-selection state with 3 songs: [101, 102, 103]
+    act(() => {
+      dispatch({
+        type: 'UPDATE_MULTIPLE_SELECTIONS_DATA',
+        data: {
+          isEnabled: true,
+          selectionType: 'songs',
+          multipleSelections: [101, 102, 103]
+        }
+      });
+    });
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <AppUpdateContext.Provider value={mockContextValue}>
+          <CompactSongRow {...sampleSongData} index={0} />
+        </AppUpdateContext.Provider>
+      </QueryClientProvider>
+    );
+
+    const rootRow = container.querySelector('.compact-song-row') as HTMLElement;
+    expect(rootRow).toBeDefined();
+
+    // Trigger right click
+    await act(async () => {
+      fireEvent.contextMenu(rootRow, { clientX: 100, clientY: 200, pageX: 100, pageY: 200 });
+    });
+
+    expect(mockContextValue.updateContextMenuData).toHaveBeenCalled();
+    const lastCall = vi.mocked(mockContextValue.updateContextMenuData).mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+
+    const [isOpen, items, pageX, pageY, additionalData] = lastCall!;
+    expect(isOpen).toBe(true);
+    expect(pageX).toBe(100);
+    expect(pageY).toBe(200);
+
+    // Verify context menu header shows multi-selection count key
+    expect(additionalData?.title).toBe('song.selectedSongCount');
+
+    // Verify batch menu items exist
+    const labels = (items as any[]).map((it) => it.label);
+    expect(labels).toContain('common.createAQueue');
+    expect(labels).toContain('common.playNextAll');
+    expect(labels).toContain('common.addToQueue');
+    expect(labels).toContain('song.toggleLikeSongs');
+    expect(labels).toContain('song.delete');
+
+    // Play button should be disabled when multi-selection is active
+    const playItem = (items as any[]).find((it) => it.label === 'common.play');
+    expect(playItem?.isDisabled).toBe(true);
+
+    // Create Queue should be enabled
+    const queueItem = (items as any[]).find((it) => it.label === 'common.createAQueue');
+    expect(queueItem?.isDisabled).toBe(false);
+  });
 });
+

@@ -17,7 +17,6 @@ import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
-import { useQueueOperations } from '../../hooks/useQueueOperations';
 import { songCacheKeys } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
 import { store } from '../../store/store';
@@ -27,10 +26,12 @@ import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
 import type { SongProp } from './StandardSongRow';
+import useSongContextMenu from './useSongContextMenu';
 
 export const CompactSongRow = memo(
   forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => {
     const {
+      index,
       songId,
       duration,
       isBlacklisted = false,
@@ -45,7 +46,12 @@ export const CompactSongRow = memo(
       isDragging = false,
       onPlayClick,
       highlightText,
-      className = ''
+      className = '',
+      year,
+      path,
+      genres,
+      discNo,
+      trackNo
     } = props;
 
     // Granular store subscriptions: only subscribe to primitives relevant to this specific song
@@ -64,15 +70,11 @@ export const CompactSongRow = memo(
 
     const {
       playSong,
-      updateContextMenuData,
       toggleIsFavorite,
       toggleMultipleSelections,
       updateMultipleSelections
     } = useContext(AppUpdateContext);
     const { t } = useTranslation();
-
-    // Queue operations for context menu actions
-    const { addToNext, addToEnd } = useQueueOperations();
 
     const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
     const likeMutationSeqRef = useRef(0);
@@ -143,6 +145,30 @@ export const CompactSongRow = memo(
         });
     }, [isAFavorite, isCurrentSong, songId, toggleIsFavorite, triggerBurst]);
 
+    // Shared context menu hook delivering complete multi-selection parity with StandardSongRow
+    const { handleContextMenu, handleMoreOptionsClick } =
+      useSongContextMenu({
+        songId,
+        title,
+        artists,
+        album,
+        duration,
+        year,
+        path,
+        isBlacklisted,
+        genres,
+        discNo,
+        trackNo,
+        isAFavorite,
+        isCurrentSong,
+        isAMultipleSelection,
+        isMultipleSelectionEnabled,
+        additionalContextMenuItems,
+        handlePlayBtnClick,
+        toggleSingleSongFavorite,
+        isCompact: true
+      });
+
     // Duration formatting
     const { minutes, seconds } = useMemo(() => {
       const totalSec = Math.floor(duration);
@@ -173,51 +199,12 @@ export const CompactSongRow = memo(
       return t('common.unknownArtist');
     }, [artists, t]);
 
-    // Context menu builder
-    const getContextMenuItems = useCallback(async (): Promise<ContextMenuItem[]> => {
-      const items: ContextMenuItem[] = [
-        {
-          label: isSongPlaying ? t('common.pause') : t('common.play'),
-          iconName: isSongPlaying ? 'pause' : 'play_arrow',
-          handlerFunction: () => handlePlayBtnClick()
-        },
-        {
-          label: t('common.playNext'),
-          iconName: 'play_arrow',
-          handlerFunction: () => addToNext([songId])
-        },
-        {
-          label: t('common.addToQueue'),
-          iconName: 'queue',
-          handlerFunction: () => addToEnd([songId])
-        },
-        {
-          label: isAFavorite ? t('song.unlikeSong') : t('song.likeSong'),
-          iconName: 'favorite',
-          handlerFunction: toggleSingleSongFavorite
-        }
-      ];
-
-      if (additionalContextMenuItems) {
-        items.push(...additionalContextMenuItems);
-      }
-
-      return items;
-    }, [
-      isSongPlaying,
-      t,
-      handlePlayBtnClick,
-      addToNext,
-      songId,
-      addToEnd,
-      isAFavorite,
-      toggleSingleSongFavorite,
-      additionalContextMenuItems
-    ]);
-
     return (
       <div
         style={{ ...style, height: 38 }}
+        data-index={index}
+        {...provided?.draggableProps}
+        {...provided?.dragHandleProps}
         className={`compact-song-row group relative flex h-[38px] max-h-[38px] min-h-[38px] w-full items-center select-none text-xs transition-none border-b border-background-color-2/30 dark:border-dark-background-color-2/30 cursor-pointer ${
           isCurrentSong
             ? 'bg-accent/8 dark:bg-accent/12'
@@ -225,13 +212,7 @@ export const CompactSongRow = memo(
               ? 'bg-accent/15 dark:bg-accent/20'
               : 'hover:bg-background-color-2/60 dark:hover:bg-dark-background-color-2/40'
         } ${isDragging ? 'shadow-lg opacity-85 z-20' : ''} ${className}`}
-        {...provided.draggableProps}
-        onContextMenu={async (e) => {
-          e.preventDefault();
-          const { pageX, pageY } = e;
-          const items = await getContextMenuItems();
-          updateContextMenuData(true, items, pageX, pageY);
-        }}
+        onContextMenu={handleContextMenu}
         onClick={(e) => {
           e.preventDefault();
           if (e.getModifierState('Shift') === true && selectAllHandler) selectAllHandler(songId);
@@ -246,11 +227,8 @@ export const CompactSongRow = memo(
         }}
         ref={ref}
       >
-        {/* Left 28px indicator slot with horizontal-only drag hit area */}
-        <div
-          className="compact-indicator-slot relative flex h-[38px] w-[28px] shrink-0 items-center justify-center px-1.5 -mx-1.5"
-          {...(provided.dragHandleProps ? provided.dragHandleProps : {})}
-        >
+        {/* Left 28px indicator slot */}
+        <div className="compact-indicator-slot relative flex h-[38px] w-[28px] shrink-0 items-center justify-center px-1.5 -mx-1.5">
           {isMultipleSelectionEnabled ? (
             <MultipleSelectionCheckbox id={songId} selectionType="songs" className="m-0" />
           ) : isBlacklisted ? (
@@ -360,13 +338,7 @@ export const CompactSongRow = memo(
             iconName="more_horiz"
             iconClassName="text-base leading-none"
             tooltipLabel={t('common.moreOptions')}
-            clickHandler={async (e) => {
-              e.stopPropagation();
-              const pageX = 'pageX' in e ? e.pageX : undefined;
-              const pageY = 'pageY' in e ? e.pageY : undefined;
-              const items = await getContextMenuItems();
-              updateContextMenuData(true, items, pageX, pageY);
-            }}
+            clickHandler={handleMoreOptionsClick}
           />
         </div>
       </div>

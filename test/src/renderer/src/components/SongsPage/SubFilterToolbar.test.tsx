@@ -55,9 +55,14 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
       expect(songsPinned).toEqual(['compactView', 'genre', 'favoriteArtists', 'favoriteAlbums']);
     });
 
-    it('falls back to defaults if stored list is empty or completely invalid', () => {
+    it('falls back to defaults if stored list is completely invalid', () => {
       const fallback = getValidPinnedTools('songs', ['invalidTool1', 'invalidTool2']);
       expect(fallback).toEqual(['compactView', 'language', 'genre']);
+    });
+
+    it('honors explicitly empty array [] as valid empty toolbar state', () => {
+      const empty = getValidPinnedTools('songs', []);
+      expect(empty).toEqual([]);
     });
 
     it('restores original canonical position even if stored preferences are out of order', () => {
