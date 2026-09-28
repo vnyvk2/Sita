@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
@@ -104,16 +105,22 @@ function buildDrizzle(db: DatabaseSync) {
   //      transaction) wait at execution time while a transaction is active, so
   //      they can neither collide with BEGIN nor join/see an uncommitted tx.
   // ------------------------------------------------------------------
+  const txLockStorage = new AsyncLocalStorage<boolean>();
   let txLock: Promise<void> | null = null;
 
   const withTxLock = async <T>(fn: () => Promise<T>): Promise<T> => {
+    if (txLockStorage.getStore()) {
+      // Re-entrant invocation from within an existing transaction lock: run directly without deadlocking
+      return await fn();
+    }
+
     const prev = txLock;
     let release!: () => void;
     const lock = new Promise<void>((resolve) => (release = resolve));
     txLock = lock;
     try {
       if (prev) await prev;
-      return await fn();
+      return await txLockStorage.run(true, fn);
     } finally {
       release();
       if (txLock === lock) txLock = null;
@@ -150,7 +157,7 @@ function buildDrizzle(db: DatabaseSync) {
       const originalThen = builder.then.bind(builder);
       builder.then = (onFulfilled: unknown, onRejected: unknown) => {
         const run = () => originalThen(onFulfilled, onRejected);
-        if (txLock) {
+        if (txLock && !txLockStorage.getStore()) {
           const prev = txLock;
           return prev.then(run, run);
         }
