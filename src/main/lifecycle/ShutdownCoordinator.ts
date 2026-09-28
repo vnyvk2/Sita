@@ -9,7 +9,7 @@ import { savePendingMetadataUpdates } from '@main/updateSong/updateSongId3Tags';
 import { adaptivePolicyEngine } from '@main/workers/adaptivePolicyEngine';
 import { libraryScheduler } from '@main/workers/jobScheduler';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
-import type { BrowserWindow } from 'electron';
+import { type BrowserWindow, ipcMain } from 'electron';
 
 import { ShutdownLogger } from './ShutdownLogger';
 import { ShutdownState } from './ShutdownState';
@@ -95,12 +95,40 @@ export class ShutdownCoordinator {
       logger.error('Error saving state during shutdown:', { error });
     }
 
-    // 3. Best-effort renderer notification
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    // 3. Renderer Notification & State Flush with ACK
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
       try {
-        mainWindow.webContents.send('app/beforeQuitEvent');
+        const flushPromise = new Promise<void>((resolve) => {
+          let resolved = false;
+          const cleanup = () => {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              ipcMain.removeListener('app/beforeQuitEventAck', ackHandler);
+              mainWindow.webContents?.removeListener('destroyed', cleanup);
+              resolve();
+            }
+          };
+
+          const timeout = setTimeout(cleanup, 1500);
+
+          const ackHandler = () => {
+            cleanup();
+          };
+
+          ipcMain.once('app/beforeQuitEventAck', ackHandler);
+          mainWindow.webContents.once('destroyed', cleanup);
+
+          try {
+            mainWindow.webContents.send('app/beforeQuitEvent');
+          } catch {
+            cleanup();
+          }
+        });
+
+        await flushPromise;
       } catch (error) {
-        logger.warn('Could not send app/beforeQuitEvent to renderer (best-effort):', { error });
+        logger.warn('Could not complete app/beforeQuitEvent flush:', { error });
       }
     }
 

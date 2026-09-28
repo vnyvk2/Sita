@@ -18,6 +18,7 @@ declare global {
 
   type IpcChannels =
     | 'app/beforeQuitEvent'
+    | 'app/beforeQuitEventAck'
     | 'app/Close'
     | 'app/minimize'
     | 'app/toggleMaximize'

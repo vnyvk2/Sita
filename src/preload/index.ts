@@ -316,7 +316,8 @@ const quitEvent = {
   beforeQuitEvent: (callback: (e: unknown) => void) =>
     ipcRenderer.on('app/beforeQuitEvent', callback),
   removeBeforeQuitEventListener: (callback: (...args: unknown[]) => void) =>
-    ipcRenderer.removeListener('app/beforeQuitEvent', callback)
+    ipcRenderer.removeListener('app/beforeQuitEvent', callback),
+  sendBeforeQuitEventAck: () => ipcRenderer.send('app/beforeQuitEventAck')
 };
 
 // $ SYSTEM BATTERY RELATED EVENTS
