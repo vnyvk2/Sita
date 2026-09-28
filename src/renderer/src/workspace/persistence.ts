@@ -1,7 +1,7 @@
-import { assertWorkspaceInvariants } from './ops';
+import { assertWorkspaceInvariants, normalizeWeights } from './ops';
 import { DEFAULT_PRESET } from './presets/default';
 import { MUSICBEE_PRESET } from './presets/musicbee';
-import type { Workspace, WorkspaceState } from './types';
+import type { LayoutNode, Workspace, WorkspaceState } from './types';
 
 export const WORKSPACE_STORAGE_KEY = 'nora.workspaces.v1';
 export const CURRENT_SCHEMA_VERSION = 2;
@@ -14,6 +14,38 @@ export function getInitialWorkspaceState(): WorkspaceState {
       [MUSICBEE_PRESET.id]: MUSICBEE_PRESET
     }
   };
+}
+
+/**
+ * Traverses layout tree and repairs split nodes with 0, missing, or drifting weights
+ * before invariant checking.
+ */
+function repairSplitWeights(node: LayoutNode): void {
+  if (node.kind === 'split') {
+    if (Array.isArray(node.children)) {
+      const childCount = node.children.length;
+      if (childCount >= 2 && childCount <= 4) {
+        const needsRepair =
+          !Array.isArray(node.weights) ||
+          node.weights.length !== childCount ||
+          node.weights.some((w) => typeof w !== 'number' || !Number.isFinite(w) || w <= 0) ||
+          Math.abs(node.weights.reduce((sum, w) => sum + w, 0) - 1.0) > 0.015;
+
+        if (needsRepair) {
+          const rawWeights =
+            Array.isArray(node.weights) && node.weights.length === childCount
+              ? node.weights.map((w) =>
+                  typeof w === 'number' && Number.isFinite(w) && w > 0 ? w : 0.001
+                )
+              : new Array(childCount).fill(1 / childCount);
+          node.weights = normalizeWeights(rawWeights);
+        }
+      }
+      for (const child of node.children) {
+        repairSplitWeights(child);
+      }
+    }
+  }
 }
 
 /**
@@ -31,6 +63,9 @@ export function sanitizeWorkspace(untrusted: unknown): Workspace | null {
   }
 
   try {
+    // Self-heal any zero or drifted split weights before running strict invariant assertion
+    repairSplitWeights(ws.root as LayoutNode);
+
     // Assert all invariants
     assertWorkspaceInvariants(ws as Workspace);
     return ws as Workspace;

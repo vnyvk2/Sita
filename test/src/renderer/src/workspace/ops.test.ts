@@ -5,6 +5,7 @@ import {
   normalizeWeights,
   WorkspaceInvariantError
 } from '@renderer/workspace/ops';
+import { sanitizeWorkspace } from '@renderer/workspace/persistence';
 import { DEFAULT_PRESET } from '@renderer/workspace/presets/default';
 import { MUSICBEE_PRESET } from '@renderer/workspace/presets/musicbee';
 import type { SplitNode, TabGroupNode, Workspace } from '@renderer/workspace/types';
@@ -806,4 +807,66 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
       }
     });
   });
+
+  describe('DEF-WS-01: Zero-weight collapse prevention and persistence self-healing', () => {
+    it('prevents small weights from collapsing to 0 during normalization', () => {
+      const result = normalizeWeights([1920, 300, 0.04]);
+      expect(result).toHaveLength(3);
+      for (const w of result) {
+        expect(w).toBeGreaterThanOrEqual(0.001);
+      }
+      const sum = result.reduce((acc, w) => acc + w, 0);
+      expect(Math.abs(sum - 1.0)).toBeLessThan(0.0002);
+    });
+
+    it('safely handles degenerate weight arrays (zeros, negatives, NaNs)', () => {
+      const result = normalizeWeights([0, -10, NaN, 100]);
+      expect(result).toHaveLength(4);
+      for (const w of result) {
+        expect(w).toBeGreaterThanOrEqual(0.001);
+      }
+      const sum = result.reduce((acc, w) => acc + w, 0);
+      expect(Math.abs(sum - 1.0)).toBeLessThan(0.0002);
+    });
+
+    it('self-heals split weights of 0 in sanitizeWorkspace rather than discarding workspace', () => {
+      const corruptedWs: Workspace = {
+        ...DEFAULT_PRESET,
+        id: 'corrupted-split-ws',
+        name: 'Corrupted Split WS',
+        root: {
+          kind: 'split',
+          id: 's_corrupted',
+          axis: 'x',
+          weights: [0.865, 0.135, 0],
+          children: [
+            { kind: 'panel', panel: 'p_main_default' },
+            {
+              kind: 'panel',
+              panel: 'p_extra_1'
+            },
+            {
+              kind: 'panel',
+              panel: 'p_extra_2'
+            }
+          ]
+        },
+        panels: {
+          ...DEFAULT_PRESET.panels,
+          p_extra_1: { id: 'p_extra_1', type: 'queue', local: {} },
+          p_extra_2: { id: 'p_extra_2', type: 'lyrics', local: {} }
+        }
+      };
+
+      const sanitized = sanitizeWorkspace(corruptedWs);
+      expect(sanitized).not.toBeNull();
+      if (sanitized && sanitized.root.kind === 'split') {
+        for (const w of sanitized.root.weights) {
+          expect(w).toBeGreaterThanOrEqual(0.001);
+        }
+      }
+      expect(() => assertWorkspaceInvariants(sanitized!)).not.toThrow();
+    });
+  });
 });
+

@@ -163,19 +163,34 @@ export function assertWorkspaceInvariants(ws: Workspace): void {
 
 export function normalizeWeights(weights: number[]): number[] {
   if (weights.length === 0) return [];
-  const sum = weights.reduce((acc, w) => acc + (w > 0 ? w : 0.001), 0);
-  if (sum <= 0) {
-    const equal = 1 / weights.length;
+  const MIN_WEIGHT = 0.001;
+  const count = weights.length;
+
+  // Fallback if weights array cannot accommodate MIN_WEIGHT per slot
+  if (count * MIN_WEIGHT > 1.0) {
+    const equal = Math.round((1 / count) * 10000) / 10000;
     return weights.map(() => equal);
   }
-  const raw = weights.map((w) => (w > 0 ? w : 0.001) / sum);
-  // Round to 4 decimal places and adjust last weight so sum is exactly 1.0
-  const rounded = raw.map((w) => Math.round(w * 10000) / 10000);
+
+  const sum = weights.reduce(
+    (acc, w) => acc + (typeof w === 'number' && Number.isFinite(w) && w > 0 ? w : MIN_WEIGHT),
+    0
+  );
+  if (sum <= 0) {
+    const equal = Math.round((1 / count) * 10000) / 10000;
+    return weights.map(() => equal);
+  }
+  const raw = weights.map(
+    (w) => (typeof w === 'number' && Number.isFinite(w) && w > 0 ? w : MIN_WEIGHT) / sum
+  );
+
+  // Round to 4 decimal places and guarantee every weight is at least MIN_WEIGHT (never 0)
+  const rounded = raw.map((w) => Math.max(MIN_WEIGHT, Math.round(w * 10000) / 10000));
   const roundedSum = rounded.reduce((acc, w) => acc + w, 0);
   const diff = Math.round((1.0 - roundedSum) * 10000) / 10000;
 
   const lastIdx = rounded.length - 1;
-  if (rounded[lastIdx] + diff >= 0.001) {
+  if (rounded[lastIdx] + diff >= MIN_WEIGHT) {
     rounded[lastIdx] = Math.round((rounded[lastIdx] + diff) * 10000) / 10000;
   } else {
     let maxIdx = 0;
@@ -184,8 +199,19 @@ export function normalizeWeights(weights: number[]): number[] {
         maxIdx = i;
       }
     }
-    rounded[maxIdx] = Math.round((rounded[maxIdx] + diff) * 10000) / 10000;
+    rounded[maxIdx] = Math.max(
+      MIN_WEIGHT,
+      Math.round((rounded[maxIdx] + diff) * 10000) / 10000
+    );
   }
+
+  // Defensive sanity check: guarantee no weight is non-positive
+  for (let i = 0; i < rounded.length; i++) {
+    if (rounded[i] <= 0) {
+      rounded[i] = MIN_WEIGHT;
+    }
+  }
+
   return rounded;
 }
 
