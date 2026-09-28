@@ -45,6 +45,15 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
 
     const idsArray = Array.from(allIdsToDelete);
     logger.info('[BulkDeleteOp] Executing bulk delete', { playlistIds, idsArray });
+
+    // Concurrency guard: cancel any in-flight Spotify synchronization across all deleted playlists
+    const { SpotifyPlaylistSyncService } = await import('../../spotify/sync/SpotifyPlaylistSyncService');
+    for (const id of idsArray) {
+      SpotifyPlaylistSyncService.markDeleting(id);
+    }
+    try {
+      await Promise.all(idsArray.map((id) => SpotifyPlaylistSyncService.cancelSync(id)));
+
     const deleteOp = new DeleteOp(this.repository);
     const allAffectedSongIds = new Set<number>();
 
@@ -93,18 +102,23 @@ export class BulkDeleteOp implements CollectionOperation<BulkDeleteInput, void> 
       }
     }
 
-    return {
-      data: undefined,
-      collectionId: createCollectionId('local', 'playlist', 0),
-      operationType: 'playlist.bulkDelete',
-      operationInput: { playlistIds: idsArray } as unknown as Record<string, unknown>,
-      inverseInput: {
-        operationType: 'playlist.bulkRestore',
-        input: { restores: inverseInputs }
-      },
-      version: 1,
-      affectedSongIds: Array.from(allAffectedSongIds)
-    };
+      return {
+        data: undefined,
+        collectionId: createCollectionId('local', 'playlist', 0),
+        operationType: 'playlist.bulkDelete',
+        operationInput: { playlistIds: idsArray } as unknown as Record<string, unknown>,
+        inverseInput: {
+          operationType: 'playlist.bulkRestore',
+          input: { restores: inverseInputs }
+        },
+        version: 1,
+        affectedSongIds: Array.from(allAffectedSongIds)
+      };
+    } finally {
+      for (const id of idsArray) {
+        SpotifyPlaylistSyncService.unmarkDeleting(id);
+      }
+    }
   }
 }
 

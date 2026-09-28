@@ -25,7 +25,10 @@ export class SpotifyApiClient {
   }
 
   /** Fetches the currently authenticated Spotify user's profile. */
-  public async getCurrentUser(accessToken: string): Promise<SpotifyUserProfile> {
+  public async getCurrentUser(
+    accessToken: string,
+    signal?: AbortSignal
+  ): Promise<SpotifyUserProfile> {
     const response = await this.pipeline.execute<{
       id: string;
       display_name: string | null;
@@ -37,7 +40,8 @@ export class SpotifyApiClient {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`
-      }
+      },
+      signal
     });
 
     if (response.status < 200 || response.status >= 300) {
@@ -155,14 +159,16 @@ export class SpotifyApiClient {
   /** Fetches metadata details for a specific playlist by ID. */
   public async getPlaylistDetails(
     accessToken: string,
-    playlistId: string
+    playlistId: string,
+    signal?: AbortSignal
   ): Promise<SpotifyPlaylistDetails> {
     const response = await this.pipeline.execute<SpotifyPlaylistDetails>({
       url: `${SPOTIFY_API_BASE_URL}/playlists/${encodeURIComponent(playlistId)}`,
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`
-      }
+      },
+      signal
     });
 
     if (response.status < 200 || response.status >= 300) {
@@ -180,9 +186,10 @@ export class SpotifyApiClient {
   /** Alias for getPlaylistDetails. */
   public async getPlaylist(
     accessToken: string,
-    playlistId: string
+    playlistId: string,
+    signal?: AbortSignal
   ): Promise<SpotifyPlaylistDetails> {
-    return this.getPlaylistDetails(accessToken, playlistId);
+    return this.getPlaylistDetails(accessToken, playlistId, signal);
   }
 
   /**
@@ -192,7 +199,7 @@ export class SpotifyApiClient {
   public async getPlaylistItems(
     accessToken: string,
     playlistId: string,
-    options?: { limit?: number; offset?: number; nextUrl?: string }
+    options?: { limit?: number; offset?: number; nextUrl?: string; signal?: AbortSignal }
   ): Promise<SpotifyPlaylistItemsResponse> {
     let url: string;
 
@@ -213,7 +220,8 @@ export class SpotifyApiClient {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`
-      }
+      },
+      signal: options?.signal
     });
 
     if (response.status < 200 || response.status >= 300) {
@@ -226,7 +234,8 @@ export class SpotifyApiClient {
   /** Fetches ALL track items from a Spotify playlist by auto-traversing page.next. */
   public async getAllPlaylistItems(
     accessToken: string,
-    playlistId: string
+    playlistId: string,
+    signal?: AbortSignal
   ): Promise<SpotifyPlaylistItemDTO[]> {
     const allItems: SpotifyPlaylistItemDTO[] = [];
     const seenNextUrls = new Set<string>();
@@ -239,7 +248,7 @@ export class SpotifyApiClient {
       const page: SpotifyPlaylistItemsResponse = await this.getPlaylistItems(
         accessToken,
         playlistId,
-        nextUrl ? { nextUrl } : { limit: 50, offset: allItems.length }
+        nextUrl ? { nextUrl, signal } : { limit: 50, offset: allItems.length, signal }
       );
 
       if (page.items && Array.isArray(page.items)) {
@@ -337,7 +346,8 @@ export class SpotifyApiClient {
   public async addPlaylistItems(
     accessToken: string,
     playlistId: string,
-    uris: string[]
+    uris: string[],
+    signal?: AbortSignal
   ): Promise<SpotifyAddItemsResponse> {
     if (!uris || uris.length === 0) {
       return { snapshot_id: '' };
@@ -358,7 +368,8 @@ export class SpotifyApiClient {
       },
       body: {
         uris
-      }
+      },
+      signal
     });
 
     if (response.status < 200 || response.status >= 300) {
@@ -376,7 +387,8 @@ export class SpotifyApiClient {
     accessToken: string,
     playlistId: string,
     items: SpotifyRemovePlaylistItem[],
-    snapshotId?: string
+    snapshotId?: string,
+    signal?: AbortSignal
   ): Promise<SpotifyRemoveItemsResponse> {
     if (!items || items.length === 0) {
       return { snapshot_id: snapshotId || '' };
@@ -402,7 +414,8 @@ export class SpotifyApiClient {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: payload
+      body: payload,
+      signal
     });
 
     if (response.status < 200 || response.status >= 300) {
@@ -419,7 +432,8 @@ export class SpotifyApiClient {
   public async replacePlaylistItems(
     accessToken: string,
     playlistId: string,
-    uris: string[]
+    uris: string[],
+    signal?: AbortSignal
   ): Promise<SpotifyAddItemsResponse> {
     if (uris.length > 100) {
       throw new Error(
@@ -436,7 +450,8 @@ export class SpotifyApiClient {
       },
       body: {
         uris
-      }
+      },
+      signal
     });
 
     if (response.status < 200 || response.status >= 300) {
