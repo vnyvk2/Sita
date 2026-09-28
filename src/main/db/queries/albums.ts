@@ -1,7 +1,7 @@
 import { db } from '@db/db';
 import { albumsArtists, albums, albumsSongs } from '@db/schema';
 import { parseAlbumArtworks } from '@main/fs/resolveFilePaths';
-import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
 
 export const isAlbumWithIdAvailable = async (albumId: number, trx: DB | DBTransaction = db) => {
   const data = await trx.select({}).from(albums).where(eq(albums.id, albumId));
@@ -214,8 +214,9 @@ export const getAlbumById = async (albumId: number, trx: DB | DBTransaction = db
 };
 
 export const getAlbumWithTitle = async (title: string, trx: DB | DBTransaction = db) => {
+  if (!title || typeof title !== 'string') return undefined;
   const data = await trx.query.albums.findFirst({
-    where: (a) => eq(a.titleCI, title) // citext column for case-insensitive match
+    where: (a) => eq(a.titleCI, sql`lower(${title})`)
   });
 
   return data;

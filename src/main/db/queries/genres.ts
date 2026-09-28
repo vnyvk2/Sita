@@ -1,6 +1,6 @@
 import { db } from '@db/db';
 import { genres, genresSongs } from '@db/schema';
-import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
 
 import { parseGenreArtworks } from '../../fs/resolveFilePaths';
 
@@ -165,8 +165,9 @@ export const getGenreSummaries = async (
 };
 
 export const getGenreWithTitle = async (name: string, trx: DB | DBTransaction = db) => {
+  if (!name || typeof name !== 'string') return undefined;
   const data = await trx.query.genres.findFirst({
-    where: (a) => eq(a.nameCI, name)
+    where: (a) => eq(a.nameCI, sql`lower(${name})`)
   });
 
   return data;
@@ -234,8 +235,9 @@ export const getLinkedSongGenre = async (
 };
 
 export const getGenreByName = async (name: string, trx: DB | DBTransaction = db) => {
+  if (!name || typeof name !== 'string') return undefined;
   const data = await trx.query.genres.findFirst({
-    where: (g) => eq(g.nameCI, name)
+    where: (g) => eq(g.nameCI, sql`lower(${name})`)
   });
 
   return data;
