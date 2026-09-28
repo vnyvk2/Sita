@@ -83,17 +83,29 @@ export function getInvalidationTargetsForEvent(
     case 'songs/updatedSong':
       return [
         'songs:all',
+        'songs:allInfo',
+        'songs:singleInfo',
+        'songs:windows',
         'songs:ids',
         'songs:facets',
         'songs:recentlyAdded',
         'songs:history',
+        'albums:all',
+        'artists:all',
         'search:query',
         'home:recentlyPlayedSongs',
         'analytics:listening'
       ];
 
     case 'songs/likes':
-      return ['songs:favorites', 'home:mostLovedSongs', 'songs:singleInfo', 'songs:windows'];
+      return [
+        'songs:ids',
+        'songs:facets',
+        'songs:favorites',
+        'home:mostLovedSongs',
+        'songs:singleInfo',
+        'songs:windows'
+      ];
 
     case 'songs/artworks':
       return [
@@ -129,6 +141,7 @@ export function getInvalidationTargetsForEvent(
         'analytics:listening'
       ];
     case 'artists/likes':
+      return ['artists:all', 'artists:single', 'songs:ids', 'songs:facets'];
     case 'artists/artworks':
       return ['artists:all', 'artists:single'];
 
@@ -137,8 +150,16 @@ export function getInvalidationTargetsForEvent(
     case 'albums/newAlbum':
     case 'albums/updatedAlbum':
     case 'albums/deletedAlbum':
-    case 'albums/likes':
       return ['albums:all', 'albums:single', 'search:query', 'analytics:listening'];
+    case 'albums/likes':
+      return [
+        'albums:all',
+        'albums:single',
+        'songs:ids',
+        'songs:facets',
+        'search:query',
+        'analytics:listening'
+      ];
 
     // 7. Genres
     case 'genres':
@@ -281,35 +302,44 @@ export function invalidateWindowsContainingIds(
     const listIdentity = getSongListIdentity(params);
     const version = Math.floor(dataUpdatedAt);
 
-    if (changedIds.size <= 32) {
-      // Fast path: early-exit linear scan terminates as soon as all changed IDs are found.
-      // Avoids allocating 50k-entry Map on single-song/small-batch mutations.
-      const remaining = new Set(changedIds);
-      for (let i = 0; i < data.ids.length; i += 1) {
-        const id = data.ids[i];
-        if (remaining.has(id)) {
-          const windowStart = Math.floor(i / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
-          client.invalidateQueries({
-            queryKey: songCacheKeys.window(listIdentity, version, windowStart)
-          });
-          remaining.delete(id);
-          if (remaining.size === 0) break;
-        }
+    const windowStartsToInvalidate = new Set<number>();
+    for (let i = 0; i < data.ids.length; i += 1) {
+      if (changedIds.has(data.ids[i])) {
+        const windowStart = Math.floor(i / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
+        windowStartsToInvalidate.add(windowStart);
       }
-    } else {
-      // Fallback path for bulk mutations (> 32 IDs)
-      const indexById = new Map<number, number>();
-      for (let i = 0; i < data.ids.length; i += 1) {
-        indexById.set(data.ids[i], i);
-      }
+    }
 
-      for (const id of changedIds) {
-        const index = indexById.get(id);
-        if (index === undefined) continue;
-        const windowStart = Math.floor(index / SONG_WINDOW_SIZE) * SONG_WINDOW_SIZE;
-        client.invalidateQueries({
-          queryKey: songCacheKeys.window(listIdentity, version, windowStart)
-        });
+    for (const windowStart of windowStartsToInvalidate) {
+      client.invalidateQueries({
+        queryKey: songCacheKeys.window(listIdentity, version, windowStart)
+      });
+    }
+  }
+
+  // Also invalidate active custom-window queries (e.g. keyPrefix: 'queue' in QueuePanel and MiniPlayer)
+  const customWindowQueries = client.getQueryCache().findAll({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey[1] === 'window' &&
+      query.queryKey[0] !== 'songs'
+  });
+
+  for (const wQuery of customWindowQueries) {
+    const rawData = wQuery.state.data;
+    if (Array.isArray(rawData)) {
+      const hasChangedSong = rawData.some(
+        (item: unknown) =>
+          item &&
+          typeof item === 'object' &&
+          ('songId' in item
+            ? changedIds.has((item as { songId: number }).songId)
+            : 'id' in item
+              ? changedIds.has((item as { id: number }).id)
+              : false)
+      );
+      if (hasChangedSong) {
+        client.invalidateQueries({ queryKey: wQuery.queryKey });
       }
     }
   }
