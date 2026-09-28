@@ -263,7 +263,8 @@ describe('reParseSong', () => {
 
     vi.mocked(manageAlbumsOfParsedSong).mockResolvedValue({
       relevantAlbum: { id: 9, title: 'The Wall' } as any,
-      newAlbum: undefined
+      newAlbum: undefined,
+      relevantAlbumArtists: []
     });
 
     vi.mocked(manageArtistsOfParsedSong).mockResolvedValue({
@@ -304,7 +305,8 @@ describe('reParseSong', () => {
 
     vi.mocked(manageAlbumsOfParsedSong).mockResolvedValue({
       relevantAlbum: { id: 10, title: 'Summer Hits' } as any,
-      newAlbum: undefined
+      newAlbum: undefined,
+      relevantAlbumArtists: []
     });
 
     // Performer changed from 'Various Artists' to 'Solo Performer' (ID 99)
@@ -351,7 +353,8 @@ describe('reParseSong', () => {
     // Track moved to New Album (ID 51)
     vi.mocked(manageAlbumsOfParsedSong).mockResolvedValue({
       relevantAlbum: { id: 51, title: 'New Album' } as any,
-      newAlbum: undefined
+      newAlbum: undefined,
+      relevantAlbumArtists: []
     });
 
     vi.mocked(manageArtistsOfParsedSong).mockResolvedValue({
