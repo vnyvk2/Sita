@@ -370,6 +370,18 @@ export const getArtistSongIds = async (
   return data.map((row) => row.songId);
 };
 
+export const getArtistAlbumIds = async (
+  artistId: number,
+  trx: DB | DBTransaction = db
+): Promise<number[]> => {
+  const data = await trx
+    .select({ albumId: albumsArtists.albumId })
+    .from(albumsArtists)
+    .where(eq(albumsArtists.artistId, artistId));
+
+  return data.map((row) => row.albumId);
+};
+
 /**
  * Deletes an artist from the database.
  *

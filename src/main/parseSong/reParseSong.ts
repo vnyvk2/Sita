@@ -13,12 +13,19 @@ import { removeDefaultAppProtocolFromFilePath, resetArtworkCache } from '../fs/r
 import logger from '../logger';
 import { dataUpdateEvent, sendMessageToRenderer } from '../main';
 import { processArtworkFiles } from '../other/artworks';
-// (GC job will be dispatched by Maintenance orchestrator)
 import {
-  removeDeletedAlbumDataOfSong,
-  removeDeletedArtistDataOfSong,
-  removeDeletedGenreDataOfSong
-} from '../removeSongsFromLibrary';
+  deleteAlbum,
+  getAlbumArtistIds,
+  getAlbumSongIds,
+  unlinkSongFromAlbum
+} from '@main/db/queries/albums';
+import {
+  deleteArtist,
+  getArtistAlbumIds,
+  getArtistSongIds,
+  unlinkSongFromArtist
+} from '@main/db/queries/artists';
+import { deleteGenre, getGenreSongIds, unlinkSongFromGenre } from '@main/db/queries/genres';
 import { extractFrontCover } from '../utils/extractFrontCover';
 import { PaletteJob } from '../workers/jobs/paletteJob';
 import { libraryScheduler } from '../workers/jobScheduler';
@@ -93,11 +100,21 @@ const reParseSong = async (filePath: string) => {
       if (updatedSong) {
         const processedArtwork = await processArtworkFiles('songs', rawPictureBytes);
 
-        const reparseResult = await db.transaction(async (trx) => {
-          await removeDeletedArtistDataOfSong(song, trx);
-          await removeDeletedAlbumDataOfSong(song, trx);
-          await removeDeletedGenreDataOfSong(song, trx);
+        // Baseline pre-reparse linkages for differential cleanup (DEF-SCN-02)
+        const previousAlbumId =
+          song.album?.albumId != null ? Number(song.album.albumId) : undefined;
+        const previousArtistIds = Array.isArray(song.artists)
+          ? song.artists
+              .map((a) => Number(a.artistId))
+              .filter((id) => !Number.isNaN(id) && id > 0)
+          : [];
+        const previousGenreIds = Array.isArray(song.genres)
+          ? song.genres
+              .map((g) => Number(g.genreId))
+              .filter((id) => !Number.isNaN(id) && id > 0)
+          : [];
 
+        const reparseResult = await db.transaction(async (trx) => {
           // Check if user manually set a language override
           const userOverride = await trx.query?.metadataOverrides?.findFirst?.({
             where: and(
@@ -163,6 +180,64 @@ const reParseSong = async (filePath: string) => {
             trx
           );
 
+          // Differential cleanup: Only unlink entities that are no longer associated with the song,
+          // and only delete an entity if it has zero remaining songs. This preserves favorites,
+          // overrides, and metadata for single-track artists and albums (DEF-SCN-02).
+
+          // 1. Albums: if the song moved to a different album or album was cleared
+          let isAlbumDeleted = false;
+          let isArtistDeleted = false;
+          const targetAlbumId = relevantAlbum?.id;
+          if (previousAlbumId !== undefined && previousAlbumId !== targetAlbumId) {
+            await unlinkSongFromAlbum(previousAlbumId, songData.id, trx);
+            const remainingAlbumSongs = await getAlbumSongIds(previousAlbumId, trx);
+            if (remainingAlbumSongs.length === 0) {
+              const oldAlbumArtistIds = await getAlbumArtistIds(previousAlbumId, trx);
+              await deleteAlbum(previousAlbumId, trx);
+              isAlbumDeleted = true;
+              for (const albumArtistId of oldAlbumArtistIds) {
+                const remainingSongs = await getArtistSongIds(albumArtistId, trx);
+                const remainingAlbums = await getArtistAlbumIds(albumArtistId, trx);
+                if (remainingSongs.length === 0 && remainingAlbums.length === 0) {
+                  await deleteArtist(albumArtistId, trx);
+                  isArtistDeleted = true;
+                }
+              }
+            }
+          }
+
+          // 2. Artists: only unlink artists that are no longer associated with this song
+          const activeArtistIds = new Set(
+            [...(relevantArtists || []), ...(newArtists || [])].map((a) => a.id)
+          );
+          for (const prevArtistId of previousArtistIds) {
+            if (!activeArtistIds.has(prevArtistId)) {
+              await unlinkSongFromArtist(prevArtistId, songData.id, trx);
+              const remainingArtistSongs = await getArtistSongIds(prevArtistId, trx);
+              const remainingArtistAlbums = await getArtistAlbumIds(prevArtistId, trx);
+              if (remainingArtistSongs.length === 0 && remainingArtistAlbums.length === 0) {
+                await deleteArtist(prevArtistId, trx);
+                isArtistDeleted = true;
+              }
+            }
+          }
+
+          // 3. Genres: only unlink genres that are no longer associated with this song
+          let isGenreDeleted = false;
+          const activeGenreIds = new Set(
+            [...(relevantGenres || []), ...(newGenres || [])].map((g) => g.id)
+          );
+          for (const prevGenreId of previousGenreIds) {
+            if (!activeGenreIds.has(prevGenreId)) {
+              await unlinkSongFromGenre(prevGenreId, songData.id, trx);
+              const remainingGenreSongs = await getGenreSongIds(prevGenreId, trx);
+              if (remainingGenreSongs.length === 0) {
+                await deleteGenre(prevGenreId, trx);
+                isGenreDeleted = true;
+              }
+            }
+          }
+
           return {
             songData,
             savedArtworkData: artworkData,
@@ -174,7 +249,10 @@ const reParseSong = async (filePath: string) => {
             newGenres,
             relevantGenres,
             relevantAlbumArtists,
-            newAlbumArtists
+            newAlbumArtists,
+            isAlbumDeleted,
+            isArtistDeleted,
+            isGenreDeleted
           };
         });
 
@@ -205,6 +283,15 @@ const reParseSong = async (filePath: string) => {
         dataUpdateEvent('artists/updatedArtist');
         dataUpdateEvent('albums/updatedAlbum');
         dataUpdateEvent('genres/updatedGenre');
+        if (reparseResult.isArtistDeleted) {
+          dataUpdateEvent('artists/deletedArtist');
+        }
+        if (reparseResult.isAlbumDeleted) {
+          dataUpdateEvent('albums/deletedAlbum');
+        }
+        if (reparseResult.isGenreDeleted) {
+          dataUpdateEvent('genres/deletedGenre');
+        }
 
         return song;
       }

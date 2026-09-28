@@ -1,12 +1,16 @@
 import fs from 'fs/promises';
 
 import { db } from '@main/db/db';
+import { deleteAlbum, unlinkSongFromAlbum } from '@main/db/queries/albums';
+import { deleteArtist, unlinkSongFromArtist } from '@main/db/queries/artists';
 import { getSongByPath, updateSongByPath } from '@main/db/queries/songs';
 import { sendMessageToRenderer } from '@main/main';
 import { processArtworkFiles } from '@main/other/artworks';
 import { libraryScheduler } from '@main/workers/jobScheduler';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import manageAlbumsOfParsedSong from '../manageAlbumsOfParsedSong';
+import manageArtistsOfParsedSong from '../manageArtistsOfParsedSong';
 import reParseSong from '../reParseSong';
 
 vi.mock('fs/promises', () => ({
@@ -51,10 +55,24 @@ vi.mock('../manageGenresOfParsedSong', () => ({
   default: vi.fn().mockResolvedValue({ newGenres: [], relevantGenres: [] })
 }));
 
-vi.mock('@main/removeSongsFromLibrary', () => ({
-  removeDeletedAlbumDataOfSong: vi.fn(),
-  removeDeletedArtistDataOfSong: vi.fn(),
-  removeDeletedGenreDataOfSong: vi.fn()
+vi.mock('@main/db/queries/albums', () => ({
+  deleteAlbum: vi.fn(),
+  getAlbumArtistIds: vi.fn().mockResolvedValue([]),
+  getAlbumSongIds: vi.fn().mockResolvedValue([]),
+  unlinkSongFromAlbum: vi.fn()
+}));
+
+vi.mock('@main/db/queries/artists', () => ({
+  deleteArtist: vi.fn(),
+  getArtistAlbumIds: vi.fn().mockResolvedValue([]),
+  getArtistSongIds: vi.fn().mockResolvedValue([]),
+  unlinkSongFromArtist: vi.fn()
+}));
+
+vi.mock('@main/db/queries/genres', () => ({
+  deleteGenre: vi.fn(),
+  getGenreSongIds: vi.fn().mockResolvedValue([]),
+  unlinkSongFromGenre: vi.fn()
 }));
 
 vi.mock('@main/workers/jobScheduler', () => ({
@@ -225,4 +243,145 @@ describe('reParseSong', () => {
       mockTrx
     );
   });
+
+  it('DEF-SCN-02: preserves single-track artist and album without premature unlinking or deletion', async () => {
+    vi.mocked(getSongByPath).mockResolvedValue({
+      id: 101,
+      path: '/music/comfortably_numb.mp3',
+      title: 'Comfortably Numb',
+      duration: 380,
+      artists: [{ artist: { id: 7, name: 'Pink Floyd' } }],
+      albums: [{ album: { id: 9, title: 'The Wall', isFavorite: true } }],
+      genres: [{ genre: { id: 3, name: 'Rock' } }],
+      artworks: []
+    } as any);
+
+    vi.mocked(fs.stat).mockResolvedValue({
+      birthtime: new Date(),
+      mtime: new Date()
+    } as any);
+
+    vi.mocked(manageAlbumsOfParsedSong).mockResolvedValue({
+      relevantAlbum: { id: 9, title: 'The Wall' } as any,
+      newAlbum: undefined
+    });
+
+    vi.mocked(manageArtistsOfParsedSong).mockResolvedValue({
+      relevantArtists: [{ id: 7, name: 'Pink Floyd' } as any],
+      newArtists: []
+    });
+
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      return callback({} as any);
+    });
+
+    const result = await reParseSong('/music/comfortably_numb.mp3');
+
+    expect(result).toBeDefined();
+    // Neither artist nor album should be unlinked or deleted
+    expect(unlinkSongFromAlbum).not.toHaveBeenCalled();
+    expect(deleteAlbum).not.toHaveBeenCalled();
+    expect(unlinkSongFromArtist).not.toHaveBeenCalled();
+    expect(deleteArtist).not.toHaveBeenCalled();
+  });
+
+  it('DEF-SCN-02: does not delete artist if still linked to albums as album artist', async () => {
+    vi.mocked(getSongByPath).mockResolvedValue({
+      id: 102,
+      path: '/music/compilation_track.mp3',
+      title: 'Compilation Track',
+      duration: 200,
+      artists: [{ artist: { id: 8, name: 'Various Artists' } }],
+      albums: [{ album: { id: 10, title: 'Summer Hits', isFavorite: true } }],
+      genres: [],
+      artworks: []
+    } as any);
+
+    vi.mocked(fs.stat).mockResolvedValue({
+      birthtime: new Date(),
+      mtime: new Date()
+    } as any);
+
+    vi.mocked(manageAlbumsOfParsedSong).mockResolvedValue({
+      relevantAlbum: { id: 10, title: 'Summer Hits' } as any,
+      newAlbum: undefined
+    });
+
+    // Performer changed from 'Various Artists' to 'Solo Performer' (ID 99)
+    vi.mocked(manageArtistsOfParsedSong).mockResolvedValue({
+      relevantArtists: [{ id: 99, name: 'Solo Performer' } as any],
+      newArtists: []
+    });
+
+    // 0 remaining performer songs, BUT still 1 album artist link
+    const { getArtistSongIds, getArtistAlbumIds, deleteArtist } = await import('@main/db/queries/artists');
+    vi.mocked(getArtistSongIds).mockResolvedValue([]);
+    vi.mocked(getArtistAlbumIds).mockResolvedValue([10]); // Still linked as album artist!
+
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      return callback({} as any);
+    });
+
+    const result = await reParseSong('/music/compilation_track.mp3');
+
+    expect(result).toBeDefined();
+    // Artist 8 was unlinked from song performer
+    expect(unlinkSongFromArtist).toHaveBeenCalledWith(8, 102, expect.anything());
+    // But artist 8 must NOT be deleted because it is still an album artist!
+    expect(deleteArtist).not.toHaveBeenCalledWith(8, expect.anything());
+  });
+
+  it('DEF-SCN-02: cleans up orphaned album artist when album is deleted and artist has no other songs or albums', async () => {
+    vi.mocked(getSongByPath).mockResolvedValue({
+      id: 103,
+      path: '/music/album_change.mp3',
+      title: 'Album Change Track',
+      duration: 210,
+      artists: [{ artist: { id: 20, name: 'Solo Singer' } }],
+      albums: [{ album: { id: 50, title: 'Old Album' } }],
+      genres: [],
+      artworks: []
+    } as any);
+
+    vi.mocked(fs.stat).mockResolvedValue({
+      birthtime: new Date(),
+      mtime: new Date()
+    } as any);
+
+    // Track moved to New Album (ID 51)
+    vi.mocked(manageAlbumsOfParsedSong).mockResolvedValue({
+      relevantAlbum: { id: 51, title: 'New Album' } as any,
+      newAlbum: undefined
+    });
+
+    vi.mocked(manageArtistsOfParsedSong).mockResolvedValue({
+      relevantArtists: [{ id: 20, name: 'Solo Singer' } as any],
+      newArtists: []
+    });
+
+    const { getAlbumSongIds, getAlbumArtistIds, deleteAlbum } = await import('@main/db/queries/albums');
+    const { getArtistSongIds, getArtistAlbumIds, deleteArtist } = await import('@main/db/queries/artists');
+
+    // Old album (50) has 0 remaining songs
+    vi.mocked(getAlbumSongIds).mockResolvedValue([]);
+    // Old album (50) had Album Artist ID 99 ("Former Producer")
+    vi.mocked(getAlbumArtistIds).mockResolvedValue([99]);
+
+    // Artist 99 has no other songs and no other albums left
+    vi.mocked(getArtistSongIds).mockResolvedValue([]);
+    vi.mocked(getArtistAlbumIds).mockResolvedValue([]);
+
+    vi.mocked(db.transaction).mockImplementation(async (callback: any) => {
+      return callback({} as any);
+    });
+
+    const result = await reParseSong('/music/album_change.mp3');
+
+    expect(result).toBeDefined();
+    // Old album was deleted
+    expect(deleteAlbum).toHaveBeenCalledWith(50, expect.anything());
+    // Orphaned album artist 99 was deleted
+    expect(deleteArtist).toHaveBeenCalledWith(99, expect.anything());
+  });
 });
+
