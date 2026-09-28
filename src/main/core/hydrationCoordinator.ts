@@ -25,12 +25,24 @@ export class HydrationCoordinator {
   private activeGenerations = new Map<string, number>();
   private pendingQueues = new Map<string, QueuedHydrationTask[]>();
   private isExecuting = new Map<string, boolean>();
+  private generationPruneTimers = new Map<string, NodeJS.Timeout>();
+  private readonly generationRetentionMs: number;
+
+  constructor(generationRetentionMs = 5000) {
+    this.generationRetentionMs = generationRetentionMs;
+  }
 
   public getLatestGeneration(listIdentity: string): number {
     return this.activeGenerations.get(listIdentity) ?? 0;
   }
 
   public updateGeneration(listIdentity: string, generationToken: number): void {
+    const pruneTimer = this.generationPruneTimers.get(listIdentity);
+    if (pruneTimer) {
+      clearTimeout(pruneTimer);
+      this.generationPruneTimers.delete(listIdentity);
+    }
+
     const current = this.activeGenerations.get(listIdentity) ?? 0;
     if (generationToken > current) {
       this.activeGenerations.set(listIdentity, generationToken);
@@ -146,18 +158,39 @@ export class HydrationCoordinator {
       }
     } finally {
       this.isExecuting.delete(listIdentity);
-      // Prune empty map entries to prevent slow memory leak from accumulated listIdentity keys
-      // (e.g. each search keystroke creates a unique identity that would persist forever).
+      // Prune empty pendingQueues, and retain activeGenerations with a decay TTL
+      // to drop late-arriving superseded tasks across rapid scroll reversals while
+      // preventing memory leaks from accumulated listIdentity keys.
       const queue = this.pendingQueues.get(listIdentity);
       if (!queue || queue.length === 0) {
         this.pendingQueues.delete(listIdentity);
-        this.activeGenerations.delete(listIdentity);
+        if (this.generationRetentionMs <= 0) {
+          this.activeGenerations.delete(listIdentity);
+        } else {
+          const existingTimer = this.generationPruneTimers.get(listIdentity);
+          if (existingTimer) {
+            clearTimeout(existingTimer);
+          }
+          const timer = setTimeout(() => {
+            this.activeGenerations.delete(listIdentity);
+            this.generationPruneTimers.delete(listIdentity);
+          }, this.generationRetentionMs);
+          if (typeof timer.unref === 'function') {
+            timer.unref();
+          }
+          this.generationPruneTimers.set(listIdentity, timer);
+        }
       }
     }
   }
 
   public reset(listIdentity?: string): void {
     if (listIdentity) {
+      const timer = this.generationPruneTimers.get(listIdentity);
+      if (timer) {
+        clearTimeout(timer);
+        this.generationPruneTimers.delete(listIdentity);
+      }
       const queue = this.pendingQueues.get(listIdentity);
       if (queue) {
         for (const task of queue) {
@@ -168,6 +201,10 @@ export class HydrationCoordinator {
       this.activeGenerations.delete(listIdentity);
       this.isExecuting.delete(listIdentity);
     } else {
+      for (const timer of this.generationPruneTimers.values()) {
+        clearTimeout(timer);
+      }
+      this.generationPruneTimers.clear();
       for (const queue of this.pendingQueues.values()) {
         for (const task of queue) {
           task.resolve({ cancelled: true, generationToken: task.generationToken });
