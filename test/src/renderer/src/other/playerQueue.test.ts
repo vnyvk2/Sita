@@ -1719,4 +1719,74 @@ describe('PlayerQueue', () => {
       expect(queue.songIds).toHaveLength(5);
     });
   });
+
+  describe('DEF-QUE-01: Active Track Deletion & Clear Invariants', () => {
+    test('removeSongId emits positionChange when active track is deleted (middle of queue)', () => {
+      const queue = new PlayerQueue(['song1', 'song2', 'song3'], 0);
+      const listener = vi.fn();
+      queue.on('positionChange', listener);
+
+      queue.removeSongId('song1');
+      expect(queue.songIds).toEqual(['song2', 'song3']);
+      expect(queue.position).toBe(0);
+      expect(queue.currentSongId).toBe('song2');
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith({
+        oldPosition: 0,
+        newPosition: 0,
+        currentSongId: 'song2'
+      });
+    });
+
+    test('removeSongId emits positionChange and clamps position when active track is last in queue', () => {
+      const queue = new PlayerQueue(['song1', 'song2', 'song3'], 2);
+      const listener = vi.fn();
+      queue.on('positionChange', listener);
+
+      queue.removeSongId('song3');
+      expect(queue.songIds).toEqual(['song1', 'song2']);
+      expect(queue.position).toBe(1);
+      expect(queue.currentSongId).toBe('song2');
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith({
+        oldPosition: 2,
+        newPosition: 1,
+        currentSongId: 'song2'
+      });
+    });
+
+    test('removeSongAtPosition emits positionChange when active track is deleted', () => {
+      const queue = new PlayerQueue(['song1', 'song2', 'song3'], 1);
+      const listener = vi.fn();
+      queue.on('positionChange', listener);
+
+      queue.removeSongAtPosition(1);
+      expect(queue.songIds).toEqual(['song1', 'song3']);
+      expect(queue.position).toBe(1);
+      expect(queue.currentSongId).toBe('song3');
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith({
+        oldPosition: 1,
+        newPosition: 1,
+        currentSongId: 'song3'
+      });
+    });
+
+    test('clear() unconditionally emits positionChange even if oldPosition === 0', () => {
+      const queue = new PlayerQueue(['song1', 'song2'], 0);
+      const listener = vi.fn();
+      queue.on('positionChange', listener);
+
+      queue.clear();
+      expect(queue.songIds).toEqual([]);
+      expect(queue.currentSongId).toBeNull();
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith({
+        oldPosition: 0,
+        newPosition: 0,
+        currentSongId: null
+      });
+    });
+  });
 });
+
