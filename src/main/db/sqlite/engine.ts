@@ -240,16 +240,25 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
     const tDdl = performance.now();
 
     if (currentVersion === 1) {
-      db.exec(`
-        BEGIN IMMEDIATE;
-        ALTER TABLE user_settings ADD COLUMN send_song_scrobbling_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_scrobbling_data_to_listenbrainz IN (0,1));
-        ALTER TABLE user_settings ADD COLUMN send_song_favorites_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_favorites_data_to_listenbrainz IN (0,1));
-        ALTER TABLE user_settings ADD COLUMN send_now_playing_song_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_now_playing_song_data_to_listenbrainz IN (0,1));
-        ALTER TABLE user_settings ADD COLUMN listenbrainz_username TEXT;
-        ALTER TABLE user_settings ADD COLUMN listenbrainz_user_token TEXT;
-        PRAGMA user_version = 2;
-        COMMIT;
-      `);
+      const cols = new Set(
+        (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
+          (c) => c.name
+        )
+      );
+      if (!cols.has('send_song_scrobbling_data_to_listenbrainz')) {
+        db.exec(`
+          BEGIN IMMEDIATE;
+          ALTER TABLE user_settings ADD COLUMN send_song_scrobbling_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_scrobbling_data_to_listenbrainz IN (0,1));
+          ALTER TABLE user_settings ADD COLUMN send_song_favorites_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_favorites_data_to_listenbrainz IN (0,1));
+          ALTER TABLE user_settings ADD COLUMN send_now_playing_song_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_now_playing_song_data_to_listenbrainz IN (0,1));
+          ALTER TABLE user_settings ADD COLUMN listenbrainz_username TEXT;
+          ALTER TABLE user_settings ADD COLUMN listenbrainz_user_token TEXT;
+          PRAGMA user_version = 2;
+          COMMIT;
+        `);
+      } else {
+        db.exec(`PRAGMA user_version = 2;`);
+      }
       currentVersion = 2;
       logger.info(
         `SQLite incremental schema migration applied (v1 -> v2) in ${Math.round(performance.now() - tDdl)}ms`
@@ -257,12 +266,21 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
     }
 
     if (currentVersion === 2) {
-      db.exec(`
-        BEGIN IMMEDIATE;
-        ALTER TABLE user_settings ADD COLUMN is_mini_player_taskbar_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_taskbar_hidden IN (0,1));
-        PRAGMA user_version = 3;
-        COMMIT;
-      `);
+      const cols = new Set(
+        (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
+          (c) => c.name
+        )
+      );
+      if (!cols.has('is_mini_player_taskbar_hidden')) {
+        db.exec(`
+          BEGIN IMMEDIATE;
+          ALTER TABLE user_settings ADD COLUMN is_mini_player_taskbar_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_taskbar_hidden IN (0,1));
+          PRAGMA user_version = 3;
+          COMMIT;
+        `);
+      } else {
+        db.exec(`PRAGMA user_version = 3;`);
+      }
       currentVersion = 3;
       logger.info(
         `SQLite incremental schema migration applied (v2 -> v3) in ${Math.round(performance.now() - tDdl)}ms`
@@ -297,7 +315,6 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
         ALTER TABLE user_settings ADD COLUMN send_now_playing_song_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_now_playing_song_data_to_listenbrainz IN (0,1));
         ALTER TABLE user_settings ADD COLUMN listenbrainz_username TEXT;
         ALTER TABLE user_settings ADD COLUMN listenbrainz_user_token TEXT;
-        PRAGMA user_version = 2;
         COMMIT;
       `);
     }
@@ -306,7 +323,6 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
       db.exec(`
         BEGIN IMMEDIATE;
         ALTER TABLE user_settings ADD COLUMN is_mini_player_taskbar_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_taskbar_hidden IN (0,1));
-        PRAGMA user_version = 3;
         COMMIT;
       `);
     }
@@ -332,9 +348,15 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
       db.exec(`
         BEGIN IMMEDIATE;
         CREATE INDEX IF NOT EXISTS idx_songs_title_covering ON songs (title, id, is_blacklisted);
-        PRAGMA user_version = 4;
         COMMIT;
       `);
+    }
+
+    // Ensure user_version is at least SCHEMA_VERSION (never downgraded)
+    const finalVersion = (db.prepare('PRAGMA user_version').get() as { user_version: number })
+      .user_version;
+    if (finalVersion < SCHEMA_VERSION) {
+      db.prepare(`PRAGMA user_version = ${SCHEMA_VERSION}`).run();
     }
 
     ddlMs = performance.now() - tDdl;
@@ -366,7 +388,7 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
         try {
           await Promise.race([
             activeLock,
-            new Promise<void>((_, reject) =>
+            new Promise<void>((_resolve, reject) =>
               setTimeout(() => reject(new Error('Timed out waiting for txLock on close')), 5000)
             )
           ]);
