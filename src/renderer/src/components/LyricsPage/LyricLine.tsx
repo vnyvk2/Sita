@@ -41,16 +41,6 @@ const getLyricText = (lyrics: string) => {
 };
 
 const LyricLine = (props: LyricProp) => {
-  const { updateSongPosition, updateContextMenuData, addNewNotifications } =
-    useContext(AppUpdateContext);
-  const { t } = useTranslation();
-  const player = useAudioPlayer();
-
-  const lyricsRef = useRef<HTMLDivElement | null>(null);
-  const prevIsActiveRef = useRef(false);
-  const prevIsAutoScrollingRef = useRef(isAutoScrolling);
-  const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
-
   const {
     index,
     lyric,
@@ -67,6 +57,16 @@ const LyricLine = (props: LyricProp) => {
     isAutoScrolling = true,
     playerType = 'normal'
   } = props;
+
+  const { updateSongPosition, updateContextMenuData, addNewNotifications } =
+    useContext(AppUpdateContext);
+  const { t } = useTranslation();
+  const player = useAudioPlayer();
+
+  const lyricsRef = useRef<HTMLDivElement | null>(null);
+  const prevIsActiveRef = useRef(false);
+  const prevIsAutoScrollingRef = useRef(isAutoScrolling);
+  const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
 
   const isSynced = syncedStart !== undefined && syncedEnd !== undefined;
 
