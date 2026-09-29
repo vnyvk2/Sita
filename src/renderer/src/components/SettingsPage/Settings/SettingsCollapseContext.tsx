@@ -43,6 +43,18 @@ export interface SettingsCollapseContextType {
   highlightedSettingId: string | null;
 }
 
+export interface SettingsCollapseActions {
+  toggleSection: (key: SettingsSectionKey) => void;
+  expandSection: (key: SettingsSectionKey) => void;
+  collapseAll: () => void;
+  expandAll: () => void;
+  jumpToSetting: (id: string, sectionKey: SettingsSectionKey) => void;
+}
+
+export const SettingsCollapseActionsContext = createContext<SettingsCollapseActions | null>(null);
+
+export const useSettingsCollapseActions = () => useContext(SettingsCollapseActionsContext);
+
 export const SettingsCollapseContext = createContext<SettingsCollapseContextType | null>(null);
 
 export const useSettingsCollapse = () => useContext(SettingsCollapseContext);
@@ -160,6 +172,11 @@ export const SettingsCollapseProvider = ({
             });
           }
 
+          // Clear spotlight from any previous active elements to prevent class leaks
+          document.querySelectorAll('.setting-spotlight-active').forEach((el) => {
+            el.classList.remove('setting-spotlight-active');
+          });
+
           // Apply spotlight CSS class
           element.classList.add('setting-spotlight-active');
           setHighlightedSettingId(id);
@@ -186,18 +203,32 @@ export const SettingsCollapseProvider = ({
     };
   }, [pendingTarget, expandedMap]);
 
-  // Cleanup spotlight timer on unmount
+  // Cleanup spotlight timer and active classes on unmount
   useEffect(() => {
     return () => {
       if (cleanupTimerRef.current) {
         clearTimeout(cleanupTimerRef.current);
       }
+      document.querySelectorAll('.setting-spotlight-active').forEach((el) => {
+        el.classList.remove('setting-spotlight-active');
+      });
     };
   }, []);
 
   const areAllCollapsed = useMemo(() => {
     return SETTINGS_SECTION_KEYS.every((key) => !expandedMap[key]);
   }, [expandedMap]);
+
+  const actions = useMemo<SettingsCollapseActions>(
+    () => ({
+      toggleSection,
+      expandSection,
+      collapseAll,
+      expandAll,
+      jumpToSetting
+    }),
+    [toggleSection, expandSection, collapseAll, expandAll, jumpToSetting]
+  );
 
   const value = useMemo(
     () => ({
@@ -223,8 +254,10 @@ export const SettingsCollapseProvider = ({
   );
 
   return (
-    <SettingsCollapseContext.Provider value={value}>
-      {children}
-    </SettingsCollapseContext.Provider>
+    <SettingsCollapseActionsContext.Provider value={actions}>
+      <SettingsCollapseContext.Provider value={value}>
+        {children}
+      </SettingsCollapseContext.Provider>
+    </SettingsCollapseActionsContext.Provider>
   );
 };

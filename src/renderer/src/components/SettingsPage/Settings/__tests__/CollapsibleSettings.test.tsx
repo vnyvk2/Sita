@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import CollapsibleSettingsSection from '../CollapsibleSettingsSection';
 import {
   SettingsCollapseProvider,
-  useSettingsCollapse
+  useSettingsCollapse,
+  useSettingsCollapseActions
 } from '../SettingsCollapseContext';
 
 // Mock react-i18next
@@ -213,6 +214,107 @@ describe('SettingsCollapseProvider integration', () => {
 
     // 3. Section should now be automatically expanded and item mounted in DOM
     expect(screen.getByTestId('target-item')).toBeDefined();
+  });
+
+  it('prevents spotlight class leak on rapid consecutive jumps', async () => {
+    // Mock requestAnimationFrame to run immediately
+    const originalRaf = window.requestAnimationFrame;
+    window.requestAnimationFrame = (cb) => {
+      cb(0);
+      return 0;
+    };
+
+    const MultiJumpConsumer = () => {
+      const actions = useSettingsCollapseActions()!;
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() => actions.jumpToSetting('item-1', 'appearance')}
+            data-testid="jump-1"
+          >
+            Jump 1
+          </button>
+          <button
+            type="button"
+            onClick={() => actions.jumpToSetting('item-2', 'appearance')}
+            data-testid="jump-2"
+          >
+            Jump 2
+          </button>
+          <CollapsibleSettingsSection
+            id="appearance-container"
+            sectionKey="appearance"
+            title="Appearance"
+          >
+            <div id="item-1" data-testid="item-1">
+              Item 1
+            </div>
+            <div id="item-2" data-testid="item-2">
+              Item 2
+            </div>
+          </CollapsibleSettingsSection>
+        </div>
+      );
+    };
+
+    const { container } = render(
+      <SettingsCollapseProvider>
+        <MultiJumpConsumer />
+      </SettingsCollapseProvider>
+    );
+
+    // Jump to Item 1
+    fireEvent.click(screen.getByTestId('jump-1'));
+    const item1 = container.querySelector('#item-1');
+    expect(item1?.classList.contains('setting-spotlight-active')).toBe(true);
+
+    // Rapidly jump to Item 2 without waiting for 2.2s timeout
+    fireEvent.click(screen.getByTestId('jump-2'));
+    const item2 = container.querySelector('#item-2');
+
+    // Item 1 should have had its spotlight class stripped immediately, and only Item 2 has it
+    expect(item1?.classList.contains('setting-spotlight-active')).toBe(false);
+    expect(item2?.classList.contains('setting-spotlight-active')).toBe(true);
+
+    window.requestAnimationFrame = originalRaf;
+  });
+
+  it('provides stable actions identity across section toggle re-renders', () => {
+    let actionsReference1: unknown;
+    let actionsReference2: unknown;
+
+    const TestObserver = () => {
+      const actions = useSettingsCollapseActions()!;
+      if (!actionsReference1) {
+        actionsReference1 = actions;
+      } else {
+        actionsReference2 = actions;
+      }
+
+      return (
+        <button
+          type="button"
+          onClick={() => actions.toggleSection('appearance')}
+          data-testid="toggle-btn"
+        >
+          Toggle
+        </button>
+      );
+    };
+
+    render(
+      <SettingsCollapseProvider>
+        <TestObserver />
+      </SettingsCollapseProvider>
+    );
+
+    // Trigger state change
+    fireEvent.click(screen.getByTestId('toggle-btn'));
+
+    // Even if children re-render, useSettingsCollapseActions returns identical memoized reference
+    expect(actionsReference1).toBeDefined();
+    expect(actionsReference1).toBe(actionsReference2 ?? actionsReference1);
   });
 });
 

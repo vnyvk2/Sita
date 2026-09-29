@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Button from '../Button';
@@ -21,6 +21,7 @@ import PreferencesSettings from './Settings/PreferencesSettings';
 import {
   SettingsCollapseProvider,
   useSettingsCollapse,
+  useSettingsCollapseActions,
   type SettingsSectionKey
 } from './Settings/SettingsCollapseContext';
 import { settingsCatalog } from './settingsCatalog';
@@ -75,10 +76,17 @@ const SettingsDeepLinkHandler = ({
   initialHighlight,
   initialSection
 }: SettingsPageProps) => {
+  const collapseActions = useSettingsCollapseActions();
   const collapseContext = useSettingsCollapse();
+  const jumpToSetting = collapseActions?.jumpToSetting ?? collapseContext?.jumpToSetting;
+  const lastHandledKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (initialHighlight && collapseContext) {
+    if (initialHighlight && jumpToSetting) {
+      const targetKey = `${initialHighlight}:${initialSection ?? ''}`;
+      if (lastHandledKeyRef.current === targetKey) return;
+      lastHandledKeyRef.current = targetKey;
+
       let sectionKey = initialSection as SettingsSectionKey | undefined;
       if (!sectionKey) {
         const found = settingsCatalog.find((e) => e.id === initialHighlight);
@@ -87,10 +95,10 @@ const SettingsDeepLinkHandler = ({
         }
       }
       if (sectionKey) {
-        collapseContext.jumpToSetting(initialHighlight, sectionKey);
+        jumpToSetting(initialHighlight, sectionKey);
       }
     }
-  }, [initialHighlight, initialSection, collapseContext]);
+  }, [initialHighlight, initialSection, jumpToSetting]);
 
   return null;
 };

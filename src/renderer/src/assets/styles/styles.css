@@ -1197,7 +1197,7 @@ input[type='checkbox']:checked ~ .checkmark .icon {
 /* Settings search spotlight pulse */
 .setting-spotlight-active {
   position: relative;
-  outline: 2px solid rgb(var(--text-color-highlight, 249 115 22) / 0.9);
+  outline: 2px solid hsl(var(--text-color-highlight) / 0.9);
   outline-offset: 4px;
   border-radius: 0.5rem;
   transition: outline 0.3s ease, box-shadow 0.3s ease;
@@ -1211,13 +1211,13 @@ input[type='checkbox']:checked ~ .checkmark .icon {
 
 @keyframes settingSpotlightPulse {
   0% {
-    box-shadow: 0 0 0 0 rgb(var(--text-color-highlight, 249 115 22) / 0.6);
+    box-shadow: 0 0 0 0 hsl(var(--text-color-highlight) / 0.6);
   }
   30% {
-    box-shadow: 0 0 16px 6px rgb(var(--text-color-highlight, 249 115 22) / 0.5);
+    box-shadow: 0 0 16px 6px hsl(var(--text-color-highlight) / 0.5);
   }
   70% {
-    box-shadow: 0 0 10px 3px rgb(var(--text-color-highlight, 249 115 22) / 0.3);
+    box-shadow: 0 0 10px 3px hsl(var(--text-color-highlight) / 0.3);
   }
   100% {
     box-shadow: 0 0 0 0 transparent;

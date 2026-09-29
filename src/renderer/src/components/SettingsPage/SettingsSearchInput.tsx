@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import HighlightedText from '../SearchPage/HighlightedText';
 import { settingsCatalog } from './settingsCatalog';
-import { useSettingsCollapse } from './Settings/SettingsCollapseContext';
+import { useSettingsCollapse, useSettingsCollapseActions } from './Settings/SettingsCollapseContext';
 import { matchSettings, type SettingSearchResult } from './utils/matchSettings';
 
 interface SettingsSearchInputProps {
@@ -13,7 +13,9 @@ interface SettingsSearchInputProps {
 
 export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInputProps) => {
   const { t } = useTranslation();
+  const collapseActions = useSettingsCollapseActions();
   const collapseContext = useSettingsCollapse();
+  const jumpToSetting = collapseActions?.jumpToSetting ?? collapseContext?.jumpToSetting;
 
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -41,13 +43,13 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
   // Jump to selected setting
   const handleSelectResult = useCallback(
     (result: SettingSearchResult) => {
-      if (collapseContext) {
-        collapseContext.jumpToSetting(result.entry.id, result.entry.sectionKey);
+      if (jumpToSetting) {
+        jumpToSetting(result.entry.id, result.entry.sectionKey);
       }
       setIsOpen(false);
       inputRef.current?.blur();
     },
-    [collapseContext]
+    [jumpToSetting]
   );
 
   // Keyboard navigation inside input / combobox
