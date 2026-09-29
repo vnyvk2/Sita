@@ -54,6 +54,7 @@ const TitleBarContainer = (props: Props) => {
         {isLyricsVisible && (
           <Button
             className="lyrics-scroll-mode-btn text-font-color-white dark:text-font-color-white mr-1! rounded-md! border-0! bg-transparent! p-1.5! outline-offset-1 [-webkit-app-region:no-drag] focus-visible:outline!"
+            ariaPressed={scrollMode === 'auto'}
             tooltipLabel={
               scrollMode === 'auto'
                 ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')

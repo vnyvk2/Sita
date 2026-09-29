@@ -13,6 +13,7 @@ import { CloseIcon } from '../Icons/WindowIcons';
 import Img from '../Img';
 import { useActiveLyricIndex } from '../LyricsPage/useActiveLyricIndex';
 import { useLyricsScrollSync } from '../LyricsPage/useLyricsScrollSync';
+import { getLyricScrollBehavior } from '../LyricsPage/lyricsUtils';
 
 type Props = {
   isLyricsVisible: boolean;
@@ -60,7 +61,8 @@ const CompactLyricsPanel = (props: Props) => {
     direction,
     showSnapBack,
     handleSnapBack,
-    handleToggleScrollMode
+    handleToggleScrollMode,
+    markProgrammaticScroll
   } = useLyricsScrollSync({
     containerRef: scrollContainerRef,
     activeLineIndex: rawActiveIndex,
@@ -77,17 +79,18 @@ const CompactLyricsPanel = (props: Props) => {
         const container = scrollContainerRef.current;
         const targetScrollTop =
           lineEl.offsetTop - container.clientHeight / 2 + lineEl.clientHeight / 2;
+        markProgrammaticScroll();
         if (typeof container.scrollTo === 'function') {
           container.scrollTo({
             top: Math.max(0, targetScrollTop),
-            behavior: 'smooth'
+            behavior: getLyricScrollBehavior()
           });
         } else {
           container.scrollTop = Math.max(0, targetScrollTop);
         }
       }
     }
-  }, [currentLineIndex, isAutoScrolling]);
+  }, [currentLineIndex, isAutoScrolling, markProgrammaticScroll]);
 
   const handleLineClick = (start?: number) => {
     if (typeof start === 'number' && updateSongPosition) {
@@ -117,6 +120,7 @@ const CompactLyricsPanel = (props: Props) => {
           <button
             type="button"
             onClick={handleToggleScrollMode}
+            aria-pressed={scrollMode === 'auto'}
             title={
               scrollMode === 'auto'
                 ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')

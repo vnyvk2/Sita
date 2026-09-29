@@ -2,13 +2,36 @@ import type { ReactNode } from 'react';
 
 import LyricLine from './LyricLine';
 
+/**
+ * Scroll behavior honoring the OS reduced-motion setting. All programmatic
+ * lyrics scrolling must go through this so motion-sensitive users get instant
+ * jumps instead of smooth animations.
+ */
+export function getLyricScrollBehavior(): ScrollBehavior {
+  try {
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return 'auto';
+    }
+  } catch {
+    // Ignore matchMedia failures and fall through to smooth scrolling.
+  }
+  return 'smooth';
+}
+
 export function renderLyricsLines(
   lyrics: SongLyrics | null | undefined,
   songDuration: number,
   isAutoScrolling = true,
   playerType: 'normal' | 'full' | 'mini' | 'drawer' = 'normal',
   activeLineIndex: number | null = null,
-  abLoop?: AbLoopState | null
+  abLoop?: AbLoopState | null,
+  // When false, lines never scroll themselves (container-owned auto-follow
+  // drives scrolling instead, keeping ancestor scrollers untouched).
+  selfScroll = true
 ): ReactNode[] {
   if (!lyrics?.lyrics) return [];
   const { isSynced, parsedLyrics, offset = 0 } = lyrics.lyrics;
@@ -62,6 +85,7 @@ export function renderLyricsLines(
           isLoopStart={isLoopStart}
           isAutoScrolling={isAutoScrolling}
           convertedLyric={lyric.romanizedText}
+          selfScroll={selfScroll}
         />
       );
     });
@@ -76,6 +100,7 @@ export function renderLyricsLines(
         syncedStart={0}
         syncedEnd={(parsedLyrics[0]?.start || 0) + offset}
         isAutoScrolling={isAutoScrolling}
+        selfScroll={selfScroll}
       />
     );
 
@@ -95,6 +120,7 @@ export function renderLyricsLines(
           translatedLyricLines={line.translatedTexts}
           isAutoScrolling={isAutoScrolling}
           convertedLyric={line.romanizedText}
+          selfScroll={selfScroll}
         />
       );
     });

@@ -42,7 +42,8 @@ const LyricsContainer = (props: Props) => {
       isAutoScrolling,
       'mini',
       activeLineIndex,
-      abLoop
+      abLoop,
+      false
     );
   }, [lyrics, currentSongData.duration, isAutoScrolling, activeLineIndex, abLoop]);
 

@@ -63,7 +63,8 @@ const LyricsDrawer = () => {
       isAutoScrolling,
       'drawer',
       activeLineIndex,
-      abLoop
+      abLoop,
+      false
     );
   }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex, abLoop]);
 
@@ -118,6 +119,7 @@ const LyricsDrawer = () => {
             <Button
               className="scroll-mode-btn hover:bg-background-color-2 dark:hover:bg-dark-background-color-2 m-0! flex h-8 w-8 items-center justify-center rounded-md! border-0! bg-transparent p-0!"
               iconName={scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
+              ariaPressed={scrollMode === 'auto'}
               iconClassName={`material-icons-round text-lg ${
                 scrollMode === 'auto'
                   ? 'text-accent opacity-90'

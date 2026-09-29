@@ -54,7 +54,8 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
       isAutoScrolling,
       'drawer',
       activeLineIndex,
-      abLoop
+      abLoop,
+      false
     );
   }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex, abLoop]);
 
@@ -98,6 +99,7 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
             <button
               type="button"
               onClick={handleToggleScrollMode}
+              aria-pressed={scrollMode === 'auto'}
               title={
                 scrollMode === 'auto'
                   ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
