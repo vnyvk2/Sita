@@ -1,8 +1,8 @@
 //! Daemon loop and asynchronous command dispatcher for engine-cli.
 
 use std::io::{BufRead, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -13,20 +13,20 @@ use engine_lib::buffer::BoundedAudioTransport;
 use engine_lib::decoder::DecoderPipeline;
 use engine_lib::dsp::{DspConfig, DspPipeline};
 use engine_lib::mixer::{DualSlotMixer, SlotId as LibSlotId};
-use engine_lib::sink::{CpalBackend, OutputBackend};
-use engine_lib::types::AudioSpec;
+use engine_lib::sink::{AudioSource, CpalBackend, OutputBackend};
+use engine_lib::types::{AudioSpec, SinkError};
 
 /// Core daemon controller managing background decoder threads, audio sinks, and the 4Hz heartbeat.
 pub struct EngineDaemon {
     running: Arc<AtomicBool>,
     is_playing: Arc<AtomicBool>,
     state: PlaybackState,
-    active_slot: SlotId,
+    active_slot: Arc<AtomicU8>, // 0 for SlotId::A, 1 for SlotId::B
     volume: f32,
-    dsp: DspPipeline,
-    mixer: DualSlotMixer,
+    shared_engine: Arc<Mutex<(DualSlotMixer, DspPipeline)>>,
     backend: CpalBackend,
     start_time: Instant,
+    slot_durations: Arc<(AtomicU64, AtomicU64)>, // f64 duration in bits
 }
 
 impl Default for EngineDaemon {
@@ -41,12 +41,12 @@ impl EngineDaemon {
             running: Arc::new(AtomicBool::new(true)),
             is_playing: Arc::new(AtomicBool::new(false)),
             state: PlaybackState::Stopped,
-            active_slot: SlotId::A,
+            active_slot: Arc::new(AtomicU8::new(0)),
             volume: 1.0,
-            dsp: DspPipeline::new(48000.0),
-            mixer: DualSlotMixer::new(),
+            shared_engine: Arc::new(Mutex::new((DualSlotMixer::new(), DspPipeline::new(48000.0)))),
             backend: CpalBackend::new(),
             start_time: Instant::now(),
+            slot_durations: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
         }
     }
 
@@ -55,6 +55,44 @@ impl EngineDaemon {
         let id = req.id;
         let res = self.handle_command(req.command);
         DaemonResponse { id, result: res }
+    }
+
+    /// Ensure CPAL live output stream is initialized and bound to the shared audio mixer.
+    pub fn ensure_backend_open(&mut self) -> Result<(), SinkError> {
+        if self.backend.is_open() {
+            return Ok(());
+        }
+
+        let shared_cb = Arc::clone(&self.shared_engine);
+        let active_slot_cb = Arc::clone(&self.active_slot);
+        let is_playing_cb = Arc::clone(&self.is_playing);
+
+        let render_fn = move |data: &mut [f32]| -> usize {
+            if !is_playing_cb.load(Ordering::Relaxed) {
+                data.fill(0.0);
+                return data.len();
+            }
+
+            if let Ok(mut guard) = shared_cb.try_lock() {
+                let (mixer, dsp) = &mut *guard;
+                let written = mixer.render(data);
+                if written > 0 {
+                    dsp.process(&mut data[..written]);
+                }
+                let slot_idx = match mixer.active_slot {
+                    LibSlotId::A => 0,
+                    LibSlotId::B => 1,
+                };
+                active_slot_cb.store(slot_idx, Ordering::Relaxed);
+                written
+            } else {
+                data.fill(0.0);
+                data.len()
+            }
+        };
+
+        let spec = AudioSpec::new_f32_stereo(48000);
+        self.backend.open_with_render_fn(spec, render_fn)
     }
 
     /// Execute command and return synchronous result.
@@ -76,19 +114,57 @@ impl EngineDaemon {
                 let channels = probed.spec.channels;
                 let codec = probed.codec.clone();
 
-                let spec = AudioSpec::new_f32_stereo(sample_rate);
+                match slot {
+                    SlotId::A => self.slot_durations.0.store(duration_secs.to_bits(), Ordering::Release),
+                    SlotId::B => self.slot_durations.1.store(duration_secs.to_bits(), Ordering::Release),
+                }
+
+                let target_rate = 48000;
+                let spec = AudioSpec::new_f32_stereo(target_rate);
                 let (mut producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
                 let stop_signal = Arc::new(AtomicBool::new(false));
 
-                // Spawn background decoder thread
+                // Spawn background decoder thread with sample-rate adaptation
                 let stop_clone = Arc::clone(&stop_signal);
                 let path_clone = path.clone();
                 thread::spawn(move || {
                     if let Ok(mut pipeline) = DecoderPipeline::open(&path_clone) {
+                        let in_rate = pipeline.spec().sample_rate;
+                        let mut resample_staging: Vec<f32> = Vec::new();
+
                         while !stop_clone.load(Ordering::Relaxed) {
                             match pipeline.decode_next() {
                                 Ok(Some(samples)) => {
-                                    if producer.push_with_backpressure(samples, &stop_clone).is_err() {
+                                    let push_slice = if in_rate == target_rate {
+                                        samples
+                                    } else {
+                                        // Linear interpolation resampler for interleaved stereo
+                                        let in_frames = samples.len() / 2;
+                                        if in_frames == 0 {
+                                            continue;
+                                        }
+                                        let out_frames = ((in_frames as f64) * (target_rate as f64) / (in_rate as f64)).round() as usize;
+                                        resample_staging.clear();
+                                        resample_staging.reserve(out_frames * 2);
+                                        let ratio = in_rate as f64 / target_rate as f64;
+                                        for i in 0..out_frames {
+                                            let src_pos = i as f64 * ratio;
+                                            let idx0 = (src_pos.floor() as usize).min(in_frames - 1);
+                                            let frac = (src_pos - idx0 as f64) as f32;
+                                            let idx1 = (idx0 + 1).min(in_frames - 1);
+
+                                            let l0 = samples[idx0 * 2];
+                                            let r0 = samples[idx0 * 2 + 1];
+                                            let l1 = samples[idx1 * 2];
+                                            let r1 = samples[idx1 * 2 + 1];
+
+                                            resample_staging.push(l0 * (1.0 - frac) + l1 * frac);
+                                            resample_staging.push(r0 * (1.0 - frac) + r1 * frac);
+                                        }
+                                        &resample_staging
+                                    };
+
+                                    if producer.push_with_backpressure(push_slice, &stop_clone).is_err() {
                                         break;
                                     }
                                 }
@@ -101,7 +177,10 @@ impl EngineDaemon {
                     }
                 });
 
-                self.mixer.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
+                if let Ok(mut guard) = self.shared_engine.lock() {
+                    guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
+                }
+
                 DaemonResult::Ok {
                     data: Some(serde_json::json!({
                         "slot": slot,
@@ -115,39 +194,58 @@ impl EngineDaemon {
                 }
             }
             DaemonCommand::Preload { path } => {
-                let standby = match self.active_slot {
-                    SlotId::A => SlotId::B,
-                    SlotId::B => SlotId::A,
+                let standby = if self.active_slot.load(Ordering::Relaxed) == 0 {
+                    SlotId::B
+                } else {
+                    SlotId::A
                 };
                 self.handle_command(DaemonCommand::Load { slot: standby, path })
             }
             DaemonCommand::Play => {
-                let active_id = match self.active_slot {
-                    SlotId::A => LibSlotId::A,
-                    SlotId::B => LibSlotId::B,
+                let active_id = if self.active_slot.load(Ordering::Relaxed) == 0 {
+                    LibSlotId::A
+                } else {
+                    LibSlotId::B
                 };
-                if self.mixer.slot(active_id).state == engine_lib::mixer::SlotState::Empty {
+
+                if let Ok(guard) = self.shared_engine.lock() {
+                    if guard.0.slot(active_id).state == engine_lib::mixer::SlotState::Empty {
+                        return DaemonResult::Error {
+                            message: "No track loaded in active slot".to_string(),
+                        };
+                    }
+                }
+
+                if let Err(e) = self.ensure_backend_open() {
                     return DaemonResult::Error {
-                        message: "No track loaded in active slot".to_string(),
+                        message: format!("Failed to open audio output: {}", e),
                     };
                 }
+
                 self.state = PlaybackState::Playing;
                 self.is_playing.store(true, Ordering::Release);
-                self.mixer.play();
+
+                if let Ok(mut guard) = self.shared_engine.lock() {
+                    guard.0.play();
+                }
                 let _ = self.backend.start();
                 DaemonResult::Ok { data: None }
             }
             DaemonCommand::Pause => {
                 self.state = PlaybackState::Paused;
                 self.is_playing.store(false, Ordering::Release);
-                self.mixer.pause();
+                if let Ok(mut guard) = self.shared_engine.lock() {
+                    guard.0.pause();
+                }
                 let _ = self.backend.pause();
                 DaemonResult::Ok { data: None }
             }
             DaemonCommand::Stop => {
                 self.state = PlaybackState::Stopped;
                 self.is_playing.store(false, Ordering::Release);
-                self.mixer.pause();
+                if let Ok(mut guard) = self.shared_engine.lock() {
+                    guard.0.pause();
+                }
                 let _ = self.backend.stop();
                 DaemonResult::Ok { data: None }
             }
@@ -157,31 +255,39 @@ impl EngineDaemon {
             }
             DaemonCommand::Crossfade { duration_ms } => {
                 let frames = ((duration_ms as f64 / 1000.0) * 48000.0).round() as usize;
-                if let Err(e) = self.mixer.start_crossfade(frames) {
-                    DaemonResult::Error { message: e.to_string() }
-                } else {
-                    DaemonResult::Ok { data: None }
+                if let Ok(mut guard) = self.shared_engine.lock() {
+                    if let Err(e) = guard.0.start_crossfade(frames) {
+                        return DaemonResult::Error { message: e.to_string() };
+                    }
                 }
+                DaemonResult::Ok { data: None }
             }
             DaemonCommand::SetVolume { volume } => {
                 self.volume = volume.clamp(0.0, 1.0);
-                self.mixer.set_volume(self.volume);
+                if let Ok(mut guard) = self.shared_engine.lock() {
+                    guard.0.set_volume(self.volume);
+                }
                 DaemonResult::Ok { data: None }
             }
             DaemonCommand::SetEq { gains } => {
-                let mut dsp_config = self.dsp.config().clone();
-                dsp_config.eq_gains = gains;
-                self.dsp.update_config(dsp_config);
+                if let Ok(mut guard) = self.shared_engine.lock() {
+                    let mut dsp_config = guard.1.config().clone();
+                    dsp_config.eq_gains = gains;
+                    guard.1.update_config(dsp_config);
+                }
                 DaemonResult::Ok { data: None }
             }
             DaemonCommand::SetDsp { bypass, rg_db, karaoke, limiter } => {
-                self.dsp.update_config(DspConfig {
-                    bypass,
-                    replaygain_db: rg_db,
-                    eq_gains: self.dsp.config().eq_gains,
-                    karaoke,
-                    limiter,
-                });
+                if let Ok(mut guard) = self.shared_engine.lock() {
+                    let current_gains = guard.1.config().eq_gains;
+                    guard.1.update_config(DspConfig {
+                        bypass,
+                        replaygain_db: rg_db,
+                        eq_gains: current_gains,
+                        karaoke,
+                        limiter,
+                    });
+                }
                 DaemonResult::Ok { data: None }
             }
             DaemonCommand::ListDevices => {
@@ -199,10 +305,15 @@ impl EngineDaemon {
             }
             DaemonCommand::GetState => {
                 let stats = self.backend.stats();
+                let slot_id = if self.active_slot.load(Ordering::Relaxed) == 0 {
+                    SlotId::A
+                } else {
+                    SlotId::B
+                };
                 DaemonResult::Ok {
                     data: Some(serde_json::json!({
                         "state": self.state,
-                        "active_slot": self.active_slot,
+                        "active_slot": slot_id,
                         "volume": self.volume,
                         "xrun_count": stats.xrun_count,
                         "low_water_mark": stats.low_water_mark,
@@ -230,7 +341,11 @@ impl EngineDaemon {
         // 2. Spawn Gated 4Hz Heartbeat thread (only transmits while playing)
         let running_hb = Arc::clone(&self.running);
         let is_playing_hb = Arc::clone(&self.is_playing);
+        let active_slot_hb = Arc::clone(&self.active_slot);
+        let slot_durations_hb = Arc::clone(&self.slot_durations);
+        let stats_ref = self.backend.shared_stats();
         let start_time = self.start_time;
+
         thread::spawn(move || {
             let mut hb_stdout = std::io::stdout();
             while running_hb.load(Ordering::Relaxed) {
@@ -238,11 +353,23 @@ impl EngineDaemon {
 
                 if is_playing_hb.load(Ordering::Relaxed) {
                     let wallclock_ms = start_time.elapsed().as_millis() as u64;
+                    let slot_id = if active_slot_hb.load(Ordering::Relaxed) == 0 {
+                        SlotId::A
+                    } else {
+                        SlotId::B
+                    };
+                    let duration_bits = if slot_id == SlotId::A {
+                        slot_durations_hb.0.load(Ordering::Relaxed)
+                    } else {
+                        slot_durations_hb.1.load(Ordering::Relaxed)
+                    };
+                    let duration_secs = f64::from_bits(duration_bits);
+                    let snapshot = stats_ref.snapshot(48000);
 
                     let heartbeat = DaemonEvent::Heartbeat {
-                        active_slot: SlotId::A,
-                        position_secs: 0.0,
-                        duration_secs: 0.0,
+                        active_slot: slot_id,
+                        position_secs: snapshot.position_seconds,
+                        duration_secs,
                         wallclock_ms,
                         is_playing: true,
                     };
@@ -301,7 +428,9 @@ impl EngineDaemon {
         // Clean up audio hardware and state
         self.running.store(false, Ordering::Release);
         self.is_playing.store(false, Ordering::Release);
-        self.mixer.pause();
+        if let Ok(mut guard) = self.shared_engine.lock() {
+            guard.0.pause();
+        }
         let _ = self.backend.stop();
     }
 }

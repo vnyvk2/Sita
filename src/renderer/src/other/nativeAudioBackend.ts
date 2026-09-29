@@ -214,6 +214,10 @@ export class NativeAudioBackend {
     });
   }
 
+  public get playing(): boolean {
+    return this.isPlaying;
+  }
+
   public destroy(): void {
     if (this.rafId !== null) {
       cancelFrame(this.rafId);
@@ -221,5 +225,8 @@ export class NativeAudioBackend {
     }
     this.unsubscribeEvents?.();
     this.isPlaying = false;
+    if (typeof window?.api?.audioEngine?.stop === 'function') {
+      window.api.audioEngine.stop().catch(() => {});
+    }
   }
 }

@@ -134,6 +134,7 @@ describe('Native Audio Backend - Anchored RAF Interpolation', () => {
       api: {
         audioEngine: {
           send: sendMock,
+          stop: vi.fn().mockResolvedValue(undefined),
           onEvent: (cb: any) => {
             eventHandler = cb;
             return () => {

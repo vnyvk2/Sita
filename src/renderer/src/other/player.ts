@@ -134,6 +134,8 @@ class AudioPlayer {
   private loopRafId: number | null = null;
   private nativeBackend: NativeAudioBackend | null = null;
   private isNativeEngineActive: boolean = false;
+  private nativeIsPlaying: boolean = false;
+  private nativeCurrentPosition: number = 0;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -220,7 +222,7 @@ class AudioPlayer {
       this.nativeBackend = new NativeAudioBackend({
         onTimeUpdate: (pos, _dur) => {
           if (!this.isNativeEngineActive) return;
-          this.audio.currentTime = pos;
+          this.nativeCurrentPosition = pos;
           this.emit('timeUpdate', pos);
           if (this.abLoopController.phase !== 'active') {
             this.crossfadeScheduler.onTimeUpdate(pos);
@@ -244,6 +246,7 @@ class AudioPlayer {
         },
         onTrackEnd: () => {
           if (!this.isNativeEngineActive) return;
+          this.nativeIsPlaying = false;
           if (this.abLoopController.isActive()) {
             this.executeLoopSeek(this.abLoopController.pointA!);
             this.nativeBackend?.play().catch(() => {});
@@ -255,8 +258,10 @@ class AudioPlayer {
         onStateChange: (state) => {
           if (!this.isNativeEngineActive) return;
           if (state === 'playing') {
+            this.nativeIsPlaying = true;
             this.emit('play');
           } else if (state === 'paused') {
+            this.nativeIsPlaying = false;
             this.emit('pause');
           }
         },
@@ -269,6 +274,7 @@ class AudioPlayer {
         }
       });
       this.isNativeEngineActive = true;
+      this.nativeIsPlaying = false;
       const vol = store.state.player?.volume?.value ?? this.currentVolume;
       this.nativeBackend.setVolume(vol / 100).catch(() => {});
       const isKaraoke = storage.playback.getPlaybackOptions('isKaraoke') ?? false;
@@ -276,19 +282,36 @@ class AudioPlayer {
     } catch (err) {
       console.warn('[AudioPlayer] Failed to initialize native audio backend, using WebAudio:', err);
       this.isNativeEngineActive = false;
+      this.nativeIsPlaying = false;
     }
   }
 
   private fallbackToWebAudio() {
     this.isNativeEngineActive = false;
+    this.nativeIsPlaying = false;
     if (this.nativeBackend) {
       this.nativeBackend.destroy();
       this.nativeBackend = null;
     }
+    window?.api?.audioEngine?.stop().catch(() => {});
+
+    // Restore WebAudio gain graph and resume AudioContext if suspended
+    this.activeFadeGain.gain.value = 1.0;
+    this.standbyFadeGain.gain.value = 0.0;
+    this.gainNode.gain.value = this.volume;
+    this.audio.volume = this.volume;
+    if (this.currentContext.state === 'suspended') {
+      this.currentContext.resume().catch(() => {});
+    }
+
     logPlayer('[AudioPlayer] Falling back to WebAudio backend');
     if (this.currentSongData) {
       this.audio.src = this.currentSongData.path;
       this.audio.load();
+      const resumePos = this.nativeCurrentPosition;
+      if (resumePos > 0) {
+        this.audio.currentTime = resumePos;
+      }
       this.play().catch(() => {});
     }
   }
@@ -1589,6 +1612,7 @@ class AudioPlayer {
   async play() {
     if (this.isNativeEngineActive && this.nativeBackend) {
       await this.nativeBackend.play();
+      this.nativeIsPlaying = true;
       this.emit('play');
       return;
     }
@@ -1613,6 +1637,7 @@ class AudioPlayer {
     this.stopLoopWatchers();
     if (this.isNativeEngineActive && this.nativeBackend) {
       await this.nativeBackend.pause();
+      this.nativeIsPlaying = false;
       this.emit('pause');
       return;
     }
@@ -1637,7 +1662,7 @@ class AudioPlayer {
    */
   async togglePlayback(forcePlay?: boolean): Promise<void> {
     if (this.isNativeEngineActive && this.nativeBackend) {
-      const isCurrentlyPlaying = !this.audio.paused;
+      const isCurrentlyPlaying = this.nativeIsPlaying;
       const shouldPlay = forcePlay !== undefined ? forcePlay : !isCurrentlyPlaying;
       if (shouldPlay) {
         await this.play();
@@ -1671,6 +1696,7 @@ class AudioPlayer {
       this.clearAbLoop('SEEK_OUTSIDE');
     }
     if (this.isNativeEngineActive && this.nativeBackend) {
+      this.nativeCurrentPosition = time;
       this.emit('seeking', time);
       this.nativeBackend
         .seek(time)
@@ -1881,21 +1907,35 @@ class AudioPlayer {
 
   /** Gets the current playback time in seconds. */
   get currentTime(): number {
+    if (this.isNativeEngineActive) {
+      return this.nativeCurrentPosition;
+    }
     return this.audio.currentTime;
   }
 
   /** Sets the current playback time in seconds. */
   set currentTime(time: number) {
+    if (this.isNativeEngineActive && this.nativeBackend) {
+      this.nativeCurrentPosition = time;
+      this.seek(time);
+      return;
+    }
     this.audio.currentTime = time;
   }
 
   /** Gets the duration of the current song in seconds. */
   get duration(): number {
+    if (this.isNativeEngineActive && this.currentSongData?.duration) {
+      return this.currentSongData.duration;
+    }
     return this.audio.duration;
   }
 
   /** Gets whether the audio is currently paused. */
   get paused(): boolean {
+    if (this.isNativeEngineActive) {
+      return !this.nativeIsPlaying;
+    }
     return this.audio.paused;
   }
 

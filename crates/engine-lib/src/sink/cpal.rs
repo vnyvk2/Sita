@@ -114,10 +114,12 @@ impl CpalBackend {
     pub fn has_device_error(&self) -> bool {
         self.device_error.load(Ordering::Acquire)
     }
-}
 
-impl OutputBackend for CpalBackend {
-    fn open(&mut self, spec: AudioSpec) -> Result<(), SinkError> {
+    /// Open CPAL output with a custom real-time audio render callback.
+    pub fn open_with_render_fn<F>(&mut self, spec: AudioSpec, mut render_fn: F) -> Result<(), SinkError>
+    where
+        F: FnMut(&mut [f32]) -> usize + Send + 'static,
+    {
         if self.is_open {
             return Err(SinkError::AlreadyOpen);
         }
@@ -155,8 +157,10 @@ impl OutputBackend for CpalBackend {
                                 data.fill(0.0);
                                 return;
                             }
-                            // Emits silence if no source is attached
-                            data.fill(0.0);
+                            let written = render_fn(data);
+                            if written < data.len() {
+                                data[written..].fill(0.0);
+                            }
                             stats.record_consumption(data.len(), channels as u16);
                         },
                         err_fn,
@@ -167,6 +171,7 @@ impl OutputBackend for CpalBackend {
             SampleFormat::I16 => {
                 let stats = stats_clone;
                 let mut dither = XorShift32(123456789);
+                let mut scratch = vec![0.0f32; 4096];
                 device
                     .build_output_stream(
                         &config,
@@ -175,10 +180,17 @@ impl OutputBackend for CpalBackend {
                                 data.fill(0);
                                 return;
                             }
-                            // TPDF dithered silence / zero output
-                            for out in data.iter_mut() {
+                            if scratch.len() < data.len() {
+                                scratch.resize(data.len(), 0.0);
+                            }
+                            let written = render_fn(&mut scratch[..data.len()]);
+                            if written < data.len() {
+                                scratch[written..data.len()].fill(0.0);
+                            }
+                            for (i, out) in data.iter_mut().enumerate() {
                                 let noise = dither.next_tpdf_i16();
-                                *out = (noise * 32767.0).clamp(-32768.0, 32767.0) as i16;
+                                let sample = (scratch[i] + noise) * 32767.0;
+                                *out = sample.clamp(-32768.0, 32767.0) as i16;
                             }
                             stats.record_consumption(data.len(), channels as u16);
                         },
@@ -200,6 +212,12 @@ impl OutputBackend for CpalBackend {
         self.is_open = true;
         self.is_running = false;
         Ok(())
+    }
+}
+
+impl OutputBackend for CpalBackend {
+    fn open(&mut self, spec: AudioSpec) -> Result<(), SinkError> {
+        self.open_with_render_fn(spec, |_| 0)
     }
 
     fn start(&mut self) -> Result<(), SinkError> {

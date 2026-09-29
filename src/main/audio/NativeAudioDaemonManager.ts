@@ -12,21 +12,29 @@ import type {
   DaemonRequest,
   DaemonResponse
 } from '../../common/audioEngineProtocol';
-import { decodeNoraFilePath } from '../handleFileProtocol';
+import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
 import logger from '../logger';
 
 export function resolveToLocalDiskPath(inputPath: string): string {
-  if (inputPath.startsWith('nora://') || inputPath.startsWith('nora:/')) {
-    return decodeNoraFilePath(inputPath).filePath;
+  let cleanPath = inputPath;
+  if (cleanPath.startsWith('nora://') || cleanPath.startsWith('nora:/')) {
+    cleanPath = removeDefaultAppProtocolFromFilePath(cleanPath);
+  } else if (cleanPath.startsWith('file://')) {
+    cleanPath = fileURLToPath(cleanPath);
   }
-  if (inputPath.startsWith('file://')) {
-    return fileURLToPath(inputPath);
-  }
-  const queryIndex = inputPath.indexOf('?');
+  const queryIndex = cleanPath.indexOf('?');
   if (queryIndex !== -1) {
-    return inputPath.substring(0, queryIndex);
+    cleanPath = cleanPath.substring(0, queryIndex);
   }
-  return inputPath;
+  try {
+    cleanPath = decodeURIComponent(cleanPath);
+  } catch {
+    // Already decoded
+  }
+  if (process.platform === 'win32') {
+    cleanPath = cleanPath.replaceAll('/', '\\');
+  }
+  return cleanPath;
 }
 
 export class NativeAudioDaemonManager {
@@ -276,15 +284,23 @@ export class NativeAudioDaemonManager {
 
     // Translate audio path to local disk path if needed
     let translatedCommand = command;
-    if (command.cmd === 'load') {
+    if (command.cmd === 'load' || command.cmd === 'preload') {
+      const diskPath = resolveToLocalDiskPath(command.path);
+      if (!fs.existsSync(diskPath)) {
+        logger.error('File not found on disk for native audio command:', {
+          cmd: command.cmd,
+          diskPath,
+          originalPath: command.path
+        });
+        return {
+          id: this.nextRequestId++,
+          status: 'error',
+          message: `File not found on disk: ${diskPath}`
+        };
+      }
       translatedCommand = {
         ...command,
-        path: resolveToLocalDiskPath(command.path)
-      };
-    } else if (command.cmd === 'preload') {
-      translatedCommand = {
-        ...command,
-        path: resolveToLocalDiskPath(command.path)
+        path: diskPath
       };
     }
 
@@ -345,14 +361,14 @@ export class NativeAudioDaemonManager {
       const killTimeout = setTimeout(() => {
         try {
           if (!currentChild.killed) {
-            logger.warn('Native audio daemon did not exit gracefully within 1500ms; sending SIGTERM');
-            currentChild.kill('SIGTERM');
+            logger.warn('Native audio daemon did not exit within 500ms; force terminating');
+            currentChild.kill('SIGKILL');
           }
         } catch {
           // ignore
         }
         finish();
-      }, 1500);
+      }, 500);
 
       currentChild.once('exit', () => {
         clearTimeout(killTimeout);
@@ -360,10 +376,13 @@ export class NativeAudioDaemonManager {
       });
 
       try {
-        // Send EOF on stdin - as verified, engine-cli terminates immediately on stdin EOF
         currentChild.stdin?.end();
+        if (process.platform === 'win32') {
+          // Immediately send SIGTERM on Windows to release the WASAPI audio endpoint
+          currentChild.kill('SIGTERM');
+        }
       } catch {
-        currentChild.kill('SIGTERM');
+        currentChild.kill('SIGKILL');
         finish();
       }
     });
