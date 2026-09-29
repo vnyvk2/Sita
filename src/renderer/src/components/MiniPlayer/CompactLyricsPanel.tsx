@@ -112,7 +112,7 @@ const CompactLyricsPanel = (props: Props) => {
       </div>
 
       {/* ── Layer 2: Floating Header Controls (z-30) ── */}
-      <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5">
+      <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5 [-webkit-app-region:no-drag]">
         {lyrics && isSynced && parsedLyrics.length > 0 && (
           <button
             type="button"
@@ -122,24 +122,24 @@ const CompactLyricsPanel = (props: Props) => {
                 ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
                 : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
             }
-            className={`flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 backdrop-blur-xs transition-colors ${
+            className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-sm bg-black/40 backdrop-blur-xs transition-colors [-webkit-app-region:no-drag] ${
               scrollMode === 'auto'
                 ? 'text-accent hover:bg-black/60'
                 : 'text-font-color-white/70 hover:bg-black/60 hover:text-white'
             }`}
           >
-            <span className="material-symbols-rounded text-xs">
+            <span className="material-symbols-rounded text-sm">
               {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
             </span>
           </button>
         )}
         <button
           type="button"
-          className="text-font-color-white/70 flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-[#e81123] hover:text-white"
+          className="text-font-color-white/70 flex h-6 w-6 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-[#e81123] hover:text-white [-webkit-app-region:no-drag]"
           onClick={onClose}
           title={t('common.close', 'Close')}
         >
-          <CloseIcon className="h-2 w-2" />
+          <CloseIcon className="h-2.5 w-2.5" />
         </button>
       </div>
 
@@ -211,7 +211,7 @@ const CompactLyricsPanel = (props: Props) => {
           type="button"
           onClick={handleSnapBack}
           title={t('lyricsPage.scrollToCurrentLine', 'Scroll to current line')}
-          className={`bg-accent text-white absolute left-1/2 z-30 flex -translate-x-1/2 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-xl backdrop-blur-md transition-all hover:scale-105 hover:shadow-accent/40 active:scale-95 ${
+          className={`bg-accent text-white absolute left-1/2 z-30 flex -translate-x-1/2 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-xl backdrop-blur-md transition-all hover:scale-105 hover:shadow-accent/40 active:scale-95 [-webkit-app-region:no-drag] ${
             direction === 'up' ? 'top-2.5' : 'bottom-6'
           }`}
         >

@@ -48,6 +48,7 @@ const LyricLine = (props: LyricProp) => {
 
   const lyricsRef = useRef<HTMLDivElement | null>(null);
   const prevIsActiveRef = useRef(false);
+  const prevIsAutoScrollingRef = useRef(isAutoScrolling);
   const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
 
   const {
@@ -69,9 +70,13 @@ const LyricLine = (props: LyricProp) => {
 
   const isSynced = syncedStart !== undefined && syncedEnd !== undefined;
 
-  // Auto-scroll only when this line becomes active
+  // Auto-scroll when this line becomes active, OR when auto-scroll is re-enabled while active
   useEffect(() => {
-    if (isActive && !prevIsActiveRef.current) {
+    const becameActive = isActive && !prevIsActiveRef.current;
+    const autoScrollEnabledWhileActive =
+      isActive && isAutoScrolling && !prevIsAutoScrollingRef.current;
+
+    if (becameActive || autoScrollEnabledWhileActive) {
       if (isAutoScrolling && lyricsRef.current?.scrollIntoView) {
         lyricsRef.current.scrollIntoView({
           behavior: 'smooth',
@@ -81,6 +86,7 @@ const LyricLine = (props: LyricProp) => {
       document.dispatchEvent(lyricsScrollIntoViewEvent);
     }
     prevIsActiveRef.current = isActive;
+    prevIsAutoScrollingRef.current = isAutoScrolling;
   }, [isActive, isAutoScrolling]);
 
   // Word-level active tracking: ONLY when this line is active AND has word-level timestamps

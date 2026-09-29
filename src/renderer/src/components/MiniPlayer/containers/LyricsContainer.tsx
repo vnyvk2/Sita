@@ -72,11 +72,11 @@ const LyricsContainer = (props: Props) => {
 
   return (
     <div
-      className={`absolute inset-0 z-20 transition-all duration-200 select-none ${
+      className={`absolute inset-0 z-30 transition-all duration-200 select-none ${
         isLyricsVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
       }`}
     >
-      {/* Scroll Mode Toggle (Top-Left corner of mini player lyrics) */}
+      {/* Scroll Mode Toggle (Top-Left corner, below the 32px title bar drag region) */}
       {isLyricsVisible && isSynced && lyricsComponents.length > 0 && (
         <button
           type="button"
@@ -86,13 +86,13 @@ const LyricsContainer = (props: Props) => {
               ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
               : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
           }
-          className={`[-webkit-app-region:no-drag] absolute top-2.5 left-2.5 z-40 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-black/50 backdrop-blur-md transition-colors ${
-            scrollMode === 'auto'
-              ? 'text-accent hover:bg-black/70'
-              : 'text-font-color-white/70 hover:bg-black/70 hover:text-white'
-          }`}
+          className="[-webkit-app-region:no-drag] absolute top-9.5 left-2.5 z-50 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md bg-black/60 backdrop-blur-md transition-all hover:scale-105 hover:bg-black/80 active:scale-95"
         >
-          <span className="material-symbols-rounded text-sm">
+          <span
+            className={`material-symbols-rounded text-base ${
+              scrollMode === 'auto' ? 'text-accent' : 'text-white/70'
+            }`}
+          >
             {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
           </span>
         </button>
@@ -127,7 +127,7 @@ const LyricsContainer = (props: Props) => {
         <FloatingLyricsSnapBackBtn
           direction={direction}
           onClick={handleSnapBack}
-          className={direction === 'up' ? 'top-10' : 'bottom-4'}
+          className={direction === 'up' ? 'top-10' : 'bottom-14'}
         />
       )}
     </div>
