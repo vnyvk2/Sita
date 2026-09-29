@@ -521,6 +521,25 @@ export class SpotifyPlaylistSyncService {
     return await syncPromise;
   }
 
+  /** Sweeps any stranded SYNCING states left over from application crashes or power loss. */
+  public static async reconcileStuckSyncStatesOnStartup(): Promise<void> {
+    try {
+      await db
+        .update(spotifyPlaylistLinks)
+        .set({
+          syncState: 'ERROR',
+          lastError: 'Sync interrupted by application termination',
+          updatedAt: new Date()
+        })
+        .where(eq(spotifyPlaylistLinks.syncState, 'SYNCING'));
+      logger.info('[SpotifyPlaylistSyncService] Reconciled stranded SYNCING states on boot.');
+    } catch (err) {
+      logger.error('[SpotifyPlaylistSyncService] Failed to sweep stuck sync states on boot:', {
+        error: err
+      });
+    }
+  }
+
   private async executeSyncInternal(
     playlistId: number,
     chosenStrategy?: SyncStrategy,
@@ -556,14 +575,66 @@ export class SpotifyPlaylistSyncService {
     const currentUser = await this.apiClient.getCurrentUser(accessToken, signal);
     this.assertLinkBelongsToCurrentUser(link, currentUser.id);
 
-    // Mark link as SYNCING
-    await db
-      .update(spotifyPlaylistLinks)
-      .set({
-        syncState: 'SYNCING',
-        updatedAt: new Date()
-      })
-      .where(eq(spotifyPlaylistLinks.id, link.id));
+    let markedAsSyncing = false;
+    let terminalResult: SpotifySyncResult;
+
+    try {
+      // Mark link as SYNCING
+      await db
+        .update(spotifyPlaylistLinks)
+        .set({
+          syncState: 'SYNCING',
+          updatedAt: new Date()
+        })
+        .where(eq(spotifyPlaylistLinks.id, link.id));
+      markedAsSyncing = true;
+
+      terminalResult = await this.executeSyncCore(link, strategy, activeClientId, signal);
+    } catch (err: any) {
+      terminalResult = {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'ERROR',
+        completedRemoteBatches: 0,
+        totalRemoteBatches: 0,
+        error: err.message || 'Unknown sync error'
+      };
+    } finally {
+      if (markedAsSyncing) {
+        try {
+          const currentLink = await this.getLinkedPlaylist(playlistId);
+          if (currentLink && currentLink.syncState === 'SYNCING') {
+            await db
+              .update(spotifyPlaylistLinks)
+              .set({
+                syncState: terminalResult!.syncState === 'SYNCED' ? 'SYNCED' : 'ERROR',
+                lastError:
+                  terminalResult!.error ||
+                  (signal?.aborted ? 'Sync cancelled' : 'Sync terminated unexpectedly'),
+                updatedAt: new Date()
+              })
+              .where(eq(spotifyPlaylistLinks.id, link.id));
+          }
+        } catch (dbErr) {
+          logger.error('[SpotifyPlaylistSyncService] Failed to finalize syncState in DB:', {
+            error: dbErr
+          });
+        }
+      }
+    }
+
+    return terminalResult;
+  }
+
+  private async executeSyncCore(
+    link: SpotifyPlaylistLinkDTO,
+    strategy: SyncStrategy,
+    activeClientId: string,
+    signal?: AbortSignal
+  ): Promise<SpotifySyncResult> {
+    const playlistId = link.playlistId;
 
     // 1. Generate plan with baseline capture
     const plan = await this.generateSyncPlan(playlistId, strategy, activeClientId);

@@ -13,6 +13,42 @@ interface MissingSongInfo {
   originalLocation?: string;
 }
 
+const normalizeText = (str: string): string => {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]/gu, '')
+    .trim();
+};
+
+const splitArtists = (artistStr: string): string[] => {
+  if (!artistStr) return [];
+  return artistStr
+    .split(/,\s*|\s+(?:feat\.?|ft\.?|&|x)\s+/i)
+    .map((a) => normalizeText(a))
+    .filter((a) => a.length > 0);
+};
+
+const getLocalSongArtists = (song: {
+  artists?: Array<{ name?: string } | string>;
+  artist?: string;
+}): string[] => {
+  const artists: string[] = [];
+  if (Array.isArray(song.artists)) {
+    for (const a of song.artists) {
+      if (typeof a === 'string') {
+        artists.push(a);
+      } else if (a && typeof a.name === 'string') {
+        artists.push(a.name);
+      }
+    }
+  } else if (typeof song.artist === 'string') {
+    artists.push(song.artist);
+  }
+  return artists.flatMap(splitArtists);
+};
+
 const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ onClose }) => {
   const { t } = useTranslation();
   const [spotifyUrl, setSpotifyUrl] = useState('');
@@ -22,6 +58,7 @@ const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ o
   const [missingSongs, setMissingSongs] = useState<MissingSongInfo[]>([]);
   const [allSongs, setAllSongs] = useState<MissingSongInfo[]>([]);
   const [hasScanned, setHasScanned] = useState(false);
+  const [isTruncated, setIsTruncated] = useState(false);
 
   const handleM3uScan = async () => {
     try {
@@ -36,6 +73,7 @@ const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ o
       setLoading(true);
       setError(null);
       setHasScanned(false);
+      setIsTruncated(false);
 
       const filePath = filePaths[0];
       const plan = await (window.api.collections as any).preview(filePath);
@@ -65,27 +103,36 @@ const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ o
       setLoading(true);
       setError(null);
       setHasScanned(false);
+      setIsTruncated(false);
 
+      const isConnected = Boolean((await window.api?.spotify?.getStatus?.())?.isConnected);
       let plan: any = null;
-      try {
-        plan = await (window.api.spotify as any).generateImportPlan(playlistId);
-      } catch (authErr) {
-        console.warn('Authenticated Spotify API failed, falling back to public embed...', authErr);
+
+      if (isConnected) {
+        try {
+          plan = await (window.api.spotify as any).generateImportPlan(playlistId);
+        } catch (authErr) {
+          console.warn('Authenticated Spotify API failed', authErr);
+          throw authErr;
+        }
       }
 
       if (plan) {
         processPlan(plan);
       } else {
         // Public embed fallback
-        const embedRes = await fetch(`https://open.spotify.com/embed/playlist/${playlistId}`, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
+        const embedRes = await fetch(`https://open.spotify.com/embed/playlist/${playlistId}`);
+        if (!embedRes.ok) {
+          throw new Error(
+            `Failed to fetch Spotify playlist (HTTP ${embedRes.status}). Please ensure the playlist is public or connect your Spotify account in Settings.`
+          );
+        }
         const html = await embedRes.text();
         const m = html.match(/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s);
         if (!m) {
-          throw new Error('Failed to fetch Spotify playlist. Please ensure the playlist is public.');
+          throw new Error(
+            'Failed to fetch Spotify playlist. Please ensure the playlist is public or connect your Spotify account in Settings.'
+          );
         }
 
         const data = JSON.parse(m[1]);
@@ -95,12 +142,27 @@ const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ o
           throw new Error('No tracks found in this playlist.');
         }
 
-        // Compare against local library
+        if (trackList.length >= 100) {
+          setIsTruncated(true);
+        }
+
+        // Compare against local library with Unicode normalization and multi-artist matching
         const localSongs = await window.api.audioLibraryControls.getAllSongs();
         const localList = localSongs?.data || [];
-        const localTitles = new Set(
-          localList.map((s) => s.title.toLowerCase().replace(/[^a-z0-9]/g, ''))
-        );
+
+        const titleToArtists = new Map<string, string[][]>();
+        for (const song of localList) {
+          if (!song.title) continue;
+          const normTitle = normalizeText(song.title);
+          if (!normTitle) continue;
+          const artistTokens = getLocalSongArtists(song);
+          const existing = titleToArtists.get(normTitle);
+          if (existing) {
+            existing.push(artistTokens);
+          } else {
+            titleToArtists.set(normTitle, [artistTokens]);
+          }
+        }
 
         let found = 0;
         const missing: MissingSongInfo[] = [];
@@ -109,7 +171,9 @@ const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ o
         for (const t of trackList) {
           const title = t.title || 'Unknown Title';
           const artist = t.subtitle || '';
-          const normTitle = title.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normTitle = normalizeText(title);
+          const remoteArtistTokens = splitArtists(artist);
+
           const songInfo: MissingSongInfo = {
             title,
             artist,
@@ -118,7 +182,35 @@ const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ o
 
           all.push(songInfo);
 
-          if (localTitles.has(normTitle)) {
+          let isMatch = false;
+          const candidates = normTitle ? titleToArtists.get(normTitle) : undefined;
+
+          if (candidates && candidates.length > 0) {
+            if (remoteArtistTokens.length === 0) {
+              // Remote has no artist metadata -> accept title-only match
+              isMatch = true;
+            } else {
+              // Check each local candidate with matching title
+              for (const candArtists of candidates) {
+                if (candArtists.length === 0) {
+                  // Local candidate has no artist metadata -> accept title-only match
+                  isMatch = true;
+                  break;
+                }
+                const sharesArtist = candArtists.some((ca) =>
+                  remoteArtistTokens.some(
+                    (ra) => ca === ra || ca.includes(ra) || ra.includes(ca)
+                  )
+                );
+                if (sharesArtist) {
+                  isMatch = true;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (isMatch) {
             found++;
           } else {
             missing.push(songInfo);
@@ -130,9 +222,9 @@ const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ o
         setAllSongs(all);
         setHasScanned(true);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Failed to analyze Spotify playlist.');
+      setError(err instanceof Error ? err.message : 'Failed to analyze Spotify playlist.');
     } finally {
       setLoading(false);
     }
@@ -275,6 +367,15 @@ const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ o
             </div>
           </div>
 
+          {isTruncated && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+              <p className="flex items-center gap-1.5 font-medium">
+                <span className="material-icons-round text-base">warning</span>
+                Notice: Spotify public embeds are limited to the first 100 tracks. Connect your Spotify account in Settings to check complete playlists.
+              </p>
+            </div>
+          )}
+
           {missingSongs.length > 0 ? (
             <>
               <div className="missing-list max-h-60 overflow-y-auto rounded-lg border border-stone-200 p-2 dark:border-stone-800">
@@ -315,7 +416,10 @@ const MissingSongsCheckerPrompt: React.FC<MissingSongsCheckerPromptProps> = ({ o
             label="Scan Another"
             iconName="refresh"
             className="w-full justify-center mt-2"
-            clickHandler={() => setHasScanned(false)}
+            clickHandler={() => {
+              setHasScanned(false);
+              setIsTruncated(false);
+            }}
           />
         </div>
       )}

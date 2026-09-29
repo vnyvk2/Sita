@@ -18,8 +18,6 @@ import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
-import { songCacheKeys, songQuery } from '../../queries/songs';
-import { queryClient } from '../../queryClient';
 import { store } from '../../store/store';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
@@ -30,6 +28,7 @@ import HighlightedText from '../SearchPage/HighlightedText';
 import SongArtist from './SongArtist';
 import type { SongProp } from './StandardSongRow';
 import useSongContextMenu from './useSongContextMenu';
+import { useSongFavoriteToggle } from './useSongFavoriteToggle';
 
 export const SmallSongRow = memo(
   forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => {
@@ -80,98 +79,25 @@ export const SmallSongRow = memo(
     const { t } = useTranslation();
 
     const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
-    const likeMutationSeqRef = useRef(0);
     const { isBursting, triggerBurst } = useHeartBurst();
 
-    const [optimisticFavorite, setOptimisticFavorite] = useState<{
-      songId: number;
-      isFavorite: boolean;
-    } | null>(null);
-
-    useEffect(() => {
-      setOptimisticFavorite(null);
-    }, [props.isAFavorite, songId]);
-
-    const isAFavorite =
+    const initialFavorite =
       isCurrentSong && currentSongFavorite !== undefined
         ? currentSongFavorite
-        : optimisticFavorite && optimisticFavorite.songId === songId
-          ? optimisticFavorite.isFavorite
-          : props.isAFavorite;
+        : props.isAFavorite;
+
+    const { isFavorite: isAFavorite, toggleFavorite: toggleSingleSongFavorite } =
+      useSongFavoriteToggle({
+        songId,
+        isAFavorite: initialFavorite,
+        isCurrentSong,
+        triggerBurst
+      });
 
     const handlePlayBtnClick = useCallback(() => {
       if (onPlayClick) return onPlayClick(songId);
       return playSong(songId);
     }, [onPlayClick, playSong, songId]);
-
-    const toggleSingleSongFavorite = useCallback(() => {
-      const nextFav = !isAFavorite;
-      const currentSeq = ++likeMutationSeqRef.current;
-
-      setOptimisticFavorite({ songId, isFavorite: nextFav });
-      if (nextFav) triggerBurst();
-
-      queryClient.setQueriesData<SongData[]>({ queryKey: songCacheKeys.windowsRoot }, (old) => {
-        if (!Array.isArray(old)) return old;
-        let changed = false;
-        const updated = old.map((s) => {
-          if (s && s.songId === songId) {
-            changed = true;
-            return { ...s, isAFavorite: nextFav };
-          }
-          return s;
-        });
-        return changed ? updated : old;
-      });
-
-      // Optimistically update legacy/non-windowed song queries
-      queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
-        { queryKey: songQuery.all._def },
-        (old) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((s) => (s.songId === songId ? { ...s, isAFavorite: nextFav } : s))
-          };
-        }
-      );
-
-      if (isCurrentSong) {
-        toggleIsFavorite(nextFav, true);
-      }
-
-      window.api.playerControls
-        .toggleLikeSongs([songId], nextFav)
-        .then((res) => {
-          if (likeMutationSeqRef.current !== currentSeq) return;
-          if (res && res.likes.length + res.dislikes.length === 0) {
-            setOptimisticFavorite({ songId, isFavorite: !nextFav });
-            queryClient.setQueriesData<SongData[]>(
-              { queryKey: songCacheKeys.windowsRoot },
-              (old) => {
-                if (!Array.isArray(old)) return old;
-                return old.map((s) => (s && s.songId === songId ? { ...s, isAFavorite: !nextFav } : s));
-              }
-            );
-            queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
-              { queryKey: songQuery.all._def },
-              (old) => {
-                if (!old?.data) return old;
-                return {
-                  ...old,
-                  data: old.data.map((s) => (s.songId === songId ? { ...s, isAFavorite: !nextFav } : s))
-                };
-              }
-            );
-          } else {
-            queryClient.invalidateQueries({ queryKey: ['songs', 'favorites'] });
-          }
-        })
-        .catch(() => {
-          if (likeMutationSeqRef.current !== currentSeq) return;
-          setOptimisticFavorite({ songId, isFavorite: !nextFav });
-        });
-    }, [isAFavorite, isCurrentSong, songId, toggleIsFavorite, triggerBurst]);
 
     // Local context menu fallback for isolated testing or non-delegated contexts
     const fallbackContextMenu = useSongContextMenu({

@@ -1,6 +1,7 @@
 import { assertWorkspaceInvariants, normalizeWeights, pruneOrphanPanels } from './ops';
 import { DEFAULT_PRESET } from './presets/default';
 import { MUSICBEE_PRESET } from './presets/musicbee';
+import { PANEL_DEFINITIONS } from './registry';
 import type { LayoutNode, Workspace, WorkspaceState } from './types';
 
 export const WORKSPACE_STORAGE_KEY = 'nora.workspaces.v1';
@@ -19,9 +20,11 @@ export function getInitialWorkspaceState(): WorkspaceState {
 
 /**
  * Traverses layout tree and repairs split nodes with 0, missing, or drifting weights before
- * invariant checking.
+ * invariant checking. Guarded with a recursion depth limit (max 5) to prevent V8 stack overflows.
  */
-function repairSplitWeights(node: LayoutNode): void {
+function repairSplitWeights(node: LayoutNode, depth = 0): void {
+  if (depth > 5) return;
+
   if (node.kind === 'split') {
     if (Array.isArray(node.children)) {
       const childCount = node.children.length;
@@ -38,7 +41,7 @@ function repairSplitWeights(node: LayoutNode): void {
       }
 
       for (const child of node.children) {
-        repairSplitWeights(child);
+        repairSplitWeights(child, depth + 1);
       }
     }
   } else if (node.kind === 'tabs') {
@@ -46,28 +49,86 @@ function repairSplitWeights(node: LayoutNode): void {
   }
 }
 
+/** Checks whether a local state property is a safe JSON value (primitives, arrays, or shallow objects). */
+function isJsonSafeValue(v: unknown): boolean {
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) {
+    return true;
+  }
+  if (Array.isArray(v)) {
+    return v.every(
+      (elem) =>
+        typeof elem === 'string' ||
+        typeof elem === 'number' ||
+        typeof elem === 'boolean' ||
+        elem === null
+    );
+  }
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    return Object.values(v).every(
+      (child) =>
+        typeof child === 'string' ||
+        typeof child === 'number' ||
+        typeof child === 'boolean' ||
+        child === null
+    );
+  }
+  return false;
+}
+
 /**
  * Validates and sanitizes an untrusted workspace document (e.g. from localStorage or JSON import).
- * Degrades unknown panel types to 'empty' and asserts all structural invariants.
+ * Degrades unknown panel types to 'empty', cleanses local state dictionary, repairs weights,
+ * prunes orphans, and asserts all structural invariants.
  */
-export function sanitizeWorkspace(untrusted: unknown): Workspace | null {
+export function validateWorkspace(untrusted: unknown): Workspace | null {
   if (!untrusted || typeof untrusted !== 'object') {
     return null;
   }
 
   const ws = untrusted as Partial<Workspace>;
-  if (!ws.id || !ws.name || !ws.root || !ws.panels) {
+  if (!ws.id || !ws.name || !ws.root || !ws.panels || typeof ws.panels !== 'object') {
     return null;
   }
 
   try {
-    // Self-heal any zero or drifted split weights before running strict invariant assertion
-    repairSplitWeights(ws.root as LayoutNode);
+    // 1. Whitelist panel types and sanitize local dictionary BEFORE invariants run.
+    // Degrade unknown or non-object panel instances to 'empty' (never delete to avoid dangling tree refs).
+    for (const [panelId, p] of Object.entries(ws.panels)) {
+      const isKnownType =
+        p &&
+        typeof p === 'object' &&
+        typeof p.type === 'string' &&
+        Object.prototype.hasOwnProperty.call(PANEL_DEFINITIONS, p.type);
 
-    // Prune orphan panels to ensure recoverable state is not rejected on reload (PR-05)
+      if (!isKnownType) {
+        ws.panels[panelId] = {
+          id: panelId,
+          type: 'empty',
+          local: {}
+        };
+      } else {
+        // Sanitize local state: retain only JSON-safe values
+        if (!p.local || typeof p.local !== 'object' || Array.isArray(p.local)) {
+          p.local = {};
+        } else {
+          const sanitizedLocal: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(p.local)) {
+            if (isJsonSafeValue(v)) {
+              sanitizedLocal[k] = v;
+            }
+          }
+          p.local = sanitizedLocal;
+        }
+      }
+    }
+
+    // 2. Self-heal any zero or drifted split weights before running strict invariant assertion
+    repairSplitWeights(ws.root as LayoutNode, 0);
+
+    // 3. Prune orphan panels to ensure recoverable state is not rejected on reload
     const prunedWs = pruneOrphanPanels(ws as Workspace);
 
-    // Assert all invariants
+    // 4. Assert all core invariants
     assertWorkspaceInvariants(prunedWs);
     return prunedWs;
   } catch (err) {
@@ -77,6 +138,27 @@ export function sanitizeWorkspace(untrusted: unknown): Workspace | null {
     );
     return null;
   }
+}
+
+/** Alias for backward compatibility */
+export const sanitizeWorkspace = validateWorkspace;
+
+/** Validates that an entire WorkspaceState is structurally sound and satisfies invariants across all workspaces. */
+export function isValidWorkspaceState(state: unknown): state is WorkspaceState {
+  if (!state || typeof state !== 'object') return false;
+  const s = state as Partial<WorkspaceState>;
+  if (!s.active || typeof s.active !== 'string' || !s.workspaces || typeof s.workspaces !== 'object') {
+    return false;
+  }
+
+  const activeWs = s.workspaces[s.active];
+  if (!activeWs) return false;
+
+  for (const ws of Object.values(s.workspaces)) {
+    if (!validateWorkspace(ws)) return false;
+  }
+
+  return true;
 }
 
 function tryParseAndSanitize(rawString: string | null): WorkspaceState | null {
@@ -89,7 +171,7 @@ function tryParseAndSanitize(rawString: string | null): WorkspaceState | null {
 
     const sanitizedWorkspaces: Record<string, Workspace> = {};
     for (const [id, ws] of Object.entries(parsed.workspaces)) {
-      const sanitized = sanitizeWorkspace(ws);
+      const sanitized = validateWorkspace(ws);
       if (sanitized) {
         if (id === DEFAULT_PRESET.id && (sanitized.schemaVersion ?? 1) < CURRENT_SCHEMA_VERSION) {
           sanitizedWorkspaces[id] = DEFAULT_PRESET;
@@ -156,6 +238,38 @@ export function loadWorkspaceState(): WorkspaceState {
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** Single shared validated writer routine for both debounced and immediate persistence. */
+function persistValidatedWorkspaceState(state: WorkspaceState): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+
+  // 1. Guard against persisting structurally corrupted state (looping all workspaces)
+  if (!isValidWorkspaceState(state)) {
+    console.warn('[WorkspacePersistence] Dropping invalid workspace state save.');
+    return;
+  }
+
+  try {
+    const serialized = JSON.stringify(state);
+    const existingPrimaryRaw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+
+    // 2. Validate existing primary before promoting to backup slot (never promote corruption)
+    if (existingPrimaryRaw && existingPrimaryRaw !== serialized) {
+      try {
+        const parsedExisting = JSON.parse(existingPrimaryRaw);
+        if (isValidWorkspaceState(parsedExisting)) {
+          window.localStorage.setItem(WORKSPACE_BACKUP_STORAGE_KEY, existingPrimaryRaw);
+        }
+      } catch {
+        // Existing primary was corrupted JSON; keep existing untainted backup slot
+      }
+    }
+
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, serialized);
+  } catch (err) {
+    console.error('[WorkspacePersistence] Failed to persist workspace state:', err);
+  }
+}
+
 /** Debounced persistence to localStorage (300ms window) */
 export function saveWorkspaceStateDebounced(state: WorkspaceState, delay = 300): void {
   if (typeof window === 'undefined' || !window.localStorage) return;
@@ -165,13 +279,7 @@ export function saveWorkspaceStateDebounced(state: WorkspaceState, delay = 300):
   }
 
   debounceTimer = setTimeout(() => {
-    try {
-      const serialized = JSON.stringify(state);
-      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, serialized);
-      window.localStorage.setItem(WORKSPACE_BACKUP_STORAGE_KEY, serialized);
-    } catch (err) {
-      console.error('[WorkspacePersistence] Failed to persist workspace state:', err);
-    }
+    persistValidatedWorkspaceState(state);
   }, delay);
 }
 
@@ -184,11 +292,5 @@ export function saveWorkspaceStateImmediate(state: WorkspaceState): void {
     debounceTimer = null;
   }
 
-  try {
-    const serialized = JSON.stringify(state);
-    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, serialized);
-    window.localStorage.setItem(WORKSPACE_BACKUP_STORAGE_KEY, serialized);
-  } catch (err) {
-    console.error('[WorkspacePersistence] Failed to persist workspace state immediately:', err);
-  }
+  persistValidatedWorkspaceState(state);
 }

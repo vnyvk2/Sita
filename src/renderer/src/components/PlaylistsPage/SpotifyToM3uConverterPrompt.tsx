@@ -20,6 +20,7 @@ const SpotifyToM3uConverterPrompt: React.FC<SpotifyToM3uConverterPromptProps> = 
   const [error, setError] = useState<string | null>(null);
   const [allSongs, setAllSongs] = useState<SongInfo[]>([]);
   const [hasScanned, setHasScanned] = useState(false);
+  const [isTruncated, setIsTruncated] = useState(false);
 
   const handleSpotifyScan = async () => {
     try {
@@ -37,47 +38,66 @@ const SpotifyToM3uConverterPrompt: React.FC<SpotifyToM3uConverterPromptProps> = 
       setLoading(true);
       setError(null);
       setHasScanned(false);
+      setIsTruncated(false);
 
       const all: SongInfo[] = [];
 
-      // 1. Try public embed fetch first (no auth, no developer setup, no 403)
-      try {
-        const embedRes = await fetch(`https://open.spotify.com/embed/playlist/${playlistId}`, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-        const html = await embedRes.text();
-        const m = html.match(/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s);
-        if (m) {
-          const data = JSON.parse(m[1]);
-          const entity = data.props?.pageProps?.state?.data?.entity;
-          if (entity?.trackList && Array.isArray(entity.trackList)) {
-            for (const t of entity.trackList) {
-              const artist = t.subtitle || '';
-              const title = t.title || 'Unknown Title';
+      const isConnected = Boolean((await window.api?.spotify?.getStatus?.())?.isConnected);
+
+      if (isConnected) {
+        // 1. Authenticated API flow
+        const plan = await (window.api.spotify as any).generateImportPlan(playlistId);
+        if (plan?.entries && Array.isArray(plan.entries)) {
+          for (const entry of plan.entries) {
+            const track =
+              entry.source?.trackReference?.resolvedTrack?.track ||
+              entry.source?.trackReference?.track;
+            if (track) {
               all.push({
-                title,
-                artist,
-                originalLocation: `${artist ? `${artist} - ` : ''}${title}.mp3`
+                title: track.title || track.originalLocation || 'Unknown Title',
+                artist: track.artist,
+                originalLocation: track.originalLocation
               });
             }
           }
         }
-      } catch (embedErr) {
-        console.warn('Public embed fetch failed, falling back to authenticated API', embedErr);
-      }
-
-      // 2. Fallback to authenticated API if embed didn't find tracks
-      if (all.length === 0) {
-        const plan = await (window.api.spotify as any).generateImportPlan(playlistId);
-        for (const entry of plan.entries) {
-          const track = entry.source.trackReference.resolvedTrack?.track || entry.source.trackReference.track;
-          all.push({
-            title: track.title || track.originalLocation || 'Unknown Title',
-            artist: track.artist,
-            originalLocation: track.originalLocation
-          });
+        if (all.length === 0) {
+          throw new Error('No songs could be found in this playlist via Spotify API.');
+        }
+      } else {
+        // 2. Public embed fetch fallback (no User-Agent header in Chromium fetch)
+        try {
+          const embedRes = await fetch(`https://open.spotify.com/embed/playlist/${playlistId}`);
+          if (!embedRes.ok) {
+            throw new Error(`Failed to load Spotify embed (HTTP ${embedRes.status})`);
+          }
+          const html = await embedRes.text();
+          const m = html.match(/<script id="__NEXT_DATA__"[^>]*>(.*?)<\/script>/s);
+          if (m) {
+            const data = JSON.parse(m[1]);
+            const entity = data.props?.pageProps?.state?.data?.entity;
+            if (entity?.trackList && Array.isArray(entity.trackList)) {
+              if (entity.trackList.length >= 100) {
+                setIsTruncated(true);
+              }
+              for (const t of entity.trackList) {
+                const artist = t.subtitle || '';
+                const title = t.title || 'Unknown Title';
+                all.push({
+                  title,
+                  artist,
+                  originalLocation: `${artist ? `${artist} - ` : ''}${title}.mp3`
+                });
+              }
+            }
+          }
+        } catch (embedErr: unknown) {
+          console.warn('Public embed fetch failed', embedErr);
+          const message =
+            embedErr instanceof Error
+              ? embedErr.message
+              : 'Failed to fetch public Spotify playlist. If the playlist is private or unlisted, connect your Spotify account in Settings.';
+          throw new Error(message);
         }
       }
 
@@ -87,9 +107,9 @@ const SpotifyToM3uConverterPrompt: React.FC<SpotifyToM3uConverterPromptProps> = 
 
       setAllSongs(all);
       setHasScanned(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || 'Failed to fetch Spotify playlist.');
+      setError(err instanceof Error ? err.message : 'Failed to fetch Spotify playlist.');
     } finally {
       setLoading(false);
     }
@@ -181,6 +201,15 @@ const SpotifyToM3uConverterPrompt: React.FC<SpotifyToM3uConverterPromptProps> = 
             </div>
           </div>
 
+          {isTruncated && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+              <p className="flex items-center gap-1.5 font-medium">
+                <span className="material-icons-round text-base">warning</span>
+                Notice: Spotify public embeds are limited to the first 100 tracks. Connect your Spotify account in Settings to export complete playlists.
+              </p>
+            </div>
+          )}
+
           <Button
             label="Download M3U File"
             iconName="save"
@@ -192,7 +221,10 @@ const SpotifyToM3uConverterPrompt: React.FC<SpotifyToM3uConverterPromptProps> = 
             label="Convert Another"
             iconName="refresh"
             className="w-full justify-center mt-2"
-            clickHandler={() => setHasScanned(false)}
+            clickHandler={() => {
+              setHasScanned(false);
+              setIsTruncated(false);
+            }}
           />
         </div>
       )}

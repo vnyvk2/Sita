@@ -22,8 +22,6 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import { useSongPreferences } from '../../contexts/SongPreferencesContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
-import { songCacheKeys, songQuery } from '../../queries/songs';
-import { queryClient } from '../../queryClient';
 import { store } from '../../store/store';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
@@ -34,6 +32,7 @@ import HighlightedText from '../SearchPage/HighlightedText';
 import SoundBarsIndicator from '../SoundBarsIndicator';
 import SongArtist from './SongArtist';
 import useSongContextMenu from './useSongContextMenu';
+import { useSongFavoriteToggle } from './useSongFavoriteToggle';
 
 export interface SongProp {
   songId: number;
@@ -143,152 +142,23 @@ export const StandardSongRow = memo(
     const likeMutationSeqRef = useRef(0);
     const { isBursting, triggerBurst } = useHeartBurst();
 
-    // Immediate optimistic favorite state for instant 0ms visual feedback on clicks,
-    // safely bound to songId to prevent virtualization row-recycling bleed.
-    const [optimisticFavorite, setOptimisticFavorite] = useState<{
-      songId: number;
-      isFavorite: boolean;
-    } | null>(null);
-
-    // Clear optimistic override once props catch up or row recycled to another song
-    useEffect(() => {
-      setOptimisticFavorite(null);
-    }, [props.isAFavorite, songId]);
-
-    // Single source of truth: player state (if active song) > local optimistic click > props
-    const isAFavorite =
+    const initialFavorite =
       isCurrentSong && currentSongFavorite !== undefined
         ? currentSongFavorite
-        : optimisticFavorite && optimisticFavorite.songId === songId
-          ? optimisticFavorite.isFavorite
-          : props.isAFavorite;
+        : props.isAFavorite;
+
+    const { isFavorite: isAFavorite, toggleFavorite: toggleSingleSongFavorite } =
+      useSongFavoriteToggle({
+        songId,
+        isAFavorite: initialFavorite,
+        isCurrentSong,
+        triggerBurst
+      });
 
     const handlePlayBtnClick = useCallback(() => {
       if (onPlayClick) return onPlayClick(songId);
       return playSong(songId);
     }, [onPlayClick, playSong, songId]);
-
-    // Unified single-song favorite mutation handler shared by direct button and context menu
-    const toggleSingleSongFavorite = useCallback(() => {
-      const nextFav = !isAFavorite;
-      const currentSeq = ++likeMutationSeqRef.current;
-
-      // 1. Immediate synchronous visual feedback on this row (0ms latency)
-      setOptimisticFavorite({ songId, isFavorite: nextFav });
-
-      if (nextFav) {
-        triggerBurst();
-      }
-
-      // 2. Optimistically update all hydrated window caches in React Query
-      queryClient.setQueriesData<SongData[]>({ queryKey: songCacheKeys.windowsRoot }, (old) => {
-        if (!Array.isArray(old)) return old;
-        let changed = false;
-        const updated = old.map((s) => {
-          if (s && s.songId === songId) {
-            changed = true;
-            return { ...s, isAFavorite: nextFav };
-          }
-          return s;
-        });
-        return changed ? updated : old;
-      });
-
-      // 3. Optimistically update legacy/non-windowed song queries
-      queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
-        { queryKey: songQuery.all._def },
-        (old) => {
-          if (!old?.data) return old;
-          return {
-            ...old,
-            data: old.data.map((s) => (s.songId === songId ? { ...s, isAFavorite: nextFav } : s))
-          };
-        }
-      );
-
-      if (isCurrentSong) {
-        toggleIsFavorite(nextFav, true);
-      }
-
-      window.api.playerControls
-        .toggleLikeSongs([songId], nextFav)
-        .then((res) => {
-          // If a newer click occurred while this request was in flight, do not overwrite with stale rollback
-          if (likeMutationSeqRef.current !== currentSeq) return;
-
-          if (res && res.likes.length + res.dislikes.length === 0) {
-            // Revert cache if DB rejected
-            setOptimisticFavorite({ songId, isFavorite: !nextFav });
-            queryClient.setQueriesData<SongData[]>(
-              { queryKey: songCacheKeys.windowsRoot },
-              (old) => {
-                if (!Array.isArray(old)) return old;
-                return old.map((s) =>
-                  s && s.songId === songId ? { ...s, isAFavorite: !nextFav } : s
-                );
-              }
-            );
-            queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
-              { queryKey: songQuery.all._def },
-              (old) => {
-                if (!old?.data) return old;
-                return {
-                  ...old,
-                  data: old.data.map((s) =>
-                    s.songId === songId ? { ...s, isAFavorite: !nextFav } : s
-                  )
-                };
-              }
-            );
-            if (isCurrentSong) {
-              toggleIsFavorite(!nextFav, true);
-            }
-          }
-        })
-        .catch((err) => {
-          // If a newer click occurred while this request was in flight, ignore failure of superseded mutation
-          if (likeMutationSeqRef.current !== currentSeq) return;
-
-          console.error(err);
-          // Revert cache on error
-          setOptimisticFavorite({ songId, isFavorite: !nextFav });
-          queryClient.setQueriesData<SongData[]>({ queryKey: songCacheKeys.windowsRoot }, (old) => {
-            if (!Array.isArray(old)) return old;
-            return old.map((s) => (s && s.songId === songId ? { ...s, isAFavorite: !nextFav } : s));
-          });
-          queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
-            { queryKey: songQuery.all._def },
-            (old) => {
-              if (!old?.data) return old;
-              return {
-                ...old,
-                data: old.data.map((s) =>
-                  s.songId === songId ? { ...s, isAFavorite: !nextFav } : s
-                )
-              };
-            }
-          );
-          if (isCurrentSong) {
-            toggleIsFavorite(!nextFav, true);
-          }
-          addNewNotifications([
-            {
-              id: `toggleLikeError-${songId}`,
-              content: t('song.toggleLikeFailed'),
-              iconName: 'error',
-              duration: 5000
-            }
-          ]);
-        });
-    }, [
-      addNewNotifications,
-      isAFavorite,
-      isCurrentSong,
-      songId,
-      t,
-      toggleIsFavorite,
-      triggerBurst
-    ]);
 
     const { minutes, seconds } = useMemo(() => {
       const addZero = (num: number) => {
