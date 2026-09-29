@@ -564,7 +564,8 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     isKaraoke: false,
     karaokeLevel: 100,
     isNightMode: false,
-    nightModePreset: 'standard'
+    nightModePreset: 'standard',
+    useNativeAudioEngine: false
   },
   queue: {
     queues: [{ id: 'default-queue', position: 0, songIds: [] }],

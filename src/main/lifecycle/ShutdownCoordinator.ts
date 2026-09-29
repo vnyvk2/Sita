@@ -9,6 +9,7 @@ import { savePendingMetadataUpdates } from '@main/updateSong/updateSongId3Tags';
 import { adaptivePolicyEngine } from '@main/workers/adaptivePolicyEngine';
 import { libraryScheduler } from '@main/workers/jobScheduler';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { nativeAudioDaemonManager } from '@main/audio/NativeAudioDaemonManager';
 import type { BrowserWindow } from 'electron';
 
 import { ShutdownLogger } from './ShutdownLogger';
@@ -72,6 +73,13 @@ export class ShutdownCoordinator {
     } catch (error) {
       hasPartialFailures = true;
       logger.error('Error terminating media worker bridge during shutdown:', { error });
+    }
+
+    try {
+      await nativeAudioDaemonManager.stop();
+    } catch (error) {
+      hasPartialFailures = true;
+      logger.error('Error stopping native audio daemon during shutdown:', { error });
     }
 
     // 2. Save pending state

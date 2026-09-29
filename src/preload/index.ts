@@ -53,6 +53,7 @@ import type {
 import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
 import type { LastFMTrackInfoApi } from '../types/last_fm_api';
 import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
+import type { DaemonCommand, DaemonPushEvent, DaemonResponse } from '../common/audioEngineProtocol';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -1148,6 +1149,18 @@ export const api = {
     validateAndSaveToken: (token: string): Promise<{ success: boolean; userName: string }> =>
       ipcRenderer.invoke('app/validateAndSaveListenBrainzToken', token),
     disconnect: (): Promise<boolean> => ipcRenderer.invoke('app/disconnectListenBrainz')
+  },
+  audioEngine: {
+    isAvailable: (): Promise<boolean> => ipcRenderer.invoke('audioEngine/isAvailable'),
+    start: (): Promise<boolean> => ipcRenderer.invoke('audioEngine/start'),
+    stop: (): Promise<boolean> => ipcRenderer.invoke('audioEngine/stop'),
+    send: (command: DaemonCommand): Promise<DaemonResponse> =>
+      ipcRenderer.invoke('audioEngine/send', command),
+    onEvent: (callback: (event: DaemonPushEvent) => void) => {
+      const handler = (_: unknown, event: DaemonPushEvent) => callback(event);
+      ipcRenderer.on('audioEngine/event', handler);
+      return () => ipcRenderer.removeListener('audioEngine/event', handler);
+    }
   }
 };
 

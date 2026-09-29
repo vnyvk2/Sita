@@ -682,6 +682,7 @@ declare global {
     karaokeLevel?: number;
     isNightMode?: boolean;
     nightModePreset?: 'gentle' | 'standard' | 'strong';
+    useNativeAudioEngine?: boolean;
   }
 
   type EqualizerBandFilters =

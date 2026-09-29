@@ -98,6 +98,8 @@ import {
 } from './db/queries/userPreferences';
 import { songs as songsTable } from './db/schema';
 import { setupDownloadsIpc } from './downloads/setupDownloads';
+import { nativeAudioDaemonManager } from './audio/NativeAudioDaemonManager';
+import type { DaemonCommand, DaemonPushEvent } from '../common/audioEngineProtocol';
 import {
   broadcastLyricsToFloatingWindow,
   broadcastPlayStateToFloatingWindow,
@@ -1256,5 +1258,30 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     });
 
     ipcMain.on('app/restartApp', (_: unknown, reason: string) => restartApp(reason));
+
+    // Native Rust Audio Engine IPC handlers
+    ipcMain.handle('audioEngine/isAvailable', () => {
+      return nativeAudioDaemonManager.isAvailable();
+    });
+
+    ipcMain.handle('audioEngine/send', async (_, command: DaemonCommand) => {
+      return nativeAudioDaemonManager.sendCommand(command);
+    });
+
+    ipcMain.handle('audioEngine/start', async () => {
+      await nativeAudioDaemonManager.start();
+      return true;
+    });
+
+    ipcMain.handle('audioEngine/stop', async () => {
+      await nativeAudioDaemonManager.stop();
+      return true;
+    });
+
+    nativeAudioDaemonManager.addListener((event: DaemonPushEvent) => {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
+        mainWindow.webContents.send('audioEngine/event', event);
+      }
+    });
   }
 }

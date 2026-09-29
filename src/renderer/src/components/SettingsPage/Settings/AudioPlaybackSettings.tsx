@@ -48,12 +48,14 @@ const AudioPlaybackSettings = () => {
   const [preampDb, setPreampDb] = useState(0);
   const [preventClipping, setPreventClipping] = useState(true);
   const [crossfadeDuration, setCrossfadeDuration] = useState(0);
+  const [useNativeEngine, setUseNativeEngine] = useState(false);
 
   useEffect(() => {
     const interval = storage.preferences.getPreferences('seekbarScrollInterval');
     const playbackRate = storage.playback.getPlaybackOptions('playbackRate');
     const rg = storage.playback.getPlaybackOptions('replayGain');
     const cf = storage.playback.getPlaybackOptions('crossfade');
+    const nativeEngine = storage.playback.getPlaybackOptions('useNativeAudioEngine');
 
     setPlaybackRateInterval(playbackRate);
     setSeekbarScrollInterval(interval.toString());
@@ -67,7 +69,17 @@ const AudioPlaybackSettings = () => {
     if (cf && typeof cf.duration === 'number') {
       setCrossfadeDuration(cf.duration);
     }
+
+    if (typeof nativeEngine === 'boolean') {
+      setUseNativeEngine(nativeEngine);
+    }
   }, []);
+
+  const updateUseNativeEngine = (enabled: boolean) => {
+    setUseNativeEngine(enabled);
+    storage.playback.setPlaybackOptions('useNativeAudioEngine', enabled);
+    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: storage.getLocalStorage() });
+  };
 
   const updateCrossfade = (duration: number) => {
     setCrossfadeDuration(duration);
@@ -357,6 +369,26 @@ const AudioPlaybackSettings = () => {
                   'audio-fx-modal-dialog w-[860px] max-w-[94vw]'
                 )
               }
+            />
+          </div>
+        </li>
+
+        <li className="native-audio-engine-settings mb-6" id="nativeAudioEngineSettings">
+          <div className="title text-font-color-highlight dark:text-dark-font-color-highlight mb-1 text-lg font-medium flex items-center gap-2">
+            <span>Experimental Rust Audio Engine</span>
+            <span className="text-xs uppercase px-2 py-0.5 rounded bg-font-color-highlight/20 text-font-color-highlight font-semibold">
+              Experimental
+            </span>
+          </div>
+          <div className="description mb-3 text-sm opacity-80">
+            Enables high-performance native Rust playback daemon (`engine-cli`) with bit-accurate decoding, sample-accurate gapless transitions, and ultra-low latency.
+          </div>
+          <div className="flex items-center gap-4">
+            <Checkbox
+              id="useNativeAudioEngineCheckbox"
+              isChecked={useNativeEngine}
+              checkedStateUpdateFunction={(state) => updateUseNativeEngine(state)}
+              labelContent="Enable Native Rust Audio Engine (Default: Off)"
             />
           </div>
         </li>
