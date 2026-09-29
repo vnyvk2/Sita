@@ -10,6 +10,16 @@ interface UseLyricsScrollSyncProps {
   songId?: number;
 }
 
+/**
+ * Manages lyrics scroll sync state.
+ *
+ * - `isAutoScrolling` is purely driven by user preference (`auto` vs `manual`).
+ *   It is NEVER influenced by browsing state — that was the bug.
+ * - The snap-back button only appears in MANUAL mode when the active line
+ *   is scrolled out of the visible viewport.
+ * - Direction (`up` / `down`) tells you where the active line is relative
+ *   to the current viewport so the button arrow points the right way.
+ */
 export function useLyricsScrollSync({
   containerRef,
   activeLineIndex,
@@ -18,21 +28,16 @@ export function useLyricsScrollSync({
 }: UseLyricsScrollSyncProps) {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const scrollMode = preferences?.lyricsScrollMode ?? 'auto';
+  const isAutoScrolling = scrollMode === 'auto';
 
   const [direction, setDirection] = useState<'up' | 'down' | null>(null);
-  const [isUserBrowsing, setIsUserBrowsing] = useState(false);
-  const isUserBrowsingRef = useRef(false);
+  const prevSongIdRef = useRef(songId);
 
-  useEffect(() => {
-    isUserBrowsingRef.current = isUserBrowsing;
-  }, [isUserBrowsing]);
-
-  // Check active line visibility relative to container viewport
+  // Check whether the active lyric line is visible in the scroll container
   const checkVisibility = useCallback(() => {
     const container = containerRef.current;
     if (!container || activeLineIndex === null || !isSynced) {
       setDirection(null);
-      setIsUserBrowsing(false);
       return;
     }
 
@@ -45,33 +50,30 @@ export function useLyricsScrollSync({
     const containerRect = container.getBoundingClientRect();
     const activeRect = activeEl.getBoundingClientRect();
 
-    // 20px threshold to prevent jitter when right on the boundary
-    const isAbove = activeRect.bottom < containerRect.top + 20;
-    const isBelow = activeRect.top > containerRect.bottom - 20;
+    const threshold = 20;
+    const isAbove = activeRect.bottom < containerRect.top + threshold;
+    const isBelow = activeRect.top > containerRect.bottom - threshold;
 
-    if (isAbove) {
-      setDirection('up');
-      setIsUserBrowsing(true);
-    } else if (isBelow) {
-      setDirection('down');
-      setIsUserBrowsing(true);
-    } else {
-      setDirection(null);
-      setIsUserBrowsing(false);
-    }
+    if (isAbove) setDirection('up');
+    else if (isBelow) setDirection('down');
+    else setDirection(null);
   }, [activeLineIndex, isSynced, containerRef]);
 
-  // Listen to scroll events (handles wheel, touch, scrollbar dragging, keys)
+  // Listen to scroll events for manual-mode visibility tracking
   useEffect(() => {
+    // Only track in manual mode — in auto mode LyricLine handles everything
+    if (isAutoScrolling) {
+      setDirection(null);
+      return;
+    }
+
     const container = containerRef.current;
     if (!container) return;
 
     let rafId: number | null = null;
     const handleScroll = () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        checkVisibility();
-      });
+      rafId = requestAnimationFrame(checkVisibility);
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
@@ -79,48 +81,33 @@ export function useLyricsScrollSync({
       container.removeEventListener('scroll', handleScroll);
       if (rafId !== null) cancelAnimationFrame(rafId);
     };
-  }, [checkVisibility, containerRef]);
+  }, [isAutoScrolling, checkVisibility, containerRef]);
 
-  // Re-check after active line changes
+  // Re-check after active line changes (only in manual mode)
   useEffect(() => {
-    const timer = setTimeout(() => {
-      checkVisibility();
-    }, 60);
+    if (isAutoScrolling) return;
+    const timer = setTimeout(checkVisibility, 80);
     return () => clearTimeout(timer);
-  }, [activeLineIndex, checkVisibility]);
+  }, [activeLineIndex, isAutoScrolling, checkVisibility]);
 
-  // Reset browsing state on song change
+  // Reset on song change
   useEffect(() => {
-    setIsUserBrowsing(false);
-    setDirection(null);
+    if (songId !== prevSongIdRef.current) {
+      setDirection(null);
+      prevSongIdRef.current = songId;
+    }
   }, [songId]);
 
-  // Mathematically precise snap back to active line inside container
+  // Snap back to active line
   const handleSnapBack = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const activeEl = container.querySelector('[data-active-line="true"]') as HTMLElement | null;
     if (activeEl) {
-      const containerRect = container.getBoundingClientRect();
-      const activeRect = activeEl.getBoundingClientRect();
-      const targetScrollTop =
-        container.scrollTop +
-        (activeRect.top - containerRect.top) -
-        container.clientHeight / 2 +
-        activeRect.height / 2;
-
-      if (typeof container.scrollTo === 'function') {
-        container.scrollTo({
-          top: Math.max(0, targetScrollTop),
-          behavior: 'smooth'
-        });
-      } else {
-        activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    setIsUserBrowsing(false);
     setDirection(null);
   }, [containerRef]);
 
@@ -131,10 +118,11 @@ export function useLyricsScrollSync({
 
   return {
     scrollMode,
-    isAutoScrolling: scrollMode === 'auto' && !isUserBrowsing,
-    isUserBrowsing,
+    // isAutoScrolling is PURELY preference-driven. Never gated by browsing state.
+    isAutoScrolling,
     direction,
-    showSnapBack: isSynced && direction !== null && activeLineIndex !== null,
+    // Snap-back only shows in manual mode when the line is off-screen
+    showSnapBack: !isAutoScrolling && isSynced && direction !== null && activeLineIndex !== null,
     handleSnapBack,
     handleToggleScrollMode
   };
