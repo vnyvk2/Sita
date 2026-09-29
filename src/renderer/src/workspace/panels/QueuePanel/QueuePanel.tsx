@@ -1,9 +1,10 @@
 import SoundBarsIndicator from '@renderer/components/SoundBarsIndicator';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type FC } from 'react';
+import { memo, useCallback, useContext, useMemo, useRef, type FC, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Virtuoso } from 'react-virtuoso';
 
@@ -39,100 +40,64 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
   const currentSongIndex = currentQueue?.position ?? 0;
 
   const manager = getQueuesManager();
+  const viewingQueue = manager?.queues?.[activeQueueIndex] ?? manager?.getActiveQueue();
+  const queueId = viewingQueue?.id ?? currentQueue?.id ?? `queue-${activeQueueIndex}`;
 
-  // Load song metadata for the visible queue songs
-  const [songsMetadata, setSongsMetadata] = useState<Record<number, SongData>>({});
-  const songsMetadataRef = useRef(songsMetadata);
-  songsMetadataRef.current = songsMetadata;
-  const failedIdsRef = useRef<Set<number>>(new Set());
-
-  // Pre-seed metadata cache from currentSongData when available
-  useEffect(() => {
-    if (currentSongData?.songId) {
-      setSongsMetadata((prev) => {
-        if (prev[currentSongData.songId]) return prev;
-        const next = {
-          ...prev,
-          [currentSongData.songId]: currentSongData as unknown as SongData
-        };
-        songsMetadataRef.current = next;
-        return next;
-      });
-    }
-  }, [currentSongData]);
-
-  useEffect(() => {
-    let isCancelled = false;
+  // Robust versioning: use queue's structureVersion and membershipVersion if present, else FNV-1a hash of songIds
+  const queueVersion = useMemo(() => {
     if (
-      songIds.length === 0 ||
-      typeof window === 'undefined' ||
-      !window.api?.audioLibraryControls?.getSongInfo
+      viewingQueue?.structureVersion !== undefined &&
+      viewingQueue?.membershipVersion !== undefined
     ) {
-      return;
+      return `${queueId}:${viewingQueue.structureVersion}:${viewingQueue.membershipVersion}`;
     }
+    if (viewingQueue?.membershipVersion !== undefined) {
+      return `${queueId}:${viewingQueue.membershipVersion}`;
+    }
+    let hash = 2166136261;
+    for (let i = 0; i < songIds.length; i++) {
+      hash ^= songIds[i];
+      hash = Math.imul(hash, 16777619);
+    }
+    return `${queueId}:${songIds.length}:${hash >>> 0}`;
+  }, [viewingQueue?.structureVersion, viewingQueue?.membershipVersion, queueId, songIds]);
 
-    // Batch load missing metadata (deduplicated to avoid redundant queries)
-    const missingIds = Array.from(
-      new Set(
-        songIds.filter((id) => !songsMetadataRef.current[id] && !failedIdsRef.current.has(id))
-      )
-    );
-    if (missingIds.length === 0) return;
-
-    const fetchBatches = async () => {
-      // Load up to first 100 songs in a batch for responsiveness
-      for (let i = 0; i < missingIds.length; i += 100) {
-        if (isCancelled) break;
-        const idsToFetch = missingIds.slice(i, i + 100);
-        try {
-          const res = await window.api.audioLibraryControls.getSongInfo(idsToFetch);
-          if (isCancelled) return;
-
-          const songs = Array.isArray(res) ? res : [];
-          const returnedIds = new Set(
-            songs
-              .filter((s): s is SongData => Boolean(s && typeof s.songId === 'number'))
-              .map((s) => s.songId)
-          );
-          for (const id of idsToFetch) {
-            if (!returnedIds.has(id)) {
-              failedIdsRef.current.add(id);
-            }
+  // Stable item identity mapping to preserve Virtuoso element recycling across queue mutations
+  const nextKeyRef = useRef(1);
+  const prevEntriesRef = useRef<{ key: number; songId: number }[]>([]);
+  const queueEntries = useMemo(() => {
+    const prev = prevEntriesRef.current;
+    const next: { key: number; songId: number }[] = [];
+    let prevIdx = 0;
+    for (let i = 0; i < songIds.length; i++) {
+      const id = songIds[i];
+      if (prevIdx < prev.length && prev[prevIdx].songId === id) {
+        next.push(prev[prevIdx]);
+        prevIdx++;
+      } else {
+        let foundIdx = -1;
+        for (let j = prevIdx + 1; j < Math.min(prevIdx + 10, prev.length); j++) {
+          if (prev[j].songId === id) {
+            foundIdx = j;
+            break;
           }
-
-          if (songs.length > 0) {
-            setSongsMetadata((prev) => {
-              let changed = false;
-              const next = { ...prev };
-              for (const song of songs) {
-                if (song && typeof song.songId === 'number' && !prev[song.songId]) {
-                  next[song.songId] = song;
-                  changed = true;
-                }
-              }
-              if (changed) {
-                songsMetadataRef.current = next;
-                return next;
-              }
-              return prev;
-            });
-          }
-        } catch (err) {
-          console.error('[QueuePanel] Failed to fetch song info:', err);
-          for (const id of idsToFetch) {
-            failedIdsRef.current.add(id);
-          }
-          break;
+        }
+        if (foundIdx !== -1) {
+          next.push(prev[foundIdx]);
+          prevIdx = foundIdx + 1;
+        } else {
+          next.push({ key: nextKeyRef.current++, songId: id });
         }
       }
-    };
-
-    fetchBatches();
-
-    return () => {
-      isCancelled = true;
-    };
+    }
+    prevEntriesRef.current = next;
+    return next;
   }, [songIds]);
+
+  const { getItem, onRangeChange } = useWindowHydration(songIds, queueVersion, {
+    keyPrefix: 'queue',
+    initialIndex: 0
+  });
 
   const handlePlayQueueTrack = useCallback(
     (index: number) => {
@@ -144,7 +109,7 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
   );
 
   const handleRemoveTrack = useCallback(
-    (e: React.MouseEvent, index: number) => {
+    (e: MouseEvent, index: number) => {
       e.stopPropagation();
       const activeQueue = manager?.getActiveQueue();
       if (activeQueue) {
@@ -176,12 +141,12 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
   return (
     <div className="queue-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white flex h-full w-full flex-col overflow-hidden">
       {/* Sub-header toolbar */}
-      <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/30 flex shrink-0 items-center justify-between border-b border-stone-200/50 px-3 py-2 dark:border-stone-800/50">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="text-font-color-black dark:text-font-color-white truncate text-xs font-semibold">
+      <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/30 flex shrink-0 items-center justify-between border-b border-stone-200/50 px-2.5 py-1.5 dark:border-stone-800/50">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="text-font-color-black dark:text-font-color-white truncate text-[11px] font-semibold">
             {queueTitle}
           </span>
-          <span className="text-font-color-dimmed rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-medium dark:bg-stone-800">
+          <span className="text-font-color-dimmed rounded-full bg-stone-200 px-1.5 py-px text-[9px] font-medium leading-tight dark:bg-stone-800">
             {songIds.length} {t('common.song_other', 'songs')}
           </span>
         </div>
@@ -191,16 +156,16 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
             type="button"
             onClick={handleClearQueue}
             title={t('currentQueuePage.clearQueue', 'Clear queue')}
-            className="text-font-color-dimmed flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs transition-colors hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+            className="text-font-color-dimmed flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
           >
-            <span className="material-symbols-rounded text-sm">clear_all</span>
+            <span className="material-symbols-rounded text-xs">clear_all</span>
             <span>{t('common.clear', 'Clear')}</span>
           </button>
         )}
       </div>
 
       {/* Song list */}
-      <div className="flex-1 min-h-0 overflow-hidden p-1">
+      <div className="min-h-0 flex-1 overflow-hidden p-1">
         {songIds.length === 0 ? (
           <div className="text-font-color-dimmed flex h-full w-full flex-col items-center justify-center p-6 text-center">
             <span className="material-symbols-rounded mb-2 text-3xl opacity-60">queue_music</span>
@@ -209,12 +174,14 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
         ) : (
           <Virtuoso
             style={{ height: '100%' }}
-            data={songIds}
+            data={queueEntries}
+            rangeChanged={onRangeChange}
             overscan={200}
-            computeItemKey={(index, songId) => `${songId}-${index}`}
-            itemContent={(index, songId) => {
+            computeItemKey={(_index, entry) => entry.key}
+            itemContent={(index, entry) => {
+              const songId = entry.songId;
               const isCurrent = index === currentSongIndex;
-              const song = songsMetadata[songId];
+              const song = getItem(index);
               const title = isCurrent
                 ? currentSongData?.title || song?.title || `Track ${songId}`
                 : song?.title || `Track ${songId}`;
@@ -233,7 +200,7 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
 
               return (
                 <li
-                  key={`${songId}-${index}`}
+                  key={entry.key}
                   role="button"
                   tabIndex={0}
                   onClick={() => handlePlayQueueTrack(index)}

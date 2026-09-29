@@ -248,17 +248,33 @@ class AudioPlayer {
             return;
           }
           const songId = queue.currentSongId;
+          const wasPlaying = !this.audio.paused;
           logPlayer('[AudioPlayer.positionChange]', {
             position: queue.position,
             songId,
             willLoad: !!songId,
-            pendingAutoPlay: this.pendingAutoPlay
+            pendingAutoPlay: this.pendingAutoPlay,
+            wasPlaying
           });
+          const shouldAutoPlay = this.pendingAutoPlay || wasPlaying;
+          this.pendingAutoPlay = false; // Reset after use
           if (songId) {
-            this.loadSong(songId, { autoPlay: this.pendingAutoPlay }).catch((err) => {
+            this.loadSong(songId, { autoPlay: shouldAutoPlay }).catch((err) => {
               console.error('[AudioPlayer.positionChange] Failed to load song:', err);
             });
-            this.pendingAutoPlay = false; // Reset after use
+          } else {
+            this.cancelPendingLoads();
+            this.audio.pause();
+            this.audio.src = '';
+            this.standbyAudio.pause();
+            this.standbyAudio.src = '';
+            this.crossfadeScheduler.cancel();
+            this.currentSongData = null;
+            dispatch({
+              type: 'CURRENT_SONG_PLAYBACK_STATE',
+              data: false
+            });
+            this.emit('playbackComplete');
           }
         })
       );
@@ -288,10 +304,30 @@ class AudioPlayer {
           console.error('[AudioPlayer.activeQueueChanged] Failed to load song:', err);
         });
       } else {
+        this.cancelPendingLoads();
         this.audio.src = '';
         this.audio.pause();
+        this.currentSongData = null;
+        dispatch({
+          type: 'CURRENT_SONG_PLAYBACK_STATE',
+          data: false
+        });
+        this.emit('playbackComplete');
       }
     });
+  }
+
+  /**
+   * Bumps loadRequestId and nulls in-flight references to invalidate any
+   * pending asynchronous track fetches, preventing resurrected playback on empty queue.
+   */
+  private cancelPendingLoads(): void {
+    this.loadRequestId += 1;
+    this.inFlightLoad = null;
+    if (this.pendingCanPlayHandler) {
+      this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.pendingCanPlayHandler = null;
+    }
   }
 
   /**
@@ -634,6 +670,7 @@ class AudioPlayer {
 
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
+    this.cancelPendingLoads();
     this.clearAbLoop('DESTROY');
     this.karaokeNode.destroy();
     this.nightModeNode.destroy();

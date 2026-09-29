@@ -17,13 +17,19 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
   public async execute(input: DeleteInput, ctx: OperationContext): Promise<OperationResult<void>> {
     const { playlistId } = input;
 
-    const playlist = await this.repository.getById(playlistId, ctx.trx);
-    if (!playlist) {
-      logger.warn('[DeleteOp] Playlist not found', { playlistId });
-      throw new Error(`Playlist ${playlistId} not found`);
-    }
+    // Concurrency guard: mark deleting and cancel any in-flight Spotify synchronization on this playlist
+    const { SpotifyPlaylistSyncService } = await import('../../spotify/sync/SpotifyPlaylistSyncService');
+    SpotifyPlaylistSyncService.markDeleting(playlistId);
+    try {
+      await SpotifyPlaylistSyncService.cancelSync(playlistId);
 
-    logger.info('[DeleteOp] Deleting playlist', { playlistId, playlistName: playlist.name });
+      const playlist = await this.repository.getById(playlistId, ctx.trx);
+      if (!playlist) {
+        logger.warn('[DeleteOp] Playlist not found', { playlistId });
+        throw new Error(`Playlist ${playlistId} not found`);
+      }
+
+      logger.info('[DeleteOp] Deleting playlist', { playlistId, playlistName: playlist.name });
 
     // Get all entries so we know what song memberships are affected, and for undo
     const entries = await this.repository.getEntries(playlistId, {}, ctx.trx);
@@ -55,24 +61,27 @@ export class DeleteOp implements CollectionOperation<DeleteInput, void> {
         ? parseFloat(playlist.totalDuration)
         : playlist.totalDuration || 0;
 
-    return {
-      data: undefined,
-      collectionId: createCollectionId('local', 'playlist', playlistId),
-      operationType: 'playlist.delete',
-      operationInput: { playlistId },
-      inverseInput: {
-        operationType: 'playlist.restore',
-        input: { playlist, entries: entries.map((e) => e.entry), smartRule }
-      },
-      version: 1,
-      affectedSongIds,
-      statsDelta: playlist.parentId
-        ? {
-            targetPlaylistId: playlist.parentId,
-            itemCountDelta: -(playlist.itemCount || 0),
-            durationDelta: -duration
-          }
-        : undefined
-    };
+      return {
+        data: undefined,
+        collectionId: createCollectionId('local', 'playlist', playlistId),
+        operationType: 'playlist.delete',
+        operationInput: { playlistId },
+        inverseInput: {
+          operationType: 'playlist.restore',
+          input: { playlist, entries: entries.map((e) => e.entry), smartRule }
+        },
+        version: 1,
+        affectedSongIds,
+        statsDelta: playlist.parentId
+          ? {
+              targetPlaylistId: playlist.parentId,
+              itemCountDelta: -(playlist.itemCount || 0),
+              durationDelta: -duration
+            }
+          : undefined
+      };
+    } finally {
+      SpotifyPlaylistSyncService.unmarkDeleting(playlistId);
+    }
   }
 }

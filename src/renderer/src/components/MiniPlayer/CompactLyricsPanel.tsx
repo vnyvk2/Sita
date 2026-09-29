@@ -3,7 +3,7 @@
 import { SYNCED_LYRICS_REGEX } from '@common/isLyricsSynced';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import { useContext, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
@@ -12,6 +12,8 @@ import { useLyricsQuery } from '../../queries/lyrics';
 import { CloseIcon } from '../Icons/WindowIcons';
 import Img from '../Img';
 import { useActiveLyricIndex } from '../LyricsPage/useActiveLyricIndex';
+import { useLyricsScrollSync } from '../LyricsPage/useLyricsScrollSync';
+import { getLyricScrollBehavior } from '../LyricsPage/lyricsUtils';
 
 type Props = {
   isLyricsVisible: boolean;
@@ -40,60 +42,57 @@ const CompactLyricsPanel = (props: Props) => {
   const { updateSongPosition } = useContext(AppUpdateContext);
   const { t } = useTranslation();
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
   const { data: lyrics } = useLyricsQuery({ enabled: isLyricsVisible });
   const rawActiveIndex = useActiveLyricIndex(isLyricsVisible ? lyrics : null);
   const currentLineIndex = rawActiveIndex ?? -1;
-
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map());
-  const isUserScrollingRef = useRef(false);
-  const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Auto-scroll isolated to the lyrics viewport (does NOT scroll parent containers)
-  useEffect(() => {
-    if (isUserScrollingRef.current) return;
-    if (currentLineIndex >= 0 && scrollContainerRef.current) {
-      const lineEl = lineRefs.current.get(currentLineIndex);
-      if (lineEl) {
-        const container = scrollContainerRef.current;
-        const targetScrollTop =
-          lineEl.offsetTop - container.clientHeight / 2 + lineEl.clientHeight / 2;
-        if (typeof container.scrollTo === 'function') {
-          container.scrollTo({
-            top: Math.max(0, targetScrollTop),
-            behavior: 'smooth'
-          });
-        } else {
-          container.scrollTop = Math.max(0, targetScrollTop);
-        }
-      }
-    }
-  }, [currentLineIndex]);
-
-  // Handle user manual scroll via wheel/touch with temporary pause on auto-scroll
-  const handleUserInteraction = useCallback(() => {
-    isUserScrollingRef.current = true;
-    if (userScrollTimeoutRef.current) {
-      clearTimeout(userScrollTimeoutRef.current);
-    }
-    userScrollTimeoutRef.current = setTimeout(() => {
-      isUserScrollingRef.current = false;
-    }, 2500);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (userScrollTimeoutRef.current) {
-        clearTimeout(userScrollTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const parsedLyrics = useMemo(
     () => lyrics?.lyrics?.parsedLyrics ?? [],
     [lyrics?.lyrics?.parsedLyrics]
   );
   const isSynced = lyrics?.lyrics?.isSynced ?? false;
+
+  const {
+    scrollMode,
+    isAutoScrolling,
+    direction,
+    showSnapBack,
+    handleSnapBack,
+    handleToggleScrollMode,
+    markProgrammaticScroll
+  } = useLyricsScrollSync({
+    containerRef: scrollContainerRef,
+    activeLineIndex: rawActiveIndex,
+    isSynced,
+    songId: currentSongData.songId,
+    parsedLyrics: lyrics?.lyrics?.parsedLyrics ?? null,
+    offset: lyrics?.lyrics?.offset ?? 0
+  });
+
+  // Auto-scroll isolated to the lyrics viewport (does NOT scroll parent containers)
+  useEffect(() => {
+    if (!isAutoScrolling) return;
+    if (currentLineIndex >= 0 && scrollContainerRef.current) {
+      const lineEl = lineRefs.current.get(currentLineIndex);
+      if (lineEl) {
+        const container = scrollContainerRef.current;
+        const targetScrollTop =
+          lineEl.offsetTop - container.clientHeight / 2 + lineEl.clientHeight / 2;
+        markProgrammaticScroll();
+        if (typeof container.scrollTo === 'function') {
+          container.scrollTo({
+            top: Math.max(0, targetScrollTop),
+            behavior: getLyricScrollBehavior()
+          });
+        } else {
+          container.scrollTop = Math.max(0, targetScrollTop);
+        }
+      }
+    }
+  }, [currentLineIndex, isAutoScrolling, markProgrammaticScroll]);
 
   const handleLineClick = (start?: number) => {
     if (typeof start === 'number' && updateSongPosition) {
@@ -117,21 +116,42 @@ const CompactLyricsPanel = (props: Props) => {
         <div className="absolute inset-0 bg-black/60" />
       </div>
 
-      {/* ── Layer 2: Floating Close Button (z-30) ── */}
-      <button
-        type="button"
-        className="text-font-color-white/70 absolute top-2 right-2 z-30 flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-[#e81123] hover:text-white"
-        onClick={onClose}
-        title={t('common.close', 'Close')}
-      >
-        <CloseIcon className="h-2 w-2" />
-      </button>
+      {/* ── Layer 2: Floating Header Controls (z-30) ── */}
+      <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5 [-webkit-app-region:no-drag]">
+        {lyrics && isSynced && parsedLyrics.length > 0 && (
+          <button
+            type="button"
+            onClick={handleToggleScrollMode}
+            aria-pressed={scrollMode === 'auto'}
+            title={
+              scrollMode === 'auto'
+                ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
+                : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
+            }
+            className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-sm bg-black/40 backdrop-blur-xs transition-colors [-webkit-app-region:no-drag] ${
+              scrollMode === 'auto'
+                ? 'text-accent hover:bg-black/60'
+                : 'text-font-color-white/70 hover:bg-black/60 hover:text-white'
+            }`}
+          >
+            <span className="material-symbols-rounded text-sm">
+              {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
+            </span>
+          </button>
+        )}
+        <button
+          type="button"
+          className="text-font-color-white/70 flex h-6 w-6 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-[#e81123] hover:text-white [-webkit-app-region:no-drag]"
+          onClick={onClose}
+          title={t('common.close', 'Close')}
+        >
+          <CloseIcon className="h-2.5 w-2.5" />
+        </button>
+      </div>
 
       {/* ── Layer 3: Lyrics Scrollable Viewport (Strict min-h-0 flex-1 container at z-10) ── */}
       <div
         ref={scrollContainerRef}
-        onWheel={handleUserInteraction}
-        onTouchMove={handleUserInteraction}
         className="relative z-10 min-h-0 w-full flex-1 scrollbar-none overflow-y-auto px-4 py-6 text-center select-none"
       >
         {/* ── Synced Lyrics List ── */}
@@ -148,6 +168,8 @@ const CompactLyricsPanel = (props: Props) => {
                     if (el) lineRefs.current.set(idx, el);
                     else lineRefs.current.delete(idx);
                   }}
+                  data-line-index={idx}
+                  data-active-line={isActive ? 'true' : undefined}
                   onClick={() => handleLineClick(line.start)}
                   className={`max-w-full cursor-pointer px-2 transition-all duration-200 ${
                     isActive
@@ -189,6 +211,23 @@ const CompactLyricsPanel = (props: Props) => {
           </div>
         )}
       </div>
+
+      {/* ── Floating Bidirectional Snap-Back Button (z-30) ── */}
+      {showSnapBack && direction && (
+        <button
+          type="button"
+          onClick={handleSnapBack}
+          title={t('lyricsPage.scrollToCurrentLine', 'Scroll to current line')}
+          className={`bg-accent text-white absolute left-1/2 z-30 flex -translate-x-1/2 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold shadow-xl backdrop-blur-md transition-all hover:scale-105 hover:shadow-accent/40 active:scale-95 [-webkit-app-region:no-drag] ${
+            direction === 'up' ? 'top-2.5' : 'bottom-6'
+          }`}
+        >
+          <span className="material-symbols-rounded text-xs">
+            {direction === 'up' ? 'keyboard_double_arrow_up' : 'keyboard_double_arrow_down'}
+          </span>
+          <span>{t('lyricsPage.currentLine', 'Current line')}</span>
+        </button>
+      )}
 
       {/* ── Layer 4: Pinned Attribution Footer (z-10 outside scrolling viewport) ── */}
       {lyrics?.source && (

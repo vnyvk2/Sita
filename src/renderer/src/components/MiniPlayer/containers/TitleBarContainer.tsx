@@ -2,6 +2,7 @@ import { settingsQuery } from '@renderer/queries/settings';
 import { store } from '@renderer/store/store';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
+import storage from '@renderer/utils/localStorage';
 import { useContext } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,6 +27,13 @@ const TitleBarContainer = (props: Props) => {
   const { t } = useTranslation();
 
   const { isLyricsVisible } = props;
+  const preferences = useStore(store, (state) => state.localStorage.preferences);
+  const scrollMode = preferences?.lyricsScrollMode ?? 'auto';
+
+  const handleToggleScrollMode = () => {
+    const next = scrollMode === 'auto' ? 'manual' : 'auto';
+    storage.preferences.setPreferences('lyricsScrollMode', next);
+  };
 
   return (
     <div
@@ -43,6 +51,23 @@ const TitleBarContainer = (props: Props) => {
             : ''
         } ${!isCurrentSongPlaying ? 'visible! opacity-100!' : ''}`}
       >
+        {isLyricsVisible && (
+          <Button
+            className="lyrics-scroll-mode-btn text-font-color-white dark:text-font-color-white mr-1! rounded-md! border-0! bg-transparent! p-1.5! outline-offset-1 [-webkit-app-region:no-drag] focus-visible:outline!"
+            ariaPressed={scrollMode === 'auto'}
+            tooltipLabel={
+              scrollMode === 'auto'
+                ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
+                : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
+            }
+            iconName={scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
+            iconClassName={`material-icons-round text-lg! ${
+              scrollMode === 'auto' ? 'text-accent' : 'opacity-80'
+            }`}
+            clickHandler={handleToggleScrollMode}
+            removeFocusOnClick
+          />
+        )}
         <Button
           className="go-to-main-player-btn text-font-color-white dark:text-font-color-white mr-1! rounded-md! border-0! bg-transparent! p-1.5! outline-offset-1 [-webkit-app-region:no-drag] focus-visible:outline!"
           tooltipLabel={t('player.goToMainPlayer')}

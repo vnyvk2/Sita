@@ -25,7 +25,7 @@ const LanguageSettings = () => {
       className="language-settings-container"
     >
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
-        <li className="seekbar-scroll-interval mb-4">
+        <li id="setting-language-dropdown" className="seekbar-scroll-interval mb-4">
           <div className="description">{t('settingsPage.languageDescription')}</div>
           <Dropdown
             className="mt-4"

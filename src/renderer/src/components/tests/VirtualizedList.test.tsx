@@ -107,6 +107,142 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
     expect(scrollRegistry.getIndex('test-songs')).toBe(530);
   });
 
+  it('should preserve saved scroll index when mounted with empty data and restore when data arrives (empty-data restoration)', () => {
+    scrollRegistry.set('test-async-songs', { index: 750, offset: 10 });
+
+    // Mount initially with empty array while async query is in flight
+    const { rerender } = render(
+      <VirtualizedList
+        scrollKey="test-async-songs"
+        data={[]}
+        fixedItemHeight={60}
+        itemContent={(idx) => <div>Item {idx}</div>}
+      />
+    );
+
+    // Initial topmost index must NOT be clamped to 0 while data is loading
+    expect(lastVirtuosoProps.initialTopMostItemIndex).toEqual({
+      index: 750,
+      offset: 10
+    });
+
+    // Transient initial layout event at index 0 must NOT overwrite saved position
+    const rangeChanged = lastVirtuosoProps.rangeChanged as (range: {
+      startIndex: number;
+      endIndex: number;
+    }) => void;
+    rangeChanged({ startIndex: 0, endIndex: 0 });
+    expect(scrollRegistry.get('test-async-songs')).toEqual({ index: 750, offset: 10 });
+
+    // Data resolves and populates 2000 songs
+    const loadedData = Array.from({ length: 2000 }, (_, i) => ({ id: i }));
+    rerender(
+      <VirtualizedList
+        scrollKey="test-async-songs"
+        data={loadedData}
+        fixedItemHeight={60}
+        itemContent={(idx) => <div>Item {idx}</div>}
+      />
+    );
+
+    // Range changes to target position
+    const updatedRangeChanged = lastVirtuosoProps.rangeChanged as (range: {
+      startIndex: number;
+      endIndex: number;
+    }) => void;
+    updatedRangeChanged({ startIndex: 740, endIndex: 760 });
+
+    // Now in TRACKING: normal scroll to 800 updates registry
+    updatedRangeChanged({ startIndex: 800, endIndex: 825 });
+    expect(scrollRegistry.getIndex('test-async-songs')).toBe(800);
+  });
+
+  it('should unlock to TRACKING when list shrinks below saved target index (shrinking-list restoration)', () => {
+    // Saved position is at index 1200
+    scrollRegistry.set('test-shrunk-songs', { index: 1200, offset: 0 });
+
+    // List shrinks/filters to only 100 songs
+    const shrunkData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+
+    render(
+      <VirtualizedList
+        scrollKey="test-shrunk-songs"
+        data={shrunkData}
+        fixedItemHeight={60}
+        itemContent={(idx) => <div>Item {idx}</div>}
+      />
+    );
+
+    const rangeChanged = lastVirtuosoProps.rangeChanged as (range: {
+      startIndex: number;
+      endIndex: number;
+    }) => void;
+
+    // Virtuoso clamps visible range to the end of the shrunk list: [80, 99]
+    // Under DEF-RN-01, range.endIndex (99) >= maxIndex (99), which must unlock to TRACKING
+    rangeChanged({ startIndex: 80, endIndex: 99 });
+
+    // Subsequent scroll must now be accepted by scrollRegistry (not locked in RESTORING forever)
+    rangeChanged({ startIndex: 30, endIndex: 50 });
+    expect(scrollRegistry.getIndex('test-shrunk-songs')).toBe(30);
+  });
+
+  it('should not allow failsafe timer to force TRACKING and overwrite registry when data takes >500ms to load (slow-load restoration)', () => {
+    vi.useFakeTimers();
+    try {
+      scrollRegistry.set('test-slow-load', { index: 650, offset: 25 });
+
+      // Mount with empty data
+      const { rerender } = render(
+        <VirtualizedList
+          scrollKey="test-slow-load"
+          data={[]}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      // Advance past 500ms (e.g. 1500ms) while data is still loading
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+
+      // Transient layout before data arrival
+      const rangeChanged = lastVirtuosoProps.rangeChanged as (range: {
+        startIndex: number;
+        endIndex: number;
+      }) => void;
+      rangeChanged({ startIndex: 0, endIndex: 0 });
+
+      // Stored position MUST NOT be overwritten with 0!
+      expect(scrollRegistry.get('test-slow-load')).toEqual({ index: 650, offset: 25 });
+
+      // Data finally resolves at 1500ms
+      const loadedData = Array.from({ length: 1000 }, (_, i) => ({ id: i }));
+      rerender(
+        <VirtualizedList
+          scrollKey="test-slow-load"
+          data={loadedData}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      // Range arrives at restored target
+      const updatedRangeChanged = lastVirtuosoProps.rangeChanged as (range: {
+        startIndex: number;
+        endIndex: number;
+      }) => void;
+      updatedRangeChanged({ startIndex: 645, endIndex: 665 });
+
+      // Now normal tracking updates registry
+      updatedRangeChanged({ startIndex: 700, endIndex: 720 });
+      expect(scrollRegistry.getIndex('test-slow-load')).toBe(700);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('should imperatively scroll Virtuoso when scrollKey changes on an already-mounted list', () => {
     scrollRegistry.set('dataset-a', { index: 300, offset: 15 });
     scrollRegistry.set('dataset-b', { index: 120, offset: 8 });
@@ -418,6 +554,29 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
       expect(DEFAULT_SCROLL_SEEK_CONFIG.enter(-2800, dummyRange)).toBe(true);
       expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(200, dummyRange)).toBe(true);
       expect(DEFAULT_SCROLL_SEEK_CONFIG.exit(400, dummyRange)).toBe(false);
+    });
+
+    it('passes fixedItemHeight to Virtuoso and updates when row height changes', () => {
+      const dummyData = Array.from({ length: 100 }, (_, i) => ({ id: i }));
+      const { rerender } = render(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={60}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      expect(lastVirtuosoProps.fixedItemHeight).toBe(60);
+
+      rerender(
+        <VirtualizedList
+          data={dummyData}
+          fixedItemHeight={38}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      expect(lastVirtuosoProps.fixedItemHeight).toBe(38);
     });
   });
 });

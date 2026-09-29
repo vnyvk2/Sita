@@ -30,13 +30,13 @@ const TabButton: FC<TabButtonProps> = memo(
         aria-selected={isActive}
         onClick={() => onTabClick(panelId)}
         onPointerDown={handlePointerDown}
-        className={`group flex cursor-grab items-center gap-1.5 rounded-t-lg px-3 py-1.5 text-xs font-medium transition-all active:cursor-grabbing ${
+        className={`group flex cursor-grab items-center gap-1 rounded-t-md px-2.5 py-1 text-[11px] font-medium transition-all active:cursor-grabbing ${
           isActive
             ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white border-accent border-b-2 shadow-xs'
             : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200/50 dark:hover:bg-stone-800/50'
         }`}
       >
-        {def && <span className="material-symbols-rounded text-sm opacity-80">{def.icon}</span>}
+        {def && <span className="material-symbols-rounded text-xs opacity-80">{def.icon}</span>}
         <span className="max-w-[120px] truncate">{def?.title ?? panelId}</span>
 
         {canClose && (
@@ -52,9 +52,9 @@ const TabButton: FC<TabButtonProps> = memo(
             }}
             title="Close tab"
             aria-label={`Close tab ${def?.title ?? panelId}`}
-            className="ml-1 flex h-4 w-4 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-80 hover:bg-stone-300 hover:opacity-100 dark:hover:bg-stone-700"
+            className="ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-80 hover:bg-stone-300 hover:opacity-100 dark:hover:bg-stone-700"
           >
-            <span className="material-symbols-rounded text-[11px]">close</span>
+            <span className="material-symbols-rounded text-[10px]">close</span>
           </span>
         )}
       </button>
@@ -107,7 +107,22 @@ export const TabGroup: FC<TabGroupProps> = memo(({ node }) => {
       <div
         role="tablist"
         aria-label="Workspace Tabs"
-        className="tab-strip bg-background-color-2/50 dark:bg-dark-background-color-2/50 text-font-color-black dark:text-font-color-white flex h-9 shrink-0 items-center gap-1 overflow-x-auto overflow-y-hidden border-b border-stone-200/60 px-2 select-none dark:border-stone-800/60"
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            const currentIndex = node.tabs.indexOf(node.active);
+            if (currentIndex === -1) return;
+            const nextIndex =
+              e.key === 'ArrowLeft'
+                ? (currentIndex - 1 + node.tabs.length) % node.tabs.length
+                : (currentIndex + 1) % node.tabs.length;
+            const nextPanelId = node.tabs[nextIndex];
+            if (nextPanelId) {
+              handleTabClick(nextPanelId);
+            }
+          }
+        }}
+        className="tab-strip bg-background-color-2/50 dark:bg-dark-background-color-2/50 text-font-color-black dark:text-font-color-white flex h-7 shrink-0 items-center gap-0.5 overflow-x-auto overflow-y-hidden border-b border-stone-200/60 px-1.5 select-none dark:border-stone-800/60"
       >
         {node.tabs.map((panelId) => {
           const instance = panelsMap[panelId];

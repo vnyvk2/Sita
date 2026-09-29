@@ -46,7 +46,7 @@ const DownloadsSettings = () => {
       className="downloads-settings-container"
     >
       <ul className="secondary-container p-4">
-        <li className="download-folder mb-4">
+        <li id="setting-downloads-folder" className="download-folder mb-4">
           <div className="description">
             {t(
               'settingsPage.downloads.folderDescription',
@@ -88,7 +88,7 @@ const DownloadsSettings = () => {
           </div>
         </li>
 
-        <li className="add-downloads-to-library mb-4">
+        <li id="setting-downloads-add-to-library" className="add-downloads-to-library mb-4">
           <Checkbox
             id="addDownloadsToLibrary"
             isChecked={userSettings !== undefined && userSettings.addDownloadsToLibrary === true}
@@ -106,7 +106,7 @@ const DownloadsSettings = () => {
           </div>
         </li>
 
-        <li className="duplicate-policy mb-4">
+        <li id="setting-downloads-duplicate-policy" className="duplicate-policy mb-4">
           <div className="description">
             {t(
               'settingsPage.downloads.duplicatePolicyDescription',

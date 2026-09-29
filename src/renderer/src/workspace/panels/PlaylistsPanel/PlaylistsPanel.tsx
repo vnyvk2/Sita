@@ -162,14 +162,11 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
   return (
     <div className="playlists-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white flex h-full w-full flex-col overflow-hidden">
       {/* Header */}
-      <div className="border-b border-stone-200/50 px-3 py-2 dark:border-stone-800/50">
-        <div className="flex items-center justify-between pb-1.5">
+      <div className="border-b border-stone-200/50 px-2.5 py-1.5 dark:border-stone-800/50">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="material-symbols-rounded text-accent text-base">
-              featured_play_list
-            </span>
-            <span className="text-xs font-semibold">{t('common.playlist_other', 'Playlists')}</span>
-            <span className="text-font-color-dimmed bg-background-color-2/60 dark:bg-dark-background-color-2/60 rounded-full px-1.5 py-0.2 text-[10px]">
+            <span className="text-[11px] font-semibold">{t('common.playlist_other', 'Playlists')}</span>
+            <span className="text-font-color-dimmed bg-background-color-2/60 dark:bg-dark-background-color-2/60 rounded-full px-1.5 text-[9px] leading-tight">
               {playlists.length}
             </span>
           </div>
@@ -178,15 +175,15 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
             type="button"
             onClick={openNewPlaylistPrompt}
             title={t('playlistsPage.createPlaylist', 'Create Playlist')}
-            className="hover:bg-background-color-2 text-font-color-dimmed hover:text-font-color-black dark:hover:bg-dark-background-color-2 dark:hover:text-font-color-white flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors"
+            className="hover:bg-background-color-2 text-font-color-dimmed hover:text-font-color-black dark:hover:bg-dark-background-color-2 dark:hover:text-font-color-white flex h-5 w-5 cursor-pointer items-center justify-center rounded transition-colors"
           >
-            <span className="material-symbols-rounded text-base">add</span>
+            <span className="material-symbols-rounded text-sm">add</span>
           </button>
         </div>
 
         {/* Search Filter Input */}
         {playlists.length > 3 && (
-          <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 mt-1 flex items-center rounded-md border border-stone-200/60 px-2 py-1 dark:border-stone-800/60">
+          <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 mt-1 flex items-center rounded-md border border-stone-200/60 px-2 py-0.5 dark:border-stone-800/60">
             <span className="material-symbols-rounded text-font-color-dimmed mr-1.5 text-xs">
               search
             </span>
@@ -220,9 +217,7 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
           </div>
         ) : filteredPlaylists.length === 0 ? (
           <div className="text-font-color-dimmed flex h-full w-full flex-col items-center justify-center p-6 text-center">
-            <span className="material-symbols-rounded mb-2 text-3xl opacity-60">
-              queue_music
-            </span>
+            <span className="material-symbols-rounded mb-2 text-3xl opacity-60">queue_music</span>
             <p className="text-xs">
               {searchQuery
                 ? t('searchPage.noResults', 'No playlists match your search')
@@ -248,9 +243,7 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
                   <span className="material-symbols-rounded text-xs">push_pin</span>
                   <span>{t('playlist.pinned', 'Pinned')}</span>
                 </div>
-                <ul className="flex flex-col gap-0.5">
-                  {pinnedPlaylists.map(renderPlaylistItem)}
-                </ul>
+                <ul className="flex flex-col gap-0.5">{pinnedPlaylists.map(renderPlaylistItem)}</ul>
               </div>
             )}
 

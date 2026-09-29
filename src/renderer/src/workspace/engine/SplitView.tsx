@@ -37,6 +37,11 @@ export const SplitView: FC<SplitViewProps> = memo(({ node }) => {
       const slotB = slotRefs.current[dividerIndex + 1];
       if (!slotA || !slotB) return;
 
+      const initialWeights = [...node.weights];
+      const weightA = initialWeights[dividerIndex] ?? 1 / node.children.length;
+      const weightB = initialWeights[dividerIndex + 1] ?? 1 / node.children.length;
+      const pairWeight = weightA + weightB;
+
       dividerEl.setPointerCapture(e.pointerId);
       containerEl.setAttribute('data-resizing', 'true');
 
@@ -48,24 +53,31 @@ export const SplitView: FC<SplitViewProps> = memo(({ node }) => {
       const totalPairSize = startSizeA + startSizeB;
       const minSlotSize = 80; // Minimum slot pixel size guard
 
+      if (totalPairSize <= 0 || pairWeight <= 0) return;
+
+      const effectiveMin = Math.min(minSlotSize, totalPairSize / 2);
+
+      let currentWeightA = weightA;
+      let currentWeightB = weightB;
+
       const onPointerMove = (moveEvent: PointerEvent): void => {
         const curCoord = isHorizontal ? moveEvent.clientX : moveEvent.clientY;
         const delta = curCoord - startCoord;
 
         let newSizeA = startSizeA + delta;
-        let newSizeB = startSizeB - delta;
-
-        if (newSizeA < minSlotSize) {
-          newSizeA = minSlotSize;
-          newSizeB = totalPairSize - minSlotSize;
-        } else if (newSizeB < minSlotSize) {
-          newSizeB = minSlotSize;
-          newSizeA = totalPairSize - minSlotSize;
+        if (newSizeA < effectiveMin) {
+          newSizeA = effectiveMin;
+        } else if (newSizeA > totalPairSize - effectiveMin) {
+          newSizeA = totalPairSize - effectiveMin;
         }
 
-        // Direct DOM update (Decision D5: 0 React renders during drag)
-        slotA.style.flexGrow = String(newSizeA);
-        slotB.style.flexGrow = String(newSizeB);
+        const ratioA = newSizeA / totalPairSize;
+        currentWeightA = Math.round(pairWeight * ratioA * 10000) / 10000;
+        currentWeightB = Math.round((pairWeight - currentWeightA) * 10000) / 10000;
+
+        // Direct DOM update in fractional weight domain (0 React renders during drag, 0 crushed siblings)
+        slotA.style.flexGrow = String(currentWeightA);
+        slotB.style.flexGrow = String(currentWeightB);
       };
 
       const onPointerUp = (upEvent: PointerEvent): void => {
@@ -80,19 +92,12 @@ export const SplitView: FC<SplitViewProps> = memo(({ node }) => {
           // Ignored if capture already lost
         }
 
-        // Measure all child slot pixel sizes from DOM and normalize
-        const currentSizes: number[] = [];
-        for (let i = 0; i < node.children.length; i++) {
-          const slot = slotRefs.current[i];
-          if (slot) {
-            const rect = slot.getBoundingClientRect();
-            currentSizes.push(isHorizontal ? rect.width : rect.height);
-          } else {
-            currentSizes.push(node.weights[i] ?? 1);
-          }
-        }
+        // Commit mathematical weights directly (avoids measuring crushed sibling DOM boxes)
+        const finalWeights = [...initialWeights];
+        finalWeights[dividerIndex] = currentWeightA;
+        finalWeights[dividerIndex + 1] = currentWeightB;
 
-        const normalized = normalizeWeights(currentSizes);
+        const normalized = normalizeWeights(finalWeights);
         workspaceActions.dispatchOp({
           t: 'split.weights',
           splitId: node.id,
@@ -150,6 +155,9 @@ export const SplitView: FC<SplitViewProps> = memo(({ node }) => {
             {/* Divider between children */}
             {index < node.children.length - 1 && (
               <div
+                role="separator"
+                aria-orientation={isHorizontal ? 'vertical' : 'horizontal'}
+                tabIndex={0}
                 onPointerDown={(e) => handleDividerPointerDown(index, e)}
                 title="Drag to resize split"
                 className={`split-divider group relative z-30 shrink-0 touch-none select-none ${

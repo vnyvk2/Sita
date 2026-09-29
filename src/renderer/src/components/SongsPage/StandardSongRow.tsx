@@ -1,0 +1,462 @@
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+/* eslint-disable jsx-a11y/click-events-have-key-events */
+import { type DraggableProvided } from '@hello-pangea/dnd';
+import { useStore } from '@tanstack/react-store';
+import {
+  type CSSProperties,
+  type ForwardedRef,
+  forwardRef,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { appPreferences } from '../../../../../package.json';
+import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
+import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useSongSelection } from '../../contexts/MultipleSelectionContext';
+import { useSongPreferences } from '../../contexts/SongPreferencesContext';
+import useHeartBurst from '../../hooks/useHeartBurst';
+import { store } from '../../store/store';
+import Button from '../Button';
+import HeartBurst from '../HeartBurst';
+import Img from '../Img';
+import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
+import NavLink from '../NavLink';
+import HighlightedText from '../SearchPage/HighlightedText';
+import SoundBarsIndicator from '../SoundBarsIndicator';
+import SongArtist from './SongArtist';
+import useSongContextMenu from './useSongContextMenu';
+import { useSongFavoriteToggle } from './useSongFavoriteToggle';
+
+export interface SongProp {
+  songId: number;
+  artworkPaths: ArtworkPaths;
+  title: string;
+  artists?: { name: string; artistId: number }[];
+  album?: { name: string; albumId: number };
+  duration: number;
+  year?: number;
+  path: string;
+  isBlacklisted?: boolean;
+  additionalContextMenuItems?: ContextMenuItem[];
+  index: number;
+  trackNo?: number | string;
+  isIndexingSongs: boolean;
+  isAFavorite: boolean;
+  className?: string;
+  onPlayClick?: (currSongId: number) => void;
+  style?: CSSProperties;
+  isDraggable?: boolean;
+  /** True while an active drag operation holds this row (visual lift only). */
+  isDragging?: boolean;
+  provided?: DraggableProvided;
+  selectAllHandler?: (_upToId?: number) => void;
+  genres?: { genreId: number | string; name: string }[];
+  discNo?: number;
+  /** When provided, highlights the matching portion of the title in search results */
+  highlightText?: string;
+  /**
+   * When provided, skips the per-row store subscription for bodyBackgroundImage.
+   * Pass from the parent to avoid N store subscriptions in the hot scrolling path.
+   */
+  hasBodyBackgroundImage?: boolean;
+  /** When true, renders compact 38px MusicBee-style row without artwork */
+  isCompact?: boolean;
+  /** Active row size for views with artwork ('normal' = 60px card, 'small' = 48px row). Defaults to 'normal'. */
+  rowSize?: 'normal' | 'small';
+  /** When true, contextmenu and more-options click events bubble to list container without local interception */
+  isDelegated?: boolean;
+  /** Optional direct contextmenu handler for tests/delegation */
+  onContextMenu?: (e: React.MouseEvent) => void;
+  /** Optional direct more options click handler for tests/delegation */
+  onMoreOptionsClick?: (
+    e: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLButtonElement>
+  ) => void;
+}
+
+export const StandardSongRow = memo(
+  forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => {
+    const {
+      index,
+      songId,
+      duration,
+      artworkPaths,
+      isIndexingSongs,
+      isBlacklisted = false,
+      path,
+      title,
+      additionalContextMenuItems,
+      artists,
+      album,
+      genres,
+      discNo,
+      style,
+      year,
+      trackNo,
+      selectAllHandler,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      provided = {} as any,
+      isDragging = false,
+      onPlayClick,
+      highlightText,
+      hasBodyBackgroundImage,
+      isDelegated = false,
+      onContextMenu: directContextMenu
+    } = props;
+
+    // Granular store subscriptions: only subscribe to primitives relevant to this specific song
+    const isCurrentSong = useStore(store, (state) => state.currentSongData?.songId === songId);
+    const isSongPlaying = useStore(
+      store,
+      (state) =>
+        state.currentSongData?.songId === songId && Boolean(state.player.isCurrentSongPlaying)
+    );
+    const currentSongFavorite = useStore(store, (state) =>
+      state.currentSongData?.songId === songId ? state.currentSongData.isAFavorite : undefined
+    );
+    const preferences = useSongPreferences();
+    const bodyBackgroundImage = hasBodyBackgroundImage ?? preferences.bodyBackgroundImage;
+    const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
+      useSongSelection(songId);
+    const showTrackNumberAsSongIndex = preferences.showTrackNumberAsSongIndex;
+    const showEqualizerOnTracklist = preferences.showEqualizerOnTracklist;
+    const isAnimationDisabled = preferences.isAnimationDisabled;
+
+    const {
+      playSong,
+      addNewNotifications,
+      toggleIsFavorite,
+      toggleMultipleSelections,
+      updateMultipleSelections
+    } = useContext(AppUpdateContext);
+    const { t } = useTranslation();
+
+    const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
+    // Monotonic counter to prevent race conditions on rapid successive favorite toggles
+    const likeMutationSeqRef = useRef(0);
+    const { isBursting, triggerBurst } = useHeartBurst();
+
+    const initialFavorite =
+      isCurrentSong && currentSongFavorite !== undefined
+        ? currentSongFavorite
+        : props.isAFavorite;
+
+    const { isFavorite: isAFavorite, toggleFavorite: toggleSingleSongFavorite } =
+      useSongFavoriteToggle({
+        songId,
+        isAFavorite: initialFavorite,
+        isCurrentSong,
+        triggerBurst
+      });
+
+    const handlePlayBtnClick = useCallback(() => {
+      if (onPlayClick) return onPlayClick(songId);
+      return playSong(songId);
+    }, [onPlayClick, playSong, songId]);
+
+    const { minutes, seconds } = useMemo(() => {
+      const addZero = (num: number) => {
+        if (num < 10) return `0${num}`;
+        return num.toString();
+      };
+
+      const min = Math.floor((duration || 0) / 60);
+      const sec = Math.floor((duration || 0) % 60);
+
+      return {
+        minutes: Number.isNaN(min) ? undefined : addZero(min),
+        seconds: Number.isNaN(sec) ? undefined : addZero(sec)
+      };
+    }, [duration]);
+
+    // Stable identity key based on artist IDs, not the array reference itself.
+    // The artists prop is a fresh array from IPC on every window refetch, which would
+    // invalidate useMemo even when the actual data is identical.
+    const artistsKey = useMemo(
+      () => artists?.map((a) => a.artistId).join(',') ?? '',
+      [artists]
+    );
+
+    const songArtists = useMemo(() => {
+      if (Array.isArray(artists) && artists.length > 0) {
+        return artists
+          .map((artist, i) => {
+            const arr = [
+              <SongArtist
+                key={artist.artistId}
+                artistId={artist.artistId}
+                name={artist.name}
+                className={`${(isCurrentSong || isAMultipleSelection) && 'dark:text-font-color-black!'}`}
+              />
+            ];
+
+            if ((artists?.length ?? 1) - 1 !== i) {
+              arr.push(
+                <span key={`comma-${artist.artistId}-${i}`} className="mr-1">
+                  ,
+                </span>
+              );
+            }
+
+            return arr;
+          })
+          .flat();
+      }
+      return <span className="text-xs font-normal">{t('common.unknownArtist')}</span>;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [artistsKey, isCurrentSong, isAMultipleSelection, t]);
+
+    const fallbackContextMenu = useSongContextMenu({
+      songId,
+      title,
+      artists,
+      album,
+      duration,
+      year,
+      path,
+      isBlacklisted,
+      genres,
+      discNo,
+      trackNo,
+      isAFavorite,
+      isCurrentSong,
+      artworkPaths,
+      isAMultipleSelection,
+      isMultipleSelectionEnabled,
+      additionalContextMenuItems,
+      handlePlayBtnClick,
+      toggleSingleSongFavorite,
+      isCompact: false
+    });
+
+    const handleContextMenu = isDelegated
+      ? directContextMenu
+      : (directContextMenu ?? fallbackContextMenu.handleContextMenu);
+
+    return (
+      <div
+        style={style}
+        data-index={index}
+        data-song-id={songId}
+        data-song-index={index}
+        {...provided?.draggableProps}
+        {...provided?.dragHandleProps}
+        className={`song-item list-row [contain:layout] ${songId} group relative mr-4 mb-2 flex h-13 w-[98%] rounded-lg p-[0.2rem] px-2 -outline-offset-2 transition-[background,color,opacity] duration-150 ease-in-out focus-visible:outline! ${
+          isCurrentSong || isAMultipleSelection
+            ? bodyBackgroundImage
+              ? `bg-background-color-3/70 text-font-color-black dark:bg-dark-background-color-3/70 shadow-lg`
+              : 'bg-background-color-3 text-font-color-black dark:bg-dark-background-color-3 shadow-lg'
+            : bodyBackgroundImage
+              ? `bg-background-color-2/70 hover:bg-background-color-2! dark:bg-dark-background-color-2/70 dark:hover:bg-dark-background-color-2!`
+              : `odd:bg-background-color-2/70 hover:!bg-background-color-2 dark:odd:bg-dark-background-color-2/50 dark:hover:!bg-dark-background-color-2 ${
+                  (index + 1) % 2 === 1
+                    ? 'bg-background-color-2/70! dark:bg-dark-background-color-2/50!'
+                    : 'bg-background-color-1! dark:bg-dark-background-color-1!'
+                }`
+        } ${!isAMultipleSelection && isBlacklisted && 'opacity-30!'} ${
+          isDragging
+            ? 'ring-background-color-3 dark:ring-dark-background-color-3 z-50! opacity-90 shadow-2xl'
+            : ''
+        }`}
+        onContextMenu={handleContextMenu}
+        onClick={(e) => {
+          e.preventDefault();
+          if (e.getModifierState('Shift') === true && selectAllHandler) selectAllHandler(songId);
+          else if (e.getModifierState('Control') === true && !isMultipleSelectionEnabled)
+            toggleMultipleSelections(!isAMultipleSelection, 'songs', [songId]);
+          else if (isMultipleSelectionEnabled)
+            updateMultipleSelections(songId, 'songs', isAMultipleSelection ? 'remove' : 'add');
+        }}
+        onDoubleClick={() => {
+          if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+          handlePlayBtnClick();
+        }}
+        ref={ref}
+      >
+        <div
+          className={`song-cover-and-play-btn-container flex w-[clamp(6rem,15%,9rem)] shrink-0 items-center justify-center ${
+            !isIndexingSongs && !showTrackNumberAsSongIndex && 'w-[clamp(4rem,10%,6rem)]!'
+          }`}
+        >
+          {isMultipleSelectionEnabled ? (
+            <div className="bg-background-color-1 text-font-color-highlight dark:bg-dark-background-color-1 dark:text-dark-background-color-3 relative mx-1 flex h-fit items-center rounded-lg p-1">
+              <MultipleSelectionCheckbox id={songId} selectionType="songs" />
+            </div>
+          ) : isBlacklisted ? (
+            <div
+              className={`relative mr-2 flex h-full items-center justify-center ${
+                index < 10
+                  ? 'min-w-7'
+                  : index < 100
+                    ? 'min-w-10'
+                    : index < 1000
+                      ? 'min-w-12'
+                      : 'min-w-15'
+              }`}
+              title={t('notifications.songBlacklisted', { title })}
+            >
+              <span
+                className={`material-icons-round text-font-color-black dark:text-font-color-white mx-2 text-2xl ${
+                  isCurrentSong && 'dark:text-font-color-black!'
+                } `}
+              >
+                block
+              </span>
+            </div>
+          ) : isIndexingSongs || showTrackNumberAsSongIndex ? (
+            <div
+              className={`bg-background-color-1 text-font-color-highlight group-even:bg-background-color-2/75 group-hover:bg-background-color-1 dark:bg-dark-background-color-1 dark:text-dark-background-color-3 dark:group-even:bg-dark-background-color-2/50 dark:group-hover:bg-dark-background-color-1 relative mx-1 flex items-center justify-center rounded-2xl px-3 py-1 text-center ${
+                index < 10
+                  ? 'min-w-7'
+                  : index < 100
+                    ? 'min-w-10'
+                    : index < 1000
+                      ? 'min-w-12'
+                      : 'min-w-15'
+              }`}
+            >
+              {isCurrentSong && showEqualizerOnTracklist ? (
+                <span className="flex items-center justify-center transition-opacity duration-200">
+                  <SoundBarsIndicator
+                    isPlaying={isSongPlaying && !isAnimationDisabled}
+                    variant="dots"
+                    size="xs"
+                  />
+                </span>
+              ) : (
+                <span className="min-w-2 text-sm leading-tight font-medium transition-opacity duration-200">
+                  {trackNo ?? (isIndexingSongs ? index + 1 : '--')}
+                </span>
+              )}
+            </div>
+          ) : (
+            ''
+          )}
+          <div
+            className={`song-cover-container relative mr-4 ml-2 flex h-[90%] min-w-12 flex-row items-center justify-center overflow-hidden rounded-md ${
+              (isIndexingSongs || isMultipleSelectionEnabled || isBlacklisted) && 'sm:hidden'
+            }`}
+          >
+            {!isIndexingSongs &&
+              !showTrackNumberAsSongIndex &&
+              isCurrentSong &&
+              showEqualizerOnTracklist && (
+                <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-200 group-focus-within:opacity-0 group-hover:opacity-0">
+                  <span className="bg-background-color-1/90 dark:bg-dark-background-color-1/90 text-font-color-highlight dark:text-dark-font-color-highlight flex items-center justify-center rounded-full p-1.5 shadow-md">
+                    <SoundBarsIndicator
+                      isPlaying={isSongPlaying && !isAnimationDisabled}
+                      variant="dots"
+                      size="xs"
+                    />
+                  </span>
+                </div>
+              )}
+            <div className="play-btn-container absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+              <Button
+                className="m-0! rounded-none! border-0! bg-transparent p-0! outline-offset-1 transition-colors! hover:bg-transparent focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
+                iconClassName={`text-3xl! text-font-color-white/0 leading-none! ${
+                  isCurrentSong && !showEqualizerOnTracklist && 'text-font-color-white/100'
+                } group-focus-within:text-font-color-white/100 group-hover:text-font-color-white/100 ${
+                  isSongPlaying && !showEqualizerOnTracklist && 'text-font-color-white/75!'
+                }`}
+                clickHandler={handlePlayBtnClick}
+                iconName={isSongPlaying ? 'pause_circle' : 'play_circle'}
+              />
+            </div>
+            <Img
+              src={
+                artworkPaths?.optimizedArtworkPath ||
+                artworkPaths?.artworkPath ||
+                DefaultSongCover
+              }
+              thumbnail={!artworkPaths?.optimizedArtworkPath && Boolean(artworkPaths?.artworkPath)}
+              loading="lazy"
+              decoding="async"
+              alt="Song cover"
+              className={`aspect-square max-h-full min-w-full object-contain py-[0.1rem] transition-[filter]! duration-300 group-focus-within:brightness-50 group-hover:brightness-50 ${
+                isSongPlaying && !showEqualizerOnTracklist ? 'brightness-50' : ''
+              }`}
+              enableImgFadeIns={false}
+            />
+          </div>
+        </div>
+        <div
+          className={`song-info-container text-font-color-black dark:text-font-color-white grid min-w-0 flex-1 grid-cols-[35%_2fr_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] items-center gap-3 sm:grid-cols-[45%_1fr_minmax(4.5rem,6rem)] sm:gap-2 lg:grid-cols-[40%_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] lg:gap-0! ${
+            (isCurrentSong || isAMultipleSelection) && 'dark:text-font-color-black!'
+          }`}
+        >
+          <NavLink
+            to="/main-player/songs/$songId"
+            params={{ songId: String(songId) }}
+            title={title}
+            className="song-title truncate text-base font-normal outline-offset-1 transition-none focus-visible:outline!"
+            disabled={isMultipleSelectionEnabled}
+          >
+            {window.api.properties.isInDevelopment && `(${songId})`}{' '}
+            {highlightText ? <HighlightedText text={title} highlight={highlightText} /> : title}
+          </NavLink>
+          <div className="song-artists w-full truncate text-xs font-normal transition-none">
+            {songArtists}
+          </div>
+          <div className="song-album w-full truncate text-xs transition-none sm:hidden md:hidden lg:hidden">
+            {album?.name ? (
+              <NavLink
+                to="/main-player/albums/$albumId"
+                params={{ albumId: String(album?.albumId) }}
+                disabled={album?.albumId === undefined || isMultipleSelectionEnabled}
+                className="cursor-pointer -outline-offset-1 hover:underline focus-visible:outline!"
+                title={album.name}
+              >
+                {album.name}
+              </NavLink>
+            ) : (
+              t('common.unknownAlbum')
+            )}
+          </div>
+          <div className="song-year flex items-center justify-center text-center text-xs transition-none sm:hidden">
+            {window.api.properties.isInDevelopment && appPreferences.showSongIdInsteadOfSongYear
+              ? songId
+              : (year ?? '----')}
+          </div>
+          <div className="song-duration flex w-full! items-center justify-between pr-4 pl-2 text-center transition-none sm:pr-1">
+            <div className="relative flex items-center justify-center">
+              <Button
+                className="mt-1 mr-0! rounded-none! border-0! bg-transparent p-0! text-inherit! outline-offset-1 focus-visible:outline! dark:bg-transparent"
+                iconName="favorite"
+                iconClassName={`${
+                  isAFavorite ? 'material-icons-round' : 'material-icons-round-outlined'
+                } ${isBursting ? 'fx-heart-pop' : ''} leading-none! text-xl! font-light! ${
+                  isAFavorite
+                    ? isCurrentSong || isAMultipleSelection
+                      ? 'text-font-color-black! dark:text-font-color-black!'
+                      : 'text-font-color-favorite!'
+                    : isCurrentSong || isAMultipleSelection
+                      ? 'text-font-color-black! dark:text-font-color-black!'
+                      : 'text-font-color-highlight! dark:text-dark-background-color-3!'
+                }`}
+                tooltipLabel={t(`song.${isAFavorite ? 'likedThisSong' : 'dislikedThisSong'}`)}
+                clickHandler={(e) => {
+                  e.stopPropagation();
+                  toggleSingleSongFavorite();
+                }}
+              />
+              <HeartBurst isBursting={isBursting} />
+            </div>
+            <span className="">
+              {minutes ?? '--'}:{seconds ?? '--'}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  })
+);
+
+StandardSongRow.displayName = 'StandardSongRow';
+export default StandardSongRow;

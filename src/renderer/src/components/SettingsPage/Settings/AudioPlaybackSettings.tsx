@@ -115,7 +115,7 @@ const AudioPlaybackSettings = () => {
       className="audio-playback-settings-container"
     >
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight list-disc pl-6">
-        <li className="secondary-container enable-waveform-seekbar mb-4">
+        <li id="setting-audio-waveform-seekbar" className="secondary-container enable-waveform-seekbar mb-4">
           <div className="description">{t('settingsPage.enableWaveformSeekbarDescription')}</div>
           <Checkbox
             id="toggleEnableWaveformSeekbar"
@@ -128,7 +128,7 @@ const AudioPlaybackSettings = () => {
           />
         </li>
 
-        <li className="secondary-container show-remaining-song-duration mb-4">
+        <li id="setting-audio-remaining-duration" className="secondary-container show-remaining-song-duration mb-4">
           <div className="description">
             {t('settingsPage.showRemainingSongDurationDescription')}
           </div>
@@ -142,7 +142,7 @@ const AudioPlaybackSettings = () => {
           />
         </li>
 
-        <li className="playback-rate mb-6" id="playbackRateInterval">
+        <li className="playback-rate mb-6" id="setting-audio-playback-rate">
           <div className="description">{t('settingsPage.changePlaybackRate')}</div>
           <div className="mt-6 flex items-center">
             <div className="flex w-1/2 min-w-[120px] flex-col items-center justify-center">
@@ -195,7 +195,7 @@ const AudioPlaybackSettings = () => {
           )}
         </li>
 
-        <li className="seekbar-scroll-interval mb-6">
+        <li id="setting-audio-seekbar-scroll-interval" className="seekbar-scroll-interval mb-6">
           <div className="description">{t('settingsPage.seekbarScrollInterval')}</div>
           <Dropdown
             className="mt-4"
@@ -210,7 +210,7 @@ const AudioPlaybackSettings = () => {
           />
         </li>
 
-        <li className="replay-gain-settings mb-6" id="replayGainSettings">
+        <li className="replay-gain-settings mb-6" id="setting-audio-replaygain">
           <div className="title text-font-color-highlight dark:text-dark-font-color-highlight mb-1 text-lg font-medium">
             Loudness Normalization (ReplayGain / ITU-R BS.1770)
           </div>
@@ -236,7 +236,7 @@ const AudioPlaybackSettings = () => {
             />
           </div>
 
-          <div className="mb-4">
+          <div className="mb-4" id="setting-audio-prevent-clipping">
             <Checkbox
               id="togglePreventClipping"
               isChecked={preventClipping}
@@ -248,7 +248,7 @@ const AudioPlaybackSettings = () => {
             />
           </div>
 
-          <div className="preamp-container flex w-1/2 min-w-[200px] flex-col">
+          <div className="preamp-container flex w-1/2 min-w-[200px] flex-col" id="setting-audio-preamp">
             <span className="mb-1 text-sm font-medium">
               Pre-amp Adjustment: {preampDb > 0 ? `+${preampDb}` : preampDb} dB
             </span>
@@ -284,7 +284,7 @@ const AudioPlaybackSettings = () => {
           </div>
         </li>
 
-        <li className="crossfade-settings mb-6" id="crossfadeSettings">
+        <li className="crossfade-settings mb-6" id="setting-audio-crossfade">
           <div className="title text-font-color-highlight dark:text-dark-font-color-highlight mb-1 text-lg font-medium">
             {t('crossfade.title', 'Crossfade Songs')}
           </div>
@@ -330,7 +330,7 @@ const AudioPlaybackSettings = () => {
           </div>
         </li>
 
-        <li className="audio-fx-settings mb-6" id="audioFxSettings">
+        <li className="audio-fx-settings mb-6" id="setting-audio-fx">
           <div className="title text-font-color-highlight dark:text-dark-font-color-highlight mb-1 text-lg font-medium">
             {t('audioFx.title', 'Audio Effects')}
           </div>

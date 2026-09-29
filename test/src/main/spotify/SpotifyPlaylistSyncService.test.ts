@@ -277,7 +277,8 @@ describe('SpotifyPlaylistSyncService', () => {
       expect(mockApiClient.replacePlaylistItems).toHaveBeenCalledWith(
         'valid_mock_token',
         'sp_pl_1',
-        ['spotify:track:t1', 'spotify:track:t2']
+        ['spotify:track:t1', 'spotify:track:t2'],
+        expect.anything()
       );
     });
 

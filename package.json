@@ -162,6 +162,7 @@
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@playwright/test": "^1.63.0",
     "@rolldown/plugin-babel": "^0.2.3",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/router-cli": "1.167.17",
@@ -181,6 +182,7 @@
     "electron-builder": "^26.8.1",
     "electron-devtools-installer": "^4.0.0",
     "electron-vite": "^6.0.0-beta.1",
+    "fast-check": "^4.10.2",
     "globals": "^17.4.0",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",

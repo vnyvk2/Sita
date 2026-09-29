@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useWorkspaceShortcuts } from '@renderer/workspace/engine/useWorkspaceShortcuts';
-import { dndStore, workspaceActions } from '@renderer/workspace/store';
+import { dndStore, workspaceActions, workspaceStore } from '@renderer/workspace/store';
 import { act, fireEvent, render, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,7 +26,9 @@ describe('useWorkspaceShortcuts Hook', () => {
   describe('Alt Panel Shortcuts Delegation', () => {
     it('does not intercept Alt shortcuts, delegating them to global useKeyboardShortcuts', () => {
       const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
-      const modalSpy = vi.spyOn(workspaceActions, 'openSaveLayoutModal').mockImplementation(() => {});
+      const modalSpy = vi
+        .spyOn(workspaceActions, 'openSaveLayoutModal')
+        .mockImplementation(() => {});
       const { unmount } = renderHook(() => useWorkspaceShortcuts());
 
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'q', altKey: true }));
@@ -64,6 +66,76 @@ describe('useWorkspaceShortcuts Hook', () => {
 
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       expect(spy).toHaveBeenCalled();
+
+      unmount();
+    });
+
+    it('closes delete confirm modal when Escape is pressed', () => {
+      const spy = vi
+        .spyOn(workspaceActions, 'closeDeleteConfirmModal')
+        .mockImplementation(() => {});
+      dndStore.setState((s) => ({ ...s, isDeleteConfirmModalOpen: true }));
+
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      expect(spy).toHaveBeenCalled();
+
+      unmount();
+    });
+  });
+
+  describe('Ctrl+Alt+M Maximize Shortcut Handling (CF-05)', () => {
+    it('un-maximizes when a panel is currently maximized', () => {
+      const spy = vi.spyOn(workspaceActions, 'setMaximizedPanel').mockImplementation(() => {});
+      dndStore.setState((s) => ({ ...s, maximizedPanelId: 'p_max' }));
+
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, altKey: true, cancelable: true })
+      );
+      expect(spy).toHaveBeenCalledWith(null);
+
+      unmount();
+    });
+
+    it('maximizes focused panel if active element is inside data-panel-id', () => {
+      const toggleSpy = vi
+        .spyOn(workspaceActions, 'toggleMaximizePanel')
+        .mockImplementation(() => {});
+
+      const panelDiv = document.createElement('div');
+      panelDiv.setAttribute('data-panel-id', 'test-panel-queue');
+      const innerButton = document.createElement('button');
+      panelDiv.appendChild(innerButton);
+      document.body.appendChild(panelDiv);
+      innerButton.focus();
+
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, altKey: true, cancelable: true })
+      );
+      expect(toggleSpy).toHaveBeenCalledWith('test-panel-queue');
+
+      unmount();
+      document.body.removeChild(panelDiv);
+    });
+
+    it('falls back to maximizing router-view if no panel is focused', () => {
+      const toggleSpy = vi
+        .spyOn(workspaceActions, 'toggleMaximizePanel')
+        .mockImplementation(() => {});
+
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, altKey: true, cancelable: true })
+      );
+      const activeWs = workspaceStore.state.workspaces[workspaceStore.state.active];
+      const routerPanel = Object.values(activeWs.panels).find((p) => p.type === 'router-view');
+      expect(toggleSpy).toHaveBeenCalledWith(routerPanel?.id);
 
       unmount();
     });
@@ -131,6 +203,101 @@ describe('useWorkspaceShortcuts Hook', () => {
 
       fireEvent.keyDown(input, { key: 'Escape' });
       expect(maxSpy).not.toHaveBeenCalled();
+    });
+
+    it('ignores Ctrl+Z, Ctrl+Y, and Ctrl+1 when target is an input element', () => {
+      const undoSpy = vi.spyOn(workspaceActions, 'undo').mockReturnValue(true);
+      const redoSpy = vi.spyOn(workspaceActions, 'redo').mockReturnValue(true);
+      const switchSpy = vi.spyOn(workspaceActions, 'switchWorkspace').mockImplementation(() => {});
+
+      const { getByTestId } = render(<TestComponent />);
+      const input = getByTestId('test-input');
+
+      fireEvent.keyDown(input, { key: 'z', ctrlKey: true });
+      fireEvent.keyDown(input, { key: 'y', ctrlKey: true });
+      fireEvent.keyDown(input, { key: '1', code: 'Digit1', ctrlKey: true });
+
+      expect(undoSpy).not.toHaveBeenCalled();
+      expect(redoSpy).not.toHaveBeenCalled();
+      expect(switchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Undo / Redo Shortcuts', () => {
+    it('calls workspaceActions.undo on Ctrl+Z and Cmd+Z', () => {
+      const undoSpy = vi.spyOn(workspaceActions, 'undo').mockReturnValue(true);
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, cancelable: true })
+      );
+      expect(undoSpy).toHaveBeenCalledTimes(1);
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'z', metaKey: true, cancelable: true })
+      );
+      expect(undoSpy).toHaveBeenCalledTimes(2);
+
+      unmount();
+    });
+
+    it('calls workspaceActions.redo on Ctrl+Shift+Z, Cmd+Shift+Z, and Ctrl+Y', () => {
+      const redoSpy = vi.spyOn(workspaceActions, 'redo').mockReturnValue(true);
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, shiftKey: true, cancelable: true })
+      );
+      expect(redoSpy).toHaveBeenCalledTimes(1);
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'y', ctrlKey: true, cancelable: true })
+      );
+      expect(redoSpy).toHaveBeenCalledTimes(2);
+
+      unmount();
+    });
+  });
+
+  describe('Direct Workspace Switching Shortcuts (Ctrl+1..9)', () => {
+    it('switches to workspace by 1-based index', () => {
+      const switchSpy = vi.spyOn(workspaceActions, 'switchWorkspace').mockImplementation(() => {});
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      // Ctrl+1 should switch to first workspace
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '1', code: 'Digit1', ctrlKey: true, cancelable: true })
+      );
+      const workspaceIds = Object.keys(workspaceStore.state.workspaces);
+      expect(switchSpy).toHaveBeenCalledWith(workspaceIds[0]);
+
+      // Ctrl+2 should switch to second workspace
+      if (workspaceIds.length > 1) {
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: '2',
+            code: 'Digit2',
+            ctrlKey: true,
+            cancelable: true
+          })
+        );
+        expect(switchSpy).toHaveBeenCalledWith(workspaceIds[1]);
+      }
+
+      unmount();
+    });
+
+    it('ignores digit shortcut if index is out of bounds', () => {
+      const switchSpy = vi.spyOn(workspaceActions, 'switchWorkspace').mockImplementation(() => {});
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      // Ctrl+9 when only 2 workspaces exist
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: '9', code: 'Digit9', ctrlKey: true, cancelable: true })
+      );
+      expect(switchSpy).not.toHaveBeenCalled();
+
+      unmount();
     });
   });
 

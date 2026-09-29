@@ -340,10 +340,16 @@ describe('WorkspaceToolbar', () => {
       expect(activeWs.name).toBe('Studio Pro (Copy)');
       expect(screen.getByTitle('Workspace Layout: Studio Pro (Copy)')).toBeDefined();
 
-      // Test Delete on the duplicated layout
+      // Test Delete on the duplicated layout via ConfirmDeleteModal
       fireEvent.click(screen.getByTitle('Workspace Layout: Studio Pro (Copy)'));
       const deleteBtn = screen.getByLabelText('Delete Studio Pro (Copy)');
       fireEvent.click(deleteBtn);
+
+      expect(screen.getByText('Delete Workspace')).toBeDefined();
+      expect(screen.getByText(/Are you sure you want to delete/)).toBeDefined();
+
+      const confirmDeleteSubmitBtn = screen.getByRole('button', { name: 'Delete Layout' });
+      fireEvent.click(confirmDeleteSubmitBtn);
 
       // Verify duplicated layout was deleted and active switched back
       expect(workspaceStore.state.workspaces[activeWs.id]).toBeUndefined();

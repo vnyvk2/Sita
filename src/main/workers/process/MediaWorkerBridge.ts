@@ -137,6 +137,7 @@ export class MediaWorkerBridge extends EventEmitter {
       }) => Promise<void>;
       totalParsed: number;
       totalErrors: number;
+      activeBatchPromise?: Promise<void>;
     }
   > = new Map();
 
@@ -520,7 +521,6 @@ export class MediaWorkerBridge extends EventEmitter {
 
       const onAbort = () => {
         if (settled) return;
-        settled = true;
         try {
           this.sendCommand({
             protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
@@ -531,15 +531,24 @@ export class MediaWorkerBridge extends EventEmitter {
           // Ignore
         }
         const currentTask = this.activeParseResolvers.get(taskId);
-        const totalParsed = currentTask?.totalParsed ?? 0;
-        const totalErrors = currentTask?.totalErrors ?? 0;
-        cleanup();
-        resolve({ totalParsed, totalErrors, cancelled: true });
+        const finalizeAbort = () => {
+          if (settled) return;
+          settled = true;
+          const totalParsed = currentTask?.totalParsed ?? 0;
+          const totalErrors = currentTask?.totalErrors ?? 0;
+          cleanup();
+          resolve({ totalParsed, totalErrors, cancelled: true });
+        };
+
+        if (currentTask?.activeBatchPromise) {
+          void currentTask.activeBatchPromise.finally(finalizeAbort).catch(() => {});
+        } else {
+          finalizeAbort();
+        }
       };
 
       const onTimeout = () => {
         if (settled) return;
-        settled = true;
         try {
           this.sendCommand({
             protocolVersion: MEDIA_WORKER_PROTOCOL_VERSION,
@@ -549,8 +558,22 @@ export class MediaWorkerBridge extends EventEmitter {
         } catch {
           // Ignore
         }
-        cleanup();
-        reject(new Error(`[MediaWorkerBridge] Batch parsing timed out after ${timeoutMs}ms.`));
+        const currentTask = this.activeParseResolvers.get(taskId);
+        const timeoutError = new Error(
+          `[MediaWorkerBridge] Batch parsing timed out after ${timeoutMs}ms.`
+        );
+        const finalizeTimeout = () => {
+          if (settled) return;
+          settled = true;
+          cleanup();
+          reject(timeoutError);
+        };
+
+        if (currentTask?.activeBatchPromise) {
+          void currentTask.activeBatchPromise.finally(finalizeTimeout).catch(() => {});
+        } else {
+          finalizeTimeout();
+        }
       };
 
       if (abortSignal) {
@@ -830,11 +853,23 @@ export class MediaWorkerBridge extends EventEmitter {
         const failEvt = event as EvtTracksParsedFailed;
         const parseTask = this.activeParseResolvers.get(failEvt.taskId);
         if (parseTask) {
-          parseTask.reject(
-            new Error(
-              `[MediaWorkerBridge] Worker batch parsing failed: ${failEvt.error}. Committed ${parseTask.totalParsed} tracks before failure.`
-            )
+          const failError = new Error(
+            `[MediaWorkerBridge] Worker batch parsing failed: ${failEvt.error}. Committed ${parseTask.totalParsed} tracks before failure.`
           );
+          if (parseTask.activeBatchPromise) {
+            void parseTask.activeBatchPromise
+              .finally(() => {
+                parseTask.reject(failError);
+              })
+              .catch((err) => {
+                logger.warn(
+                  `[MediaWorkerBridge] In-flight onBatch failed prior to task failure rejection on task ${failEvt.taskId}:`,
+                  err
+                );
+              });
+          } else {
+            parseTask.reject(failError);
+          }
         }
         break;
       }
@@ -856,7 +891,7 @@ export class MediaWorkerBridge extends EventEmitter {
           }));
 
           // Process batch in Main process (Drizzle transaction + artwork write)
-          parseTask
+          const batchPromise = parseTask
             .onBatch({
               batchId: batchEvt.batchId,
               isLastBatch: batchEvt.isLastBatch,
@@ -888,6 +923,7 @@ export class MediaWorkerBridge extends EventEmitter {
                   cancelled: Boolean(batchEvt.cancelled)
                 });
               }
+              return undefined;
             })
             .catch((err) => {
               if (this.childProcess) {
@@ -902,7 +938,14 @@ export class MediaWorkerBridge extends EventEmitter {
                 }
               }
               parseTask.reject(err instanceof Error ? err : new Error(String(err)));
+            })
+            .finally(() => {
+              if (parseTask.activeBatchPromise === batchPromise) {
+                parseTask.activeBatchPromise = undefined;
+              }
             });
+
+          parseTask.activeBatchPromise = batchPromise;
         }
         break;
       }
@@ -979,15 +1022,28 @@ export class MediaWorkerBridge extends EventEmitter {
     }
     this.activeWalkResolvers.clear();
 
-    // Fail any in-flight parse streaming promises
-    for (const parseTask of this.activeParseResolvers.values()) {
-      parseTask.reject(
-        new Error(
-          `[MediaWorkerBridge] Worker process exited with code ${code} during track parsing.`
-        )
-      );
-    }
+    // Fail any in-flight parse streaming promises after ensuring any active batch transaction finishes
+    const parseTasks = Array.from(this.activeParseResolvers.values());
     this.activeParseResolvers.clear();
+    for (const parseTask of parseTasks) {
+      const exitError = new Error(
+        `[MediaWorkerBridge] Worker process exited with code ${code} during track parsing.`
+      );
+      if (parseTask.activeBatchPromise) {
+        void parseTask.activeBatchPromise
+          .finally(() => {
+            parseTask.reject(exitError);
+          })
+          .catch((err) => {
+            logger.warn(
+              `[MediaWorkerBridge] In-flight onBatch failed prior to worker exit rejection:`,
+              err
+            );
+          });
+      } else {
+        parseTask.reject(exitError);
+      }
+    }
 
     // Fail any in-flight asset generation promises immediately (CRITICAL: Bridge NEVER retries work!)
     for (const [taskId, assetTask] of this.activeAssetResolvers.entries()) {

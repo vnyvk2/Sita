@@ -319,7 +319,8 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
     expect(mockApiClient.replacePlaylistItems).toHaveBeenCalledWith(
       'mock_access_token',
       'sp_pl_1',
-      ['spotify:track:A', 'spotify:track:B', 'spotify:track:C']
+      ['spotify:track:A', 'spotify:track:B', 'spotify:track:C'],
+      expect.anything()
     );
   });
 
@@ -621,19 +622,22 @@ describe('SpotifyPlaylistSyncExecution (Target-State Invariants & Boundary Verif
     expect(mockApiClient.replacePlaylistItems).toHaveBeenCalledWith(
       'mock_access_token',
       'sp_pl_1',
-      target250Uris.slice(0, 100)
+      target250Uris.slice(0, 100),
+      expect.anything()
     );
     expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(
       1,
       'mock_access_token',
       'sp_pl_1',
-      target250Uris.slice(100, 200)
+      target250Uris.slice(100, 200),
+      expect.anything()
     );
     expect(mockApiClient.addPlaylistItems).toHaveBeenNthCalledWith(
       2,
       'mock_access_token',
       'sp_pl_1',
-      target250Uris.slice(200, 250)
+      target250Uris.slice(200, 250),
+      expect.anything()
     );
   });
 

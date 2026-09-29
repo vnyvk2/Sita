@@ -652,9 +652,9 @@ class PlayerQueue {
           newPosition: this.position,
           currentSongId: this.currentSongId
         });
-      } else if (index === this.position && this.position >= this.songIds.length) {
+      } else if (index === this.position) {
         const oldPosition = this.position;
-        this.position = Math.max(0, this.songIds.length - 1);
+        this.position = Math.max(0, Math.min(this.position, this.songIds.length - 1));
         this.emit('positionChange', {
           oldPosition,
           newPosition: this.position,
@@ -689,9 +689,9 @@ class PlayerQueue {
           newPosition: this.position,
           currentSongId: this.currentSongId
         });
-      } else if (position === this.position && this.position >= this.songIds.length) {
+      } else if (position === this.position) {
         const oldPosition = this.position;
-        this.position = Math.max(0, this.songIds.length - 1);
+        this.position = Math.max(0, Math.min(this.position, this.songIds.length - 1));
         this.emit('positionChange', {
           oldPosition,
           newPosition: this.position,
@@ -724,13 +724,11 @@ class PlayerQueue {
       queueLengthAfter: this.songIds.length,
       position: this.position
     });
-    if (oldPosition !== 0) {
-      this.emit('positionChange', {
-        oldPosition,
-        newPosition: 0,
-        currentSongId: null
-      });
-    }
+    this.emit('positionChange', {
+      oldPosition,
+      newPosition: 0,
+      currentSongId: null
+    });
   }
 
   /**

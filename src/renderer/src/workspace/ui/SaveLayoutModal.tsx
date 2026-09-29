@@ -1,13 +1,5 @@
 import { useStore } from '@tanstack/react-store';
-import {
-  memo,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FC,
-  type FormEvent
-} from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type FC, type FormEvent } from 'react';
 
 import { dndStore, workspaceActions, workspaceStore } from '../store';
 
@@ -114,7 +106,7 @@ const SaveLayoutModalContent: FC<SaveLayoutModalContentProps> = memo(
 
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
             handleClose();
@@ -127,7 +119,7 @@ const SaveLayoutModalContent: FC<SaveLayoutModalContentProps> = memo(
           role="dialog"
           aria-modal="true"
           aria-labelledby="save-layout-modal-title"
-          className="bg-background-color-1 dark:bg-dark-background-color-1 border border-stone-200 dark:border-stone-800 rounded-2xl shadow-2xl p-5 w-full max-w-sm flex flex-col gap-4 text-font-color-black dark:text-font-color-white"
+          className="bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-stone-200 p-5 shadow-2xl dark:border-stone-800"
         >
           {/* Header */}
           <div className="flex items-center justify-between">
@@ -141,7 +133,7 @@ const SaveLayoutModalContent: FC<SaveLayoutModalContentProps> = memo(
               type="button"
               onClick={handleClose}
               aria-label="Close"
-              className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-stone-200/60 dark:hover:bg-stone-800/60 cursor-pointer"
+              className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-stone-200/60 dark:hover:bg-stone-800/60"
             >
               <span className="material-symbols-rounded text-lg">close</span>
             </button>
@@ -161,7 +153,7 @@ const SaveLayoutModalContent: FC<SaveLayoutModalContentProps> = memo(
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Studio Layout, Lyrics Focus..."
-                className="w-full rounded-xl border border-stone-300 bg-stone-100/70 px-3.5 py-2 text-sm text-font-color-black placeholder:text-font-color-dimmed focus:border-accent focus:outline-hidden focus:ring-1 focus:ring-accent dark:border-stone-700 dark:bg-stone-800/70 dark:text-font-color-white transition-colors"
+                className="text-font-color-black placeholder:text-font-color-dimmed focus:border-accent focus:ring-accent dark:text-font-color-white w-full rounded-xl border border-stone-300 bg-stone-100/70 px-3.5 py-2 text-sm transition-colors focus:ring-1 focus:outline-hidden dark:border-stone-700 dark:bg-stone-800/70"
               />
             </div>
 
@@ -170,14 +162,14 @@ const SaveLayoutModalContent: FC<SaveLayoutModalContentProps> = memo(
               <button
                 type="button"
                 onClick={handleClose}
-                className="rounded-xl px-3.5 py-2 text-xs font-semibold text-font-color-dimmed hover:bg-stone-200/60 hover:text-font-color-black dark:hover:bg-stone-800/60 dark:hover:text-font-color-white transition-colors cursor-pointer"
+                className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white cursor-pointer rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors hover:bg-stone-200/60 dark:hover:bg-stone-800/60"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={!name.trim()}
-                className="rounded-xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                className="bg-accent cursor-pointer rounded-xl px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {actionButtonText}
               </button>

@@ -11,8 +11,9 @@ export const isArtistWithNameAvailable = async (name: string, trx: DB | DBTransa
 };
 
 export const getArtistWithName = async (name: string, trx: DB | DBTransaction = db) => {
+  if (!name || typeof name !== 'string') return undefined;
   const data = await trx.query.artists.findFirst({
-    where: (a) => eq(a.nameCI, name) // citext column for case-insensitive match
+    where: (a) => eq(a.nameCI, sql`lower(${name})`)
   });
 
   return data;
@@ -367,6 +368,18 @@ export const getArtistSongIds = async (
     .where(eq(artistsSongs.artistId, artistId));
 
   return data.map((row) => row.songId);
+};
+
+export const getArtistAlbumIds = async (
+  artistId: number,
+  trx: DB | DBTransaction = db
+): Promise<number[]> => {
+  const data = await trx
+    .select({ albumId: albumsArtists.albumId })
+    .from(albumsArtists)
+    .where(eq(albumsArtists.artistId, artistId));
+
+  return data.map((row) => row.albumId);
 };
 
 /**

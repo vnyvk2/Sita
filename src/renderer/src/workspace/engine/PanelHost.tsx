@@ -30,7 +30,10 @@ export const PanelHost: FC<PanelHostProps> = memo(({ panelId, showHeader = true 
         workspaceActions.updatePanelLocal(panelId, key, value);
       },
       getLocal: <T,>(key: string, defaultValue: T): T => {
-        return (instance?.local[key] as T) ?? defaultValue;
+        const state = workspaceStore.state;
+        const activeWs = state.workspaces[state.active];
+        const panel = activeWs?.panels[panelId];
+        return (panel?.local?.[key] as T) ?? defaultValue;
       },
       close: () => {
         workspaceActions.dispatchOp({ t: 'panel.close', panelId });
@@ -39,7 +42,7 @@ export const PanelHost: FC<PanelHostProps> = memo(({ panelId, showHeader = true 
         workspaceActions.toggleMaximizePanel(panelId);
       }
     }),
-    [panelId, instance?.type, instance?.local]
+    [panelId, instance?.type]
   );
 
   if (!instance || !def) {

@@ -1,18 +1,22 @@
 import '@renderer/store/store';
+import storage from '@renderer/utils/localStorage';
 import { useStore } from '@tanstack/react-store';
-import { memo, useCallback, useEffect, useState, type FC } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import storage from '@renderer/utils/localStorage';
-import {
-  findRightsideSecondaryPanel,
-  findRightsideTabGroup
-} from '../ops';
+import { findRightsideSecondaryPanel, findRightsideTabGroup } from '../ops';
 import { DEFAULT_PRESET } from '../presets/default';
 import { MUSICBEE_PRESET } from '../presets/musicbee';
 import { PANEL_DEFINITIONS, getMountedPanelTypes } from '../registry';
-import { dndStore, workspaceActions, workspaceStore } from '../store';
+import {
+  dndStore,
+  downloadLayoutFile,
+  workspaceActions,
+  workspaceHistoryStore,
+  workspaceStore
+} from '../store';
 import type { PanelType } from '../types';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { SaveLayoutModal } from './SaveLayoutModal';
 
 const PANEL_SHORTCUT_LABELS: Partial<Record<PanelType, string>> = {
@@ -74,10 +78,41 @@ export const WorkspaceToolbar: FC = memo(() => {
   const workspaces = useStore(workspaceStore, (s) => s.workspaces);
   const isToolbarCollapsed = useStore(dndStore, (s) => s.isToolbarCollapsed);
   const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
+  const canUndo = useStore(workspaceHistoryStore, (s) => s.past.length > 0);
+  const canRedo = useStore(workspaceHistoryStore, (s) => s.future.length > 0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const activeWs = workspaces[activeId];
 
   const [addPosition, setAddPosition] = useState<'auto' | 'left' | 'right' | 'tab'>('auto');
   const mountedTypes = activeWs ? getMountedPanelTypes(activeWs) : new Set<PanelType>();
+
+  const handleExportWorkspace = (wsId?: string) => {
+    const exported = workspaceActions.exportWorkspace(wsId);
+    if (exported) {
+      downloadLayoutFile(exported);
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        const result = workspaceActions.importWorkspace(parsed);
+        if (!result.success) {
+          console.warn('[WorkspaceToolbar] Failed to import layout:', result.error);
+        }
+      } catch (err) {
+        console.error('[WorkspaceToolbar] JSON parse error during layout import:', err);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   useEffect(() => {
     if (!isWsDropdownOpen && !isPanelMenuOpen) return;
@@ -121,11 +156,7 @@ export const WorkspaceToolbar: FC = memo(() => {
       const isLeftTool = type === 'playlists' || type === 'navigation';
 
       const effectivePosition =
-        addPosition === 'auto'
-          ? isLeftTool
-            ? 'left'
-            : 'auto-right'
-          : addPosition;
+        addPosition === 'auto' ? (isLeftTool ? 'left' : 'auto-right') : addPosition;
 
       if (effectivePosition === 'left' || (isLeftTool && addPosition === 'auto')) {
         // Dock to the left of router-view
@@ -226,13 +257,16 @@ export const WorkspaceToolbar: FC = memo(() => {
   );
 
   const handleResetLayout = useCallback(() => {
-    const defaultPreset = activeId === MUSICBEE_PRESET.id ? MUSICBEE_PRESET : DEFAULT_PRESET;
+    const originPreset =
+      activeWs?.sourcePresetId ||
+      (activeId === MUSICBEE_PRESET.id ? MUSICBEE_PRESET.id : DEFAULT_PRESET.id);
+    const defaultPreset = originPreset === MUSICBEE_PRESET.id ? MUSICBEE_PRESET : DEFAULT_PRESET;
     workspaceActions.dispatchOp({
       t: 'ws.reset',
       id: activeId,
       defaultPreset
     });
-  }, [activeId]);
+  }, [activeId, activeWs?.sourcePresetId]);
 
   if (!activeWs) return null;
 
@@ -251,11 +285,11 @@ export const WorkspaceToolbar: FC = memo(() => {
             aria-haspopup="menu"
             aria-expanded={isWsDropdownOpen}
             title={`Workspace Layout: ${activeWs.name}`}
-            className="h-7 flex items-center gap-1.5 rounded-lg border border-stone-200/80 dark:border-stone-700/80 bg-background-color-1/80 dark:bg-dark-background-color-1/80 px-2.5 py-1 text-xs font-semibold shadow-2xs backdrop-blur-md transition-all hover:bg-stone-100 dark:hover:bg-stone-800 cursor-pointer"
+            className="bg-background-color-1/80 dark:bg-dark-background-color-1/80 flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-stone-200/80 px-2.5 py-1 text-xs font-semibold shadow-2xs backdrop-blur-md transition-all hover:bg-stone-100 dark:border-stone-700/80 dark:hover:bg-stone-800"
           >
             <span className="material-symbols-rounded text-accent text-sm">view_quilt</span>
             <span className="text-font-color-dimmed font-normal">Layout:</span>
-            <span className="truncate max-w-[120px] sm:max-w-[160px]">{activeWs.name}</span>
+            <span className="max-w-[120px] truncate sm:max-w-[160px]">{activeWs.name}</span>
             <span
               className={`material-symbols-rounded text-font-color-dimmed text-xs transition-transform duration-200 ${
                 isWsDropdownOpen ? 'rotate-180' : ''
@@ -269,15 +303,16 @@ export const WorkspaceToolbar: FC = memo(() => {
             <div
               role="menu"
               aria-label="Workspaces"
-              className="absolute top-full left-0 mt-1.5 z-50 min-w-[230px] rounded-xl border border-stone-200/80 dark:border-stone-700/80 bg-background-color-1/95 dark:bg-dark-background-color-1/95 p-1.5 shadow-2xl backdrop-blur-xl"
+              className="bg-background-color-1/95 dark:bg-dark-background-color-1/95 absolute top-full left-0 z-50 mt-1.5 min-w-[230px] rounded-xl border border-stone-200/80 p-1.5 shadow-2xl backdrop-blur-xl dark:border-stone-700/80"
             >
               <div className="text-font-color-dimmed mb-1 px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase">
                 Workspaces
               </div>
-              <div className="max-h-60 overflow-y-auto space-y-0.5 scrollbar-thin">
+              <div className="max-h-60 scrollbar-thin space-y-0.5 overflow-y-auto">
                 {Object.values(workspaces).map((ws) => {
                   const isActive = activeId === ws.id;
-                  const isDefaultPreset = ws.id === DEFAULT_PRESET.id || ws.id === MUSICBEE_PRESET.id;
+                  const isDefaultPreset =
+                    ws.id === DEFAULT_PRESET.id || ws.id === MUSICBEE_PRESET.id;
 
                   return (
                     <div
@@ -292,10 +327,10 @@ export const WorkspaceToolbar: FC = memo(() => {
                         type="button"
                         role="menuitem"
                         onClick={() => handleSwitchWorkspace(ws.id)}
-                        className="flex items-center gap-2 min-w-0 flex-1 text-left cursor-pointer"
+                        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
                       >
                         <span
-                          className={`material-symbols-rounded text-sm shrink-0 ${
+                          className={`material-symbols-rounded shrink-0 text-sm ${
                             isActive ? 'text-accent' : 'opacity-70'
                           }`}
                         >
@@ -303,13 +338,13 @@ export const WorkspaceToolbar: FC = memo(() => {
                         </span>
                         <span className="truncate">{ws.name}</span>
                         {isDefaultPreset && (
-                          <span className="shrink-0 rounded bg-stone-200/60 dark:bg-stone-700/60 px-1 py-0.2 text-[9px] font-medium tracking-wide uppercase text-font-color-dimmed">
+                          <span className="py-0.2 text-font-color-dimmed shrink-0 rounded bg-stone-200/60 px-1 text-[9px] font-medium tracking-wide uppercase dark:bg-stone-700/60">
                             Preset
                           </span>
                         )}
                       </button>
 
-                      <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity ml-1">
+                      <div className="ml-1 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                         {!isDefaultPreset && (
                           <button
                             type="button"
@@ -320,7 +355,7 @@ export const WorkspaceToolbar: FC = memo(() => {
                               setIsWsDropdownOpen(false);
                               workspaceActions.openSaveLayoutModal('rename', ws.id);
                             }}
-                            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-300/40 dark:hover:bg-stone-700/40 transition-colors"
+                            className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-stone-300/40 dark:hover:bg-stone-700/40"
                           >
                             <span className="material-symbols-rounded text-xs">edit</span>
                           </button>
@@ -334,9 +369,22 @@ export const WorkspaceToolbar: FC = memo(() => {
                             setIsWsDropdownOpen(false);
                             workspaceActions.duplicateWorkspace(ws.id);
                           }}
-                          className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-300/40 dark:hover:bg-stone-700/40 transition-colors"
+                          className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-stone-300/40 dark:hover:bg-stone-700/40"
                         >
                           <span className="material-symbols-rounded text-xs">content_copy</span>
+                        </button>
+                        <button
+                          type="button"
+                          title={`Export ${ws.name}`}
+                          aria-label={`Export ${ws.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsWsDropdownOpen(false);
+                            handleExportWorkspace(ws.id);
+                          }}
+                          className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-stone-300/40 dark:hover:bg-stone-700/40"
+                        >
+                          <span className="material-symbols-rounded text-xs">download</span>
                         </button>
                         {!isDefaultPreset && (
                           <button
@@ -346,9 +394,9 @@ export const WorkspaceToolbar: FC = memo(() => {
                             onClick={(e) => {
                               e.stopPropagation();
                               setIsWsDropdownOpen(false);
-                              workspaceActions.deleteWorkspace(ws.id);
+                              workspaceActions.openDeleteConfirmModal(ws.id);
                             }}
-                            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-rose-600 dark:text-rose-400 hover:bg-rose-100/60 dark:hover:bg-rose-950/40 transition-colors"
+                            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-100/60 dark:text-rose-400 dark:hover:bg-rose-950/40"
                           >
                             <span className="material-symbols-rounded text-xs">delete</span>
                           </button>
@@ -359,7 +407,7 @@ export const WorkspaceToolbar: FC = memo(() => {
                 })}
               </div>
 
-              <div className="border-t border-stone-200/50 dark:border-stone-800/50 my-1" />
+              <div className="my-1 border-t border-stone-200/50 dark:border-stone-800/50" />
 
               <button
                 type="button"
@@ -370,10 +418,40 @@ export const WorkspaceToolbar: FC = memo(() => {
                   setIsWsDropdownOpen(false);
                   workspaceActions.openSaveLayoutModal('save');
                 }}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-font-color-black dark:text-font-color-white hover:bg-accent/15 hover:text-accent transition-colors cursor-pointer"
+                className="text-font-color-black dark:text-font-color-white hover:bg-accent/15 hover:text-accent flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors"
               >
                 <span className="material-symbols-rounded text-sm">bookmark_add</span>
                 <span>+ Save Current Layout As...</span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                aria-label="Export Current Layout"
+                title="Export current workspace layout to JSON"
+                onClick={() => {
+                  setIsWsDropdownOpen(false);
+                  handleExportWorkspace(activeId);
+                }}
+                className="text-font-color-black dark:text-font-color-white hover:bg-accent/15 hover:text-accent flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors"
+              >
+                <span className="material-symbols-rounded text-sm">file_download</span>
+                <span>Export Current Layout...</span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                aria-label="Import Layout"
+                title="Import workspace layout from JSON file"
+                onClick={() => {
+                  setIsWsDropdownOpen(false);
+                  fileInputRef.current?.click();
+                }}
+                className="text-font-color-black dark:text-font-color-white hover:bg-accent/15 hover:text-accent flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors"
+              >
+                <span className="material-symbols-rounded text-sm">file_upload</span>
+                <span>Import Layout...</span>
               </button>
 
               <button
@@ -385,11 +463,20 @@ export const WorkspaceToolbar: FC = memo(() => {
                   setIsWsDropdownOpen(false);
                   handleResetLayout();
                 }}
-                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-font-color-black dark:text-font-color-white hover:bg-rose-100/60 dark:hover:bg-rose-950/40 hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer"
+                className="text-font-color-black dark:text-font-color-white flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors hover:bg-rose-100/60 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
               >
                 <span className="material-symbols-rounded text-sm">restart_alt</span>
                 <span>Reset Layout to Default</span>
               </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,.nora-layout.json"
+                onChange={handleImportFile}
+                className="hidden"
+                aria-hidden="true"
+              />
             </div>
           )}
         </div>
@@ -407,10 +494,10 @@ export const WorkspaceToolbar: FC = memo(() => {
                   ? 'Sidebar is compact. Click to hide sidebar.'
                   : 'Sidebar is expanded. Click to collapse to icons.'
             }
-            className={`hover:bg-stone-200/50 hover:text-font-color-black dark:hover:bg-stone-800/50 dark:hover:text-font-color-white flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-xs transition-colors ${
+            className={`hover:text-font-color-black dark:hover:text-font-color-white flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-xs transition-colors hover:bg-stone-200/50 dark:hover:bg-stone-800/50 ${
               sidebarMode === 'hidden'
                 ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
-                : 'border-stone-200/60 text-font-color-dimmed dark:border-stone-700/60'
+                : 'text-font-color-dimmed border-stone-200/60 dark:border-stone-700/60'
             }`}
           >
             <span className="material-symbols-rounded text-accent text-sm">
@@ -420,7 +507,7 @@ export const WorkspaceToolbar: FC = memo(() => {
                   ? 'left_panel_open'
                   : 'dock_to_left'}
             </span>
-            <span className="text-[11px] font-medium capitalize hidden sm:inline">
+            <span className="hidden text-[11px] font-medium capitalize sm:inline">
               {sidebarMode === 'hidden' ? 'Show Sidebar' : sidebarMode}
             </span>
           </button>
@@ -445,9 +532,9 @@ export const WorkspaceToolbar: FC = memo(() => {
                   <button
                     type="button"
                     onClick={() => setAddPosition('auto')}
-                    className={`flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all cursor-pointer ${
+                    className={`flex-1 cursor-pointer rounded-md py-1 text-center text-[10px] font-semibold transition-all ${
                       addPosition === 'auto'
-                        ? 'bg-white text-accent shadow-xs dark:bg-dark-background-color-1'
+                        ? 'text-accent dark:bg-dark-background-color-1 bg-white shadow-xs'
                         : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
                     }`}
                   >
@@ -456,9 +543,9 @@ export const WorkspaceToolbar: FC = memo(() => {
                   <button
                     type="button"
                     onClick={() => setAddPosition('left')}
-                    className={`flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all cursor-pointer ${
+                    className={`flex-1 cursor-pointer rounded-md py-1 text-center text-[10px] font-semibold transition-all ${
                       addPosition === 'left'
-                        ? 'bg-white text-accent shadow-xs dark:bg-dark-background-color-1'
+                        ? 'text-accent dark:bg-dark-background-color-1 bg-white shadow-xs'
                         : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
                     }`}
                   >
@@ -467,9 +554,9 @@ export const WorkspaceToolbar: FC = memo(() => {
                   <button
                     type="button"
                     onClick={() => setAddPosition('right')}
-                    className={`flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all cursor-pointer ${
+                    className={`flex-1 cursor-pointer rounded-md py-1 text-center text-[10px] font-semibold transition-all ${
                       addPosition === 'right'
-                        ? 'bg-white text-accent shadow-xs dark:bg-dark-background-color-1'
+                        ? 'text-accent dark:bg-dark-background-color-1 bg-white shadow-xs'
                         : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
                     }`}
                   >
@@ -478,9 +565,9 @@ export const WorkspaceToolbar: FC = memo(() => {
                   <button
                     type="button"
                     onClick={() => setAddPosition('tab')}
-                    className={`flex-1 rounded-md py-1 text-center text-[10px] font-semibold transition-all cursor-pointer ${
+                    className={`flex-1 cursor-pointer rounded-md py-1 text-center text-[10px] font-semibold transition-all ${
                       addPosition === 'tab'
-                        ? 'bg-white text-accent shadow-xs dark:bg-dark-background-color-1'
+                        ? 'text-accent dark:bg-dark-background-color-1 bg-white shadow-xs'
                         : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
                     }`}
                   >
@@ -512,15 +599,15 @@ export const WorkspaceToolbar: FC = memo(() => {
                         }`}
                       >
                         <div className="flex items-center gap-2 truncate">
-                          <span className="material-symbols-rounded text-sm opacity-80 shrink-0">
+                          <span className="material-symbols-rounded shrink-0 text-sm opacity-80">
                             {def.icon}
                           </span>
                           <span className="truncate">{def.title}</span>
                         </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        <div className="ml-2 flex shrink-0 items-center gap-1.5">
                           {shortcut && (
-                            <kbd className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-stone-200/60 dark:bg-stone-700/60 text-font-color-dimmed">
+                            <kbd className="text-font-color-dimmed rounded bg-stone-200/60 px-1.5 py-0.5 font-mono text-[10px] dark:bg-stone-700/60">
                               {shortcut}
                             </kbd>
                           )}
@@ -534,6 +621,30 @@ export const WorkspaceToolbar: FC = memo(() => {
               </div>
             )}
           </div>
+
+          {/* Undo */}
+          <button
+            type="button"
+            disabled={!canUndo}
+            onClick={() => workspaceActions.undo()}
+            title="Undo layout change (Ctrl+Z)"
+            aria-label="Undo layout change"
+            className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-stone-200/50 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-stone-800/50"
+          >
+            <span className="material-symbols-rounded text-sm">undo</span>
+          </button>
+
+          {/* Redo */}
+          <button
+            type="button"
+            disabled={!canRedo}
+            onClick={() => workspaceActions.redo()}
+            title="Redo layout change (Ctrl+Shift+Z / Ctrl+Y)"
+            aria-label="Redo layout change"
+            className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-stone-200/50 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-stone-800/50"
+          >
+            <span className="material-symbols-rounded text-sm">redo</span>
+          </button>
 
           {/* Reset Layout */}
           <button
@@ -558,6 +669,7 @@ export const WorkspaceToolbar: FC = memo(() => {
         </div>
       </div>
       <SaveLayoutModal />
+      <ConfirmDeleteModal />
     </>
   );
 });

@@ -45,6 +45,10 @@ const LyricsSettings = () => {
     store,
     (state) => state.localStorage.preferences?.lyricsArtworkAnimation ?? true
   );
+  const lyricsScrollMode = useStore(
+    store,
+    (state) => state.localStorage.preferences?.lyricsScrollMode ?? 'auto'
+  );
 
   const [lyricsAutomaticallySaveState, setLyricsAutomaticallySaveState] =
     useState<AutomaticallySaveLyricsTypes>('NONE');
@@ -100,6 +104,10 @@ const LyricsSettings = () => {
     storage.preferences.setPreferences('lyricsArtworkAnimation', val);
   };
 
+  const handleScrollModeChange = (mode: 'auto' | 'manual') => {
+    storage.preferences.setPreferences('lyricsScrollMode', mode);
+  };
+
   const blurSliderStyle: CSSProperties = {
     ['--seek-before-width' as string]: `${((lyricsArtworkBlur - 20) / 60) * 100}%`
   };
@@ -119,7 +127,7 @@ const LyricsSettings = () => {
     >
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight appear-from-bottom list-disc pl-6">
           {/* 1. Lyrics Appearance (Default vs Artwork background) */}
-          <li className="lyrics-appearance-section mb-6 -ml-6 list-none">
+          <li id="setting-lyrics-background-style" className="lyrics-appearance-section mb-6 -ml-6 list-none">
             <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 border-background-color-3/20 dark:border-dark-background-color-3/20 flex flex-col gap-4 rounded-lg border p-4">
               <div className="flex flex-col gap-1">
                 <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm font-medium">
@@ -261,8 +269,54 @@ const LyricsSettings = () => {
             </div>
           </li>
 
+          {/* 2. Lyrics Scroll Behavior */}
+          <li id="setting-lyrics-scroll-mode" className="lyrics-scroll-section mb-6 -ml-6 list-none">
+            <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 border-background-color-3/20 dark:border-dark-background-color-3/20 flex flex-col gap-4 rounded-lg border p-4">
+              <div className="flex flex-col gap-1">
+                <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm font-medium">
+                  {t('settingsPage.lyricsScrollBehavior', 'Lyrics Scroll Behavior')}
+                </div>
+                <div className="text-text-color-dimmed dark:text-dark-text-color-dimmed text-xs">
+                  {t(
+                    'settingsPage.lyricsScrollBehaviorDescription',
+                    'Choose how lyrics scroll during playback. Auto follows the current line. Manual lets you scroll freely with a button to jump back.'
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  aria-pressed={lyricsScrollMode === 'auto'}
+                  className={`flex flex-1 cursor-pointer flex-col items-center gap-1 rounded-md px-4 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out ${
+                    lyricsScrollMode === 'auto'
+                      ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
+                      : 'bg-background-color-1/70 dark:bg-dark-background-color-1/70 text-text-color dark:text-dark-text-color hover:bg-background-color-1 dark:hover:bg-dark-background-color-1'
+                  }`}
+                  onClick={() => handleScrollModeChange('auto')}
+                >
+                  <span className="material-symbols-rounded text-lg">swap_vert</span>
+                  <span>{t('settingsPage.lyricsScrollAuto', 'Auto-scroll')}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={lyricsScrollMode === 'manual'}
+                  className={`flex flex-1 cursor-pointer flex-col items-center gap-1 rounded-md px-4 py-2.5 text-sm font-medium transition-colors duration-200 ease-in-out ${
+                    lyricsScrollMode === 'manual'
+                      ? 'bg-font-color-highlight text-background-color-1 dark:bg-dark-font-color-highlight dark:text-dark-background-color-1 shadow-xs'
+                      : 'bg-background-color-1/70 dark:bg-dark-background-color-1/70 text-text-color dark:text-dark-text-color hover:bg-background-color-1 dark:hover:bg-dark-background-color-1'
+                  }`}
+                  onClick={() => handleScrollModeChange('manual')}
+                >
+                  <span className="material-symbols-rounded text-lg">swipe_up</span>
+                  <span>{t('settingsPage.lyricsScrollManual', 'Manual')}</span>
+                </button>
+              </div>
+            </div>
+          </li>
+
           {/* Existing lyrics settings */}
-          <li className="save-lyrics-automatically mb-4">
+          <li id="setting-lyrics-auto-save" className="save-lyrics-automatically mb-4">
             <div className="description">
               {t('settingsPage.saveLyricsAutomaticallyDescription')}
             </div>
@@ -286,7 +340,7 @@ const LyricsSettings = () => {
             </div>
           </li>
 
-          <li className="secondary-container always-save-lrc-files mb-4">
+          <li id="setting-lyrics-save-in-lrc" className="secondary-container always-save-lrc-files mb-4">
             <div className="description">{t('settingsPage.saveLyricsInLrcFilesDescription')}</div>
             <Checkbox
               id="saveLyricsInLrcFilesForSupportedSongs"
@@ -300,7 +354,7 @@ const LyricsSettings = () => {
             />
           </li>
 
-          <li className="lrc-files-custom-save-location mb-4">
+          <li id="setting-lyrics-custom-location" className="lrc-files-custom-save-location mb-4">
             <div className="description">
               {t('settingsPage.lrcFileCustomSaveLocationDescription')}
             </div>

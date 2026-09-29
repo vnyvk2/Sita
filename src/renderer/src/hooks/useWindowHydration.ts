@@ -47,12 +47,22 @@ export function useWindowHydration(
     initialIndex?: number;
     /** When true (default), fetches lightweight compact row projection optimized for table scrolling */
     compact?: boolean;
+    /** When true, adapts lookahead window overscan for 38px high-density compact row rendering */
+    isCompactView?: boolean;
+    /** Dynamic row height in pixels to automatically compute lookahead overscan rows */
+    rowHeight?: number;
   }
 ) {
+  const effectiveRowHeight = options?.rowHeight ?? (options?.isCompactView ? 38 : 60);
+  const defaultExtraBefore = Math.ceil(4500 / effectiveRowHeight);
+  const defaultExtraAfter = Math.ceil(9000 / effectiveRowHeight);
+
   const {
     enabled = true,
-    extraRowsBefore = 75,
-    extraRowsAfter = 150,
+    isCompactView: _isCompactView = false,
+    rowHeight: _rowHeight,
+    extraRowsBefore = defaultExtraBefore,
+    extraRowsAfter = defaultExtraAfter,
     keyPrefix = 'songs',
     listIdentity = 'default',
     initialIndex = 0,
@@ -96,7 +106,12 @@ export function useWindowHydration(
           scrollTrace.onRequestScheduled(lookaheadStart, true);
           queryClient.prefetchQuery({
             queryKey: [keyPrefix, 'window', listIdentity, idsVersion, lookaheadStart],
-            queryFn: async () => {
+            queryFn: async ({ signal }: { signal?: AbortSignal } = {}) => {
+              if (signal?.aborted || generationRef.current > token) {
+                const err = new Error(`Lookahead window ${lookaheadStart} aborted`);
+                err.name = 'AbortError';
+                throw err;
+              }
               scrollTrace.onRequestStarted(lookaheadStart);
               const t0 = performance.now();
               try {
@@ -113,6 +128,11 @@ export function useWindowHydration(
                     compact
                   }
                 );
+                if (signal?.aborted) {
+                  const err = new Error(`Lookahead window ${lookaheadStart} aborted by signal`);
+                  err.name = 'AbortError';
+                  throw err;
+                }
                 if (res && 'cancelled' in res && res.cancelled) {
                   const err = new Error(`Lookahead window ${lookaheadStart} cancelled (generation ${token})`);
                   err.name = 'AbortError';
@@ -141,7 +161,12 @@ export function useWindowHydration(
           scrollTrace.onRequestScheduled(lookaheadStart, true);
           queryClient.prefetchQuery({
             queryKey: [keyPrefix, 'window', listIdentity, idsVersion, lookaheadStart],
-            queryFn: async () => {
+            queryFn: async ({ signal }: { signal?: AbortSignal } = {}) => {
+              if (signal?.aborted || generationRef.current > token) {
+                const err = new Error(`Lookahead window ${lookaheadStart} aborted`);
+                err.name = 'AbortError';
+                throw err;
+              }
               scrollTrace.onRequestStarted(lookaheadStart);
               const t0 = performance.now();
               try {
@@ -158,6 +183,11 @@ export function useWindowHydration(
                     compact
                   }
                 );
+                if (signal?.aborted) {
+                  const err = new Error(`Lookahead window ${lookaheadStart} aborted by signal`);
+                  err.name = 'AbortError';
+                  throw err;
+                }
                 if (res && 'cancelled' in res && res.cancelled) {
                   const err = new Error(`Lookahead window ${lookaheadStart} cancelled (generation ${token})`);
                   err.name = 'AbortError';
@@ -253,7 +283,12 @@ export function useWindowHydration(
   const queries = useQueries({
     queries: windows.map((win) => ({
       queryKey: [keyPrefix, 'window', listIdentity, idsVersion, win.startIndex],
-      queryFn: async () => {
+      queryFn: async ({ signal }: { signal?: AbortSignal } = {}) => {
+        if (signal?.aborted) {
+          const err = new Error(`Target window ${win.startIndex} aborted by signal`);
+          err.name = 'AbortError';
+          throw err;
+        }
         const token = generationRef.current;
         scrollTrace.onRequestScheduled(win.startIndex, false);
         scrollTrace.onRequestStarted(win.startIndex);
@@ -272,6 +307,11 @@ export function useWindowHydration(
               compact
             }
           );
+          if (signal?.aborted) {
+            const err = new Error(`Target window ${win.startIndex} aborted by signal`);
+            err.name = 'AbortError';
+            throw err;
+          }
           if (res && 'cancelled' in res && res.cancelled) {
             const err = new Error(`Target window ${win.startIndex} cancelled (generation ${token})`);
             err.name = 'AbortError';

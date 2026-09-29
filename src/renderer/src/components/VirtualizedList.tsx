@@ -1,5 +1,13 @@
 import { useDebouncedCallback } from '@tanstack/react-pacer';
-import { type CSSProperties, type ReactNode, forwardRef, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  forwardRef,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import {
   Virtuoso,
   type Components,
@@ -201,7 +209,21 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
         });
       }
     }
-  }, [scrollKey, scrollTopOffset]);
+  }, [scrollKey, scrollTopOffset, data?.length]);
+
+  // Restoration failsafe: if programmatic restoration doesn't settle within 500ms after data loads, unlock to TRACKING
+  useEffect(() => {
+    const hasData = (data?.length ?? 0) > 0;
+    if (restorationStateRef.current === 'RESTORING' && hasData) {
+      const timer = setTimeout(() => {
+        if (restorationStateRef.current === 'RESTORING') {
+          restorationStateRef.current = 'TRACKING';
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [scrollKey, scrollTopOffset, data?.length]);
 
   const handleDebouncedScroll = useDebouncedCallback(
     (range: ListRange) => {
@@ -247,6 +269,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
 
   return (
     <Virtuoso
+      key={`virtuoso-h-${fixedItemHeight}`}
       style={
         useWindowScroll
           ? { ...style }
@@ -284,9 +307,13 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
         // Guard scroll registry updates while restoring so transient ranges don't overwrite saved position
         if (restorationStateRef.current === 'RESTORING') {
           const target = targetIndexRef.current;
+          const maxIndex = Math.max(0, (data?.length ?? 0) - 1);
+          const hasLoadedData = Boolean(data && data.length > 0);
+          const effectiveTarget = hasLoadedData ? Math.min(target, maxIndex) : target;
           const isTargetReached =
-            (range.startIndex <= target && range.endIndex >= target) ||
-            Math.abs(range.startIndex - target) <= 25;
+            (range.startIndex <= effectiveTarget && range.endIndex >= effectiveTarget) ||
+            Math.abs(range.startIndex - effectiveTarget) <= 25 ||
+            (hasLoadedData && range.endIndex >= maxIndex);
 
           if (isTargetReached) {
             // Target position reached; transition to normal tracking

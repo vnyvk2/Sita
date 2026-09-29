@@ -115,7 +115,9 @@ export class CDPClient {
             if (msg.error) cb.reject(new Error(msg.error.message));
             else cb.resolve(msg.result);
           }
-        } catch (e) {}
+        } catch (_e) {
+          /* ignore JSON parse errors on non-CDP messages */
+        }
       };
     });
   }
@@ -154,7 +156,9 @@ export class CDPClient {
   close() {
     try {
       if (this.ws) this.ws.close();
-    } catch (e) {}
+    } catch (_e) {
+      /* ignore socket close errors */
+    }
   }
 }
 
@@ -169,7 +173,9 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
           return page;
         }
       }
-    } catch (e) {}
+    } catch (_e) {
+      /* retry until target is available */
+    }
     await sleep(1000);
   }
   throw new Error(`Could not find Nora CDP target on port ${port} after ${maxAttempts}s`);
@@ -178,10 +184,14 @@ export async function getCDPTarget(port = 9876, maxAttempts = 30) {
 export function killAllNora() {
   try {
     execSync('taskkill /IM electron.exe /F /T', { stdio: 'ignore' });
-  } catch (e) {}
+  } catch (_e) {
+    /* ignore if electron process does not exist */
+  }
   try {
     execSync('taskkill /IM nora.exe /F /T', { stdio: 'ignore' });
-  } catch (e) {}
+  } catch (_e) {
+    /* ignore if nora process does not exist */
+  }
 }
 
 async function runSongsTabBenchmark() {
@@ -264,7 +274,9 @@ async function runSongsTabBenchmark() {
       let cdpMetrics = null;
       try {
         cdpMetrics = await cdp.getPerformanceMetrics();
-      } catch (e) {}
+      } catch (_e) {
+        /* ignore if CDP metrics are unavailable */
+      }
 
       const jsHeapUsedMB = cdpMetrics?.JSHeapUsedSize
         ? Math.round((cdpMetrics.JSHeapUsedSize / 1024 / 1024) * 100) / 100
@@ -327,31 +339,66 @@ async function runSongsTabBenchmark() {
         }
         requestAnimationFrame(recordFrame);
 
+        const isDeep = ${process.argv.includes('--deep') ? 'true' : 'false'};
         const totalScrollHeight = scroller.scrollHeight - scroller.clientHeight;
-        const scrollDistance = Math.min(totalScrollHeight, 35000); // Scroll deep into library
+        const scrollDistance = Math.min(totalScrollHeight, isDeep ? 500000 : 75000); // 75k standard, 500k deep
         const step = 80;
         let currentPos = 0;
 
         const startTime = performance.now();
 
-        // 1. Scroll Down
-        while (currentPos < scrollDistance) {
-          const frameStart = performance.now();
-          currentPos = Math.min(currentPos + step, scrollDistance);
-          scroller.scrollTop = currentPos;
-          await new Promise((r) => setTimeout(r, 16));
-          frameTimes.push(performance.now() - frameStart);
-        }
+        if (pass === 2) {
+          // Pass 2: Rapid Direction Reversals (Stress-testing generation tokens & coordinator lookahead aborts)
+          console.log('[Pass 2] Executing Rapid Direction Reversal Pattern...');
+          for (let cycle = 0; cycle < 5; cycle++) {
+            // Fling down 3000px
+            const targetDown = Math.min(currentPos + 3000, scrollDistance);
+            while (currentPos < targetDown) {
+              const frameStart = performance.now();
+              currentPos = Math.min(currentPos + step * 2, targetDown);
+              scroller.scrollTop = currentPos;
+              await new Promise((r) => setTimeout(r, 16));
+              frameTimes.push(performance.now() - frameStart);
+            }
+            // Abruptly reverse direction up 1500px
+            const targetUp = Math.max(currentPos - 1500, 0);
+            while (currentPos > targetUp) {
+              const frameStart = performance.now();
+              currentPos = Math.max(currentPos - step * 2, targetUp);
+              scroller.scrollTop = currentPos;
+              await new Promise((r) => setTimeout(r, 16));
+              frameTimes.push(performance.now() - frameStart);
+            }
+          }
+          // Return to top
+          while (currentPos > 0) {
+            const frameStart = performance.now();
+            currentPos = Math.max(currentPos - step * 3, 0);
+            scroller.scrollTop = currentPos;
+            await new Promise((r) => setTimeout(r, 16));
+            frameTimes.push(performance.now() - frameStart);
+          }
+        } else {
+          // Pass 1 & 3: Sustained Scroll Down and Fling Up
+          // 1. Scroll Down
+          while (currentPos < scrollDistance) {
+            const frameStart = performance.now();
+            currentPos = Math.min(currentPos + step, scrollDistance);
+            scroller.scrollTop = currentPos;
+            await new Promise((r) => setTimeout(r, 16));
+            frameTimes.push(performance.now() - frameStart);
+          }
 
-        await new Promise((r) => setTimeout(r, 400));
+          await new Promise((r) => setTimeout(r, 400));
 
-        // 2. Fast Fling Up
-        while (currentPos > 0) {
-          const frameStart = performance.now();
-          currentPos = Math.max(currentPos - (step * 2), 0);
-          scroller.scrollTop = currentPos;
-          await new Promise((r) => setTimeout(r, 16));
-          frameTimes.push(performance.now() - frameStart);
+          // 2. Fast Fling Up
+          while (currentPos > 0) {
+            const frameStart = performance.now();
+            currentPos = Math.max(currentPos - (step * 2), 0);
+            scroller.scrollTop = currentPos;
+            await new Promise((r) => setTimeout(r, 16));
+            frameTimes.push(performance.now() - frameStart);
+          }
         }
 
         const endTime = performance.now();

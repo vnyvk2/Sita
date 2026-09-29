@@ -18,6 +18,7 @@ declare global {
 
   type IpcChannels =
     | 'app/beforeQuitEvent'
+    | 'app/beforeQuitEventAck'
     | 'app/Close'
     | 'app/minimize'
     | 'app/toggleMaximize'
@@ -624,6 +625,7 @@ declare global {
     lyricsArtworkBlur?: number;
     lyricsArtworkDarkness?: number;
     lyricsArtworkAnimation?: boolean;
+    lyricsScrollMode?: 'auto' | 'manual';
     isSongCardDynamicArtworkBackgroundEnabled?: boolean;
     showEqualizerOnTracklist?: boolean;
     reduceVisualEffectsOnBattery?: boolean;
@@ -633,6 +635,9 @@ declare global {
     customThemeOverrides?: Record<string, Record<string, string>>;
     alphabetScrubberPosition?: 'off' | 'top-horizontal' | 'left-vertical';
     playerBarControlsIn3Dots?: PlayerBarControlsIn3Dots;
+    isCompactSongView?: boolean;
+    songViewMode?: 'compact' | 'small' | 'normal';
+    pinnedSubFilterTools?: string[];
   }
 
   interface PlayerBarControlsIn3Dots {

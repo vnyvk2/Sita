@@ -27,7 +27,42 @@ import { SpotifyPlaylistSyncPlanner } from './SpotifyPlaylistSyncPlanner';
 export class SpotifyPlaylistSyncService {
   private readonly apiClient: SpotifyApiClient;
   private readonly catalogSearcher: SpotifyTrackCatalogSearcher;
-  public static readonly activeSyncLocks = new Set<number>();
+  public static readonly activeSyncLocks = new Map<
+    number,
+    {
+      controller: AbortController;
+      promise: Promise<SpotifySyncResult>;
+    }
+  >();
+  public static readonly deletingPlaylists = new Set<number>();
+
+  public static isSyncing(playlistId: number): boolean {
+    return this.activeSyncLocks.has(playlistId);
+  }
+
+  public static markDeleting(playlistId: number): void {
+    this.deletingPlaylists.add(playlistId);
+  }
+
+  public static unmarkDeleting(playlistId: number): void {
+    this.deletingPlaylists.delete(playlistId);
+  }
+
+  public static isDeleting(playlistId: number): boolean {
+    return this.deletingPlaylists.has(playlistId);
+  }
+
+  public static async cancelSync(playlistId: number): Promise<void> {
+    const entry = this.activeSyncLocks.get(playlistId);
+    if (!entry) return;
+    logger.info('[SpotifyPlaylistSyncService] Cancelling active sync for playlist', { playlistId });
+    entry.controller.abort(new Error(`Playlist ${playlistId} was deleted locally or cancelled`));
+    try {
+      await entry.promise;
+    } catch {
+      // Ignore errors when draining cancelled sync
+    }
+  }
 
   constructor(apiClient?: SpotifyApiClient) {
     this.apiClient = apiClient ?? new SpotifyApiClient();
@@ -182,6 +217,7 @@ export class SpotifyPlaylistSyncService {
 
   /** Unlinks a playlist by deleting its persistent synchronization record. */
   public async unlinkPlaylist(playlistId: number): Promise<void> {
+    await SpotifyPlaylistSyncService.cancelSync(playlistId);
     await db.delete(spotifyPlaylistLinks).where(eq(spotifyPlaylistLinks.playlistId, playlistId));
     SpotifyPlaylistSyncService.activeSyncLocks.delete(playlistId);
     logger.info('Unlinked Spotify playlist', { playlistId });
@@ -442,29 +478,107 @@ export class SpotifyPlaylistSyncService {
   public async executeSync(
     playlistId: number,
     chosenStrategy?: SyncStrategy,
-    clientId?: string
+    clientId?: string,
+    externalAbortSignal?: AbortSignal
   ): Promise<SpotifySyncResult> {
+    if (SpotifyPlaylistSyncService.isDeleting(playlistId)) {
+      throw new Error(`Playlist ${playlistId} is currently being deleted.`);
+    }
+
     if (SpotifyPlaylistSyncService.activeSyncLocks.has(playlistId)) {
       throw new Error('Playlist synchronization is already in progress.');
     }
-    SpotifyPlaylistSyncService.activeSyncLocks.add(playlistId);
+
+    const abortController = new AbortController();
+    if (externalAbortSignal) {
+      if (externalAbortSignal.aborted) {
+        abortController.abort(externalAbortSignal.reason);
+      } else {
+        externalAbortSignal.addEventListener(
+          'abort',
+          () => abortController.abort(externalAbortSignal.reason),
+          { once: true }
+        );
+      }
+    }
+
+    const lockEntry = {
+      controller: abortController,
+      promise: Promise.resolve<SpotifySyncResult>({} as any)
+    };
+    SpotifyPlaylistSyncService.activeSyncLocks.set(playlistId, lockEntry);
+
+    const syncPromise = this.executeSyncInternal(
+      playlistId,
+      chosenStrategy,
+      clientId,
+      abortController.signal
+    ).finally(() => {
+      SpotifyPlaylistSyncService.activeSyncLocks.delete(playlistId);
+    });
+
+    lockEntry.promise = syncPromise;
+    return await syncPromise;
+  }
+
+  /** Sweeps any stranded SYNCING states left over from application crashes or power loss. */
+  public static async reconcileStuckSyncStatesOnStartup(): Promise<void> {
+    try {
+      await db
+        .update(spotifyPlaylistLinks)
+        .set({
+          syncState: 'ERROR',
+          lastError: 'Sync interrupted by application termination',
+          updatedAt: new Date()
+        })
+        .where(eq(spotifyPlaylistLinks.syncState, 'SYNCING'));
+      logger.info('[SpotifyPlaylistSyncService] Reconciled stranded SYNCING states on boot.');
+    } catch (err) {
+      logger.error('[SpotifyPlaylistSyncService] Failed to sweep stuck sync states on boot:', {
+        error: err
+      });
+    }
+  }
+
+  private async executeSyncInternal(
+    playlistId: number,
+    chosenStrategy?: SyncStrategy,
+    clientId?: string,
+    signal?: AbortSignal
+  ): Promise<SpotifySyncResult> {
+    const link = await this.getLinkedPlaylist(playlistId);
+    if (!link) {
+      throw new Error(`Playlist ${playlistId} is not linked to any Spotify playlist.`);
+    }
+
+    const strategy = chosenStrategy ?? link.syncStrategy;
+
+    if (signal?.aborted) {
+      return {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'ERROR',
+        completedRemoteBatches: 0,
+        totalRemoteBatches: 0,
+        error: 'Sync cancelled before execution'
+      };
+    }
+
+    const activeClientId = clientId || process.env.MAIN_VITE_SPOTIFY_CLIENT_ID || '';
+    const accessToken = await SpotifyTokenStore.getValidAccessToken(activeClientId);
+    if (!accessToken) {
+      throw new Error('Spotify account not connected or failed to retrieve valid access token.');
+    }
+
+    const currentUser = await this.apiClient.getCurrentUser(accessToken, signal);
+    this.assertLinkBelongsToCurrentUser(link, currentUser.id);
+
+    let markedAsSyncing = false;
+    let terminalResult: SpotifySyncResult;
 
     try {
-      const link = await this.getLinkedPlaylist(playlistId);
-      if (!link) {
-        throw new Error(`Playlist ${playlistId} is not linked to any Spotify playlist.`);
-      }
-
-      const strategy = chosenStrategy ?? link.syncStrategy;
-      const activeClientId = clientId || process.env.MAIN_VITE_SPOTIFY_CLIENT_ID || '';
-      const accessToken = await SpotifyTokenStore.getValidAccessToken(activeClientId);
-      if (!accessToken) {
-        throw new Error('Spotify account not connected or failed to retrieve valid access token.');
-      }
-
-      const currentUser = await this.apiClient.getCurrentUser(accessToken);
-      this.assertLinkBelongsToCurrentUser(link, currentUser.id);
-
       // Mark link as SYNCING
       await db
         .update(spotifyPlaylistLinks)
@@ -473,423 +587,644 @@ export class SpotifyPlaylistSyncService {
           updatedAt: new Date()
         })
         .where(eq(spotifyPlaylistLinks.id, link.id));
+      markedAsSyncing = true;
 
-      // 1. Generate plan with baseline capture
-      const plan = await this.generateSyncPlan(playlistId, strategy, activeClientId);
-
-      // Pre-mutation concurrency check: verify local playlist has not changed
-      const preFlightLocalEntries = await this.loadPlaylistEntries(playlistId);
-      const preFlightLocalHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
-        preFlightLocalEntries.map((e, idx) => ({
-          position: idx + 1,
-          songId: e.songId,
-          isrc: e.isrc
-        }))
-      );
-      if (plan.base.localEntriesHash && preFlightLocalHash !== plan.base.localEntriesHash) {
-        await db
-          .update(spotifyPlaylistLinks)
-          .set({
-            syncState: 'CONFLICT',
-            lastError:
-              'Local playlist was modified during sync preparation. Please generate a fresh plan.',
-            updatedAt: new Date()
-          })
-          .where(eq(spotifyPlaylistLinks.id, link.id));
-
-        return {
-          status: 'ERROR',
-          playlistId,
-          spotifyPlaylistId: link.spotifyPlaylistId,
-          strategy,
-          syncState: 'CONFLICT',
-          completedRemoteBatches: 0,
-          totalRemoteBatches: 0,
-          error:
-            'Local playlist was modified during sync preparation. Please generate a fresh plan.'
-        };
-      }
-
-      // Pre-mutation concurrency check: verify remote snapshot has not changed
-      const preFlightRemoteDetails = await this.apiClient.getPlaylistDetails(
+      terminalResult = await this.executeSyncCore(
+        link,
+        strategy,
+        activeClientId,
         accessToken,
-        link.spotifyPlaylistId
+        signal
       );
-      const preFlightSnapshotId =
-        preFlightRemoteDetails.snapshot_id || preFlightRemoteDetails.snapshotId || '';
-      if (plan.base.remoteSnapshotId && preFlightSnapshotId !== plan.base.remoteSnapshotId) {
-        await db
-          .update(spotifyPlaylistLinks)
-          .set({
-            syncState: 'CONFLICT',
-            lastError:
-              'Remote Spotify playlist was modified during sync preparation. Please generate a fresh plan.',
-            updatedAt: new Date()
-          })
-          .where(eq(spotifyPlaylistLinks.id, link.id));
+    } catch (err: any) {
+      terminalResult = {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'ERROR',
+        completedRemoteBatches: 0,
+        totalRemoteBatches: 0,
+        error: err.message || 'Unknown sync error'
+      };
+    } finally {
+      if (markedAsSyncing) {
+        try {
+          const currentLink = await this.getLinkedPlaylist(playlistId);
+          if (currentLink && currentLink.syncState === 'SYNCING') {
+            await db
+              .update(spotifyPlaylistLinks)
+              .set({
+                syncState: terminalResult!.syncState === 'SYNCED' ? 'SYNCED' : 'ERROR',
+                lastError:
+                  terminalResult!.error ||
+                  (signal?.aborted ? 'Sync cancelled' : 'Sync terminated unexpectedly'),
+                updatedAt: new Date()
+              })
+              .where(eq(spotifyPlaylistLinks.id, link.id));
+          }
+        } catch (dbErr) {
+          logger.error('[SpotifyPlaylistSyncService] Failed to finalize syncState in DB:', {
+            error: dbErr
+          });
+        }
+      }
+    }
 
+    return terminalResult;
+  }
+
+  private async executeSyncCore(
+    link: SpotifyPlaylistLinkDTO,
+    strategy: SyncStrategy,
+    activeClientId: string,
+    accessToken: string,
+    signal?: AbortSignal
+  ): Promise<SpotifySyncResult> {
+    const playlistId = link.playlistId;
+
+    // 1. Generate plan with baseline capture
+    const plan = await this.generateSyncPlan(playlistId, strategy, activeClientId);
+
+    if (signal?.aborted) {
+      return {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'ERROR',
+        completedRemoteBatches: 0,
+        totalRemoteBatches: 0,
+        error: 'Sync cancelled after plan generation'
+      };
+    }
+
+    // Pre-mutation concurrency check: verify local playlist has not changed
+    const preFlightLocalEntries = await this.loadPlaylistEntries(playlistId);
+    const preFlightLocalHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
+      preFlightLocalEntries.map((e, idx) => ({
+        position: idx + 1,
+        songId: e.songId,
+        isrc: e.isrc
+      }))
+    );
+    if (plan.base.localEntriesHash && preFlightLocalHash !== plan.base.localEntriesHash) {
+      await db
+        .update(spotifyPlaylistLinks)
+        .set({
+          syncState: 'CONFLICT',
+          lastError:
+            'Local playlist was modified during sync preparation. Please generate a fresh plan.',
+          updatedAt: new Date()
+        })
+        .where(eq(spotifyPlaylistLinks.id, link.id));
+
+      return {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'CONFLICT',
+        completedRemoteBatches: 0,
+        totalRemoteBatches: 0,
+        error:
+          'Local playlist was modified during sync preparation. Please generate a fresh plan.'
+      };
+    }
+
+    // Pre-mutation concurrency check: verify remote snapshot has not changed
+    const preFlightRemoteDetails = await this.apiClient.getPlaylistDetails(
+      accessToken,
+      link.spotifyPlaylistId,
+      signal
+    );
+    const preFlightSnapshotId =
+      preFlightRemoteDetails.snapshot_id || preFlightRemoteDetails.snapshotId || '';
+    if (plan.base.remoteSnapshotId && preFlightSnapshotId !== plan.base.remoteSnapshotId) {
+      await db
+        .update(spotifyPlaylistLinks)
+        .set({
+          syncState: 'CONFLICT',
+          lastError:
+            'Remote Spotify playlist was modified during sync preparation. Please generate a fresh plan.',
+          updatedAt: new Date()
+        })
+        .where(eq(spotifyPlaylistLinks.id, link.id));
+
+      return {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'CONFLICT',
+        completedRemoteBatches: 0,
+        totalRemoteBatches: 0,
+        error:
+          'Remote Spotify playlist was modified during sync preparation. Please generate a fresh plan.'
+      };
+    }
+
+    let currentSnapshotId = preFlightSnapshotId;
+    let completedRemoteBatches = 0;
+    const targetUris = plan.remoteTarget
+      .map((o) => o.spotifyUri)
+      .filter((uri): uri is string => Boolean(uri));
+    const totalRemoteBatches = targetUris.length === 0 ? 1 : Math.ceil(targetUris.length / 100);
+
+    // ==========================================
+    // Phase 1: Staged Remote Target Replacement
+    // Note: Spotify's PUT replacement API does not take a conditional snapshot parameter.
+    // Preflight check + immediate post-write verification establish the authoritative boundary.
+    // ==========================================
+    if (signal?.aborted) {
+      logger.info('[SpotifyPlaylistSyncService] Sync cancelled prior to Phase 1 remote mutation', {
+        playlistId
+      });
+      return {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'ERROR',
+        completedRemoteBatches: 0,
+        totalRemoteBatches: 0,
+        error: 'Sync cancelled prior to remote mutation'
+      };
+    }
+
+    try {
+      if (targetUris.length <= 100) {
+        if (signal?.aborted) {
+          throw new Error('Sync cancelled: playlist deleted locally');
+        }
+        const res = await this.apiClient.replacePlaylistItems(
+          accessToken,
+          link.spotifyPlaylistId,
+          targetUris,
+          signal
+        );
+        if (res.snapshot_id) {
+          currentSnapshotId = res.snapshot_id;
+        }
+        completedRemoteBatches = 1;
+      } else {
+        // Staged replacement: Initial PUT first 100 items
+        if (signal?.aborted) {
+          throw new Error('Sync cancelled: playlist deleted locally');
+        }
+        const firstChunk = targetUris.slice(0, 100);
+        const putRes = await this.apiClient.replacePlaylistItems(
+          accessToken,
+          link.spotifyPlaylistId,
+          firstChunk,
+          signal
+        );
+        if (putRes.snapshot_id) {
+          currentSnapshotId = putRes.snapshot_id;
+        }
+        completedRemoteBatches = 1;
+
+        // Sequential POST for remainder
+        for (let i = 100; i < targetUris.length; i += 100) {
+          if (signal?.aborted) {
+            throw new Error('Sync cancelled: playlist deleted locally');
+          }
+          const chunk = targetUris.slice(i, i + 100);
+          const postRes = await this.apiClient.addPlaylistItems(
+            accessToken,
+            link.spotifyPlaylistId,
+            chunk,
+            signal
+          );
+          if (postRes.snapshot_id) {
+            currentSnapshotId = postRes.snapshot_id;
+          }
+          completedRemoteBatches++;
+        }
+      }
+    } catch (err) {
+      if (signal?.aborted) {
+        logger.info('[SpotifyPlaylistSyncService] Sync cancelled during remote mutation', {
+          playlistId
+        });
         return {
           status: 'ERROR',
           playlistId,
           spotifyPlaylistId: link.spotifyPlaylistId,
           strategy,
-          syncState: 'CONFLICT',
-          completedRemoteBatches: 0,
-          totalRemoteBatches: 0,
-          error:
-            'Remote Spotify playlist was modified during sync preparation. Please generate a fresh plan.'
+          syncState: 'ERROR',
+          completedRemoteBatches,
+          totalRemoteBatches,
+          error: 'Sync cancelled during remote mutation'
         };
       }
 
-      let currentSnapshotId = preFlightSnapshotId;
-      let completedRemoteBatches = 0;
-      const targetUris = plan.remoteTarget
-        .map((o) => o.spotifyUri)
-        .filter((uri): uri is string => Boolean(uri));
-      const totalRemoteBatches = targetUris.length === 0 ? 1 : Math.ceil(targetUris.length / 100);
+      logger.error('Remote Spotify mutation failed during sync', {
+        playlistId,
+        error: (err as Error).message
+      });
 
-      // ==========================================
-      // Phase 1: Staged Remote Target Replacement
-      // Note: Spotify's PUT replacement API does not take a conditional snapshot parameter.
-      // Preflight check + immediate post-write verification establish the authoritative boundary.
-      // ==========================================
-      try {
-        if (targetUris.length <= 100) {
-          const res = await this.apiClient.replacePlaylistItems(
-            accessToken,
-            link.spotifyPlaylistId,
-            targetUris
-          );
-          if (res.snapshot_id) {
-            currentSnapshotId = res.snapshot_id;
-          }
-          completedRemoteBatches = 1;
-        } else {
-          // Staged replacement: Initial PUT first 100 items
-          const firstChunk = targetUris.slice(0, 100);
-          const putRes = await this.apiClient.replacePlaylistItems(
-            accessToken,
-            link.spotifyPlaylistId,
-            firstChunk
-          );
-          if (putRes.snapshot_id) {
-            currentSnapshotId = putRes.snapshot_id;
-          }
-          completedRemoteBatches = 1;
-
-          // Sequential POST for remainder
-          for (let i = 100; i < targetUris.length; i += 100) {
-            const chunk = targetUris.slice(i, i + 100);
-            const postRes = await this.apiClient.addPlaylistItems(
-              accessToken,
-              link.spotifyPlaylistId,
-              chunk
-            );
-            if (postRes.snapshot_id) {
-              currentSnapshotId = postRes.snapshot_id;
-            }
-            completedRemoteBatches++;
-          }
-        }
-      } catch (err) {
-        logger.error('Remote Spotify mutation failed during sync', {
-          playlistId,
-          error: (err as Error).message
-        });
-
-        await db
-          .update(spotifyPlaylistLinks)
-          .set({
-            syncState: 'PARTIAL_FAILURE',
-            failureStage: 'REMOTE',
-            completedRemoteBatches,
-            failedBatchIndex: completedRemoteBatches,
-            lastError: (err as Error).message,
-            updatedAt: new Date()
-          })
-          .where(eq(spotifyPlaylistLinks.id, link.id));
-
-        return {
-          status: 'PARTIAL_FAILURE',
-          playlistId,
-          spotifyPlaylistId: link.spotifyPlaylistId,
-          strategy,
+      await db
+        .update(spotifyPlaylistLinks)
+        .set({
           syncState: 'PARTIAL_FAILURE',
           failureStage: 'REMOTE',
           completedRemoteBatches,
-          totalRemoteBatches,
           failedBatchIndex: completedRemoteBatches,
-          error: (err as Error).message
-        };
-      }
+          lastError: (err as Error).message,
+          updatedAt: new Date()
+        })
+        .where(eq(spotifyPlaylistLinks.id, link.id));
 
-      // ==========================================
-      // Phase 1.5: Post-Write Remote Verification
-      // ==========================================
-      try {
-        const verifiedRemoteItems = await this.apiClient.getAllPlaylistItems(
-          accessToken,
-          link.spotifyPlaylistId
-        );
-        const verifiedRemoteUris = verifiedRemoteItems
-          .map((item) => {
-            const track = unwrapSpotifyTrack(item);
-            if (track?.uri) return track.uri;
-            if (item && typeof item === 'object') {
-              const rec = item as Record<string, unknown>;
-              if (typeof rec.uri === 'string') return rec.uri;
-              if (
-                rec.track &&
-                typeof rec.track === 'object' &&
-                typeof (rec.track as Record<string, unknown>).uri === 'string'
-              ) {
-                return (rec.track as Record<string, unknown>).uri as string;
-              }
-              if (rec.item && typeof rec.item === 'object') {
-                const it = rec.item as Record<string, unknown>;
-                if (typeof it.uri === 'string') return it.uri;
-                if (
-                  it.track &&
-                  typeof it.track === 'object' &&
-                  typeof (it.track as Record<string, unknown>).uri === 'string'
-                ) {
-                  return (it.track as Record<string, unknown>).uri as string;
-                }
-              }
+      return {
+        status: 'PARTIAL_FAILURE',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'PARTIAL_FAILURE',
+        failureStage: 'REMOTE',
+        completedRemoteBatches,
+        totalRemoteBatches,
+        failedBatchIndex: completedRemoteBatches,
+        error: (err as Error).message
+      };
+    }
+
+    // ==========================================
+    // Phase 1.5: Post-Write Remote Verification
+    // ==========================================
+    if (signal?.aborted) {
+      return {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'ERROR',
+        completedRemoteBatches,
+        totalRemoteBatches,
+        error: 'Sync cancelled before remote verification'
+      };
+    }
+
+    try {
+      const verifiedRemoteItems = await this.apiClient.getAllPlaylistItems(
+        accessToken,
+        link.spotifyPlaylistId,
+        signal
+      );
+      const verifiedRemoteUris = verifiedRemoteItems
+        .map((item) => {
+          const track = unwrapSpotifyTrack(item);
+          if (track?.uri) return track.uri;
+          if (item && typeof item === 'object') {
+            const rec = item as Record<string, unknown>;
+            if (typeof rec.uri === 'string') return rec.uri;
+            if (
+              rec.track &&
+              typeof rec.track === 'object' &&
+              typeof (rec.track as Record<string, unknown>).uri === 'string'
+            ) {
+              return (rec.track as Record<string, unknown>).uri as string;
             }
-            return undefined;
-          })
-          .filter((u): u is string => Boolean(u));
-
-        let isRemoteMatching = verifiedRemoteUris.length === targetUris.length;
-        if (isRemoteMatching) {
-          for (let i = 0; i < targetUris.length; i++) {
-            if (verifiedRemoteUris[i] !== targetUris[i]) {
-              isRemoteMatching = false;
-              break;
+            if (rec.item && typeof rec.item === 'object') {
+              const it = rec.item as Record<string, unknown>;
+              if (typeof it.uri === 'string') return it.uri;
+              if (
+                it.track &&
+                typeof it.track === 'object' &&
+                typeof (it.track as Record<string, unknown>).uri === 'string'
+              ) {
+                return (it.track as Record<string, unknown>).uri as string;
+              }
             }
           }
+          return undefined;
+        })
+        .filter((u): u is string => Boolean(u));
+
+      let isRemoteMatching = verifiedRemoteUris.length === targetUris.length;
+      if (isRemoteMatching) {
+        for (let i = 0; i < targetUris.length; i++) {
+          if (verifiedRemoteUris[i] !== targetUris[i]) {
+            isRemoteMatching = false;
+            break;
+          }
         }
+      }
 
-        if (!isRemoteMatching) {
-          throw new Error(
-            `Remote Spotify verification failed: expected ${targetUris.length} items, observed ${verifiedRemoteUris.length}.`
-          );
-        }
-      } catch (err) {
-        logger.error('Remote Spotify post-write verification failed', {
-          playlistId,
-          error: (err as Error).message
-        });
-
-        await db
-          .update(spotifyPlaylistLinks)
-          .set({
-            syncState: 'PARTIAL_FAILURE',
-            failureStage: 'REMOTE_VERIFICATION',
-            completedRemoteBatches,
-            failedBatchIndex: null,
-            lastError: (err as Error).message,
-            updatedAt: new Date()
-          })
-          .where(eq(spotifyPlaylistLinks.id, link.id));
-
+      if (!isRemoteMatching) {
+        throw new Error(
+          `Remote Spotify verification failed: expected ${targetUris.length} items, observed ${verifiedRemoteUris.length}.`
+        );
+      }
+    } catch (err) {
+      if (signal?.aborted) {
         return {
-          status: 'PARTIAL_FAILURE',
+          status: 'ERROR',
           playlistId,
           spotifyPlaylistId: link.spotifyPlaylistId,
           strategy,
+          syncState: 'ERROR',
+          completedRemoteBatches,
+          totalRemoteBatches,
+          error: 'Sync cancelled during remote verification'
+        };
+      }
+
+      logger.error('Remote Spotify post-write verification failed', {
+        playlistId,
+        error: (err as Error).message
+      });
+
+      await db
+        .update(spotifyPlaylistLinks)
+        .set({
           syncState: 'PARTIAL_FAILURE',
           failureStage: 'REMOTE_VERIFICATION',
           completedRemoteBatches,
-          totalRemoteBatches,
-          failedBatchIndex: undefined,
-          error: (err as Error).message
-        };
-      }
+          failedBatchIndex: null,
+          lastError: (err as Error).message,
+          updatedAt: new Date()
+        })
+        .where(eq(spotifyPlaylistLinks.id, link.id));
 
-      // ==========================================
-      // Phase 2: Atomic Local DB Target Replacement
-      // Guarded by in-transaction concurrency check and post-write assertion
-      // ==========================================
-      try {
-        await db.transaction(async (trx) => {
-          // In-transaction optimistic concurrency verification
-          const inTrxEntries = await trx.query.playlistEntries.findMany({
-            where: eq(playlistEntries.playlistId, playlistId),
-            orderBy: asc(playlistEntries.position),
-            with: {
-              song: {
-                columns: {
-                  id: true,
-                  isrc: true
-                }
-              }
-            }
-          });
+      return {
+        status: 'PARTIAL_FAILURE',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'PARTIAL_FAILURE',
+        failureStage: 'REMOTE_VERIFICATION',
+        completedRemoteBatches,
+        totalRemoteBatches,
+        failedBatchIndex: undefined,
+        error: (err as Error).message
+      };
+    }
 
-          const inTrxHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
-            inTrxEntries.map((e, idx) => ({
-              position: idx + 1,
-              songId: e.songId,
-              isrc:
-                (e as { songId: number; song?: { isrc: string | null } }).song?.isrc ?? undefined
-            }))
-          );
+    // ==========================================
+    // Phase 2: Atomic Local DB Target Replacement
+    // Guarded by in-transaction concurrency check and post-write assertion
+    // ==========================================
+    if (signal?.aborted) {
+      logger.info('[SpotifyPlaylistSyncService] Sync cancelled prior to Phase 2 local mutation', {
+        playlistId
+      });
+      return {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'ERROR',
+        completedRemoteBatches,
+        totalRemoteBatches,
+        error: 'Sync cancelled prior to local mutation'
+      };
+    }
 
-          if (plan.base.localEntriesHash && inTrxHash !== plan.base.localEntriesHash) {
-            throw new Error('Local playlist modified concurrently inside transaction boundary.');
-          }
-
-          // Atomic wipe and staged insertion
-          await trx.delete(playlistEntries).where(eq(playlistEntries.playlistId, playlistId));
-
-          for (let i = 0; i < plan.localTarget.length; i++) {
-            const targetOcc = plan.localTarget[i];
-            if (targetOcc.localSongId !== undefined) {
-              await trx.insert(playlistEntries).values({
-                playlistId,
-                songId: targetOcc.localSongId,
-                position: i,
-                source: 'spotify_sync'
-              });
-            }
-          }
-
-          // Post-write local verification inside transaction
-          const insertedEntries = await trx.query.playlistEntries.findMany({
-            where: eq(playlistEntries.playlistId, playlistId),
-            orderBy: asc(playlistEntries.position)
-          });
-
-          if (insertedEntries.length !== plan.localTarget.length) {
-            throw new Error(
-              `Local DB verification failed: expected ${plan.localTarget.length} rows, found ${insertedEntries.length}.`
-            );
-          }
-
-          for (let i = 0; i < plan.localTarget.length; i++) {
-            if (
-              insertedEntries[i].songId !== plan.localTarget[i].localSongId ||
-              insertedEntries[i].position !== i
-            ) {
-              throw new Error(
-                `Local DB positional verification failed at index ${i}: expected song ${plan.localTarget[i].localSongId}, found ${insertedEntries[i].songId}.`
-              );
-            }
-          }
-        });
-      } catch (err) {
-        logger.error('Local DB transaction failed during sync', {
-          playlistId,
-          error: (err as Error).message
-        });
-
-        await db
-          .update(spotifyPlaylistLinks)
-          .set({
-            syncState: 'PARTIAL_FAILURE',
-            failureStage: 'LOCAL',
-            completedRemoteBatches,
-            failedBatchIndex: null,
-            lastError: (err as Error).message,
-            updatedAt: new Date()
-          })
-          .where(eq(spotifyPlaylistLinks.id, link.id));
-
+    // Concurrency check: verify local playlist still exists before attempting DB replacement
+    if (db.query?.playlists?.findFirst) {
+      const playlistStillExists = await db.query.playlists.findFirst({
+        where: eq(playlists.id, playlistId),
+        columns: { id: true }
+      });
+      if (!playlistStillExists) {
+        logger.info(
+          '[SpotifyPlaylistSyncService] Playlist was deleted locally. Skipping Phase 2 & 3.',
+          { playlistId }
+        );
         return {
-          status: 'PARTIAL_FAILURE',
+          status: 'ERROR',
           playlistId,
           spotifyPlaylistId: link.spotifyPlaylistId,
           strategy,
+          syncState: 'ERROR',
+          completedRemoteBatches,
+          totalRemoteBatches,
+          error: 'Playlist deleted locally'
+        };
+      }
+    }
+
+    try {
+      await db.transaction(async (trx) => {
+        if (signal?.aborted) {
+          throw new Error('Sync cancelled: playlist deleted locally');
+        }
+
+        if (trx?.query?.playlists?.findFirst) {
+          const inTrxPlaylist = await trx.query.playlists.findFirst({
+            where: eq(playlists.id, playlistId),
+            columns: { id: true }
+          });
+          if (!inTrxPlaylist) {
+            throw new Error('Playlist was deleted locally during sync transaction.');
+          }
+        }
+
+        // In-transaction optimistic concurrency verification
+        const inTrxEntries = await trx.query.playlistEntries.findMany({
+          where: eq(playlistEntries.playlistId, playlistId),
+          orderBy: asc(playlistEntries.position),
+          with: {
+            song: {
+              columns: {
+                id: true,
+                isrc: true
+              }
+            }
+          }
+        });
+
+        const inTrxHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
+          inTrxEntries.map((e, idx) => ({
+            position: idx + 1,
+            songId: e.songId,
+            isrc:
+              (e as { songId: number; song?: { isrc: string | null } }).song?.isrc ?? undefined
+          }))
+        );
+
+        if (plan.base.localEntriesHash && inTrxHash !== plan.base.localEntriesHash) {
+          throw new Error('Local playlist modified concurrently inside transaction boundary.');
+        }
+
+        // Atomic wipe and staged insertion
+        await trx.delete(playlistEntries).where(eq(playlistEntries.playlistId, playlistId));
+
+        for (let i = 0; i < plan.localTarget.length; i++) {
+          const targetOcc = plan.localTarget[i];
+          if (targetOcc.localSongId !== undefined) {
+            await trx.insert(playlistEntries).values({
+              playlistId,
+              songId: targetOcc.localSongId,
+              position: i,
+              source: 'spotify_sync'
+            });
+          }
+        }
+
+        // Post-write local verification inside transaction
+        const insertedEntries = await trx.query.playlistEntries.findMany({
+          where: eq(playlistEntries.playlistId, playlistId),
+          orderBy: asc(playlistEntries.position)
+        });
+
+        if (insertedEntries.length !== plan.localTarget.length) {
+          throw new Error(
+            `Local DB verification failed: expected ${plan.localTarget.length} rows, found ${insertedEntries.length}.`
+          );
+        }
+
+        for (let i = 0; i < plan.localTarget.length; i++) {
+          if (
+            insertedEntries[i].songId !== plan.localTarget[i].localSongId ||
+            insertedEntries[i].position !== i
+          ) {
+            throw new Error(
+              `Local DB positional verification failed at index ${i}: expected song ${plan.localTarget[i].localSongId}, found ${insertedEntries[i].songId}.`
+            );
+          }
+        }
+      });
+    } catch (err) {
+      if (signal?.aborted) {
+        logger.info('[SpotifyPlaylistSyncService] Sync cancelled during local DB transaction', {
+          playlistId
+        });
+        return {
+          status: 'ERROR',
+          playlistId,
+          spotifyPlaylistId: link.spotifyPlaylistId,
+          strategy,
+          syncState: 'ERROR',
+          completedRemoteBatches,
+          totalRemoteBatches,
+          error: 'Sync cancelled during local DB transaction'
+        };
+      }
+
+      logger.error('Local DB transaction failed during sync', {
+        playlistId,
+        error: (err as Error).message
+      });
+
+      await db
+        .update(spotifyPlaylistLinks)
+        .set({
           syncState: 'PARTIAL_FAILURE',
           failureStage: 'LOCAL',
           completedRemoteBatches,
-          totalRemoteBatches,
-          error: (err as Error).message
-        };
-      }
+          failedBatchIndex: null,
+          lastError: (err as Error).message,
+          updatedAt: new Date()
+        })
+        .where(eq(spotifyPlaylistLinks.id, link.id));
 
-      // ==========================================
-      // Phase 3: Finalize Link Baseline & Invariants
-      // Mutations succeeded locally & remotely. Advance baseline to materialized state.
-      // ==========================================
-      const finalEntries = await this.loadPlaylistEntries(playlistId);
-      const finalEntriesHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
-        finalEntries.map((e, idx) => ({
-          position: idx + 1,
-          songId: e.songId,
-          isrc: e.isrc
-        }))
-      );
+      return {
+        status: 'PARTIAL_FAILURE',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'PARTIAL_FAILURE',
+        failureStage: 'LOCAL',
+        completedRemoteBatches,
+        totalRemoteBatches,
+        error: (err as Error).message
+      };
+    }
 
-      const hasUnresolved = plan.unresolvedRemoteOccurrences.length > 0;
-      const now = new Date();
+    // ==========================================
+    // Phase 3: Finalize Link Baseline & Invariants
+    // Mutations succeeded locally & remotely. Advance baseline to materialized state.
+    // ==========================================
+    if (signal?.aborted) {
+      return {
+        status: 'ERROR',
+        playlistId,
+        spotifyPlaylistId: link.spotifyPlaylistId,
+        strategy,
+        syncState: 'ERROR',
+        completedRemoteBatches,
+        totalRemoteBatches,
+        error: 'Sync cancelled prior to finalization'
+      };
+    }
 
-      if (hasUnresolved) {
-        const unresolvedMessage = `Sync incomplete: ${plan.unresolvedRemoteOccurrences.length} remote track(s) could not be resolved to local audio files.`;
-        await db
-          .update(spotifyPlaylistLinks)
-          .set({
-            lastSyncedSnapshotId: currentSnapshotId,
-            lastSyncedEntriesHash: finalEntriesHash,
-            syncState: 'PARTIAL_FAILURE',
-            failureStage: 'FINALIZATION',
-            completedRemoteBatches: 0,
-            failedBatchIndex: null,
-            lastError: unresolvedMessage,
-            lastSyncedAt: now,
-            updatedAt: now
-          })
-          .where(eq(spotifyPlaylistLinks.id, link.id));
 
-        return {
-          status: 'PARTIAL_FAILURE',
-          playlistId,
-          spotifyPlaylistId: link.spotifyPlaylistId,
-          finalSnapshotId: currentSnapshotId,
-          finalEntriesHash,
-          strategy,
-          syncState: 'PARTIAL_FAILURE',
-          failureStage: 'FINALIZATION',
-          completedRemoteBatches,
-          totalRemoteBatches,
-          unresolvedRemoteCount: plan.unresolvedRemoteOccurrences.length,
-          error: unresolvedMessage
-        };
-      }
+    const finalEntries = await this.loadPlaylistEntries(playlistId);
+    const finalEntriesHash = SpotifyPlaylistSyncDriftDetector.computeEntriesHash(
+      finalEntries.map((e, idx) => ({
+        position: idx + 1,
+        songId: e.songId,
+        isrc: e.isrc
+      }))
+    );
 
-      // Fully synchronized: advance persistent baseline
+    const hasUnresolved = plan.unresolvedRemoteOccurrences.length > 0;
+    const now = new Date();
+
+    if (hasUnresolved) {
+      const unresolvedMessage = `Sync incomplete: ${plan.unresolvedRemoteOccurrences.length} remote track(s) could not be resolved to local audio files.`;
       await db
         .update(spotifyPlaylistLinks)
         .set({
           lastSyncedSnapshotId: currentSnapshotId,
           lastSyncedEntriesHash: finalEntriesHash,
-          syncState: 'SYNCED',
-          failureStage: null,
+          syncState: 'PARTIAL_FAILURE',
+          failureStage: 'FINALIZATION',
           completedRemoteBatches: 0,
           failedBatchIndex: null,
-          lastError: null,
+          lastError: unresolvedMessage,
           lastSyncedAt: now,
           updatedAt: now
         })
         .where(eq(spotifyPlaylistLinks.id, link.id));
 
       return {
-        status: 'SUCCESS',
+        status: 'PARTIAL_FAILURE',
         playlistId,
         spotifyPlaylistId: link.spotifyPlaylistId,
         finalSnapshotId: currentSnapshotId,
         finalEntriesHash,
         strategy,
-        syncState: 'SYNCED',
+        syncState: 'PARTIAL_FAILURE',
+        failureStage: 'FINALIZATION',
         completedRemoteBatches,
         totalRemoteBatches,
-        unresolvedRemoteCount: 0
+        unresolvedRemoteCount: plan.unresolvedRemoteOccurrences.length,
+        error: unresolvedMessage
       };
-    } finally {
-      SpotifyPlaylistSyncService.activeSyncLocks.delete(playlistId);
     }
+
+    // Fully synchronized: advance persistent baseline
+    await db
+      .update(spotifyPlaylistLinks)
+      .set({
+        lastSyncedSnapshotId: currentSnapshotId,
+        lastSyncedEntriesHash: finalEntriesHash,
+        syncState: 'SYNCED',
+        failureStage: null,
+        completedRemoteBatches: 0,
+        failedBatchIndex: null,
+        lastError: null,
+        lastSyncedAt: now,
+        updatedAt: now
+      })
+      .where(eq(spotifyPlaylistLinks.id, link.id));
+
+    return {
+      status: 'SUCCESS',
+      playlistId,
+      spotifyPlaylistId: link.spotifyPlaylistId,
+      finalSnapshotId: currentSnapshotId,
+      finalEntriesHash,
+      strategy,
+      syncState: 'SYNCED',
+      completedRemoteBatches,
+      totalRemoteBatches,
+      unresolvedRemoteCount: 0
+    };
   }
 
   private async loadPlaylistEntries(playlistId: number) {

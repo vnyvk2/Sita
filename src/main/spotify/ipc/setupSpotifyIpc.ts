@@ -36,6 +36,11 @@ export function setupSpotifyIpc(
   exportService = new SpotifyPlaylistExportService(apiClient),
   syncService = new SpotifyPlaylistSyncService(apiClient)
 ): void {
+  // Reconcile stranded SYNCING states from prior application crashes or power loss
+  SpotifyPlaylistSyncService.reconcileStuckSyncStatesOnStartup().catch((err) => {
+    logger.error('Failed to reconcile stuck sync states on boot:', { error: err });
+  });
+
   // Connect handler
   ipcMain.handle('spotify/auth/connect', async () => {
     try {

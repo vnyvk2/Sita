@@ -163,19 +163,34 @@ export function assertWorkspaceInvariants(ws: Workspace): void {
 
 export function normalizeWeights(weights: number[]): number[] {
   if (weights.length === 0) return [];
-  const sum = weights.reduce((acc, w) => acc + (w > 0 ? w : 0.001), 0);
-  if (sum <= 0) {
-    const equal = 1 / weights.length;
+  const MIN_WEIGHT = 0.001;
+  const count = weights.length;
+
+  // Fallback if weights array cannot accommodate MIN_WEIGHT per slot
+  if (count * MIN_WEIGHT > 1.0) {
+    const equal = Math.round((1 / count) * 10000) / 10000;
     return weights.map(() => equal);
   }
-  const raw = weights.map((w) => (w > 0 ? w : 0.001) / sum);
-  // Round to 4 decimal places and adjust last weight so sum is exactly 1.0
-  const rounded = raw.map((w) => Math.round(w * 10000) / 10000);
+
+  const sum = weights.reduce(
+    (acc, w) => acc + (typeof w === 'number' && Number.isFinite(w) && w > 0 ? w : MIN_WEIGHT),
+    0
+  );
+  if (sum <= 0) {
+    const equal = Math.round((1 / count) * 10000) / 10000;
+    return weights.map(() => equal);
+  }
+  const raw = weights.map(
+    (w) => (typeof w === 'number' && Number.isFinite(w) && w > 0 ? w : MIN_WEIGHT) / sum
+  );
+
+  // Round to 4 decimal places and guarantee every weight is at least MIN_WEIGHT (never 0)
+  const rounded = raw.map((w) => Math.max(MIN_WEIGHT, Math.round(w * 10000) / 10000));
   const roundedSum = rounded.reduce((acc, w) => acc + w, 0);
   const diff = Math.round((1.0 - roundedSum) * 10000) / 10000;
 
   const lastIdx = rounded.length - 1;
-  if (rounded[lastIdx] + diff >= 0.001) {
+  if (rounded[lastIdx] + diff >= MIN_WEIGHT) {
     rounded[lastIdx] = Math.round((rounded[lastIdx] + diff) * 10000) / 10000;
   } else {
     let maxIdx = 0;
@@ -184,8 +199,16 @@ export function normalizeWeights(weights: number[]): number[] {
         maxIdx = i;
       }
     }
-    rounded[maxIdx] = Math.round((rounded[maxIdx] + diff) * 10000) / 10000;
+    rounded[maxIdx] = Math.max(MIN_WEIGHT, Math.round((rounded[maxIdx] + diff) * 10000) / 10000);
   }
+
+  // Defensive sanity check: guarantee no weight is non-positive
+  for (let i = 0; i < rounded.length; i++) {
+    if (rounded[i] <= 0) {
+      rounded[i] = MIN_WEIGHT;
+    }
+  }
+
   return rounded;
 }
 
@@ -232,7 +255,10 @@ export function findTabGroupNode(root: LayoutNode, tabsId: string): TabGroupNode
   return null;
 }
 
-export function findTabGroupContainingPanel(root: LayoutNode, panelId: string): TabGroupNode | null {
+export function findTabGroupContainingPanel(
+  root: LayoutNode,
+  panelId: string
+): TabGroupNode | null {
   if (root.kind === 'tabs') {
     if (root.tabs.includes(panelId)) return root;
   } else if (root.kind === 'split') {
@@ -264,9 +290,7 @@ export function findRightsideTabGroup(ws: Workspace): TabGroupNode | null {
   if (!routerPanel) return null;
 
   if (ws.root.kind === 'split' && ws.root.axis === 'x') {
-    const routerIdx = ws.root.children.findIndex((c) =>
-      collectAllPanelIds(c).has(routerPanel.id)
-    );
+    const routerIdx = ws.root.children.findIndex((c) => collectAllPanelIds(c).has(routerPanel.id));
     if (routerIdx !== -1) {
       for (let i = routerIdx + 1; i < ws.root.children.length; i++) {
         const tgs = findAllTabGroups(ws.root.children[i]);
@@ -297,9 +321,7 @@ export function findRightsideSecondaryPanel(ws: Workspace): PanelInstance | null
   if (!routerPanel) return null;
 
   if (ws.root.kind === 'split' && ws.root.axis === 'x') {
-    const routerIdx = ws.root.children.findIndex((c) =>
-      collectAllPanelIds(c).has(routerPanel.id)
-    );
+    const routerIdx = ws.root.children.findIndex((c) => collectAllPanelIds(c).has(routerPanel.id));
     if (routerIdx !== -1) {
       for (let i = routerIdx + 1; i < ws.root.children.length; i++) {
         const child = ws.root.children[i];
@@ -323,11 +345,11 @@ export function findRightsideSecondaryPanel(ws: Workspace): PanelInstance | null
 }
 
 /**
- * Normalizes and guards drop targets to uphold structural invariants:
- * - router-view must NEVER be converted into a TabGroup or hidden. If target is tab-into router-view,
- *   it redirects to a right-side TabGroup, a right-side secondary panel, or a split-into on the right.
- * - Left-side singleton panels (playlists, navigation) must NEVER be converted into a TabGroup
- *   by an incoming tool widget.
+ * Normalizes and guards drop targets to uphold structural invariants: - router-view must NEVER be
+ * converted into a TabGroup or hidden. If target is tab-into router-view, it redirects to a
+ * right-side TabGroup, a right-side secondary panel, or a split-into on the right. - Left-side
+ * singleton panels (playlists, navigation) must NEVER be converted into a TabGroup by an incoming
+ * tool widget.
  */
 export function resolveSafeDropTarget(
   ws: Workspace,
@@ -342,7 +364,11 @@ export function resolveSafeDropTarget(
         return { ...at, tabsId: rightTg.id };
       }
       const rightSecondary = findRightsideSecondaryPanel(ws);
-      if (rightSecondary && rightSecondary.id !== movingPanelId && rightSecondary.id !== targetPanel.id) {
+      if (
+        rightSecondary &&
+        rightSecondary.id !== movingPanelId &&
+        rightSecondary.id !== targetPanel.id
+      ) {
         return { ...at, tabsId: rightSecondary.id };
       }
       return {
@@ -1167,42 +1193,56 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
     }
 
     case 'split.collapse': {
+      const nextRoot = updateNodeRecursively(
+        ws.root,
+        (n) => n.kind === 'split' && (n as SplitNode).id === op.splitId,
+        (node) => {
+          const split = node as SplitNode;
+          if (split.collapsed === op.childIndex) {
+            return split;
+          }
+          return {
+            ...split,
+            collapsed: op.childIndex
+          };
+        }
+      );
+      if (nextRoot === ws.root) {
+        return ws;
+      }
       nextWs = {
         ...ws,
-        root: updateNodeRecursively(
-          ws.root,
-          (n) => n.kind === 'split' && (n as SplitNode).id === op.splitId,
-          (node) => {
-            const split = node as SplitNode;
-            return {
-              ...split,
-              collapsed: op.childIndex
-            };
-          }
-        )
+        root: nextRoot
       };
       break;
     }
 
     case 'tabs.activate': {
+      const nextRoot = updateNodeRecursively(
+        ws.root,
+        (n) => n.kind === 'tabs' && (n as TabGroupNode).id === op.tabsId,
+        (node) => {
+          const tabs = node as TabGroupNode;
+          if (!tabs.tabs.includes(op.panelId)) {
+            throw new WorkspaceInvariantError(
+              `Panel '${op.panelId}' is not part of TabGroup '${op.tabsId}'.`
+            );
+          }
+          if (tabs.active === op.panelId) {
+            return tabs;
+          }
+          return {
+            ...tabs,
+            active: op.panelId
+          };
+        }
+      );
+      if (nextRoot === ws.root) {
+        return ws;
+      }
       nextWs = {
         ...ws,
-        root: updateNodeRecursively(
-          ws.root,
-          (n) => n.kind === 'tabs' && (n as TabGroupNode).id === op.tabsId,
-          (node) => {
-            const tabs = node as TabGroupNode;
-            if (!tabs.tabs.includes(op.panelId)) {
-              throw new WorkspaceInvariantError(
-                `Panel '${op.panelId}' is not part of TabGroup '${op.tabsId}'.`
-              );
-            }
-            return {
-              ...tabs,
-              active: op.panelId
-            };
-          }
-        )
+        root: nextRoot
       };
       break;
     }
@@ -1235,6 +1275,16 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
 
     case 'tabs.extract': {
       // Extracts a tab from TabGroup into a SplitNode along axis
+      const targetDepth = getNodeDepth(
+        ws.root,
+        (n) => n.kind === 'tabs' && (n as TabGroupNode).tabs.includes(op.panelId)
+      );
+      if (targetDepth >= 3) {
+        // If the TabGroup is already at max depth (depth >= 3), wrapping it in a SplitNode
+        // would exceed the invariant max depth of 3. Return unchanged to reject invalid op gracefully (CF-01).
+        return ws;
+      }
+
       nextWs = {
         ...ws,
         root: updateNodeRecursively(

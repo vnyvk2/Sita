@@ -8,7 +8,7 @@ describe('HydrationCoordinator', () => {
     coordinator = new HydrationCoordinator();
   });
 
-  it('executes a task directly when not superseded', async () => {
+  it('executes a task directly when not superseded and retains generationToken during TTL', async () => {
     const execute = vi.fn().mockResolvedValue(['song1', 'song2']);
 
     const result = await coordinator.schedule(
@@ -18,7 +18,41 @@ describe('HydrationCoordinator', () => {
 
     expect(execute).toHaveBeenCalledTimes(1);
     expect(result).toEqual(['song1', 'song2']);
-    expect(coordinator.getLatestGeneration('songs')).toBe(0); // Pruned after queue drained
+    // Retained immediately after queue drain to reject late-arriving lookaheads
+    expect(coordinator.getLatestGeneration('songs')).toBe(1);
+  });
+
+  it('drops late-arriving lookaheads with older tokens after queue has drained (Attack 1 defense)', async () => {
+    // 1. User scrolls to generation 5 and queue executes and drains
+    const executeGen5 = vi.fn().mockResolvedValue(['song5']);
+    await coordinator.schedule(
+      { generationToken: 5, listIdentity: 'songs', priority: 'target' },
+      executeGen5
+    );
+    expect(coordinator.getLatestGeneration('songs')).toBe(5);
+
+    // 2. Delayed lookahead from generation 3 arrives after queue drained
+    const executeGen3 = vi.fn().mockResolvedValue(['song3_stale']);
+    const resultGen3 = await coordinator.schedule(
+      { generationToken: 3, listIdentity: 'songs', priority: 'lookahead' },
+      executeGen3
+    );
+
+    // Gen 3 must be dropped immediately without executing SQLite work!
+    expect(executeGen3).not.toHaveBeenCalled();
+    expect(resultGen3).toEqual({ cancelled: true, generationToken: 3 });
+  });
+
+  it('prunes generation token when reset or when initialized with retention 0', async () => {
+    const instantCoordinator = new HydrationCoordinator(0);
+    const execute = vi.fn().mockResolvedValue(['data']);
+
+    await instantCoordinator.schedule(
+      { generationToken: 1, listIdentity: 'songs', priority: 'target' },
+      execute
+    );
+
+    expect(instantCoordinator.getLatestGeneration('songs')).toBe(0);
   });
 
   it('immediately drops a task if generationToken < latestGeneration', async () => {
@@ -36,7 +70,7 @@ describe('HydrationCoordinator', () => {
   });
 
   it('evicts queued tasks before execution when a newer generation arrives', async () => {
-    let resolveFirstTask: (v: any) => void = () => {};
+    let resolveFirstTask: (v: unknown) => void = () => {};
     const firstTaskPromise = new Promise((resolve) => {
       resolveFirstTask = resolve;
     });
@@ -79,7 +113,7 @@ describe('HydrationCoordinator', () => {
   });
 
   it('prioritizes target queries ahead of lookahead queries in queue', async () => {
-    let resolveFirstTask: (v: any) => void = () => {};
+    let resolveFirstTask: (v: unknown) => void = () => {};
     const firstTaskPromise = new Promise((resolve) => {
       resolveFirstTask = resolve;
     });

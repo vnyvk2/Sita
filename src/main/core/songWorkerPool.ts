@@ -206,6 +206,7 @@ export const processSongsWithWorkerPool = async (
     const unnotifiedGenreIds: number[] = [];
     let successCount = 0;
     let durablyCommittedSongCount = 0;
+    let activeBatchPromise: Promise<void> | null = null;
 
     try {
       performance.mark('songWorkerPool:executionMode:worker');
@@ -219,16 +220,17 @@ export const processSongsWithWorkerPool = async (
       await mediaWorkerBridge.parseTrackBatchStream(songs, {
         batchSize: 100,
         abortSignal,
-        onBatch: async (batch) => {
-          // BATCH-BOUNDARY CANCELLATION SEMANTICS:
-          // If the user cancelled the scan while this batch was in transit,
-          // discard this and all subsequent batches immediately without touching DB.
-          if (abortSignal?.aborted) {
-            logger.info(
-              `[songWorkerPool] Scan cancelled at batch boundary. Discarding batch ${batch.batchId}.`
-            );
-            return;
-          }
+        onBatch: (batch) => {
+          const promise = (async () => {
+            // BATCH-BOUNDARY CANCELLATION SEMANTICS:
+            // If the user cancelled the scan while this batch was in transit,
+            // discard this and all subsequent batches immediately without touching DB.
+            if (abortSignal?.aborted) {
+              logger.info(
+                `[songWorkerPool] Scan cancelled at batch boundary. Discarding batch ${batch.batchId}.`
+              );
+              return;
+            }
 
           if (batch.tracks.length > 0) {
             songIngestionMetrics.batchesProcessed++;
@@ -370,92 +372,116 @@ export const processSongsWithWorkerPool = async (
 
           // Yield to the libuv event loop to allow IPC messages and renderer tasks to process
           await new Promise<void>((resolve) => setImmediate(resolve));
-        }
-      });
+        })();
 
-      // Log isolated transaction and artwork latency percentiles
-      if (songIngestionMetrics.dbTxDurations.length > 0) {
-        const sortedDb = [...songIngestionMetrics.dbTxDurations].sort((a, b) => a - b);
-        const sortedArt = [...songIngestionMetrics.artworkDurations].sort((a, b) => a - b);
-        const dbP50 = sortedDb[Math.floor(sortedDb.length * 0.5)];
-        const dbP95 = sortedDb[Math.floor(sortedDb.length * 0.95)];
-        const artP50 = sortedArt[Math.floor(sortedArt.length * 0.5)];
-        const artP95 = sortedArt[Math.floor(sortedArt.length * 0.95)];
-
-        logger.info(
-          `[songWorkerPool] Ingestion complete: ${successCount} tracks in ${songIngestionMetrics.batchesProcessed} batches (${(songIngestionMetrics.totalArtworkBytes / 1024 / 1024).toFixed(1)} MB total artwork).\n` +
-            `  Pure DB Tx Latency: P50=${dbP50.toFixed(1)}ms, P95=${dbP95.toFixed(1)}ms\n` +
-            `  Artwork Decode/Disk: P50=${artP50.toFixed(1)}ms, P95=${artP95.toFixed(1)}ms`
-        );
-      }
-
-      if (!abortSignal?.aborted) {
-        // Enqueue background asset jobs
-        if (albumAssetsToQueue.size > 0) {
-          for (const [albumId, data] of albumAssetsToQueue.entries()) {
-            libraryScheduler.enqueue(
-              new ArtworkJob(albumId, data.path, data.title, libraryScheduler)
-            );
+        activeBatchPromise = promise;
+        return promise.finally(() => {
+          if (activeBatchPromise === promise) {
+            activeBatchPromise = null;
           }
-        }
-
-        if (songAssetsToQueue.length > 0) {
-          for (const song of songAssetsToQueue) {
-            libraryScheduler.enqueue(
-              new WaveformJob(song.id, song.path, song.title, libraryScheduler)
-            );
-            libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
-            libraryScheduler.enqueue(
-              new LyricsJob(song.id, song.title, libraryScheduler, 'interactive')
-            );
-          }
-        }
-
-        // Flush any remaining unnotified tracks to the renderer
-        if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', unnotifiedSongIds);
-        if (unnotifiedArtistIds.length > 0)
-          dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
-        if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', unnotifiedAlbumIds);
-        if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', unnotifiedGenreIds);
+        });
       }
+    });
 
-      return {
-        successCount,
-        errorCount: errors.length,
-        errors
-      };
-    } catch (workerErr) {
-      logger.error(
-        `[songWorkerPool] CRITICAL FALLBACK: Worker batch parsing failed at committed count ${durablyCommittedSongCount}/${songs.length}. Falling back to local ingestion in Main.`,
-        { error: workerErr }
+    // Log isolated transaction and artwork latency percentiles
+    if (songIngestionMetrics.dbTxDurations.length > 0) {
+      const sortedDb = [...songIngestionMetrics.dbTxDurations].sort((a, b) => a - b);
+      const sortedArt = [...songIngestionMetrics.artworkDurations].sort((a, b) => a - b);
+      const dbP50 = sortedDb[Math.floor(sortedDb.length * 0.5)];
+      const dbP95 = sortedDb[Math.floor(sortedDb.length * 0.95)];
+      const artP50 = sortedArt[Math.floor(sortedArt.length * 0.5)];
+      const artP95 = sortedArt[Math.floor(sortedArt.length * 0.95)];
+
+      logger.info(
+        `[songWorkerPool] Ingestion complete: ${successCount} tracks in ${songIngestionMetrics.batchesProcessed} batches (${(songIngestionMetrics.totalArtworkBytes / 1024 / 1024).toFixed(1)} MB total artwork).\n` +
+          `  Pure DB Tx Latency: P50=${dbP50.toFixed(1)}ms, P95=${dbP95.toFixed(1)}ms\n` +
+          `  Artwork Decode/Disk: P50=${artP50.toFixed(1)}ms, P95=${artP95.toFixed(1)}ms`
       );
+    }
 
-      // Enqueue background asset jobs and fire data update events for already committed tracks
-      if (!abortSignal?.aborted) {
-        if (albumAssetsToQueue.size > 0) {
-          for (const [albumId, data] of albumAssetsToQueue.entries()) {
-            libraryScheduler.enqueue(
-              new ArtworkJob(albumId, data.path, data.title, libraryScheduler)
-            );
-          }
+    if (!abortSignal?.aborted) {
+      // Enqueue background asset jobs
+      if (albumAssetsToQueue.size > 0) {
+        for (const [albumId, data] of albumAssetsToQueue.entries()) {
+          libraryScheduler.enqueue(
+            new ArtworkJob(albumId, data.path, data.title, libraryScheduler)
+          );
         }
-        if (songAssetsToQueue.length > 0) {
-          for (const song of songAssetsToQueue) {
-            libraryScheduler.enqueue(
-              new WaveformJob(song.id, song.path, song.title, libraryScheduler)
-            );
-            libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
-            libraryScheduler.enqueue(
-              new LyricsJob(song.id, song.title, libraryScheduler, 'interactive')
-            );
-          }
-        }
-        if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', unnotifiedSongIds);
-        if (unnotifiedArtistIds.length > 0)
-          dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
-        if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', unnotifiedAlbumIds);
-        if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', unnotifiedGenreIds);
       }
+
+      if (songAssetsToQueue.length > 0) {
+        for (const song of songAssetsToQueue) {
+          libraryScheduler.enqueue(
+            new WaveformJob(song.id, song.path, song.title, libraryScheduler)
+          );
+          libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
+          libraryScheduler.enqueue(
+            new LyricsJob(song.id, song.title, libraryScheduler, 'interactive')
+          );
+        }
+      }
+
+      // Flush any remaining unnotified tracks to the renderer
+      if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', unnotifiedSongIds);
+      if (unnotifiedArtistIds.length > 0)
+        dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
+      if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', unnotifiedAlbumIds);
+      if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', unnotifiedGenreIds);
+    }
+
+    return {
+      successCount,
+      errorCount: errors.length,
+      errors
+    };
+  } catch (workerErr) {
+    if (activeBatchPromise) {
+      try {
+        await activeBatchPromise;
+      } catch (inFlightErr) {
+        logger.warn('[songWorkerPool] In-flight batch failed prior to fallback ingestion:', {
+          error: inFlightErr
+        });
+      }
+    }
+
+    logger.error(
+      `[songWorkerPool] CRITICAL FALLBACK: Worker batch parsing failed at committed count ${durablyCommittedSongCount}/${songs.length}. Falling back to local ingestion in Main.`,
+      { error: workerErr }
+    );
+
+    // Enqueue background asset jobs and fire data update events for already committed tracks
+    if (!abortSignal?.aborted) {
+      if (albumAssetsToQueue.size > 0) {
+        for (const [albumId, data] of albumAssetsToQueue.entries()) {
+          libraryScheduler.enqueue(
+            new ArtworkJob(albumId, data.path, data.title, libraryScheduler)
+          );
+        }
+      }
+      if (songAssetsToQueue.length > 0) {
+        for (const song of songAssetsToQueue) {
+          libraryScheduler.enqueue(
+            new WaveformJob(song.id, song.path, song.title, libraryScheduler)
+          );
+          libraryScheduler.enqueue(new ReplayGainJob(song.id, song.title, libraryScheduler));
+          libraryScheduler.enqueue(
+            new LyricsJob(song.id, song.title, libraryScheduler, 'interactive')
+          );
+        }
+      }
+      if (unnotifiedSongIds.length > 0) dataUpdateEvent('songs/newSong', unnotifiedSongIds);
+      if (unnotifiedArtistIds.length > 0)
+        dataUpdateEvent('artists/newArtist', unnotifiedArtistIds);
+      if (unnotifiedAlbumIds.length > 0) dataUpdateEvent('albums/newAlbum', unnotifiedAlbumIds);
+      if (unnotifiedGenreIds.length > 0) dataUpdateEvent('genres/newGenre', unnotifiedGenreIds);
+      unnotifiedSongIds.length = 0;
+      unnotifiedArtistIds.length = 0;
+      unnotifiedAlbumIds.length = 0;
+      unnotifiedGenreIds.length = 0;
+      albumAssetsToQueue.clear();
+      songAssetsToQueue.length = 0;
+    }
 
       const remainingSongs = songs.slice(durablyCommittedSongCount);
       if (remainingSongs.length === 0) {

@@ -11,7 +11,7 @@ import {
   songs
 } from '@db/schema';
 import type { SqliteEngine } from '@db/sqlite/engine';
-import { rawAll } from '@db/sqlite/raw';
+import { isTransactionContext, rawAll } from '@db/sqlite/raw';
 import { parseSongArtworks } from '@main/fs/resolveFilePaths';
 import logger from '@main/logger';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
@@ -287,12 +287,13 @@ export const getFlatSongsByIds = async (
     return [];
   }
 
-  const CHUNK_SIZE = 500;
-  const uniqueIds = Array.from(new Set(songIds));
-  const isCompact = Boolean(options?.compact);
+  const executeFetch = (): SongData[] => {
+    const CHUNK_SIZE = 500;
+    const uniqueIds = Array.from(new Set(songIds));
+    const isCompact = Boolean(options?.compact);
 
-  if (isCompact) {
-    const rawRows: RawCompactSongRow[] = [];
+    if (isCompact) {
+      const rawRows: RawCompactSongRow[] = [];
 
     for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {
       const chunk = uniqueIds.slice(i, i + CHUNK_SIZE);
@@ -470,28 +471,34 @@ export const getFlatSongsByIds = async (
       WHERE s.id IN (${placeholders});
     `;
 
-    const rows = engine.all(sqlText, chunk) as unknown as RawFlatSongRow[];
-    if (rows && rows.length > 0) {
-      rawRows.push(...rows);
+      const rows = engine.all(sqlText, chunk) as unknown as RawFlatSongRow[];
+      if (rows && rows.length > 0) {
+        rawRows.push(...rows);
+      }
     }
+
+    const convertedSongs = rawRows.map(mapRawFlatRowToSongData);
+
+    if (preserveIdOrder) {
+      const songsById = new Map<number, SongData>();
+      for (let i = 0; i < convertedSongs.length; i += 1) {
+        songsById.set(convertedSongs[i].songId, convertedSongs[i]);
+      }
+      const orderedSongs: SongData[] = [];
+      for (let i = 0; i < songIds.length; i += 1) {
+        const s = songsById.get(songIds[i]);
+        if (s) orderedSongs.push(s);
+      }
+      return orderedSongs;
+    }
+
+    return convertedSongs;
+  };
+
+  if (isTransactionContext(trx, engine)) {
+    return executeFetch();
   }
-
-  const convertedSongs = rawRows.map(mapRawFlatRowToSongData);
-
-  if (preserveIdOrder) {
-    const songsById = new Map<number, SongData>();
-    for (let i = 0; i < convertedSongs.length; i += 1) {
-      songsById.set(convertedSongs[i].songId, convertedSongs[i]);
-    }
-    const orderedSongs: SongData[] = [];
-    for (let i = 0; i < songIds.length; i += 1) {
-      const s = songsById.get(songIds[i]);
-      if (s) orderedSongs.push(s);
-    }
-    return orderedSongs;
-  }
-
-  return convertedSongs;
+  return await engine.withTxLock(async () => executeFetch());
 };
 
 export const isSongWithPathAvailable = async (path: string, trx: DB | DBTransaction = db) => {

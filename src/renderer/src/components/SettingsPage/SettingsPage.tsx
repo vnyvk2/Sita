@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import Button from '../Button';
@@ -10,7 +11,6 @@ import AppearanceSettings from './Settings/AppearanceSettings';
 import AudioPlaybackSettings from './Settings/AudioPlaybackSettings';
 import DefaultPageSettings from './Settings/DefaultPageSettings';
 import DownloadsSettings from './Settings/DownloadsSettings';
-// import StorageSettings from './Settings/StorageSettings';
 import EqualizerSettings from './Settings/EqualizerSettings';
 import LanguageSettings from './Settings/LanguageSettings';
 import LibrarySettings from './Settings/LibrarySettings';
@@ -19,11 +19,21 @@ import MetadataSettings from './Settings/MetadataSettings';
 import PerformanceSettings from './Settings/PerformanceSettings';
 import PreferencesSettings from './Settings/PreferencesSettings';
 import {
+  SETTINGS_SECTION_KEYS,
   SettingsCollapseProvider,
-  useSettingsCollapse
+  useSettingsCollapse,
+  useSettingsCollapseActions,
+  type SettingsSectionKey
 } from './Settings/SettingsCollapseContext';
+import { settingsCatalog } from './settingsCatalog';
+import SettingsSearchInput from './SettingsSearchInput';
 import StartupSettings from './Settings/StartupSettings';
 import StorageSettings from './Settings/StorageSettings';
+
+interface SettingsPageProps {
+  initialHighlight?: string;
+  initialSection?: string;
+}
 
 const SettingsHeader = () => {
   const { t } = useTranslation();
@@ -41,60 +51,112 @@ const SettingsHeader = () => {
   };
 
   return (
-    <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center justify-between text-3xl font-medium">
-      <span>{t('settingsPage.settings')}</span>
-      {collapseContext && (
-        <Button
-          tooltipLabel={
-            areAllCollapsed
-              ? t('settingsPage.expandAll', 'Expand all')
-              : t('settingsPage.collapseAll', 'Collapse all')
-          }
-          iconName={areAllCollapsed ? 'unfold_more' : 'unfold_less'}
-          iconClassName="text-xl!"
-          className="mr-0 h-10 w-10 cursor-pointer p-0 text-sm font-normal"
-          clickHandler={handleToggleAll}
-        />
-      )}
+    <div className="title-container mt-1 mb-4 flex flex-wrap items-center justify-between gap-4">
+      <span className="text-font-color-highlight dark:text-dark-font-color-highlight text-3xl font-medium">
+        {t('settingsPage.settings')}
+      </span>
+      <div className="flex items-center gap-3">
+        <SettingsSearchInput />
+        {collapseContext && (
+          <Button
+            tooltipLabel={
+              areAllCollapsed
+                ? t('settingsPage.expandAll', 'Expand all')
+                : t('settingsPage.collapseAll', 'Collapse all')
+            }
+            iconName={areAllCollapsed ? 'unfold_more' : 'unfold_less'}
+            iconClassName="text-xl!"
+            className="mr-0 h-10 w-10 cursor-pointer p-0 text-sm font-normal"
+            clickHandler={handleToggleAll}
+          />
+        )}
+      </div>
     </div>
   );
 };
 
-const SettingsPage = () => {
+const SettingsDeepLinkHandler = ({
+  initialHighlight,
+  initialSection
+}: SettingsPageProps) => {
+  const collapseActions = useSettingsCollapseActions();
+  const collapseContext = useSettingsCollapse();
+  const jumpToSetting = collapseActions?.jumpToSetting ?? collapseContext?.jumpToSetting;
+  const lastHandledKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (initialHighlight && jumpToSetting) {
+      const targetKey = `${initialHighlight}:${initialSection ?? ''}`;
+      if (lastHandledKeyRef.current === targetKey) return;
+      lastHandledKeyRef.current = targetKey;
+
+      let sectionKey: SettingsSectionKey | undefined;
+      if (
+        initialSection &&
+        SETTINGS_SECTION_KEYS.includes(initialSection as SettingsSectionKey)
+      ) {
+        sectionKey = initialSection as SettingsSectionKey;
+      }
+
+      if (!sectionKey) {
+        const found = settingsCatalog.find((e) => e.id === initialHighlight);
+        if (found) {
+          sectionKey = found.sectionKey;
+        }
+      }
+
+      if (sectionKey) {
+        jumpToSetting(initialHighlight, sectionKey);
+      } else {
+        console.warn(
+          `[Settings] Unable to resolve section for highlight target: ${initialHighlight}`
+        );
+      }
+    }
+  }, [initialHighlight, initialSection, jumpToSetting]);
+
+  return null;
+};
+
+const SettingsPage = ({ initialHighlight, initialSection }: SettingsPageProps) => {
   return (
     <MainContainer className="main-container settings-container appear-from-bottom text-font-color-black dark:text-font-color-white mb-0! h-fit! [scrollbar-gutter:stable] pr-8 pb-8">
       <SettingsCollapseProvider>
+        <SettingsDeepLinkHandler
+          initialHighlight={initialHighlight}
+          initialSection={initialSection}
+        />
         <SettingsHeader />
 
         <ul className="pl-4">
-          {/*  APPEARANCE SETTINGS */}
+          {/* APPEARANCE SETTINGS */}
           <AppearanceSettings />
 
-          {/*  LANGUAGE SETTINGS */}
+          {/* LANGUAGE SETTINGS */}
           <LanguageSettings />
 
-          {/* ? AUDIO PLAYBACK SETTINGS */}
+          {/* AUDIO PLAYBACK SETTINGS */}
           <AudioPlaybackSettings />
 
-          {/* ? ACCOUNTS SETTINGS */}
+          {/* ACCOUNTS SETTINGS */}
           <AccountsSettings />
 
-          {/* ? LYRICS SETTINGS */}
+          {/* LYRICS SETTINGS */}
           <LyricsSettings />
 
-          {/* ? EQUALIZER SETTINGS */}
+          {/* EQUALIZER SETTINGS */}
           <EqualizerSettings />
 
           {/* DEFAULT PAGE SETTINGS */}
           <DefaultPageSettings />
 
-          {/* ? PREFERENCES SETTINGS */}
+          {/* PREFERENCES SETTINGS */}
           <PreferencesSettings />
 
           {/* METADATA & AUTOTAG SOURCES SETTINGS */}
           <MetadataSettings />
 
-          {/* ? ACCESSIBILITY SETTINGS */}
+          {/* ACCESSIBILITY SETTINGS */}
           <AccessibilitySettings />
 
           {/* PERFORMANCE SETTINGS */}

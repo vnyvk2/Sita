@@ -17,6 +17,7 @@ import Button from '../../Button';
 import Hyperlink from '../../Hyperlink';
 import Img from '../../Img';
 import AppStats from './AppStats';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 
 const ReleaseNotesPrompt = lazy(() => import('../../ReleaseNotesPrompt/ReleaseNotesPrompt'));
 const ResetAppConfirmationPrompt = lazy(() => import('../ResetAppConfirmationPrompt'));
@@ -49,13 +50,15 @@ const AboutSettings = () => {
   }, [currentVersionReleasedDate]);
 
   return (
-    <li className="main-container about-container" id="about-settings-container">
-      <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex items-center text-2xl font-medium">
-        <span className="material-icons-round-outlined mr-2">info</span>
-        About
-      </div>
+    <CollapsibleSettingsSection
+      id="about-settings-container"
+      sectionKey="about"
+      title={t('settingsPage.about', 'About')}
+      iconName="info"
+      className="about-container"
+    >
       <div className="pl-2">
-        <div className="mb-2 flex items-center justify-between p-2 text-lg">
+        <div id="setting-about-app-version" className="mb-2 flex items-center justify-between p-2 text-lg">
           <div className="flex items-center">
             <Img src={AppIcon} className="aspect-square max-h-12 rounded-md shadow-md" alt="" />
             <div className="ml-4 flex flex-col">
@@ -224,113 +227,125 @@ const AboutSettings = () => {
             className="mb-4"
             clickHandler={() => window.api.audioLibraryControls.generatePalettes()}
           />
-          <Button
-            label={t('settingsPage.appShortcuts')}
-            iconName="trail_length_short"
-            className="mb-4"
-            iconClassName="material-icons-round-outlined"
-            clickHandler={() => changePromptMenuData(true, <AppShortcutsPrompt />)}
-          />
+          <div id="setting-about-app-shortcuts" className="inline-block">
+            <Button
+              label={t('settingsPage.appShortcuts')}
+              iconName="trail_length_short"
+              className="mb-4"
+              iconClassName="material-icons-round-outlined"
+              clickHandler={() => changePromptMenuData(true, <AppShortcutsPrompt />)}
+            />
+          </div>
         </div>
 
         <AppStats />
 
-        <div className="about-buttons-container mb-4 flex flex-wrap justify-center">
-          <Button
-            label={t('settingsPage.resetApp')}
-            iconName="auto_mode"
-            className="mb-4"
-            clickHandler={() =>
-              changePromptMenuData(true, <ResetAppConfirmationPrompt />, 'confirm-app-reset')
-            }
-          />
-          <Button
-            label={t('settingsPage.clearOptionalData')}
-            iconName="delete"
-            className="mb-4"
-            iconClassName="material-icons-round-outlined"
-            clickHandler={() =>
-              changePromptMenuData(true, <ClearLocalStoragePrompt />, 'confirm-app-reset')
-            }
-          />
+        <div className="about-buttons-container mb-4 flex flex-wrap justify-center gap-2">
+          <div id="setting-about-reset-app" className="inline-block">
+            <Button
+              label={t('settingsPage.resetApp')}
+              iconName="auto_mode"
+              className="mb-4"
+              clickHandler={() =>
+                changePromptMenuData(true, <ResetAppConfirmationPrompt />, 'confirm-app-reset')
+              }
+            />
+          </div>
+          <div id="setting-about-clear-localstorage" className="inline-block">
+            <Button
+              label={t('settingsPage.clearOptionalData')}
+              iconName="delete"
+              className="mb-4"
+              iconClassName="material-icons-round-outlined"
+              clickHandler={() =>
+                changePromptMenuData(true, <ClearLocalStoragePrompt />, 'confirm-app-reset')
+              }
+            />
+          </div>
 
-          <Button
-            label={t('settingsPage.clearHistory')}
-            iconName="clear"
-            className="mb-4"
-            clickHandler={() => {
-              changePromptMenuData(
-                true,
-                <SensitiveActionConfirmPrompt
-                  title={t('settingsPage.confirmSongHistoryDeletion')}
-                  content={<div>{t('settingsPage.songHistoryDeletionDisclaimer')}</div>}
-                  confirmButton={{
-                    label: t('settingsPage.clearHistory'),
-                    clickHandler: () => {
-                      window.api.audioLibraryControls
-                        .clearSongHistory()
-                        .then((res) => {
-                          if (res.success) {
-                            addNewNotifications([
-                              {
-                                id: 'songHistoryCleared',
-                                duration: 5000,
-                                content: <span>{t('settingsPage.songHistoryDeletionSuccess')}</span>
-                              }
-                            ]);
-                          }
-                          return changePromptMenuData(false);
-                        })
-                        .catch((err) => console.error(err));
-                    }
-                  }}
-                />
-              );
-            }}
-          />
+          <div id="setting-about-clear-history" className="inline-block">
+            <Button
+              label={t('settingsPage.clearHistory')}
+              iconName="clear"
+              className="mb-4"
+              clickHandler={() => {
+                changePromptMenuData(
+                  true,
+                  <SensitiveActionConfirmPrompt
+                    title={t('settingsPage.confirmSongHistoryDeletion')}
+                    content={<div>{t('settingsPage.songHistoryDeletionDisclaimer')}</div>}
+                    confirmButton={{
+                      label: t('settingsPage.clearHistory'),
+                      clickHandler: () => {
+                        window.api.audioLibraryControls
+                          .clearSongHistory()
+                          .then((res) => {
+                            if (res.success) {
+                              addNewNotifications([
+                                {
+                                  id: 'songHistoryCleared',
+                                  duration: 5000,
+                                  content: <span>{t('settingsPage.songHistoryDeletionSuccess')}</span>
+                                }
+                              ]);
+                            }
+                            return changePromptMenuData(false);
+                          })
+                          .catch((err) => console.error(err));
+                      }
+                    }}
+                  />
+                );
+              }}
+            />
+          </div>
 
-          <Button
-            label={t('settingsPage.exportAppData')}
-            iconName="file_upload"
-            className="mb-4"
-            clickHandler={(_, setIsDisabled, setIsPending) => {
-              setIsDisabled(true);
-              setIsPending(true);
+          <div id="setting-about-export-app-data" className="inline-block">
+            <Button
+              label={t('settingsPage.exportAppData')}
+              iconName="file_upload"
+              className="mb-4"
+              clickHandler={(_, setIsDisabled, setIsPending) => {
+                setIsDisabled(true);
+                setIsPending(true);
 
-              return window.api.settingsHelpers
-                .exportAppData(JSON.stringify(storage.getAllItems()))
-                .finally(() => {
-                  setIsDisabled(false);
-                  setIsPending(false);
-                })
-                .catch((err) => console.error(err));
-            }}
-          />
+                return window.api.settingsHelpers
+                  .exportAppData(JSON.stringify(storage.getAllItems()))
+                  .finally(() => {
+                    setIsDisabled(false);
+                    setIsPending(false);
+                  })
+                  .catch((err) => console.error(err));
+              }}
+            />
+          </div>
 
-          <Button
-            label={t('settingsPage.importAppData')}
-            iconName="publish"
-            className="mr-0! mb-4"
-            clickHandler={(_, setIsDisabled, setIsPending) => {
-              setIsDisabled(true);
-              setIsPending(true);
+          <div id="setting-about-import-app-data" className="inline-block">
+            <Button
+              label={t('settingsPage.importAppData')}
+              iconName="publish"
+              className="mr-0! mb-4"
+              clickHandler={(_, setIsDisabled, setIsPending) => {
+                setIsDisabled(true);
+                setIsPending(true);
 
-              return window.api.settingsHelpers
-                .importAppData()
-                .then((res) => {
-                  if (res) storage.setAllItems(res);
-                  return undefined;
-                })
-                .finally(() => {
-                  setIsDisabled(false);
-                  setIsPending(false);
-                })
-                .catch((err) => console.error(err));
-            }}
-          />
+                return window.api.settingsHelpers
+                  .importAppData()
+                  .then((res) => {
+                    if (res) storage.setAllItems(res);
+                    return undefined;
+                  })
+                  .finally(() => {
+                    setIsDisabled(false);
+                    setIsPending(false);
+                  })
+                  .catch((err) => console.error(err));
+              }}
+            />
+          </div>
         </div>
       </div>
-    </li>
+    </CollapsibleSettingsSection>
   );
 };
 

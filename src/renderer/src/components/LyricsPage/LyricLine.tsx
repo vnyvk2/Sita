@@ -10,6 +10,7 @@ import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { computeLyricLoopRange } from '../../utils/lyricLoopRange';
 import EnhancedSyncedLyricWord from '../LyricsEditingPage/EnhancedSyncedLyricWord';
 import LyricsProgressBar from './LyricsProgressBar';
+import { getLyricScrollBehavior } from './lyricsUtils';
 
 interface LyricProp {
   lyric: string | SyncedLyricsLineWord[];
@@ -26,11 +27,14 @@ interface LyricProp {
   isLoopStart?: boolean;
   isAutoScrolling?: boolean;
   playerType?: PlayerTypes | 'drawer';
+  /**
+   * When false, this line never scrolls itself into view. Used by surfaces
+   * where the scroll container owns auto-follow (container-scoped scrolling
+   * that cannot leak into ancestor scrollers). Legacy surfaces that rely on
+   * per-line scrollIntoView keep the default true.
+   */
+  selfScroll?: boolean;
 }
-
-const lyricsScrollIntoViewEvent = new CustomEvent('lyrics/scrollIntoView', {
-  detail: 'scrollingUsingScrollIntoView'
-});
 
 const getLyricText = (lyrics: string) => {
   const match = SYNCED_LYRICS_REGEX.exec(lyrics);
@@ -41,15 +45,6 @@ const getLyricText = (lyrics: string) => {
 };
 
 const LyricLine = (props: LyricProp) => {
-  const { updateSongPosition, updateContextMenuData, addNewNotifications } =
-    useContext(AppUpdateContext);
-  const { t } = useTranslation();
-  const player = useAudioPlayer();
-
-  const lyricsRef = useRef<HTMLDivElement | null>(null);
-  const prevIsActiveRef = useRef(false);
-  const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
-
   const {
     index,
     lyric,
@@ -64,24 +59,40 @@ const LyricLine = (props: LyricProp) => {
     isLoopStart = false,
     isActive = false,
     isAutoScrolling = true,
-    playerType = 'normal'
+    playerType = 'normal',
+    selfScroll = true
   } = props;
+
+  const { updateSongPosition, updateContextMenuData, addNewNotifications } =
+    useContext(AppUpdateContext);
+  const { t } = useTranslation();
+  const player = useAudioPlayer();
+
+  const lyricsRef = useRef<HTMLDivElement | null>(null);
+  const prevIsActiveRef = useRef(false);
+  const prevIsAutoScrollingRef = useRef(isAutoScrolling);
+  const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
 
   const isSynced = syncedStart !== undefined && syncedEnd !== undefined;
 
-  // Auto-scroll only when this line becomes active
+  // Auto-scroll when this line becomes active, OR when auto-scroll is re-enabled while active.
+  // Skipped when the owning scroll container drives auto-follow itself (selfScroll=false).
   useEffect(() => {
-    if (isActive && !prevIsActiveRef.current) {
+    const becameActive = isActive && !prevIsActiveRef.current;
+    const autoScrollEnabledWhileActive =
+      isActive && isAutoScrolling && !prevIsAutoScrollingRef.current;
+
+    if ((becameActive || autoScrollEnabledWhileActive) && selfScroll) {
       if (isAutoScrolling && lyricsRef.current?.scrollIntoView) {
         lyricsRef.current.scrollIntoView({
-          behavior: 'smooth',
+          behavior: getLyricScrollBehavior(),
           block: 'center'
         });
       }
-      document.dispatchEvent(lyricsScrollIntoViewEvent);
     }
     prevIsActiveRef.current = isActive;
-  }, [isActive, isAutoScrolling]);
+    prevIsAutoScrollingRef.current = isAutoScrolling;
+  }, [isActive, isAutoScrolling, selfScroll]);
 
   // Word-level active tracking: ONLY when this line is active AND has word-level timestamps
   useEffect(() => {
@@ -175,6 +186,9 @@ const LyricLine = (props: LyricProp) => {
 
   return (
     <div
+      data-lyric-line="true"
+      data-line-index={index}
+      data-active-line={isActive ? 'true' : undefined}
       style={{
         animationDelay: `${100 + 20 * (index + 1)}ms`
       }}

@@ -449,7 +449,7 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
       let txHolding = true;
       let rawExecuted = false;
 
-      const txPromise = engine.orm.transaction(async (trx: any) => {
+      const txPromise = singletonDb.transaction(async (trx: any) => {
         await trx.insert(genres).values({ name: 'Tx Genre' });
         // Hold transaction open across an async boundary
         while (txHolding) {
@@ -482,7 +482,7 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
     it('rollback case: the queued raw write executes after the abort and persists', async () => {
       let txHolding = true;
 
-      const abortTxPromise = engine.orm
+      const abortTxPromise = singletonDb
         .transaction(async (trx: any) => {
           await trx.insert(genres).values({ name: 'Aborted Tx Genre' });
           while (txHolding) {
@@ -514,7 +514,7 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
     });
 
     it('rawRun(q, trx) inside a transaction completes without deadlock and sees tx-local state', async () => {
-      await engine.orm.transaction(async (trx: any) => {
+      await singletonDb.transaction(async (trx: any) => {
         await rawRun(sql`INSERT INTO genres (name) VALUES ('Tx-Local Genre')`, trx);
         const inside = await rawGet<{ name: string }>(
           sql`SELECT name FROM genres WHERE name = 'Tx-Local Genre'`,

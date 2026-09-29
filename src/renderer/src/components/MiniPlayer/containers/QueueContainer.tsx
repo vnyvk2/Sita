@@ -1,12 +1,22 @@
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { useOpenMainPlayerRoute } from '@renderer/hooks/useOpenMainPlayerRoute';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import toggleSongIsFavorite from '@renderer/other/toggleSongIsFavorite';
-import { songQuery } from '@renderer/queries/songs';
 import { store } from '@renderer/store/store';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
-import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { type VirtuosoHandle } from 'react-virtuoso';
 
@@ -23,7 +33,7 @@ type MiniQueueRowProps = {
   isActivePosition: boolean;
   isCurrentSongPlaying: boolean;
   onSongClick: (index: number) => void;
-  onToggleFavorite: (e: React.MouseEvent, song: SongData) => void;
+  onToggleFavorite: (e: MouseEvent, song: SongData) => void;
   unknownArtistText: string;
   unknownAlbumText: string;
   likeText: string;
@@ -49,7 +59,7 @@ const MiniQueueRow = memo((props: MiniQueueRowProps) => {
   }, [onSongClick, index]);
 
   const handleFavoriteClick = useCallback(
-    (e: React.MouseEvent) => {
+    (e: MouseEvent) => {
       if (song) {
         onToggleFavorite(e, song);
       }
@@ -58,10 +68,10 @@ const MiniQueueRow = memo((props: MiniQueueRowProps) => {
   );
 
   const handleFavoriteKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
+    (e: KeyboardEvent) => {
       if ((e.key === 'Enter' || e.key === ' ') && song) {
         e.preventDefault();
-        onToggleFavorite(e as unknown as React.MouseEvent, song);
+        onToggleFavorite(e as unknown as MouseEvent, song);
       }
     },
     [onToggleFavorite, song]
@@ -205,20 +215,35 @@ const QueueContainer = (props: Props) => {
 
   const currentQueue = queue.queues[viewingQueueIndex];
   const songIds = currentQueue?.songIds ?? EMPTY_SONG_IDS;
-  const queueId = currentQueue?.id ?? 'active';
-  const membershipVersion = manager?.queues?.[viewingQueueIndex]?.membershipVersion ?? 0;
+  const viewingQueue = manager?.queues?.[viewingQueueIndex];
+  const queueId = currentQueue?.id ?? viewingQueue?.id ?? 'active';
 
-  const { data: queuedSongs } = useQuery({
-    ...songQuery.queue({
-      songIds,
-      queueId,
-      membershipVersion
-    }),
-    enabled: songIds.length > 0 && isQueueVisible
-  });
+  const queueVersion = useMemo(() => {
+    if (
+      viewingQueue?.structureVersion !== undefined &&
+      viewingQueue?.membershipVersion !== undefined
+    ) {
+      return `${queueId}:${viewingQueue.structureVersion}:${viewingQueue.membershipVersion}`;
+    }
+    if (viewingQueue?.membershipVersion !== undefined) {
+      return `${queueId}:${viewingQueue.membershipVersion}`;
+    }
+    let hash = 2166136261;
+    for (let i = 0; i < songIds.length; i++) {
+      hash ^= songIds[i];
+      hash = Math.imul(hash, 16777619);
+    }
+    return `${queueId}:${songIds.length}:${hash >>> 0}`;
+  }, [viewingQueue?.structureVersion, viewingQueue?.membershipVersion, queueId, songIds]);
 
   const activePosition = queue.queues[queue.currentQueueIndex]?.position ?? -1;
   const isViewingActiveQueue = viewingQueueIndex === queue.currentQueueIndex;
+
+  const { getItem, onRangeChange } = useWindowHydration(songIds, queueVersion, {
+    keyPrefix: 'queue',
+    initialIndex: isViewingActiveQueue ? Math.max(0, activePosition) : 0,
+    enabled: songIds.length > 0 && isQueueVisible
+  });
 
   // Auto-scroll to the currently playing song when the queue opens or active song changes
   useEffect(() => {
@@ -255,7 +280,7 @@ const QueueContainer = (props: Props) => {
   );
 
   const handleToggleFavorite = useCallback(
-    (e: React.MouseEvent, song: SongData) => {
+    (e: MouseEvent, song: SongData) => {
       e.stopPropagation();
       toggleSongIsFavorite(song.songId, Boolean(song.isAFavorite))
         .then((newFavorite) => {
@@ -264,11 +289,7 @@ const QueueContainer = (props: Props) => {
               toggleIsFavorite(newFavorite);
             }
             queryClient.invalidateQueries({
-              queryKey: songQuery.queue({
-                songIds,
-                queueId,
-                membershipVersion
-              }).queryKey
+              queryKey: ['queue', 'window']
             });
           }
         })
@@ -276,13 +297,8 @@ const QueueContainer = (props: Props) => {
           console.error('Failed to toggle song favorite:', err);
         });
     },
-    [currentSongId, toggleIsFavorite, queryClient, songIds, queueId, membershipVersion]
+    [currentSongId, toggleIsFavorite, queryClient]
   );
-
-  const queuedSongsMap = useMemo(() => {
-    if (!queuedSongs) return new Map<number, SongData>();
-    return new Map(queuedSongs.map((s) => [s.songId, s]));
-  }, [queuedSongs]);
 
   if (!isQueueVisible) return null;
 
@@ -351,11 +367,12 @@ const QueueContainer = (props: Props) => {
             fixedItemHeight={52}
             initialItemCount={15}
             style={{ height: '100%' }}
+            onChange={onRangeChange}
             itemContent={(index, id) => (
               <MiniQueueRow
                 index={index}
                 songId={id}
-                song={queuedSongsMap.get(id)}
+                song={getItem(index)}
                 isActivePosition={isViewingActiveQueue && index === activePosition}
                 isCurrentSongPlaying={isCurrentSongPlaying && !isAnimationDisabled}
                 onSongClick={handleSongClick}

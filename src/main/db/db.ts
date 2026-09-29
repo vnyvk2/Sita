@@ -140,7 +140,8 @@ export const exportDatabase = async (): Promise<string> => {
   if (isDatabaseStubbed || !engine) {
     throw new Error('[Nora] Database is stubbed; export unavailable.');
   }
-  return dumpToSql(engine);
+  const activeEngine = engine;
+  return await activeEngine.withTxLock(async () => dumpToSql(activeEngine));
 };
 
 const sqlLiteral = (v: unknown): string => {
@@ -200,7 +201,10 @@ export const importDatabase = async (sqlDump: string) => {
   if (!engine) {
     throw new Error('[Nora] Database is stubbed; import unavailable.');
   }
-  engine.exec(sqlDump);
+  const activeEngine = engine;
+  await activeEngine.withTxLock(async () => {
+    activeEngine.exec(sqlDump);
+  });
   logger.info('Database imported successfully.');
   return true;
 };

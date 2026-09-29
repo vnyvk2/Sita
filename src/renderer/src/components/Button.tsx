@@ -106,6 +106,7 @@ const Button = memo((props: ButtonProps) => {
         }
       }}
       title={tooltipLabel || label}
+      aria-label={tooltipLabel || label}
       disabled={isButtonDisabled}
       aria-pressed={ariaPressed}
       onContextMenu={onContextMenu}
