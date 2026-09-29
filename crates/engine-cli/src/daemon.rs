@@ -6,7 +6,9 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::protocol::{DaemonCommand, DaemonEvent, DaemonResponse, PlaybackState, SlotId};
+use crate::protocol::{
+    DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, DaemonResult, PlaybackState, SlotId,
+};
 use engine_lib::buffer::BoundedAudioTransport;
 use engine_lib::decoder::DecoderPipeline;
 use engine_lib::dsp::{DspConfig, DspPipeline};
@@ -17,6 +19,7 @@ use engine_lib::types::AudioSpec;
 /// Core daemon controller managing background decoder threads, audio sinks, and the 4Hz heartbeat.
 pub struct EngineDaemon {
     running: Arc<AtomicBool>,
+    is_playing: Arc<AtomicBool>,
     state: PlaybackState,
     active_slot: SlotId,
     volume: f32,
@@ -36,6 +39,7 @@ impl EngineDaemon {
     pub fn new() -> Self {
         Self {
             running: Arc::new(AtomicBool::new(true)),
+            is_playing: Arc::new(AtomicBool::new(false)),
             state: PlaybackState::Stopped,
             active_slot: SlotId::A,
             volume: 1.0,
@@ -46,8 +50,15 @@ impl EngineDaemon {
         }
     }
 
-    /// Execute command and return synchronous response.
-    pub fn handle_command(&mut self, cmd: DaemonCommand) -> DaemonResponse {
+    /// Process incoming correlated request.
+    pub fn handle_request(&mut self, req: DaemonRequest) -> DaemonResponse {
+        let id = req.id;
+        let res = self.handle_command(req.command);
+        DaemonResponse { id, result: res }
+    }
+
+    /// Execute command and return synchronous result.
+    pub fn handle_command(&mut self, cmd: DaemonCommand) -> DaemonResult {
         match cmd {
             DaemonCommand::Load { slot, path } => {
                 let lib_slot = match slot {
@@ -81,7 +92,7 @@ impl EngineDaemon {
                 });
 
                 self.mixer.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
-                DaemonResponse::Ok {
+                DaemonResult::Ok {
                     data: Some(serde_json::json!({
                         "slot": slot,
                         "path": path,
@@ -98,44 +109,47 @@ impl EngineDaemon {
             }
             DaemonCommand::Play => {
                 self.state = PlaybackState::Playing;
+                self.is_playing.store(true, Ordering::Release);
                 self.mixer.play();
                 let _ = self.backend.start();
-                DaemonResponse::Ok { data: None }
+                DaemonResult::Ok { data: None }
             }
             DaemonCommand::Pause => {
                 self.state = PlaybackState::Paused;
+                self.is_playing.store(false, Ordering::Release);
                 self.mixer.pause();
                 let _ = self.backend.pause();
-                DaemonResponse::Ok { data: None }
+                DaemonResult::Ok { data: None }
             }
             DaemonCommand::Stop => {
                 self.state = PlaybackState::Stopped;
+                self.is_playing.store(false, Ordering::Release);
                 self.mixer.pause();
                 let _ = self.backend.stop();
-                DaemonResponse::Ok { data: None }
+                DaemonResult::Ok { data: None }
             }
             DaemonCommand::Seek { position_secs: _ } => {
                 // In production, seek repositions active decoder and flushes ring buffer
-                DaemonResponse::Ok { data: None }
+                DaemonResult::Ok { data: None }
             }
             DaemonCommand::Crossfade { duration_ms } => {
                 let frames = ((duration_ms as f64 / 1000.0) * 48000.0).round() as usize;
                 if let Err(e) = self.mixer.start_crossfade(frames) {
-                    DaemonResponse::Error { message: e.to_string() }
+                    DaemonResult::Error { message: e.to_string() }
                 } else {
-                    DaemonResponse::Ok { data: None }
+                    DaemonResult::Ok { data: None }
                 }
             }
             DaemonCommand::SetVolume { volume } => {
                 self.volume = volume.clamp(0.0, 1.0);
                 self.mixer.set_volume(self.volume);
-                DaemonResponse::Ok { data: None }
+                DaemonResult::Ok { data: None }
             }
             DaemonCommand::SetEq { gains } => {
                 let mut dsp_config = self.dsp.config().clone();
                 dsp_config.eq_gains = gains;
                 self.dsp.update_config(dsp_config);
-                DaemonResponse::Ok { data: None }
+                DaemonResult::Ok { data: None }
             }
             DaemonCommand::SetDsp { bypass, rg_db, karaoke, limiter } => {
                 self.dsp.update_config(DspConfig {
@@ -145,24 +159,24 @@ impl EngineDaemon {
                     karaoke,
                     limiter,
                 });
-                DaemonResponse::Ok { data: None }
+                DaemonResult::Ok { data: None }
             }
             DaemonCommand::ListDevices => {
                 let devices = self.backend.list_output_devices();
-                DaemonResponse::Ok {
+                DaemonResult::Ok {
                     data: Some(serde_json::to_value(devices).unwrap_or_default()),
                 }
             }
-            DaemonCommand::SetDevice { id } => {
-                if let Err(e) = self.backend.select_device(Some(&id)) {
-                    DaemonResponse::Error { message: e.to_string() }
+            DaemonCommand::SetDevice { device_id } => {
+                if let Err(e) = self.backend.select_device(Some(&device_id)) {
+                    DaemonResult::Error { message: e.to_string() }
                 } else {
-                    DaemonResponse::Ok { data: None }
+                    DaemonResult::Ok { data: None }
                 }
             }
             DaemonCommand::GetState => {
                 let stats = self.backend.stats();
-                DaemonResponse::Ok {
+                DaemonResult::Ok {
                     data: Some(serde_json::json!({
                         "state": self.state,
                         "active_slot": self.active_slot,
@@ -178,59 +192,75 @@ impl EngineDaemon {
 
     /// Run the interactive stdio JSON-lines protocol loop.
     pub fn run_stdio_loop(&mut self) {
-        let running = Arc::clone(&self.running);
+        let mut stdout = std::io::stdout();
 
-        // Spawn 4Hz Heartbeat thread
+        // 1. Emit Readiness Handshake event immediately
+        let ready_event = DaemonEvent::Ready {
+            protocol_version: 1,
+            engine_version: env!("CARGO_PKG_VERSION").to_string(),
+        };
+        if let Ok(line) = serde_json::to_string(&ready_event) {
+            let _ = writeln!(stdout, "{}", line);
+            let _ = stdout.flush();
+        }
+
+        // 2. Spawn Gated 4Hz Heartbeat thread (only transmits while playing)
         let running_hb = Arc::clone(&self.running);
+        let is_playing_hb = Arc::clone(&self.is_playing);
         let start_time = self.start_time;
         thread::spawn(move || {
-            let mut stdout = std::io::stdout();
+            let mut hb_stdout = std::io::stdout();
             while running_hb.load(Ordering::Relaxed) {
                 thread::sleep(Duration::from_millis(250));
-                let wallclock_ms = start_time.elapsed().as_millis() as u64;
 
-                let heartbeat = DaemonEvent::Heartbeat {
-                    active_slot: SlotId::A,
-                    position_secs: 0.0,
-                    duration_secs: 0.0,
-                    wallclock_ms,
-                    is_playing: false,
-                };
+                if is_playing_hb.load(Ordering::Relaxed) {
+                    let wallclock_ms = start_time.elapsed().as_millis() as u64;
 
-                if let Ok(line) = serde_json::to_string(&heartbeat) {
-                    let _ = writeln!(stdout, "{}", line);
-                    let _ = stdout.flush();
+                    let heartbeat = DaemonEvent::Heartbeat {
+                        active_slot: SlotId::A,
+                        position_secs: 0.0,
+                        duration_secs: 0.0,
+                        wallclock_ms,
+                        is_playing: true,
+                    };
+
+                    if let Ok(line) = serde_json::to_string(&heartbeat) {
+                        let _ = writeln!(hb_stdout, "{}", line);
+                        let _ = hb_stdout.flush();
+                    }
                 }
             }
         });
 
+        // 3. Stdin Command Processing Loop with graceful EOF termination
         let stdin = std::io::stdin();
         let mut reader = stdin.lock();
         let mut line = String::new();
-        let mut stdout = std::io::stdout();
 
-        while running.load(Ordering::Relaxed) {
+        while self.running.load(Ordering::Relaxed) {
             line.clear();
             match reader.read_line(&mut line) {
-                Ok(0) => break, // EOF on stdin
+                Ok(0) => {
+                    // EOF on stdin: Parent process terminated or closed pipe. Exit cleanly.
+                    log::info!("Stdin reached EOF, terminating engine daemon cleanly");
+                    break;
+                }
                 Ok(_) => {
                     let trimmed = line.trim();
                     if trimmed.is_empty() {
                         continue;
                     }
 
-                    match serde_json::from_str::<DaemonCommand>(trimmed) {
-                        Ok(cmd) => {
-                            let resp = self.handle_command(cmd);
+                    match serde_json::from_str::<DaemonRequest>(trimmed) {
+                        Ok(req) => {
+                            let resp = self.handle_request(req);
                             if let Ok(resp_json) = serde_json::to_string(&resp) {
                                 let _ = writeln!(stdout, "{}", resp_json);
                                 let _ = stdout.flush();
                             }
                         }
                         Err(e) => {
-                            let resp = DaemonResponse::Error {
-                                message: format!("Malformed command JSON: {}", e),
-                            };
+                            let resp = DaemonResponse::error(0, format!("Malformed request JSON: {}", e));
                             if let Ok(resp_json) = serde_json::to_string(&resp) {
                                 let _ = writeln!(stdout, "{}", resp_json);
                                 let _ = stdout.flush();
@@ -238,10 +268,17 @@ impl EngineDaemon {
                         }
                     }
                 }
-                Err(_) => break,
+                Err(e) => {
+                    log::warn!("Stdin read error: {}, exiting", e);
+                    break;
+                }
             }
         }
 
+        // Clean up audio hardware and state
         self.running.store(false, Ordering::Release);
+        self.is_playing.store(false, Ordering::Release);
+        self.mixer.pause();
+        let _ = self.backend.stop();
     }
 }

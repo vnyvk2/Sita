@@ -1,9 +1,9 @@
 //! Milestone 5: JSON-Lines Daemon Protocol, 4Hz Heartbeats & Soak Test Verification.
 //!
 //! Validates:
-//! - Full roundtrip serialization/deserialization for all 13 DaemonCommand variants.
-//! - Full roundtrip serialization/deserialization for all 5 DaemonEvent push variants.
-//! - DaemonResponse serialization for Ok and Error.
+//! - Full roundtrip serialization/deserialization for all 13 DaemonCommand variants with DaemonRequest correlation IDs.
+//! - Full roundtrip serialization/deserialization for all 8 DaemonEvent push variants (including Ready, SlotEnd, TrackEnd, TransitionComplete).
+//! - Correlated DaemonResponse serialization for Ok and Error.
 //! - C4 Bounded Memory & Soak Monitor (RSS <= 40MB, 0 xruns, watermark safety).
 //! - C5 Seek Turnaround Latency Timer (<= 30ms latency, p95 compliance).
 //! - Protocol malformed JSON and edge case handling.
@@ -11,12 +11,12 @@
 use std::time::Duration;
 
 use engine_testkit::{
-    DaemonCommand, DaemonEvent, DaemonResponse, PlaybackState, ProtocolHarness,
+    DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, PlaybackState, ProtocolHarness,
     SeekLatencyTimer, SlotId, SoakConfig, SoakMonitor,
 };
 
 #[test]
-fn test_all_13_daemon_commands_json_roundtrip() {
+fn test_all_13_daemon_commands_and_requests_json_roundtrip() {
     let commands = vec![
         DaemonCommand::Load {
             slot: SlotId::A,
@@ -44,29 +44,41 @@ fn test_all_13_daemon_commands_json_roundtrip() {
         },
         DaemonCommand::ListDevices,
         DaemonCommand::SetDevice {
-            id: "wasapi_endpoint_default".to_string(),
+            device_id: "wasapi_endpoint_default".to_string(),
         },
         DaemonCommand::GetState,
     ];
 
     assert_eq!(commands.len(), 13, "Must test exactly 13 commands from R3 spec");
 
-    for cmd in commands {
-        let serialized = ProtocolHarness::serialize_command(&cmd).expect("Command serialization must succeed");
+    for (i, cmd) in commands.into_iter().enumerate() {
+        let req_id = (i as u64) + 1;
+        let req = DaemonRequest {
+            id: req_id,
+            command: cmd,
+        };
+
+        let serialized = ProtocolHarness::serialize_request(&req).expect("Request serialization must succeed");
         assert!(serialized.ends_with('\n'), "Protocol specifies JSON-lines format ending with newline");
 
-        let deserialized: DaemonCommand = serde_json::from_str(serialized.trim()).expect("Command deserialization must succeed");
-        assert_eq!(cmd, deserialized, "Roundtrip command must be identical");
+        let deserialized: DaemonRequest = serde_json::from_str(serialized.trim()).expect("Request deserialization must succeed");
+        assert_eq!(req, deserialized, "Roundtrip request must be identical with matching ID");
     }
 }
 
 #[test]
-fn test_all_5_daemon_events_json_roundtrip() {
+fn test_all_8_daemon_events_json_roundtrip() {
     let events = vec![
+        DaemonEvent::Ready {
+            protocol_version: 1,
+            engine_version: "0.1.0".to_string(),
+        },
         DaemonEvent::StateChanged {
             state: PlaybackState::Playing,
         },
-        DaemonEvent::Eos { slot: SlotId::A },
+        DaemonEvent::SlotEnd { slot: SlotId::A },
+        DaemonEvent::TrackEnd { slot: SlotId::A },
+        DaemonEvent::TransitionComplete { active_slot: SlotId::B },
         DaemonEvent::Xrun { count: 3 },
         DaemonEvent::DeviceError {
             message: "WASAPI audio device disconnected".to_string(),
@@ -80,7 +92,7 @@ fn test_all_5_daemon_events_json_roundtrip() {
         },
     ];
 
-    assert_eq!(events.len(), 5, "Must test exactly 5 push events from R3 spec");
+    assert_eq!(events.len(), 8, "Must test all 8 push events in amended protocol");
 
     for ev in events {
         let json_line = serde_json::to_string(&ev).expect("Event serialization must succeed");
@@ -90,24 +102,25 @@ fn test_all_5_daemon_events_json_roundtrip() {
 }
 
 #[test]
-fn test_daemon_responses_ok_and_error() {
-    let ok_resp = DaemonResponse::Ok {
-        data: Some(serde_json::json!({
+fn test_correlated_daemon_responses_ok_and_error() {
+    let ok_resp = DaemonResponse::ok(
+        42,
+        Some(serde_json::json!({
             "slot": "a",
             "state": "playing",
             "volume": 1.0,
         })),
-    };
+    );
     let ok_json = serde_json::to_string(&ok_resp).expect("Serialize ok response");
     let parsed_ok = ProtocolHarness::parse_response(&ok_json).expect("Parse ok response");
     assert_eq!(ok_resp, parsed_ok);
+    assert_eq!(parsed_ok.id, 42);
 
-    let err_resp = DaemonResponse::Error {
-        message: "File not found or format unsupported".to_string(),
-    };
+    let err_resp = DaemonResponse::error(43, "File not found or format unsupported");
     let err_json = serde_json::to_string(&err_resp).expect("Serialize error response");
     let parsed_err = ProtocolHarness::parse_response(&err_json).expect("Parse error response");
     assert_eq!(err_resp, parsed_err);
+    assert_eq!(parsed_err.id, 43);
 }
 
 #[test]
@@ -170,13 +183,13 @@ fn test_protocol_malformed_json_rejection() {
         "   ",
         "not json at all",
         r#"{"cmd": "unknown_cmd"}"#,
-        r#"{"cmd": "seek"}"#, // Missing position_secs
-        r#"{"cmd": "load", "slot": "c", "path": "test.flac"}"#, // Invalid slot 'c'
-        r#"{"cmd": "set_volume", "volume": "loud"}"#, // String instead of float
+        r#"{"id": 1, "cmd": "seek"}"#, // Missing position_secs
+        r#"{"id": 2, "cmd": "load", "slot": "c", "path": "test.flac"}"#, // Invalid slot 'c'
+        r#"{"id": 3, "cmd": "set_volume", "volume": "loud"}"#, // String instead of float
     ];
 
     for raw in malformed_cases {
-        let res = serde_json::from_str::<DaemonCommand>(raw.trim());
+        let res = serde_json::from_str::<DaemonRequest>(raw.trim());
         assert!(res.is_err(), "Expected deserialization failure for invalid input: '{}'", raw);
     }
 }
