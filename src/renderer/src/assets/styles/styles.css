@@ -125,7 +125,7 @@
   --seekbar-background-color: 0 0% 20%; /* hsl(0 0% 20%) */
   --seekbar-track-background-color: 0 0% 80%; /* hsl(0 0% 80%) */
   --foreground-color-1: 247 74% 65%; /* hsl(247 74% 65%) */
-  --scrollbar-thumb-background-color: 212 48% 94%; /* hsl(212, 48%, 94%) */
+  --scrollbar-thumb-background-color: 216 20% 75%; /* hsl(216 20% 75%) */
   --transition-duration-0_2s: 0.2s;
   --transition-duration-0_25s: 0.25s;
   --transition-duration-0_3s: 0.3s;
@@ -147,7 +147,7 @@
   --dark-seekbar-track-background-color: 0 0% 25%;
   --dark-foreground-color-1: 244 98% 80%;
   --dark-background-color-dimmed: 228 7% 20%;
-  --dark-scrollbar-thumb-background-color: 212 48% 94%; /* hsl(212, 48%, 94%) */
+  --dark-scrollbar-thumb-background-color: 225 8% 28%; /* hsl(225 8% 28%) */
   --dark-slider-opacity: 0.25;
 }
 
@@ -728,30 +728,33 @@ html {
 
 /* ? DEFAULT SCROLL BAR STYLES */
 ::-webkit-scrollbar-track {
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
-  background-color: hsl(var(--background-color-1));
+  border-radius: 9999px;
+  background-color: transparent;
 }
 
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 8px;
-  background-color: hsl(var(--background-color-1));
-  transition: 'background';
+  width: 7px;
+  height: 7px;
+  background-color: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  border-radius: 10px;
-  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+  border-radius: 9999px;
   background-color: hsl(var(--scrollbar-thumb-background-color));
-  transition: 'background';
+  transition: background-color 0.2s ease;
   cursor: pointer;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background-color: hsl(var(--background-color-3));
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: hsl(var(--text-color-highlight-2));
+}
+
+::-webkit-scrollbar-corner {
+  background-color: transparent;
 }
 
 /* ? MATERIAL SYMBOLS STYLES */
@@ -1200,7 +1203,9 @@ input[type='checkbox']:checked ~ .checkmark .icon {
   outline: 2px solid hsl(var(--text-color-highlight) / 0.9);
   outline-offset: 4px;
   border-radius: 0.5rem;
-  transition: outline 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    outline 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 @media (prefers-reduced-motion: no-preference) {
