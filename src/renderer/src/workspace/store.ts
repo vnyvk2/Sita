@@ -10,6 +10,7 @@ import {
 } from './ops';
 import {
   loadWorkspaceState,
+  sanitizeWorkspace,
   saveWorkspaceStateDebounced,
   saveWorkspaceStateImmediate
 } from './persistence';
@@ -26,6 +27,18 @@ import type {
 } from './types';
 
 export type SidebarMode = 'expanded' | 'compact' | 'hidden';
+
+export interface WorkspaceHistoryState {
+  past: Workspace[];
+  future: Workspace[];
+}
+
+export interface NoraLayoutExport {
+  format: 'nora-layout';
+  formatVersion: 2;
+  exportedAt: string;
+  workspace: Workspace;
+}
 
 const initialToolbarCollapsed = (() => {
   try {
@@ -64,9 +77,16 @@ export interface TransientWorkspaceState {
   isSaveLayoutModalOpen: boolean;
   saveLayoutModalMode: 'save' | 'rename';
   targetWorkspaceId: string | null;
+  isDeleteConfirmModalOpen: boolean;
+  deleteTargetWorkspaceId: string | null;
 }
 
 export const workspaceStore = new Store<WorkspaceState>(loadWorkspaceState());
+
+export const workspaceHistoryStore = new Store<WorkspaceHistoryState>({
+  past: [],
+  future: []
+});
 
 export const dndStore = new Store<TransientWorkspaceState>({
   isDragging: false,
@@ -77,7 +97,9 @@ export const dndStore = new Store<TransientWorkspaceState>({
   sidebarMode: initialSidebarMode,
   isSaveLayoutModalOpen: false,
   saveLayoutModalMode: 'save',
-  targetWorkspaceId: null
+  targetWorkspaceId: null,
+  isDeleteConfirmModalOpen: false,
+  deleteTargetWorkspaceId: null
 });
 
 // Auto-persist workspace changes to localStorage
@@ -109,8 +131,34 @@ export function resetTransientWorkspaceState(): void {
     hoveredDropTarget: null,
     targetWorkspaceId: null,
     isSaveLayoutModalOpen: false,
-    saveLayoutModalMode: 'save'
+    saveLayoutModalMode: 'save',
+    isDeleteConfirmModalOpen: false,
+    deleteTargetWorkspaceId: null
   }));
+}
+
+export function createLayoutExport(ws: Workspace): NoraLayoutExport {
+  return {
+    format: 'nora-layout',
+    formatVersion: 2,
+    exportedAt: new Date().toISOString(),
+    workspace: JSON.parse(JSON.stringify(ws))
+  };
+}
+
+export function downloadLayoutFile(exported: NoraLayoutExport): void {
+  if (typeof document === 'undefined') return;
+  const json = JSON.stringify(exported, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const safeName = exported.workspace.name.replace(/[^a-z0-9_\- ]/gi, '_').trim() || 'layout';
+  a.download = `${safeName}.nora-layout.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export const workspaceActions = {
@@ -123,6 +171,14 @@ export const workspaceActions = {
       if (!activeWs) return state;
 
       const nextWs = applyLayoutOp(activeWs, op);
+      if (nextWs === activeWs) return state;
+
+      // Snapshot activeWs into history before updating
+      workspaceHistoryStore.setState((h) => ({
+        past: [...h.past, JSON.parse(JSON.stringify(activeWs))].slice(-20),
+        future: []
+      }));
+
       return {
         ...state,
         workspaces: {
@@ -131,6 +187,75 @@ export const workspaceActions = {
         }
       };
     });
+  },
+
+  undo(): boolean {
+    const { past, future } = workspaceHistoryStore.state;
+    if (past.length === 0) return false;
+
+    const activeWs = workspaceStore.state.workspaces[workspaceStore.state.active];
+    if (!activeWs) return false;
+
+    const previousWs = past[past.length - 1];
+    const nextPast = past.slice(0, -1);
+    const nextFuture = [JSON.parse(JSON.stringify(activeWs)), ...future].slice(0, 20);
+
+    workspaceHistoryStore.setState(() => ({
+      past: nextPast,
+      future: nextFuture
+    }));
+
+    workspaceStore.setState((state) => ({
+      ...state,
+      workspaces: {
+        ...state.workspaces,
+        [previousWs.id]: previousWs
+      }
+    }));
+
+    return true;
+  },
+
+  redo(): boolean {
+    const { past, future } = workspaceHistoryStore.state;
+    if (future.length === 0) return false;
+
+    const activeWs = workspaceStore.state.workspaces[workspaceStore.state.active];
+    if (!activeWs) return false;
+
+    const nextWs = future[0];
+    const nextFuture = future.slice(1);
+    const nextPast = [...past, JSON.parse(JSON.stringify(activeWs))].slice(-20);
+
+    workspaceHistoryStore.setState(() => ({
+      past: nextPast,
+      future: nextFuture
+    }));
+
+    workspaceStore.setState((state) => ({
+      ...state,
+      workspaces: {
+        ...state.workspaces,
+        [nextWs.id]: nextWs
+      }
+    }));
+
+    return true;
+  },
+
+  canUndo(): boolean {
+    return workspaceHistoryStore.state.past.length > 0;
+  },
+
+  canRedo(): boolean {
+    return workspaceHistoryStore.state.future.length > 0;
+  },
+
+  clearHistory(): void {
+    workspaceHistoryStore.setState(() => ({
+      past: [],
+      future: []
+    }));
   },
 
   switchWorkspace(id: string): void {
@@ -142,6 +267,7 @@ export const workspaceActions = {
       };
     });
     resetTransientWorkspaceState();
+    workspaceActions.clearHistory();
   },
 
   saveWorkspace(ws: Workspace): void {
@@ -289,6 +415,7 @@ export const workspaceActions = {
         active: newWs.id
       };
     });
+    workspaceActions.clearHistory();
     return newId;
   },
 
@@ -301,6 +428,7 @@ export const workspaceActions = {
     }
     const isActiveDeleted = workspaceStore.state.active === id;
     const isTargetRenamingDeleted = dndStore.state.targetWorkspaceId === id;
+    const isTargetConfirmDeleted = dndStore.state.deleteTargetWorkspaceId === id;
     workspaceStore.setState((state) => {
       const { [id]: _, ...restWorkspaces } = state.workspaces;
       return {
@@ -311,14 +439,24 @@ export const workspaceActions = {
     });
     if (isActiveDeleted) {
       resetTransientWorkspaceState();
-    } else if (isTargetRenamingDeleted) {
-      dndStore.setState((s) => ({
-        ...s,
-        targetWorkspaceId: null,
-        isSaveLayoutModalOpen: false,
-        saveLayoutModalMode: 'save'
-      }));
+    } else {
+      if (isTargetRenamingDeleted) {
+        dndStore.setState((s) => ({
+          ...s,
+          targetWorkspaceId: null,
+          isSaveLayoutModalOpen: false,
+          saveLayoutModalMode: 'save'
+        }));
+      }
+      if (isTargetConfirmDeleted) {
+        dndStore.setState((s) => ({
+          ...s,
+          deleteTargetWorkspaceId: null,
+          isDeleteConfirmModalOpen: false
+        }));
+      }
     }
+    workspaceActions.clearHistory();
     return true;
   },
 
@@ -377,6 +515,7 @@ export const workspaceActions = {
         active: newId
       };
     });
+    workspaceActions.clearHistory();
     return newId;
   },
 
@@ -486,5 +625,88 @@ export const workspaceActions = {
       saveLayoutModalMode: 'save',
       targetWorkspaceId: null
     }));
+  },
+
+  openDeleteConfirmModal(workspaceId: string): void {
+    if (workspaceId === DEFAULT_PRESET.id || workspaceId === MUSICBEE_PRESET.id) {
+      return;
+    }
+    dndStore.setState((state) => ({
+      ...state,
+      isDeleteConfirmModalOpen: true,
+      deleteTargetWorkspaceId: workspaceId
+    }));
+  },
+
+  closeDeleteConfirmModal(): void {
+    dndStore.setState((state) => ({
+      ...state,
+      isDeleteConfirmModalOpen: false,
+      deleteTargetWorkspaceId: null
+    }));
+  },
+
+  exportWorkspace(id?: string): NoraLayoutExport | null {
+    const targetId = id ?? workspaceStore.state.active;
+    const ws = workspaceStore.state.workspaces[targetId];
+    if (!ws) return null;
+    return createLayoutExport(ws);
+  },
+
+  importWorkspace(untrustedData: unknown): {
+    success: boolean;
+    workspaceId?: string;
+    error?: string;
+  } {
+    if (!untrustedData || typeof untrustedData !== 'object') {
+      return { success: false, error: 'Invalid file format: expected a JSON object' };
+    }
+
+    const untrustedObj = untrustedData as Record<string, unknown>;
+    const rawWs =
+      untrustedObj.format === 'nora-layout' && untrustedObj.workspace
+        ? untrustedObj.workspace
+        : untrustedData;
+
+    const sanitized = sanitizeWorkspace(rawWs);
+    if (!sanitized) {
+      return {
+        success: false,
+        error: 'Layout validation failed: invalid layout tree or missing required views'
+      };
+    }
+
+    const existingWorkspaces = workspaceStore.state.workspaces;
+    const newId = generateRandomId('ws');
+
+    // Check for name collision
+    const existingNames = new Set(
+      Object.values(existingWorkspaces).map((w) => w.name.toLowerCase())
+    );
+    let finalName = sanitized.name;
+    if (existingNames.has(finalName.toLowerCase())) {
+      finalName = `${finalName} (Imported)`;
+    }
+
+    const importedWs: Workspace = {
+      ...sanitized,
+      id: newId,
+      name: finalName,
+      sourcePresetId: sanitized.sourcePresetId || DEFAULT_PRESET.id
+    };
+
+    workspaceStore.setState((state) => ({
+      ...state,
+      workspaces: {
+        ...state.workspaces,
+        [newId]: importedWs
+      },
+      active: newId
+    }));
+
+    resetTransientWorkspaceState();
+    workspaceActions.clearHistory();
+
+    return { success: true, workspaceId: newId };
   }
 };

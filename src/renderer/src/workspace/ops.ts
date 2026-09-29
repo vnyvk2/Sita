@@ -1193,42 +1193,56 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
     }
 
     case 'split.collapse': {
+      const nextRoot = updateNodeRecursively(
+        ws.root,
+        (n) => n.kind === 'split' && (n as SplitNode).id === op.splitId,
+        (node) => {
+          const split = node as SplitNode;
+          if (split.collapsed === op.childIndex) {
+            return split;
+          }
+          return {
+            ...split,
+            collapsed: op.childIndex
+          };
+        }
+      );
+      if (nextRoot === ws.root) {
+        return ws;
+      }
       nextWs = {
         ...ws,
-        root: updateNodeRecursively(
-          ws.root,
-          (n) => n.kind === 'split' && (n as SplitNode).id === op.splitId,
-          (node) => {
-            const split = node as SplitNode;
-            return {
-              ...split,
-              collapsed: op.childIndex
-            };
-          }
-        )
+        root: nextRoot
       };
       break;
     }
 
     case 'tabs.activate': {
+      const nextRoot = updateNodeRecursively(
+        ws.root,
+        (n) => n.kind === 'tabs' && (n as TabGroupNode).id === op.tabsId,
+        (node) => {
+          const tabs = node as TabGroupNode;
+          if (!tabs.tabs.includes(op.panelId)) {
+            throw new WorkspaceInvariantError(
+              `Panel '${op.panelId}' is not part of TabGroup '${op.tabsId}'.`
+            );
+          }
+          if (tabs.active === op.panelId) {
+            return tabs;
+          }
+          return {
+            ...tabs,
+            active: op.panelId
+          };
+        }
+      );
+      if (nextRoot === ws.root) {
+        return ws;
+      }
       nextWs = {
         ...ws,
-        root: updateNodeRecursively(
-          ws.root,
-          (n) => n.kind === 'tabs' && (n as TabGroupNode).id === op.tabsId,
-          (node) => {
-            const tabs = node as TabGroupNode;
-            if (!tabs.tabs.includes(op.panelId)) {
-              throw new WorkspaceInvariantError(
-                `Panel '${op.panelId}' is not part of TabGroup '${op.tabsId}'.`
-              );
-            }
-            return {
-              ...tabs,
-              active: op.panelId
-            };
-          }
-        )
+        root: nextRoot
       };
       break;
     }

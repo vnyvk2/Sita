@@ -1,15 +1,22 @@
 import '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { useStore } from '@tanstack/react-store';
-import { memo, useCallback, useEffect, useState, type FC } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { findRightsideSecondaryPanel, findRightsideTabGroup } from '../ops';
 import { DEFAULT_PRESET } from '../presets/default';
 import { MUSICBEE_PRESET } from '../presets/musicbee';
 import { PANEL_DEFINITIONS, getMountedPanelTypes } from '../registry';
-import { dndStore, workspaceActions, workspaceStore } from '../store';
+import {
+  dndStore,
+  downloadLayoutFile,
+  workspaceActions,
+  workspaceHistoryStore,
+  workspaceStore
+} from '../store';
 import type { PanelType } from '../types';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 import { SaveLayoutModal } from './SaveLayoutModal';
 
 const PANEL_SHORTCUT_LABELS: Partial<Record<PanelType, string>> = {
@@ -71,10 +78,41 @@ export const WorkspaceToolbar: FC = memo(() => {
   const workspaces = useStore(workspaceStore, (s) => s.workspaces);
   const isToolbarCollapsed = useStore(dndStore, (s) => s.isToolbarCollapsed);
   const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
+  const canUndo = useStore(workspaceHistoryStore, (s) => s.past.length > 0);
+  const canRedo = useStore(workspaceHistoryStore, (s) => s.future.length > 0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const activeWs = workspaces[activeId];
 
   const [addPosition, setAddPosition] = useState<'auto' | 'left' | 'right' | 'tab'>('auto');
   const mountedTypes = activeWs ? getMountedPanelTypes(activeWs) : new Set<PanelType>();
+
+  const handleExportWorkspace = (wsId?: string) => {
+    const exported = workspaceActions.exportWorkspace(wsId);
+    if (exported) {
+      downloadLayoutFile(exported);
+    }
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        const result = workspaceActions.importWorkspace(parsed);
+        if (!result.success) {
+          console.warn('[WorkspaceToolbar] Failed to import layout:', result.error);
+        }
+      } catch (err) {
+        console.error('[WorkspaceToolbar] JSON parse error during layout import:', err);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
 
   useEffect(() => {
     if (!isWsDropdownOpen && !isPanelMenuOpen) return;
@@ -335,6 +373,19 @@ export const WorkspaceToolbar: FC = memo(() => {
                         >
                           <span className="material-symbols-rounded text-xs">content_copy</span>
                         </button>
+                        <button
+                          type="button"
+                          title={`Export ${ws.name}`}
+                          aria-label={`Export ${ws.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsWsDropdownOpen(false);
+                            handleExportWorkspace(ws.id);
+                          }}
+                          className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-6 w-6 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-stone-300/40 dark:hover:bg-stone-700/40"
+                        >
+                          <span className="material-symbols-rounded text-xs">download</span>
+                        </button>
                         {!isDefaultPreset && (
                           <button
                             type="button"
@@ -342,10 +393,8 @@ export const WorkspaceToolbar: FC = memo(() => {
                             aria-label={`Delete ${ws.name}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (window.confirm(`Are you sure you want to delete "${ws.name}"?`)) {
-                                setIsWsDropdownOpen(false);
-                                workspaceActions.deleteWorkspace(ws.id);
-                              }
+                              setIsWsDropdownOpen(false);
+                              workspaceActions.openDeleteConfirmModal(ws.id);
                             }}
                             className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-rose-600 transition-colors hover:bg-rose-100/60 dark:text-rose-400 dark:hover:bg-rose-950/40"
                           >
@@ -378,6 +427,36 @@ export const WorkspaceToolbar: FC = memo(() => {
               <button
                 type="button"
                 role="menuitem"
+                aria-label="Export Current Layout"
+                title="Export current workspace layout to JSON"
+                onClick={() => {
+                  setIsWsDropdownOpen(false);
+                  handleExportWorkspace(activeId);
+                }}
+                className="text-font-color-black dark:text-font-color-white hover:bg-accent/15 hover:text-accent flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors"
+              >
+                <span className="material-symbols-rounded text-sm">file_download</span>
+                <span>Export Current Layout...</span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                aria-label="Import Layout"
+                title="Import workspace layout from JSON file"
+                onClick={() => {
+                  setIsWsDropdownOpen(false);
+                  fileInputRef.current?.click();
+                }}
+                className="text-font-color-black dark:text-font-color-white hover:bg-accent/15 hover:text-accent flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-xs transition-colors"
+              >
+                <span className="material-symbols-rounded text-sm">file_upload</span>
+                <span>Import Layout...</span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
                 aria-label="Reset Layout to Default"
                 title="Reset layout to preset defaults"
                 onClick={() => {
@@ -389,6 +468,15 @@ export const WorkspaceToolbar: FC = memo(() => {
                 <span className="material-symbols-rounded text-sm">restart_alt</span>
                 <span>Reset Layout to Default</span>
               </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,.nora-layout.json"
+                onChange={handleImportFile}
+                className="hidden"
+                aria-hidden="true"
+              />
             </div>
           )}
         </div>
@@ -534,6 +622,30 @@ export const WorkspaceToolbar: FC = memo(() => {
             )}
           </div>
 
+          {/* Undo */}
+          <button
+            type="button"
+            disabled={!canUndo}
+            onClick={() => workspaceActions.undo()}
+            title="Undo layout change (Ctrl+Z)"
+            aria-label="Undo layout change"
+            className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-stone-200/50 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-stone-800/50"
+          >
+            <span className="material-symbols-rounded text-sm">undo</span>
+          </button>
+
+          {/* Redo */}
+          <button
+            type="button"
+            disabled={!canRedo}
+            onClick={() => workspaceActions.redo()}
+            title="Redo layout change (Ctrl+Shift+Z / Ctrl+Y)"
+            aria-label="Redo layout change"
+            className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-stone-200/50 disabled:cursor-not-allowed disabled:opacity-30 dark:hover:bg-stone-800/50"
+          >
+            <span className="material-symbols-rounded text-sm">redo</span>
+          </button>
+
           {/* Reset Layout */}
           <button
             type="button"
@@ -557,6 +669,7 @@ export const WorkspaceToolbar: FC = memo(() => {
         </div>
       </div>
       <SaveLayoutModal />
+      <ConfirmDeleteModal />
     </>
   );
 });
