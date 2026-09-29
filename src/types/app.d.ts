@@ -625,6 +625,7 @@ declare global {
     lyricsArtworkBlur?: number;
     lyricsArtworkDarkness?: number;
     lyricsArtworkAnimation?: boolean;
+    lyricsScrollMode?: 'auto' | 'manual';
     isSongCardDynamicArtworkBackgroundEnabled?: boolean;
     showEqualizerOnTracklist?: boolean;
     reduceVisualEffectsOnBattery?: boolean;

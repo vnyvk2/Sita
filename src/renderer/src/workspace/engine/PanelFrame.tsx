@@ -52,26 +52,26 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
           <header
             onDoubleClick={handleHeaderDoubleClick}
             onPointerDown={handlePointerDown}
-            className="panel-header group bg-background-color-2/40 dark:bg-dark-background-color-2/40 text-font-color-black dark:text-font-color-white flex h-8 shrink-0 cursor-grab items-center justify-between border-b border-stone-200/60 px-3 select-none active:cursor-grabbing dark:border-stone-800/60"
+            className="panel-header group bg-background-color-2/40 dark:bg-dark-background-color-2/40 text-font-color-black dark:text-font-color-white flex h-6 shrink-0 cursor-grab items-center justify-between border-b border-stone-200/60 px-2.5 select-none active:cursor-grabbing dark:border-stone-800/60"
           >
-            <div className="flex items-center gap-2 overflow-hidden">
-              <span className="material-symbols-rounded text-font-color-dimmed text-sm">
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              <span className="material-symbols-rounded text-font-color-dimmed text-xs">
                 {icon}
               </span>
-              <span className="text-font-color-dimmed truncate text-xs font-semibold tracking-wider uppercase">
+              <span className="text-font-color-dimmed truncate text-[10px] font-semibold tracking-wider uppercase">
                 {title}
               </span>
             </div>
 
-            <div className="flex items-center gap-1 opacity-60 transition-opacity group-hover:opacity-100">
+            <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
               <button
                 type="button"
                 onClick={handleMaximizeClick}
                 title={isMaximized ? 'Restore Panel (Ctrl+Alt+M)' : 'Maximize Panel (Ctrl+Alt+M)'}
                 aria-label={isMaximized ? 'Restore Panel' : 'Maximize Panel'}
-                className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-stone-200 dark:hover:bg-stone-700"
+                className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-4 w-4 cursor-pointer items-center justify-center rounded hover:bg-stone-200 dark:hover:bg-stone-700"
               >
-                <span className="material-symbols-rounded text-xs">
+                <span className="material-symbols-rounded text-[11px]">
                   {isMaximized ? 'close_fullscreen' : 'open_in_full'}
                 </span>
               </button>
@@ -82,9 +82,9 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
                   onClick={handleCloseClick}
                   title="Close Panel"
                   aria-label="Close Panel"
-                  className="text-font-color-dimmed flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-900/40 dark:hover:text-rose-400"
+                  className="text-font-color-dimmed flex h-4 w-4 cursor-pointer items-center justify-center rounded hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-900/40 dark:hover:text-rose-400"
                 >
-                  <span className="material-symbols-rounded text-xs">close</span>
+                  <span className="material-symbols-rounded text-[11px]">close</span>
                 </button>
               )}
             </div>

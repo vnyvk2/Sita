@@ -141,12 +141,12 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
   return (
     <div className="queue-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white flex h-full w-full flex-col overflow-hidden">
       {/* Sub-header toolbar */}
-      <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/30 flex shrink-0 items-center justify-between border-b border-stone-200/50 px-3 py-2 dark:border-stone-800/50">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="text-font-color-black dark:text-font-color-white truncate text-xs font-semibold">
+      <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/30 flex shrink-0 items-center justify-between border-b border-stone-200/50 px-2.5 py-1.5 dark:border-stone-800/50">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="text-font-color-black dark:text-font-color-white truncate text-[11px] font-semibold">
             {queueTitle}
           </span>
-          <span className="text-font-color-dimmed rounded-full bg-stone-200 px-2 py-0.5 text-[10px] font-medium dark:bg-stone-800">
+          <span className="text-font-color-dimmed rounded-full bg-stone-200 px-1.5 py-px text-[9px] font-medium leading-tight dark:bg-stone-800">
             {songIds.length} {t('common.song_other', 'songs')}
           </span>
         </div>
@@ -156,9 +156,9 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
             type="button"
             onClick={handleClearQueue}
             title={t('currentQueuePage.clearQueue', 'Clear queue')}
-            className="text-font-color-dimmed flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs transition-colors hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+            className="text-font-color-dimmed flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
           >
-            <span className="material-symbols-rounded text-sm">clear_all</span>
+            <span className="material-symbols-rounded text-xs">clear_all</span>
             <span>{t('common.clear', 'Clear')}</span>
           </button>
         )}

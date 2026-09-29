@@ -283,6 +283,15 @@ export const settingsCatalog: SettingCatalogEntry[] = [
     defaultDescription: 'Configure blur, darkness, and artwork animation in lyrics mode.',
     keywords: ['lyrics background', 'lyrics blur', 'lyrics animation', 'theatre lyrics']
   },
+  {
+    id: 'setting-lyrics-scroll-mode',
+    sectionKey: 'lyrics',
+    titleKey: 'settingsPage.lyricsScrollBehavior',
+    defaultTitle: 'Lyrics scroll behavior',
+    descriptionKey: 'settingsPage.lyricsScrollBehaviorDescription',
+    defaultDescription: 'Choose how lyrics scroll during playback.',
+    keywords: ['lyrics scroll', 'auto scroll', 'manual scroll', 'lyrics follow', 'snap back']
+  },
 
   // --- EQUALIZER ---
   {
