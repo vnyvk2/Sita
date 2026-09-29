@@ -1,0 +1,35 @@
+[workspace]
+members = [
+    "crates/engine-lib",
+    "crates/engine-cli",
+    "crates/engine-testkit",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Nora Audio Engine Team"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Core Audio & Real-time I/O
+cpal = "0.15"
+symphonia = { version = "0.5.4", features = ["all"] }
+rubato = "0.16.1"
+rtrb = "0.3"
+hound = "3.5"
+
+# Serialization & CLI Protocol
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error Handling & Telemetry Logging
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.11"
+
+# Testing & Fixtures
+tempfile = "3.10"
+approx = "0.5"

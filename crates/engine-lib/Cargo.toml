@@ -1,0 +1,18 @@
+[package]
+name = "engine-lib"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Core audio engine, decoding pipelines, DSP chain, sink abstraction, and real-time safety for Nora"
+
+[dependencies]
+cpal.workspace = true
+symphonia.workspace = true
+rubato.workspace = true
+rtrb.workspace = true
+hound.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+log.workspace = true

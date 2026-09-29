@@ -1,0 +1,15 @@
+[package]
+name = "engine-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Standalone headless daemon executable exposing the JSON-lines stdio protocol for Nora"
+
+[dependencies]
+engine-lib = { path = "../engine-lib" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+log.workspace = true
+env_logger.workspace = true
