@@ -136,7 +136,7 @@ const LibrarySettings = () => {
       </p>
 
       {/* Scanning Behavior Policy Selection */}
-      <div className="policy-section mb-6 max-w-3xl pl-4">
+      <div id="setting-library-scan-mode" className="policy-section mb-6 max-w-3xl pl-4">
         <div className="text-font-color-highlight dark:text-dark-font-color-highlight mb-3 text-xs font-semibold tracking-wider uppercase">
           {t('settingsPage.scanBehavior', { defaultValue: 'Scanning Behavior' })}
         </div>
@@ -240,7 +240,7 @@ const LibrarySettings = () => {
       </div>
 
       {/* Library Status Card */}
-      <div className="status-section max-w-3xl pl-4">
+      <div id="setting-library-folders" className="status-section max-w-3xl pl-4">
         <div className="text-font-color-highlight dark:text-dark-font-color-highlight mb-3 text-xs font-semibold tracking-wider uppercase">
           {t('settingsPage.libraryStatus', { defaultValue: 'Library Status' })}
         </div>

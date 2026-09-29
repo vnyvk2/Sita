@@ -387,6 +387,25 @@
     "settings": "Settings",
     "collapseAll": "Collapse all",
     "expandAll": "Expand all",
+    "searchSettings": "Search settings... (Ctrl+F or /)",
+    "noMatchingSettings": "No settings found matching \"{{query}}\"",
+    "resultsCount_one": "{{count}} setting found",
+    "resultsCount_other": "{{count}} settings found",
+    "aliasMatch": "Keyword match: {{keyword}}",
+    "searchAliases": {
+      "setting-appearance-theme-mode": ["dark", "light", "colors", "style", "palette", "day", "night"],
+      "setting-appearance-theme-preset": ["accent", "tint", "custom theme", "scheme"],
+      "setting-preferences-song-indexing": ["track count", "numbers", "order", "index"],
+      "setting-preferences-alphabet-scrubber": ["a-z", "letters", "scrub", "jump to song", "fast scroll"],
+      "setting-preferences-song-row-density": ["compact view", "row size", "compact rows", "density"],
+      "setting-audio-crossfade": ["smooth transition", "overlap songs", "gapless"],
+      "setting-audio-replaygain": ["volume leveling", "loudness", "normalize sound"],
+      "setting-accounts-discord-rpc": ["discord", "rich presence", "rpc status"],
+      "setting-accounts-lastfm": ["scrobble", "last fm", "audioscrobbler"],
+      "setting-accounts-listenbrainz": ["open source scrobbler", "metabrainz"],
+      "setting-accessibility-reduced-motion": ["stop animations", "disable transitions", "less motion"],
+      "setting-audio-waveform-seekbar": ["sound wave", "visualizer", "audio graph"]
+    },
 
     "appearance": "Appearance",
     "changeTheme": "Change the theme of the application to your preference.",
@@ -588,6 +607,11 @@
     "cancelScan": "Cancel",
     "lastScan": "Last scan: {{time}}",
     "lastScanNever": "Last scan: Never",
+
+    "metadataSources": "Metadata & AutoTag Sources",
+    "downloads": {
+      "title": "Online downloads"
+    },
 
     "storage": "Storage",
     "storageDescription": "See how Nora manages your library and utilizes your storage.",

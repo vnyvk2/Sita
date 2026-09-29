@@ -20,7 +20,7 @@ const DefaultPageSettings = () => {
       className="default-page-settings-container"
     >
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
-        <li className="default-page-dropdown-container">
+        <li id="setting-default-page-startup" className="default-page-dropdown-container">
           <div className="description"> {t('settingsPage.changeDefaultPageDescription')}</div>
 
           <Dropdown

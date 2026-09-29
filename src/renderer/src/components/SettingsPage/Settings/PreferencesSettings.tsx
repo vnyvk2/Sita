@@ -38,7 +38,7 @@ const PreferencesSettings = () => {
       defaultExpanded={true}
     >
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
-        <li className="checkbox-container">
+        <li id="setting-preferences-song-indexing" className="checkbox-container">
           <div className="secondary-container toggle-song-indexing mb-4">
             <div className="description">{t('settingsPage.songIndexingDescription')}</div>
             <Checkbox
@@ -52,7 +52,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li className="checkbox-container">
+        <li id="setting-preferences-track-number" className="checkbox-container">
           <div className="secondary-container toggle-song-indexing mb-4">
             <div className="description">
               {t('settingsPage.showTrackNumberAsSongIndexDescription')}
@@ -68,7 +68,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li className="alphabet-scrubber-settings-container mb-4">
+        <li id="setting-preferences-alphabet-scrubber" className="alphabet-scrubber-settings-container mb-4">
           <div className="secondary-container toggle-alphabet-scrubber mb-4">
             <div className="description">
               {t(
@@ -93,7 +93,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li className="song-view-mode-settings-container mb-4">
+        <li id="setting-preferences-song-row-density" className="song-view-mode-settings-container mb-4">
           <div className="secondary-container toggle-song-view-mode mb-4">
             <div className="description">
               {t(
@@ -118,7 +118,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li className="checkbox-container">
+        <li id="setting-preferences-show-equalizer" className="checkbox-container">
           <div className="secondary-container toggle-show-equalizer mb-4">
             <div className="description">
               {t('settingsPage.showEqualizerOnTracklistDescription')}
@@ -134,7 +134,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li className="checkbox-container">
+        <li id="setting-preferences-artist-artwork" className="checkbox-container">
           <div className="secondary-container show-artists-artwork-near-song-controls mb-4">
             <div className="description">
               {t('settingsPage.showArtistArtworkNearSongControlsDescription')}
@@ -150,7 +150,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li className="checkbox-container">
+        <li id="setting-preferences-disable-background-artwork" className="checkbox-container">
           <div className="secondary-container disable-background-artworks mb-4">
             <div className="description">
               {t('settingsPage.disableBackgroundArtworksDescription')}
@@ -166,7 +166,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li className="checkbox-container">
+        <li id="setting-preferences-experimental-workspace" className="checkbox-container">
           <div className="secondary-container toggle-experimental-workspace mb-4">
             <div className="description">
               Enable the modular workspace system for customizable multi-column sidebars, docked
@@ -183,7 +183,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li className="checkbox-container">
+        <li id="setting-preferences-playlist-artworks" className="checkbox-container">
           <div className="secondary-container enable-artwork-from-song-covers mb-4">
             <div className="description">{t('settingsPage.playlistArtworksDescription')}</div>
             <Checkbox
@@ -207,7 +207,7 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li className="checkbox-container">
+        <li id="setting-preferences-sidebar-tabs" className="checkbox-container">
           <div className="secondary-container toggle-sidebar-navigation mb-4">
             <div className="description">{t('settingsPage.sidebarNavigationDescription')}</div>
             <div className="mt-2 flex flex-col gap-1">

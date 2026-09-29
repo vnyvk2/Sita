@@ -19,7 +19,7 @@ const AccessibilitySettings = () => {
       className="accessibility-settings-container"
     >
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
-        <li className="secondary-container toggle-reduced-motion mb-4">
+        <li id="setting-accessibility-reduced-motion" className="secondary-container toggle-reduced-motion mb-4">
           <div className="description">{t('settingsPage.reducedMotionDescription')}</div>
           <Checkbox
             id="enableReducedMotion"

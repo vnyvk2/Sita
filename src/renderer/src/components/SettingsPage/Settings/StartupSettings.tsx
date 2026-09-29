@@ -51,7 +51,7 @@ const StartupSettings = () => {
       className="startup-settings-container"
     >
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
-        <li className="auto-launch-at-startup-checkbox-container mb-4">
+        <li id="setting-startup-auto-launch" className="auto-launch-at-startup-checkbox-container mb-4">
           <div className="description">{t('settingsPage.autoLaunchAtStartDescription')}</div>
           <Checkbox
             id="toggleAppAutoLaunch"
@@ -63,6 +63,7 @@ const StartupSettings = () => {
           />
         </li>
         <li
+          id="setting-startup-open-hidden"
           className={`hide-window-at-startup-checkbox-container mb-4 transition-opacity ${
             userSettings && !userSettings.autoLaunchApp && 'cursor-not-allowed opacity-50'
           }`}
@@ -83,7 +84,7 @@ const StartupSettings = () => {
             labelContent={t('settingsPage.hideWindowAtStart')}
           />
         </li>
-        <li className="hide-window-on-close-checkbox-container mb-4">
+        <li id="setting-startup-hide-on-close" className="hide-window-on-close-checkbox-container mb-4">
           <div className="description">{t('settingsPage.hideWindowOnCloseDescription')}</div>
           <Checkbox
             id="hideWindowOnClose"
@@ -92,7 +93,7 @@ const StartupSettings = () => {
             labelContent={t('settingsPage.hideWindowOnClose')}
           />
         </li>
-        <li className="tray-click-behavior-checkbox-container mb-4">
+        <li id="setting-startup-tray-single-click" className="tray-click-behavior-checkbox-container mb-4">
           <div className="description">{t('settingsPage.trayClickBehaviorDescription')}</div>
           <Checkbox
             id="trayClickBehavior"
@@ -101,7 +102,7 @@ const StartupSettings = () => {
             labelContent={t('settingsPage.traySingleClickTogglesWindow')}
           />
         </li>
-        <li className="hide-mini-player-from-taskbar-checkbox-container">
+        <li id="setting-startup-hide-mini-player" className="hide-mini-player-from-taskbar-checkbox-container">
           <div className="description">{t('settingsPage.hideMiniPlayerFromTaskbarDescription')}</div>
           <Checkbox
             id="hideMiniPlayerFromTaskbar"

@@ -119,7 +119,7 @@ const LyricsSettings = () => {
     >
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight appear-from-bottom list-disc pl-6">
           {/* 1. Lyrics Appearance (Default vs Artwork background) */}
-          <li className="lyrics-appearance-section mb-6 -ml-6 list-none">
+          <li id="setting-lyrics-background-style" className="lyrics-appearance-section mb-6 -ml-6 list-none">
             <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 border-background-color-3/20 dark:border-dark-background-color-3/20 flex flex-col gap-4 rounded-lg border p-4">
               <div className="flex flex-col gap-1">
                 <div className="text-font-color-highlight dark:text-dark-font-color-highlight text-sm font-medium">
@@ -262,7 +262,7 @@ const LyricsSettings = () => {
           </li>
 
           {/* Existing lyrics settings */}
-          <li className="save-lyrics-automatically mb-4">
+          <li id="setting-lyrics-auto-save" className="save-lyrics-automatically mb-4">
             <div className="description">
               {t('settingsPage.saveLyricsAutomaticallyDescription')}
             </div>
@@ -286,7 +286,7 @@ const LyricsSettings = () => {
             </div>
           </li>
 
-          <li className="secondary-container always-save-lrc-files mb-4">
+          <li id="setting-lyrics-save-in-lrc" className="secondary-container always-save-lrc-files mb-4">
             <div className="description">{t('settingsPage.saveLyricsInLrcFilesDescription')}</div>
             <Checkbox
               id="saveLyricsInLrcFilesForSupportedSongs"
@@ -300,7 +300,7 @@ const LyricsSettings = () => {
             />
           </li>
 
-          <li className="lrc-files-custom-save-location mb-4">
+          <li id="setting-lyrics-custom-location" className="lrc-files-custom-save-location mb-4">
             <div className="description">
               {t('settingsPage.lrcFileCustomSaveLocationDescription')}
             </div>

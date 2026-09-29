@@ -1193,3 +1193,33 @@ input[type='checkbox']:checked ~ .checkmark .icon {
 .is-scrolling .fx-heart-pop {
   animation-play-state: paused !important;
 }
+
+/* Settings search spotlight pulse */
+.setting-spotlight-active {
+  position: relative;
+  outline: 2px solid hsl(var(--text-color-highlight) / 0.9);
+  outline-offset: 4px;
+  border-radius: 0.5rem;
+  transition: outline 0.3s ease, box-shadow 0.3s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .setting-spotlight-active {
+    animation: settingSpotlightPulse 2s ease-in-out;
+  }
+}
+
+@keyframes settingSpotlightPulse {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--text-color-highlight) / 0.6);
+  }
+  30% {
+    box-shadow: 0 0 16px 6px hsl(var(--text-color-highlight) / 0.5);
+  }
+  70% {
+    box-shadow: 0 0 10px 3px hsl(var(--text-color-highlight) / 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
