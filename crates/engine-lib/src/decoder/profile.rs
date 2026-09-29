@@ -180,14 +180,10 @@ pub fn inspect_aac_audio_specific_config(extra_data: &[u8]) -> Result<(), Decode
         if let Some(sync) = reader.read_bits(11) {
             if sync == 0x2b7 {
                 if let Some(ext_aot) = reader.read_bits(5) {
-                    if ext_aot == 5 {
-                        return Err(DecodeError::UnsupportedProfile(
-                            "Hierarchical HE-AAC v1 (SBR extension 0x2b7) detected; unsupported by AAC-LC decoder".to_string(),
-                        ));
-                    } else if ext_aot == 29 {
-                        return Err(DecodeError::UnsupportedProfile(
-                            "Hierarchical HE-AAC v2 (PS extension 0x2b7) detected; unsupported by AAC-LC decoder".to_string(),
-                        ));
+                    if ext_aot == 5 || ext_aot == 29 {
+                        log::warn!(
+                            "Backward-compatible HE-AAC extension 0x2b7 present; decoding core AAC-LC frames via Symphonia"
+                        );
                     }
                 }
             }

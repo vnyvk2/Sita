@@ -20,6 +20,7 @@ pub struct ProbedSource {
     pub decoder: Box<dyn Decoder>,
     pub track_id: u32,
     pub spec: AudioSpec,
+    pub codec: String,
     pub total_frames: Option<u64>,
     pub estimated_duration: Option<Duration>,
 }
@@ -102,12 +103,14 @@ pub fn probe_media_stream(
 
     let total_frames = params.n_frames;
     let estimated_duration = total_frames.map(|f| spec.frames_to_duration(f));
+    let codec = format!("{:?}", params.codec);
 
     Ok(ProbedSource {
         format,
         decoder,
         track_id,
         spec,
+        codec,
         total_frames,
         estimated_duration,
     })

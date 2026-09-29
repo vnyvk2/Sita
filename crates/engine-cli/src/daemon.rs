@@ -66,7 +66,17 @@ impl EngineDaemon {
                     SlotId::B => LibSlotId::B,
                 };
 
-                let spec = AudioSpec::new_f32_stereo(48000);
+                let probed = match engine_lib::decoder::probe_file(&path) {
+                    Ok(p) => p,
+                    Err(e) => return DaemonResult::Error { message: format!("Probe failed: {}", e) },
+                };
+
+                let duration_secs = probed.estimated_duration.map(|d| d.as_secs_f64()).unwrap_or(0.0);
+                let sample_rate = probed.spec.sample_rate;
+                let channels = probed.spec.channels;
+                let codec = probed.codec.clone();
+
+                let spec = AudioSpec::new_f32_stereo(sample_rate);
                 let (mut producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
                 let stop_signal = Arc::new(AtomicBool::new(false));
 
@@ -97,6 +107,10 @@ impl EngineDaemon {
                         "slot": slot,
                         "path": path,
                         "cued": true,
+                        "duration_secs": duration_secs,
+                        "sample_rate": sample_rate,
+                        "channels": channels,
+                        "codec": codec,
                     })),
                 }
             }
@@ -108,6 +122,15 @@ impl EngineDaemon {
                 self.handle_command(DaemonCommand::Load { slot: standby, path })
             }
             DaemonCommand::Play => {
+                let active_id = match self.active_slot {
+                    SlotId::A => LibSlotId::A,
+                    SlotId::B => LibSlotId::B,
+                };
+                if self.mixer.slot(active_id).state == engine_lib::mixer::SlotState::Empty {
+                    return DaemonResult::Error {
+                        message: "No track loaded in active slot".to_string(),
+                    };
+                }
                 self.state = PlaybackState::Playing;
                 self.is_playing.store(true, Ordering::Release);
                 self.mixer.play();

@@ -59,3 +59,7 @@ path = "tests/tier4_real_world_scenarios.rs"
 [[test]]
 name = "rt_alloc_audit"
 path = "tests/rt_alloc_audit.rs"
+
+[[test]]
+name = "real_codec_tests"
+path = "tests/real_codec_tests.rs"
