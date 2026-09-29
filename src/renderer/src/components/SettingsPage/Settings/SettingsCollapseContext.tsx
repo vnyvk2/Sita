@@ -67,7 +67,6 @@ interface SettingsCollapseProviderProps {
 interface PendingTarget {
   id: string;
   sectionKey: SettingsSectionKey;
-  timestamp: number;
 }
 
 export const SettingsCollapseProvider = ({
@@ -84,7 +83,7 @@ export const SettingsCollapseProvider = ({
 
   const [highlightedSettingId, setHighlightedSettingId] = useState<string | null>(null);
   const [pendingTarget, setPendingTarget] = useState<PendingTarget | null>(null);
-  const cleanupTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isSectionExpanded = useCallback(
     (key: SettingsSectionKey) => expandedMap[key] ?? true,
@@ -135,15 +134,11 @@ export const SettingsCollapseProvider = ({
       return { ...prev, [sectionKey]: true };
     });
 
-    // 2. Queue pending target for post-render double-rAF execution
-    setPendingTarget({
-      id,
-      sectionKey,
-      timestamp: Date.now()
-    });
+    // 2. Queue pending target for post-render double-rAF execution & async retry
+    setPendingTarget({ id, sectionKey });
   }, []);
 
-  // Post-render double-rAF layout synchronization
+  // Post-render double-rAF layout synchronization with async section retry loop
   useEffect(() => {
     if (!pendingTarget) return;
 
@@ -153,53 +148,80 @@ export const SettingsCollapseProvider = ({
     if (!expandedMap[sectionKey]) return;
 
     let cancelled = false;
+    let raf1Id: number | null = null;
+    let raf2Id: number | null = null;
+    let retryTimerId: ReturnType<typeof setTimeout> | null = null;
+    const startTime = Date.now();
+    const MAX_RETRY_MS = 1500;
+    const RETRY_INTERVAL_MS = 60;
 
-    // Use nested requestAnimationFrame to guarantee React has flushed DOM mutations and layout
-    const raf1 = requestAnimationFrame(() => {
-      const raf2 = requestAnimationFrame(() => {
-        if (cancelled) return;
+    const attemptScrollAndHighlight = () => {
+      if (cancelled) return;
 
-        const element = document.getElementById(id);
-        if (element) {
-          const prefersReducedMotion =
-            typeof window !== 'undefined' &&
-            window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+      const element = document.getElementById(id);
+      if (element) {
+        const prefersReducedMotion =
+          typeof window !== 'undefined' &&
+          window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
 
-          if (typeof element.scrollIntoView === 'function') {
-            element.scrollIntoView({
-              behavior: prefersReducedMotion ? 'auto' : 'smooth',
-              block: 'center'
-            });
-          }
-
-          // Clear spotlight from any previous active elements to prevent class leaks
-          document.querySelectorAll('.setting-spotlight-active').forEach((el) => {
-            el.classList.remove('setting-spotlight-active');
+        if (typeof element.scrollIntoView === 'function') {
+          element.scrollIntoView({
+            behavior: prefersReducedMotion ? 'auto' : 'smooth',
+            block: 'center'
           });
-
-          // Apply spotlight CSS class
-          element.classList.add('setting-spotlight-active');
-          setHighlightedSettingId(id);
-
-          if (cleanupTimerRef.current) {
-            clearTimeout(cleanupTimerRef.current);
-          }
-
-          cleanupTimerRef.current = setTimeout(() => {
-            element.classList.remove('setting-spotlight-active');
-            setHighlightedSettingId((curr) => (curr === id ? null : curr));
-          }, 2200);
         }
 
-        setPendingTarget(null);
-      });
+        // Accessibility: Transfer focus so screen-reader and keyboard users follow the jump
+        if (typeof element.focus === 'function') {
+          if (!element.hasAttribute('tabindex')) {
+            element.setAttribute('tabindex', '-1');
+          }
+          element.focus({ preventScroll: true });
+        }
 
-      return () => cancelAnimationFrame(raf2);
+        // Clear spotlight from any previous active elements to prevent class leaks
+        document.querySelectorAll('.setting-spotlight-active').forEach((el) => {
+          el.classList.remove('setting-spotlight-active');
+        });
+
+        // Apply spotlight CSS class
+        element.classList.add('setting-spotlight-active');
+        setHighlightedSettingId(id);
+
+        if (cleanupTimerRef.current) {
+          clearTimeout(cleanupTimerRef.current);
+        }
+
+        cleanupTimerRef.current = setTimeout(() => {
+          element.classList.remove('setting-spotlight-active');
+          setHighlightedSettingId((curr) => (curr === id ? null : curr));
+        }, 2200);
+
+        setPendingTarget(null);
+        return;
+      }
+
+      // Element not found yet (e.g. async section mounting). Retry until MAX_RETRY_MS.
+      if (Date.now() - startTime < MAX_RETRY_MS) {
+        retryTimerId = setTimeout(attemptScrollAndHighlight, RETRY_INTERVAL_MS);
+      } else {
+        console.warn(`[Settings] Setting #${id} not found in DOM after ${MAX_RETRY_MS}ms retries.`);
+        setPendingTarget(null);
+      }
+    };
+
+    // Use nested requestAnimationFrame to guarantee React has flushed DOM mutations and layout
+    raf1Id = requestAnimationFrame(() => {
+      raf2Id = requestAnimationFrame(() => {
+        attemptScrollAndHighlight();
+      });
     });
 
     return () => {
       cancelled = true;
-      cancelAnimationFrame(raf1);
+      if (raf1Id !== null) cancelAnimationFrame(raf1Id);
+      if (raf2Id !== null) cancelAnimationFrame(raf2Id);
+      if (retryTimerId !== null) clearTimeout(retryTimerId);
     };
   }, [pendingTarget, expandedMap]);
 

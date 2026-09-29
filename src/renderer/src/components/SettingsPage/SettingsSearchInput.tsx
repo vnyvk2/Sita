@@ -1,9 +1,9 @@
-/* eslint-disable jsx-a11y/no-redundant-roles */
+/* eslint-disable jsx-a11y/no-redundant-roles, jsx-a11y/click-events-have-key-events */
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import HighlightedText from '../SearchPage/HighlightedText';
-import { settingsCatalog } from './settingsCatalog';
+import { getSectionDisplayName, settingsCatalog } from './settingsCatalog';
 import { useSettingsCollapse, useSettingsCollapseActions } from './Settings/SettingsCollapseContext';
 import { matchSettings, type SettingSearchResult } from './utils/matchSettings';
 
@@ -35,10 +35,14 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
   const hasResults = results.length > 0;
   const showDropdown = isOpen && query.trim().length > 0;
 
-  // Reset active index when results change
+  // Reset or clamp active index when results change
   useEffect(() => {
-    setActiveIndex(hasResults ? 0 : -1);
-  }, [hasResults, query]);
+    if (!hasResults) {
+      setActiveIndex(-1);
+    } else {
+      setActiveIndex((prev) => (prev >= 0 && prev < results.length ? prev : 0));
+    }
+  }, [hasResults, results.length, query]);
 
   // Jump to selected setting
   const handleSelectResult = useCallback(
@@ -118,24 +122,40 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
 
   // Global keybindings: Ctrl+F / Cmd+F to focus search, / to quick search
   useEffect(() => {
+    const isInteractiveElement = (el: Element | null): boolean => {
+      if (!el) return false;
+      const tagName = el.tagName;
+      return (
+        tagName === 'INPUT' ||
+        tagName === 'TEXTAREA' ||
+        tagName === 'SELECT' ||
+        tagName === 'BUTTON' ||
+        (el as HTMLElement).isContentEditable ||
+        Boolean(el.closest('[role="dialog"]'))
+      );
+    };
+
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const isCtrlF = (e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F');
       if (isCtrlF) {
-        e.preventDefault();
-        inputRef.current?.focus();
-        inputRef.current?.select();
-        setIsOpen(true);
-        return;
+        const activeEl = document.activeElement;
+        const isOtherInputFocused =
+          activeEl !== inputRef.current &&
+          (activeEl?.tagName === 'INPUT' ||
+            activeEl?.tagName === 'TEXTAREA' ||
+            (activeEl as HTMLElement)?.isContentEditable);
+
+        if (!isOtherInputFocused) {
+          e.preventDefault();
+          inputRef.current?.focus();
+          inputRef.current?.select();
+          setIsOpen(true);
+          return;
+        }
       }
 
-      if (e.key === '/') {
-        const activeEl = document.activeElement;
-        const isInputFocused =
-          activeEl?.tagName === 'INPUT' ||
-          activeEl?.tagName === 'TEXTAREA' ||
-          (activeEl as HTMLElement)?.isContentEditable;
-
-        if (!isInputFocused) {
+      if (e.key === '/' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) {
+        if (!isInteractiveElement(document.activeElement)) {
           e.preventDefault();
           inputRef.current?.focus();
           setIsOpen(true);
@@ -180,7 +200,7 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
             }
           }}
           onKeyDown={handleKeyDown}
-          className="border-background-color-2 focus:border-font-color-highlight dark:border-dark-background-color-2 dark:focus:border-dark-font-color-highlight w-64 rounded-full border-[1.5px] bg-transparent py-1.5 pr-8 pl-9 text-sm transition-all outline-none focus:w-80 md:w-72 md:text-base md:focus:w-96"
+          className="border-background-color-2 focus:border-font-color-highlight dark:border-dark-background-color-2 dark:focus:border-dark-font-color-highlight w-64 rounded-full border-[1.5px] bg-transparent py-1.5 pr-8 pl-9 text-sm outline-none sm:w-80 md:w-96 md:text-base"
         />
 
         {query.length > 0 && (
@@ -211,7 +231,7 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
 
       {/* Dropdown Results Listbox */}
       {showDropdown && (
-        <div className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 animate-in fade-in slide-in-from-top-2 absolute top-full right-0 z-50 mt-2 max-h-96 w-96 overflow-y-auto rounded-xl border shadow-xl [scrollbar-gutter:stable]">
+        <div className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 animate-in fade-in slide-in-from-top-2 absolute top-full right-0 z-50 mt-2 max-h-96 w-96 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border shadow-xl [scrollbar-gutter:stable]">
           {hasResults ? (
             <ul
               ref={listboxRef}
@@ -223,10 +243,7 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
             >
               {results.map((result, index) => {
                 const isSelected = index === activeIndex;
-                const sectionName = t(
-                  `settingsPage.${result.entry.sectionKey}`,
-                  result.entry.sectionKey
-                );
+                const sectionName = getSectionDisplayName(result.entry.sectionKey, t);
 
                 return (
                   <li
@@ -234,13 +251,11 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
                     id={`settings-search-opt-${result.entry.id}`}
                     role="option"
                     aria-selected={isSelected}
-                    onClick={() => handleSelectResult(result)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleSelectResult(result);
-                      }
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectResult(result);
                     }}
+                    onClick={() => handleSelectResult(result)}
                     onMouseEnter={() => setActiveIndex(index)}
                     className={`group flex cursor-pointer flex-col rounded-lg px-3 py-2 text-left transition-colors ${
                       isSelected

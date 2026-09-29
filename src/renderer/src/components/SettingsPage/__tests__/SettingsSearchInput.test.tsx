@@ -186,6 +186,102 @@ describe('SettingsSearchInput component', () => {
     expect(document.activeElement).not.toBe(searchInput);
   });
 
+  it('triggers jumpToSetting when an option receives onMouseDown and prevents default blur', () => {
+    renderComponent();
+
+    const input = screen.getByRole('combobox');
+    fireEvent.change(input, { target: { value: 'theme' } });
+
+    const options = screen.getAllByRole('option');
+    const mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    fireEvent(options[0], mouseDownEvent);
+
+    expect(mockJumpToSetting).toHaveBeenCalledTimes(1);
+    expect(mouseDownEvent.defaultPrevented).toBe(true);
+    expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  it('renders translated or authoritative section badge names', () => {
+    renderComponent();
+
+    const input = screen.getByRole('combobox');
+    fireEvent.change(input, { target: { value: 'theme' } });
+
+    // Section badge for appearance should be present
+    expect(screen.getAllByText('Appearance').length).toBeGreaterThan(0);
+  });
+
+  it('does NOT intercept "/" when modifier keys are pressed', () => {
+    renderComponent();
+
+    const input = screen.getByRole('combobox');
+    expect(document.activeElement).not.toBe(input);
+
+    fireEvent.keyDown(window, { key: '/', ctrlKey: true });
+    expect(document.activeElement).not.toBe(input);
+
+    fireEvent.keyDown(window, { key: '/', altKey: true });
+    expect(document.activeElement).not.toBe(input);
+
+    fireEvent.keyDown(window, { key: '/', metaKey: true });
+    expect(document.activeElement).not.toBe(input);
+
+    fireEvent.keyDown(window, { key: '/', shiftKey: true });
+    expect(document.activeElement).not.toBe(input);
+  });
+
+  it('does NOT intercept "/" when a button or dialog element is focused', () => {
+    render(
+      <div>
+        <button data-testid="other-button" type="button">
+          Click me
+        </button>
+        <div role="dialog" data-testid="dialog-container">
+          <button data-testid="inside-dialog" type="button">
+            Inside Dialog
+          </button>
+        </div>
+        <SettingsCollapseContext.Provider value={mockCollapseContext}>
+          <SettingsSearchInput />
+        </SettingsCollapseContext.Provider>
+      </div>
+    );
+
+    const button = screen.getByTestId('other-button');
+    const insideDialog = screen.getByTestId('inside-dialog');
+    const searchInput = screen.getByRole('combobox');
+
+    button.focus();
+    fireEvent.keyDown(window, { key: '/' });
+    expect(document.activeElement).toBe(button);
+    expect(document.activeElement).not.toBe(searchInput);
+
+    insideDialog.focus();
+    fireEvent.keyDown(window, { key: '/' });
+    expect(document.activeElement).toBe(insideDialog);
+    expect(document.activeElement).not.toBe(searchInput);
+  });
+
+  it('does NOT intercept Ctrl+F when another text input is focused', () => {
+    render(
+      <div>
+        <input data-testid="other-input" type="text" />
+        <SettingsCollapseContext.Provider value={mockCollapseContext}>
+          <SettingsSearchInput />
+        </SettingsCollapseContext.Provider>
+      </div>
+    );
+
+    const otherInput = screen.getByTestId('other-input');
+    const searchInput = screen.getByRole('combobox');
+
+    otherInput.focus();
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
+
+    expect(document.activeElement).toBe(otherInput);
+    expect(document.activeElement).not.toBe(searchInput);
+  });
+
   it('displays empty state when no settings match query', () => {
     renderComponent();
 

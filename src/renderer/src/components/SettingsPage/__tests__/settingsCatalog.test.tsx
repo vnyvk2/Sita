@@ -258,4 +258,33 @@ describe('settingsCatalog integrity test', () => {
       ).toEqual([]);
     });
   });
+
+  it('ensures all setting-* DOM elements in SettingsPage are indexed in settingsCatalog (reverse integrity)', async () => {
+    const testQueryClient = createTestQueryClient();
+    const { container } = render(
+      <QueryClientProvider client={testQueryClient}>
+        <SettingsPage />
+      </QueryClientProvider>
+    );
+
+    // Wait for async sections (e.g. metadata preferences) to finish loading
+    await vi.waitFor(() => {
+      const domSettingElements = container.querySelectorAll<HTMLElement>('[id^="setting-"]');
+      expect(domSettingElements.length).toBeGreaterThan(20);
+
+      const catalogIds = new Set(settingsCatalog.map((e) => e.id));
+      const uncatalogedIds: string[] = [];
+
+      domSettingElements.forEach((el) => {
+        if (!catalogIds.has(el.id)) {
+          uncatalogedIds.push(el.id);
+        }
+      });
+
+      expect(
+        uncatalogedIds,
+        `Found setting elements in DOM that are missing from settingsCatalog: ${uncatalogedIds.join(', ')}`
+      ).toEqual([]);
+    });
+  });
 });

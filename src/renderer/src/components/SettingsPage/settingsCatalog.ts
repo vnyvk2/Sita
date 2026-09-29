@@ -17,6 +17,41 @@ export interface SettingCatalogEntry {
   keywords: string[];
 }
 
+export interface SectionMeta {
+  titleKey: string;
+  defaultTitle: string;
+}
+
+export const SECTION_METADATA: Record<SettingsSectionKey, SectionMeta> = {
+  appearance: { titleKey: 'settingsPage.appearance', defaultTitle: 'Appearance' },
+  language: { titleKey: 'settingsPage.language', defaultTitle: 'Language' },
+  audioPlayback: { titleKey: 'settingsPage.audioPlayback', defaultTitle: 'Audio Playback' },
+  accounts: { titleKey: 'settingsPage.accounts', defaultTitle: 'Accounts & Integrations' },
+  lyrics: { titleKey: 'settingsPage.lyrics', defaultTitle: 'Lyrics' },
+  equalizer: { titleKey: 'settingsPage.equalizer', defaultTitle: 'Equalizer' },
+  defaultPage: { titleKey: 'settingsPage.defaultPage', defaultTitle: 'Default Page' },
+  preferences: { titleKey: 'settingsPage.preferences', defaultTitle: 'Preferences' },
+  metadata: { titleKey: 'settingsPage.metadataSources', defaultTitle: 'Metadata & AutoTag Sources' },
+  accessibility: { titleKey: 'settingsPage.accessibility', defaultTitle: 'Accessibility' },
+  performance: { titleKey: 'settingsPage.performance', defaultTitle: 'Performance' },
+  downloads: { titleKey: 'settingsPage.downloads.title', defaultTitle: 'Downloads' },
+  library: { titleKey: 'settingsPage.libraryScanning', defaultTitle: 'Library & Folders' },
+  startup: { titleKey: 'settingsPage.startupAndWindowCustomization', defaultTitle: 'Startup & Window' },
+  storage: { titleKey: 'settingsPage.storage', defaultTitle: 'Storage' },
+  advanced: { titleKey: 'settingsPage.advanced', defaultTitle: 'Advanced' },
+  about: { titleKey: 'settingsPage.about', defaultTitle: 'About' }
+};
+
+export const getSectionDisplayName = (
+  sectionKey: SettingsSectionKey,
+  t: (key: string, options?: Record<string, unknown>) => unknown
+): string => {
+  const meta = SECTION_METADATA[sectionKey];
+  if (!meta) return sectionKey;
+  const translated = t(meta.titleKey, { defaultValue: meta.defaultTitle });
+  return typeof translated === 'string' && translated.length > 0 ? translated : meta.defaultTitle;
+};
+
 export const settingsCatalog: SettingCatalogEntry[] = [
   // --- APPEARANCE ---
   {
@@ -174,6 +209,15 @@ export const settingsCatalog: SettingCatalogEntry[] = [
   },
 
   // --- ACCOUNTS ---
+  {
+    id: 'setting-accounts-discord-rpc',
+    sectionKey: 'accounts',
+    titleKey: 'settingsPage.enableDiscordRpc',
+    defaultTitle: 'Enable Discord Rich Presence',
+    descriptionKey: 'settingsPage.enableDiscordRpcDescription',
+    defaultDescription: 'Integrate Discord Rich Presence with Nora',
+    keywords: ['discord', 'rpc', 'rich presence', 'gaming status', 'now playing discord']
+  },
   {
     id: 'setting-accounts-lastfm',
     sectionKey: 'accounts',

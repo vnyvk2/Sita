@@ -391,7 +391,6 @@
     "noMatchingSettings": "No settings found matching \"{{query}}\"",
     "resultsCount_one": "{{count}} setting found",
     "resultsCount_other": "{{count}} settings found",
-    "inSection": "in {{section}}",
     "aliasMatch": "Keyword match: {{keyword}}",
     "searchAliases": {
       "setting-appearance-theme-mode": ["dark", "light", "colors", "style", "palette", "day", "night"],
@@ -401,6 +400,7 @@
       "setting-preferences-song-row-density": ["compact view", "row size", "compact rows", "density"],
       "setting-audio-crossfade": ["smooth transition", "overlap songs", "gapless"],
       "setting-audio-replaygain": ["volume leveling", "loudness", "normalize sound"],
+      "setting-accounts-discord-rpc": ["discord", "rich presence", "rpc status"],
       "setting-accounts-lastfm": ["scrobble", "last fm", "audioscrobbler"],
       "setting-accounts-listenbrainz": ["open source scrobbler", "metabrainz"],
       "setting-accessibility-reduced-motion": ["stop animations", "disable transitions", "less motion"],

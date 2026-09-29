@@ -23,17 +23,27 @@ export const normalizeText = (text: string): string => {
 };
 
 /**
+ * Normalizes punctuation and separators to spaces for flexible tokenization.
+ * e.g., "last.fm" -> "last fm", "mini-player" -> "mini player"
+ */
+export const normalizePunctuation = (text: string): string => {
+  return text.replace(/[.\-_/\\,;:!?'"()[\]{}]/g, ' ').replace(/\s+/g, ' ').trim();
+};
+
+/**
  * Matches and ranks settings catalog entries against a user search query.
  *
  * Scoring Hierarchy:
  * - 100: Exact title match
  * - 90:  Title prefix match
- * - 80:  Title word-boundary match
- * - 70:  Title substring match
+ * - 85:  Title multi-word all-token match
+ * - 80:  Title word-boundary prefix match
+ * - 70:  Title substring match (requires query.length >= 2)
  * - 60:  Alias exact match
+ * - 55:  Alias multi-token match
  * - 50:  Alias prefix match
- * - 40:  Alias substring match
- * - 30:  Description substring match
+ * - 40:  Alias substring match (requires query.length >= 2)
+ * - 30:  Description match (all tokens or substring, requires query.length >= 2)
  */
 export const matchSettings = (
   query: string,
@@ -47,15 +57,22 @@ export const matchSettings = (
     return [];
   }
 
+  const cleanQuery = normalizePunctuation(normQuery);
+  const queryTokens = cleanQuery.split(/\s+/).filter(Boolean);
+  const isSingleChar = normQuery.length === 1;
+
   const results: SettingSearchResult[] = [];
 
   for (const entry of catalog) {
     // 1. Resolve localized title
     const translatedTitle = t(entry.titleKey, { defaultValue: entry.defaultTitle });
-    const title = typeof translatedTitle === 'string' && translatedTitle.length > 0
-      ? translatedTitle
-      : entry.defaultTitle;
+    const title =
+      typeof translatedTitle === 'string' && translatedTitle.length > 0
+        ? translatedTitle
+        : entry.defaultTitle;
     const normTitle = normalizeText(title);
+    const cleanTitle = normalizePunctuation(normTitle);
+    const titleWords = cleanTitle.split(/\s+/).filter(Boolean);
 
     // 2. Resolve localized description if present
     let description: string | undefined = undefined;
@@ -68,6 +85,7 @@ export const matchSettings = (
       }
     }
     const normDesc = description ? normalizeText(description) : '';
+    const cleanDesc = description ? normalizePunctuation(normDesc) : '';
 
     // 3. Resolve aliases: universal catalog keywords + per-locale aliases from i18n
     const localeAliasesRaw = t(`settingsPage.searchAliases.${entry.id}`, {
@@ -80,61 +98,102 @@ export const matchSettings = (
     let bestScore = 0;
     let matchedField: 'title' | 'alias' | 'description' = 'title';
     let matchedAlias: string | undefined = undefined;
-    let highlightQuery = rawQuery;
+    const highlightQuery = rawQuery;
 
-    // Check Title Match
-    if (normTitle === normQuery) {
+    // Check Title Exact and Prefix Match
+    if (normTitle === normQuery || cleanTitle === cleanQuery) {
       bestScore = 100;
       matchedField = 'title';
-    } else if (normTitle.startsWith(normQuery)) {
+    } else if (normTitle.startsWith(normQuery) || cleanTitle.startsWith(cleanQuery)) {
       bestScore = 90;
       matchedField = 'title';
-    } else {
-      const titleWords = normTitle.split(/\s+/);
-      if (titleWords.some((word) => word.startsWith(normQuery))) {
-        bestScore = 80;
-        matchedField = 'title';
-      } else if (normTitle.includes(normQuery)) {
-        bestScore = 70;
-        matchedField = 'title';
-      }
+    } else if (titleWords.some((word) => word.startsWith(normQuery))) {
+      bestScore = 80;
+      matchedField = 'title';
+    } else if (
+      queryTokens.length > 1 &&
+      queryTokens.every((token) => titleWords.some((w) => w.startsWith(token) || w.includes(token)))
+    ) {
+      // Multi-word query where all tokens match title words (e.g. "theme mode")
+      bestScore = 85;
+      matchedField = 'title';
+    } else if (!isSingleChar && (normTitle.includes(normQuery) || cleanTitle.includes(cleanQuery))) {
+      bestScore = 70;
+      matchedField = 'title';
     }
 
     // Check Alias Match (if title didn't score higher than 80)
     if (bestScore < 80) {
       for (const alias of allAliases) {
         const normAlias = normalizeText(alias);
-        if (normAlias === normQuery) {
+        const cleanAlias = normalizePunctuation(normAlias);
+
+        if (normAlias === normQuery || cleanAlias === cleanQuery) {
           if (bestScore < 60) {
             bestScore = 60;
             matchedField = 'alias';
             matchedAlias = alias;
-            highlightQuery = rawQuery;
           }
           break;
-        } else if (normAlias.startsWith(normQuery)) {
+        } else if (normAlias.startsWith(normQuery) || cleanAlias.startsWith(cleanQuery)) {
           if (bestScore < 50) {
             bestScore = 50;
             matchedField = 'alias';
             matchedAlias = alias;
-            highlightQuery = rawQuery;
           }
-        } else if (normAlias.includes(normQuery)) {
+        } else if (!isSingleChar && (normAlias.includes(normQuery) || cleanAlias.includes(cleanQuery))) {
           if (bestScore < 40) {
             bestScore = 40;
             matchedField = 'alias';
             matchedAlias = alias;
-            highlightQuery = rawQuery;
+          }
+        } else if (
+          queryTokens.length > 1 &&
+          queryTokens.every((token) => cleanAlias.includes(token))
+        ) {
+          if (bestScore < 55) {
+            bestScore = 55;
+            matchedField = 'alias';
+            matchedAlias = alias;
           }
         }
       }
     }
 
-    // Check Description Match (if no higher score)
-    if (bestScore < 40 && normDesc.length > 0 && normDesc.includes(normQuery)) {
-      bestScore = 30;
-      matchedField = 'description';
-      highlightQuery = rawQuery;
+    // Check Multi-word token match across Title + Aliases (e.g. "battery animation")
+    if (bestScore < 60 && queryTokens.length > 1) {
+      const matchingAlias = allAliases.find((alias) =>
+        queryTokens.every((token) => normalizePunctuation(normalizeText(alias)).includes(token))
+      );
+      if (matchingAlias) {
+        bestScore = 55;
+        matchedField = 'alias';
+        matchedAlias = matchingAlias;
+      } else {
+        const combinedScope = `${cleanTitle} ${allAliases.map(normalizePunctuation).join(' ')}`;
+        if (queryTokens.every((token) => combinedScope.includes(token))) {
+          bestScore = 45;
+          matchedField = 'alias';
+          matchedAlias =
+            allAliases.find((a) =>
+              queryTokens.some((t) => normalizeText(a).includes(t))
+            ) ?? allAliases[0];
+        }
+      }
+    }
+
+    // Check Description Match (disallow 1-char query noise)
+    if (bestScore < 40 && !isSingleChar && cleanDesc.length > 0) {
+      if (normDesc.includes(normQuery) || cleanDesc.includes(cleanQuery)) {
+        bestScore = 30;
+        matchedField = 'description';
+      } else if (
+        queryTokens.length > 1 &&
+        queryTokens.every((token) => cleanDesc.includes(token))
+      ) {
+        bestScore = 30;
+        matchedField = 'description';
+      }
     }
 
     if (bestScore > 0) {

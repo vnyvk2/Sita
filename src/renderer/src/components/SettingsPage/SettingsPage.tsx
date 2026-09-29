@@ -19,6 +19,7 @@ import MetadataSettings from './Settings/MetadataSettings';
 import PerformanceSettings from './Settings/PerformanceSettings';
 import PreferencesSettings from './Settings/PreferencesSettings';
 import {
+  SETTINGS_SECTION_KEYS,
   SettingsCollapseProvider,
   useSettingsCollapse,
   useSettingsCollapseActions,
@@ -87,15 +88,27 @@ const SettingsDeepLinkHandler = ({
       if (lastHandledKeyRef.current === targetKey) return;
       lastHandledKeyRef.current = targetKey;
 
-      let sectionKey = initialSection as SettingsSectionKey | undefined;
+      let sectionKey: SettingsSectionKey | undefined;
+      if (
+        initialSection &&
+        SETTINGS_SECTION_KEYS.includes(initialSection as SettingsSectionKey)
+      ) {
+        sectionKey = initialSection as SettingsSectionKey;
+      }
+
       if (!sectionKey) {
         const found = settingsCatalog.find((e) => e.id === initialHighlight);
         if (found) {
           sectionKey = found.sectionKey;
         }
       }
+
       if (sectionKey) {
         jumpToSetting(initialHighlight, sectionKey);
+      } else {
+        console.warn(
+          `[Settings] Unable to resolve section for highlight target: ${initialHighlight}`
+        );
       }
     }
   }, [initialHighlight, initialSection, jumpToSetting]);

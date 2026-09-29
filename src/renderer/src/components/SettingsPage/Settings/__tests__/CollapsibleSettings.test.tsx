@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/react';
+import { useEffect, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import CollapsibleSettingsSection from '../CollapsibleSettingsSection';
@@ -315,6 +316,150 @@ describe('SettingsCollapseProvider integration', () => {
     // Even if children re-render, useSettingsCollapseActions returns identical memoized reference
     expect(actionsReference1).toBeDefined();
     expect(actionsReference1).toBe(actionsReference2 ?? actionsReference1);
+  });
+
+  it('transfers focus and sets tabindex on target element upon jump', () => {
+    const originalRaf = window.requestAnimationFrame;
+    window.requestAnimationFrame = (cb) => {
+      cb(0);
+      return 0;
+    };
+
+    const FocusConsumer = () => {
+      const actions = useSettingsCollapseActions()!;
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() => actions.jumpToSetting('focus-target', 'appearance')}
+            data-testid="jump-focus-btn"
+          >
+            Jump
+          </button>
+          <CollapsibleSettingsSection
+            id="appearance-container"
+            sectionKey="appearance"
+            title="Appearance"
+          >
+            <div id="focus-target" data-testid="focus-target">
+              Focus Target
+            </div>
+          </CollapsibleSettingsSection>
+        </div>
+      );
+    };
+
+    const { container } = render(
+      <SettingsCollapseProvider>
+        <FocusConsumer />
+      </SettingsCollapseProvider>
+    );
+
+    fireEvent.click(screen.getByTestId('jump-focus-btn'));
+
+    const target = container.querySelector('#focus-target') as HTMLElement;
+    expect(target).not.toBeNull();
+    expect(target.getAttribute('tabindex')).toBe('-1');
+    expect(document.activeElement).toBe(target);
+
+    window.requestAnimationFrame = originalRaf;
+  });
+
+  it('retries finding an asynchronously mounted setting and applies spotlight', async () => {
+    const AsyncSettingComponent = () => {
+      const actions = useSettingsCollapseActions()!;
+      const [mounted, setMounted] = useState(false);
+
+      useEffect(() => {
+        const timer = setTimeout(() => setMounted(true), 80);
+        return () => clearTimeout(timer);
+      }, []);
+
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() => actions.jumpToSetting('async-target', 'metadata')}
+            data-testid="jump-async-btn"
+          >
+            Jump Async
+          </button>
+          <CollapsibleSettingsSection
+            id="metadata-container"
+            sectionKey="metadata"
+            title="Metadata"
+          >
+            {mounted && (
+              <div id="async-target" data-testid="async-target">
+                Async Setting Content
+              </div>
+            )}
+          </CollapsibleSettingsSection>
+        </div>
+      );
+    };
+
+    const { container } = render(
+      <SettingsCollapseProvider>
+        <AsyncSettingComponent />
+      </SettingsCollapseProvider>
+    );
+
+    fireEvent.click(screen.getByTestId('jump-async-btn'));
+
+    await vi.waitFor(
+      () => {
+        const target = container.querySelector('#async-target');
+        expect(target).not.toBeNull();
+        expect(target?.classList.contains('setting-spotlight-active')).toBe(true);
+      },
+      { timeout: 1000 }
+    );
+  });
+
+  it('logs warning when target setting is not found after retry timeout', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const MissingConsumer = () => {
+      const actions = useSettingsCollapseActions()!;
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() => actions.jumpToSetting('nonexistent-target', 'appearance')}
+            data-testid="jump-missing-btn"
+          >
+            Jump Missing
+          </button>
+          <CollapsibleSettingsSection
+            id="appearance-container"
+            sectionKey="appearance"
+            title="Appearance"
+          >
+            <div>Appearance Content</div>
+          </CollapsibleSettingsSection>
+        </div>
+      );
+    };
+
+    render(
+      <SettingsCollapseProvider>
+        <MissingConsumer />
+      </SettingsCollapseProvider>
+    );
+
+    fireEvent.click(screen.getByTestId('jump-missing-btn'));
+
+    await vi.waitFor(
+      () => {
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[Settings] Setting #nonexistent-target not found in DOM')
+        );
+      },
+      { timeout: 2500 }
+    );
+
+    warnSpy.mockRestore();
   });
 });
 

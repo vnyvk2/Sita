@@ -90,4 +90,36 @@ describe('matchSettings engine', () => {
     // Crossfade title contains fade
     expect(results[0].entry.id).toBe('setting-audio-crossfade');
   });
+
+  it('matches multi-word queries across title and keywords', () => {
+    // "dark night" matches Theme Mode (dark mode in keywords, night in keywords)
+    const results = matchSettings('dark night', sampleCatalog, mockTranslate);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0].entry.id).toBe('setting-appearance-theme-mode');
+  });
+
+  it('normalizes punctuation like dots and hyphens', () => {
+    // Catalog entry with dots or hyphens
+    const testCatalog: SettingCatalogEntry[] = [
+      {
+        id: 'setting-accounts-lastfm',
+        sectionKey: 'accounts',
+        titleKey: 'settingsPage.lastFm',
+        defaultTitle: 'Last.fm Scrobbler',
+        keywords: ['last.fm', 'lastfm', 'scrobble']
+      }
+    ];
+    // User types "last fm" with a space instead of dot
+    const results = matchSettings('last fm', testCatalog, mockTranslate);
+    expect(results.length).toBe(1);
+    expect(results[0].entry.id).toBe('setting-accounts-lastfm');
+  });
+
+  it('guards against single-character substring noise in descriptions', () => {
+    // 'e' appears in almost every description ("Toggle dark mode...", "Smoothly...")
+    const results = matchSettings('e', sampleCatalog, mockTranslate);
+    // Should NOT match descriptions for single character queries; only title words starting with 'e'
+    const matchedDescriptions = results.filter((r) => r.matchedField === 'description');
+    expect(matchedDescriptions).toHaveLength(0);
+  });
 });
