@@ -200,7 +200,7 @@ export const CompactSongRow = memo(
         data-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
-        className={`compact-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[38px] max-h-[38px] min-h-[38px] w-full cursor-pointer items-center border-b text-xs transition-none select-none ${
+        className={`compact-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[38px] max-h-[38px] min-h-[38px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none select-none ${
           isCurrentSong
             ? 'bg-accent/8 dark:bg-accent/12'
             : isAMultipleSelection
@@ -223,7 +223,7 @@ export const CompactSongRow = memo(
         ref={ref}
       >
         {/* Left 28px indicator slot */}
-        <div className="compact-indicator-slot relative -mx-1.5 flex h-[38px] w-[28px] shrink-0 items-center justify-center px-1.5">
+        <div className="compact-indicator-slot relative flex h-[38px] w-[28px] shrink-0 items-center justify-center">
           {isMultipleSelectionEnabled ? (
             <MultipleSelectionCheckbox id={songId} selectionType="songs" className="m-0" />
           ) : isBlacklisted ? (
