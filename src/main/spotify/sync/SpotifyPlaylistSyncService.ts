@@ -589,7 +589,13 @@ export class SpotifyPlaylistSyncService {
         .where(eq(spotifyPlaylistLinks.id, link.id));
       markedAsSyncing = true;
 
-      terminalResult = await this.executeSyncCore(link, strategy, activeClientId, signal);
+      terminalResult = await this.executeSyncCore(
+        link,
+        strategy,
+        activeClientId,
+        accessToken,
+        signal
+      );
     } catch (err: any) {
       terminalResult = {
         status: 'ERROR',
@@ -632,6 +638,7 @@ export class SpotifyPlaylistSyncService {
     link: SpotifyPlaylistLinkDTO,
     strategy: SyncStrategy,
     activeClientId: string,
+    accessToken: string,
     signal?: AbortSignal
   ): Promise<SpotifySyncResult> {
     const playlistId = link.playlistId;
