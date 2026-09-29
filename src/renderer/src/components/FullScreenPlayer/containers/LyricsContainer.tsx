@@ -1,13 +1,15 @@
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import useSkipLyricsLines from '../../../hooks/useSkipLyricsLines';
 import { useLyricsQuery } from '../../../queries/lyrics';
+import FloatingLyricsSnapBackBtn from '../../LyricsPage/FloatingLyricsSnapBackBtn';
 import LyricsMetadata from '../../LyricsPage/LyricsMetadata';
 import { renderLyricsLines } from '../../LyricsPage/lyricsUtils';
 import { useActiveLyricIndex } from '../../LyricsPage/useActiveLyricIndex';
+import { useLyricsScrollSync } from '../../LyricsPage/useLyricsScrollSync';
 
 type Props = {
   isLyricsVisible: boolean;
@@ -26,6 +28,25 @@ const LyricsContainer = (props: Props) => {
   useSkipLyricsLines(lyrics);
 
   const activeLineIndex = useActiveLyricIndex(isLyricsVisible ? lyrics : null);
+  const isSynced = Boolean(lyrics?.lyrics?.isSynced);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const {
+    scrollMode,
+    isAutoScrolling,
+    direction,
+    showSnapBack,
+    handleSnapBack,
+    handleToggleScrollMode
+  } = useLyricsScrollSync({
+    containerRef: scrollContainerRef,
+    activeLineIndex,
+    isSynced,
+    songId: currentSongData.songId,
+    parsedLyrics: lyrics?.lyrics?.parsedLyrics ?? null,
+    offset: lyrics?.lyrics?.offset ?? 0
+  });
 
   useEffect(() => {
     if (isLyricsVisible && lyrics) {
@@ -37,12 +58,13 @@ const LyricsContainer = (props: Props) => {
     return renderLyricsLines(
       lyrics,
       currentSongData.duration,
-      true,
+      isAutoScrolling,
       'full',
       activeLineIndex,
-      abLoop
+      abLoop,
+      false
     );
-  }, [lyrics, currentSongData.duration, activeLineIndex, abLoop]);
+  }, [lyrics, currentSongData.duration, isAutoScrolling, activeLineIndex, abLoop]);
 
   const lyricsSource = useMemo(() => {
     if (lyrics && lyrics?.lyrics) {
@@ -62,11 +84,29 @@ const LyricsContainer = (props: Props) => {
 
   return (
     <div
+      ref={scrollContainerRef}
       className={`mini-player-lyrics-container appear-from-bottom w-ful absolute top-0 flex h-full max-h-screen! w-full max-w-full! flex-col items-start overflow-auto pt-20 pr-[20%] pb-[25%] pl-20 transition-[filter] delay-200 select-none group-focus-within:brightness-50 group-focus-within/fullScreenPlayer:blur-xs group-hover/fullScreenPlayer:blur-xs group-hover/fullScreenPlayer:brightness-50 ${
         !isCurrentSongPlaying ? 'blur-xs brightness-50' : ''
       }`}
       id="miniPlayerLyricsContainer"
     >
+      {isLyricsVisible && lyrics?.lyrics?.isSynced && (
+        <button
+          type="button"
+          onClick={handleToggleScrollMode}
+          aria-pressed={scrollMode === 'auto'}
+          title={
+            scrollMode === 'auto'
+              ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
+              : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
+          }
+          className="absolute top-4 right-4 z-30 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-black/30 text-white shadow-md backdrop-blur-md transition-all hover:bg-black/50"
+        >
+          <span className="material-icons-round text-xl">
+            {scrollMode === 'auto' ? 'flash_off' : 'flash_on'}
+          </span>
+        </button>
+      )}
       {isLyricsVisible && lyricsComponents.length > 0 && lyrics && lyrics.lyrics.isSynced && (
         <>
           {lyricsComponents}
@@ -86,6 +126,15 @@ const LyricsContainer = (props: Props) => {
           <p>{t('lyricsPage.noLyrics')}</p>
           <p className="mt-4 text-base">{t('lyricsPage.noLyricsDescription')}</p>
         </div>
+      )}
+
+      {/* Floating bidirectional snap-back button */}
+      {showSnapBack && direction && (
+        <FloatingLyricsSnapBackBtn
+          direction={direction}
+          onClick={handleSnapBack}
+          className={direction === 'up' ? 'top-24' : 'bottom-8'}
+        />
       )}
     </div>
   );

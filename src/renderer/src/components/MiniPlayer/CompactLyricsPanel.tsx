@@ -67,7 +67,9 @@ const CompactLyricsPanel = (props: Props) => {
     containerRef: scrollContainerRef,
     activeLineIndex: rawActiveIndex,
     isSynced,
-    songId: currentSongData.songId
+    songId: currentSongData.songId,
+    parsedLyrics: lyrics?.lyrics?.parsedLyrics ?? null,
+    offset: lyrics?.lyrics?.offset ?? 0
   });
 
   // Auto-scroll isolated to the lyrics viewport (does NOT scroll parent containers)
@@ -166,6 +168,7 @@ const CompactLyricsPanel = (props: Props) => {
                     if (el) lineRefs.current.set(idx, el);
                     else lineRefs.current.delete(idx);
                   }}
+                  data-line-index={idx}
                   data-active-line={isActive ? 'true' : undefined}
                   onClick={() => handleLineClick(line.start)}
                   className={`max-w-full cursor-pointer px-2 transition-all duration-200 ${

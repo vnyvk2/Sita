@@ -1,20 +1,21 @@
 import Button from '@renderer/components/Button';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
+import FloatingLyricsSnapBackBtn from './FloatingLyricsSnapBackBtn';
 import LyricsAmbientBackground from './LyricsAmbientBackground';
 import LyricsMetadata from './LyricsMetadata';
 import TheatreLyricsPlayerBar from './TheatreLyricsPlayerBar';
+import { useLyricsScrollSync } from './useLyricsScrollSync';
 
 interface TheatreLyricsViewProps {
   lyrics?: SongLyrics | null;
   lyricsComponents: ReactNode[];
   copyright?: string;
-  isAutoScrolling?: boolean;
-  onToggleAutoScrolling: () => void;
+  activeLineIndex: number | null;
   onEditLyrics: () => void;
   onResetLyrics?: () => void;
   onClose: () => void;
@@ -24,8 +25,7 @@ const TheatreLyricsView = ({
   lyrics,
   lyricsComponents,
   copyright,
-  isAutoScrolling = true,
-  onToggleAutoScrolling,
+  activeLineIndex,
   onEditLyrics,
   onResetLyrics,
   onClose
@@ -33,6 +33,25 @@ const TheatreLyricsView = ({
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const { t } = useTranslation();
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const isSynced = Boolean(lyrics?.lyrics?.isSynced);
+
+  const {
+    scrollMode,
+    direction,
+    showSnapBack,
+    handleSnapBack,
+    handleToggleScrollMode
+  } = useLyricsScrollSync({
+    containerRef: scrollContainerRef,
+    activeLineIndex,
+    isSynced,
+    songId: currentSongData.songId,
+    parsedLyrics: lyrics?.lyrics?.parsedLyrics ?? null,
+    offset: lyrics?.lyrics?.offset ?? 0
+  });
 
   // Escape key closes theatre mode
   useEffect(() => {
@@ -90,12 +109,13 @@ const TheatreLyricsView = ({
           {lyrics?.lyrics?.isSynced && (
             <Button
               tooltipLabel={t(
-                `currentQueuePage.${isAutoScrolling ? 'disableAutoScrolling' : 'enableAutoScrolling'}`
+                `currentQueuePage.${scrollMode === 'auto' ? 'disableAutoScrolling' : 'enableAutoScrolling'}`
               )}
-              iconName={isAutoScrolling ? 'flash_off' : 'flash_on'}
+              iconName={scrollMode === 'auto' ? 'flash_off' : 'flash_on'}
               iconClassName="material-icons-round text-xl!"
               className="rounded-full! border-0! bg-black/30 p-2! text-white! shadow-md backdrop-blur-md transition-all hover:bg-black/50"
-              clickHandler={onToggleAutoScrolling}
+              ariaPressed={scrollMode === 'auto'}
+              clickHandler={handleToggleScrollMode}
             />
           )}
 
@@ -120,7 +140,10 @@ const TheatreLyricsView = ({
       </div>
 
       {/* Main Lyrics Stream */}
-      <div className="lyrics-lines-container relative z-10 flex min-h-0 w-full flex-1 scrollbar-gutter-stable flex-col items-center overflow-y-auto px-8 py-[8vh] [overflow-anchor:none]!">
+      <div
+        ref={scrollContainerRef}
+        className="lyrics-lines-container relative z-10 flex min-h-0 w-full flex-1 scrollbar-gutter-stable flex-col items-center overflow-y-auto px-8 py-[8vh] [overflow-anchor:none]!"
+      >
         {lyricsComponents}
         {lyrics && (
           <LyricsMetadata
@@ -131,6 +154,15 @@ const TheatreLyricsView = ({
           />
         )}
       </div>
+
+      {/* Floating bidirectional snap-back button */}
+      {showSnapBack && direction && (
+        <FloatingLyricsSnapBackBtn
+          direction={direction}
+          onClick={handleSnapBack}
+          className={direction === 'up' ? 'top-20' : 'bottom-24'}
+        />
+      )}
 
       {/* Floating Bottom Player Bar */}
       <TheatreLyricsPlayerBar />

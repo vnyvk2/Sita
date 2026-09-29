@@ -187,6 +187,7 @@ const LyricLine = (props: LyricProp) => {
   return (
     <div
       data-lyric-line="true"
+      data-line-index={index}
       data-active-line={isActive ? 'true' : undefined}
       style={{
         animationDelay: `${100 + 20 * (index + 1)}ms`

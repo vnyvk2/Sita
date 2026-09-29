@@ -1,11 +1,13 @@
 import { isLyricsEnhancedSynced } from '@common/isLyricsSynced';
 import Button from '@renderer/components/Button';
+import FloatingLyricsSnapBackBtn from '@renderer/components/LyricsPage/FloatingLyricsSnapBackBtn';
 import LyricsAmbientBackground from '@renderer/components/LyricsPage/LyricsAmbientBackground';
 import LyricsMetadata from '@renderer/components/LyricsPage/LyricsMetadata';
 import { renderLyricsLines } from '@renderer/components/LyricsPage/lyricsUtils';
 import NoLyrics from '@renderer/components/LyricsPage/NoLyrics';
 import TheatreLyricsView from '@renderer/components/LyricsPage/TheatreLyricsView';
 import { useActiveLyricIndex } from '@renderer/components/LyricsPage/useActiveLyricIndex';
+import { useLyricsScrollSync } from '@renderer/components/LyricsPage/useLyricsScrollSync';
 import MainContainer from '@renderer/components/MainContainer';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useNetworkConnectivity from '@renderer/hooks/useNetworkConnectivity';
@@ -36,7 +38,7 @@ function LyricsPage() {
   const abLoop = useStore(store, (state) => state.player.abLoop);
 
   const { t } = useTranslation();
-  const { isAutoScrolling, from } = Route.useSearch();
+  const { from } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const { history } = useRouter();
   const { toggleLyricsDrawer } = useContext(AppUpdateContext);
@@ -138,6 +140,24 @@ function LyricsPage() {
 
   const activeLineIndex = useActiveLyricIndex(lyrics);
 
+  const isSynced = Boolean(lyrics?.lyrics?.isSynced);
+
+  const {
+    scrollMode,
+    isAutoScrolling,
+    direction,
+    showSnapBack,
+    handleSnapBack,
+    handleToggleScrollMode
+  } = useLyricsScrollSync({
+    containerRef: lyricsLinesContainerRef,
+    activeLineIndex,
+    isSynced,
+    songId: currentSongData.songId,
+    parsedLyrics: lyrics?.lyrics?.parsedLyrics ?? null,
+    offset: lyrics?.lyrics?.offset ?? 0
+  });
+
   const lyricsComponents = useMemo(() => {
     return renderLyricsLines(
       lyrics,
@@ -145,7 +165,8 @@ function LyricsPage() {
       isAutoScrolling,
       'normal',
       activeLineIndex,
-      abLoop
+      abLoop,
+      false
     );
   }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex, abLoop]);
 
@@ -369,12 +390,7 @@ function LyricsPage() {
           lyrics={lyrics}
           lyricsComponents={lyricsComponents}
           copyright={copyright}
-          isAutoScrolling={isAutoScrolling}
-          onToggleAutoScrolling={() =>
-            navigate({
-              search: (prev) => ({ ...prev, isAutoScrolling: !isAutoScrolling })
-            })
-          }
+          activeLineIndex={activeLineIndex}
           onEditLyrics={goToLyricsEditor}
           onResetLyrics={() => resetLyrics()}
           onClose={() => setIsTheatreMode(false)}
@@ -417,16 +433,13 @@ function LyricsPage() {
                     <Button
                       key={5}
                       tooltipLabel={t(
-                        `currentQueuePage.${isAutoScrolling ? 'disableAutoScrolling' : 'enableAutoScrolling'}`
+                        `currentQueuePage.${scrollMode === 'auto' ? 'disableAutoScrolling' : 'enableAutoScrolling'}`
                       )}
                       pendingAnimationOnDisabled
                       className="show-online-lyrics-btn text-sm! md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
-                      iconName={isAutoScrolling ? 'flash_off' : 'flash_on'}
-                      clickHandler={() =>
-                        navigate({
-                          search: (prev) => ({ ...prev, isAutoScrolling: !isAutoScrolling })
-                        })
-                      }
+                      iconName={scrollMode === 'auto' ? 'flash_off' : 'flash_on'}
+                      ariaPressed={scrollMode === 'auto'}
+                      clickHandler={handleToggleScrollMode}
                     />
                   )}
                   {/* {lyrics && !lyrics.lyrics.isTranslated && (
@@ -600,6 +613,14 @@ function LyricsPage() {
                   isTranslated={lyrics.lyrics.isTranslated}
                 />
               </div>
+              {/* Floating bidirectional snap-back button */}
+              {showSnapBack && direction && (
+                <FloatingLyricsSnapBackBtn
+                  direction={direction}
+                  onClick={handleSnapBack}
+                  className={direction === 'up' ? 'top-16' : 'bottom-6'}
+                />
+              )}
             </>
           ) : (
             <NoLyrics

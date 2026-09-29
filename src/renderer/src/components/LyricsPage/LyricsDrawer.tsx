@@ -53,7 +53,9 @@ const LyricsDrawer = () => {
     containerRef: scrollContainerRef,
     activeLineIndex,
     isSynced,
-    songId: currentSongData.songId
+    songId: currentSongData.songId,
+    parsedLyrics: lyrics?.lyrics?.parsedLyrics ?? null,
+    offset: lyrics?.lyrics?.offset ?? 0
   });
 
   const lyricsComponents = useMemo(() => {

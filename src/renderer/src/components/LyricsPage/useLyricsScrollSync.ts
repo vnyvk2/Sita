@@ -10,6 +10,15 @@ interface UseLyricsScrollSyncProps {
   activeLineIndex: number | null;
   isSynced: boolean;
   songId?: number;
+  /**
+   * Parsed lyric lines plus sync offset for gap tracking. When playback sits
+   * in an instrumental gap (activeLineIndex === null), the snap target falls
+   * back to the most recent past line derived from these timestamps instead
+   * of disappearing. Before the first timestamp there is no past line, so the
+   * snap affordance correctly stays hidden.
+   */
+  parsedLyrics?: ReadonlyArray<{ readonly start?: number | null }> | null;
+  offset?: number;
 }
 
 // Scroll events arriving inside this window after a programmatic scroll are
@@ -20,7 +29,9 @@ export function useLyricsScrollSync({
   containerRef,
   activeLineIndex,
   isSynced,
-  songId
+  songId,
+  parsedLyrics,
+  offset = 0
 }: UseLyricsScrollSyncProps) {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const scrollMode = preferences?.lyricsScrollMode ?? 'auto';
@@ -37,15 +48,62 @@ export function useLyricsScrollSync({
     lastProgrammaticScrollRef.current = performance.now();
   }, []);
 
-  // Check active line position relative to container
+  // Gap tracking: most recent past line index, updated only on timestamp
+  // boundary crossings (no re-render per position tick). Derived from the live
+  // playback position rather than remembered, so seeks and song changes cannot
+  // leave it stale.
+  const [gapTargetIndex, setGapTargetIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setGapTargetIndex(null);
+    if (!isSynced || !parsedLyrics || parsedLyrics.length === 0) return undefined;
+
+    const handlePosition = (e: Event) => {
+      if (!('detail' in e) || typeof e.detail !== 'number') return;
+      const pos = e.detail;
+      let found: number | null = null;
+      for (let i = 0; i < parsedLyrics.length; i += 1) {
+        if ((parsedLyrics[i]?.start || 0) + offset <= pos) {
+          found = i;
+        } else {
+          break;
+        }
+      }
+      setGapTargetIndex((prev) => (prev !== found ? found : prev));
+    };
+
+    document.addEventListener('player/positionChange', handlePosition);
+    return () => {
+      document.removeEventListener('player/positionChange', handlePosition);
+    };
+  }, [isSynced, parsedLyrics, offset]);
+
+  // Effective snap/scroll target: live line when singing, most recent past
+  // line during instrumental gaps, null before the first timestamp.
+  const snapTargetIndex = activeLineIndex ?? gapTargetIndex;
+
+  // Resolves the target row element: live highlight first, gap fallback by index.
+  const getTargetEl = useCallback((): HTMLElement | null => {
+    const container = containerRef.current;
+    if (!container) return null;
+    const activeEl = container.querySelector('[data-active-line="true"]') as HTMLElement | null;
+    if (activeEl) return activeEl;
+    if (snapTargetIndex === null || snapTargetIndex === undefined) return null;
+    return container.querySelector(
+      `[data-line-index="${snapTargetIndex}"]`
+    ) as HTMLElement | null;
+  }, [containerRef, snapTargetIndex]);
+
+  // Check target line position relative to container. During gaps the target
+  // is the most recent past line; before the first timestamp there is none.
   const checkVisibility = useCallback(() => {
     const container = containerRef.current;
-    if (!container || activeLineIndex === null || !isSynced) {
+    if (!container || snapTargetIndex === null || !isSynced) {
       setDirection(null);
       return;
     }
 
-    const activeEl = container.querySelector('[data-active-line="true"]') as HTMLElement | null;
+    const activeEl = getTargetEl();
     if (!activeEl) {
       setDirection(null);
       return;
@@ -65,14 +123,14 @@ export function useLyricsScrollSync({
     } else {
       setDirection(null);
     }
-  }, [activeLineIndex, isSynced, containerRef]);
+  }, [snapTargetIndex, isSynced, containerRef, getTargetEl]);
 
-  // Snap-back handler: smoothly scrolls container to active line
+  // Snap-back handler: smoothly scrolls container to target line
   const handleSnapBack = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const activeEl = container.querySelector('[data-active-line="true"]') as HTMLElement | null;
+    const activeEl = getTargetEl();
     if (activeEl) {
       const containerRect = container.getBoundingClientRect();
       const activeRect = activeEl.getBoundingClientRect();
@@ -95,7 +153,7 @@ export function useLyricsScrollSync({
 
     setIsUserBrowsing(false);
     setDirection(null);
-  }, [containerRef, markProgrammaticScroll]);
+  }, [containerRef, markProgrammaticScroll, getTargetEl]);
 
   // Shared entry into browsing state with auto-mode resume arming.
   const enterBrowsing = useCallback(() => {
@@ -191,7 +249,7 @@ export function useLyricsScrollSync({
     };
   }, [checkVisibility, enterBrowsing, isSynced, isUserBrowsing, scrollMode, containerRef]);
 
-  // Re-check after active line changes
+  // Re-check after target line changes
   useEffect(() => {
     const timer = setTimeout(() => {
       if (scrollMode === 'manual' || isUserBrowsing) {
@@ -199,7 +257,7 @@ export function useLyricsScrollSync({
       }
     }, 80);
     return () => clearTimeout(timer);
-  }, [activeLineIndex, checkVisibility, isUserBrowsing, scrollMode]);
+  }, [snapTargetIndex, checkVisibility, isUserBrowsing, scrollMode]);
 
   // Reset browsing state on song change and rewind to the top so the new
   // track doesn't open mid-list at the previous song's scroll offset.
@@ -207,6 +265,7 @@ export function useLyricsScrollSync({
     if (songId !== prevSongIdRef.current) {
       setIsUserBrowsing(false);
       setDirection(null);
+      setGapTargetIndex(null);
       prevSongIdRef.current = songId;
       if (userScrollTimeoutRef.current) {
         clearTimeout(userScrollTimeoutRef.current);
@@ -238,14 +297,16 @@ export function useLyricsScrollSync({
   // In manual mode: auto-scroll is never active.
   const isAutoScrolling = scrollMode === 'auto' && !isUserBrowsing;
 
-  // Container-owned auto-follow. Centers the active line with a container-local
+  // Container-owned auto-follow. Centers the target line with a container-local
   // scrollTo so ancestor scrollers are never disturbed (Element.scrollIntoView
-  // would bubble through every scrollable parent up to the document).
+  // would bubble through every scrollable parent up to the document). During
+  // gaps the target is the most recent past line; an already-centered target
+  // resolves to a no-op scroll.
   useEffect(() => {
-    if (!isAutoScrolling || !isSynced || activeLineIndex === null) return;
+    if (!isAutoScrolling || !isSynced || snapTargetIndex === null) return;
     const container = containerRef.current;
     if (!container) return;
-    const activeEl = container.querySelector('[data-active-line="true"]') as HTMLElement | null;
+    const activeEl = getTargetEl();
     if (!activeEl) return;
 
     const containerRect = container.getBoundingClientRect();
@@ -265,10 +326,12 @@ export function useLyricsScrollSync({
     } else {
       container.scrollTop = Math.max(0, targetScrollTop);
     }
-  }, [activeLineIndex, isAutoScrolling, isSynced, containerRef, markProgrammaticScroll]);
+  }, [snapTargetIndex, isAutoScrolling, isSynced, containerRef, markProgrammaticScroll, getTargetEl]);
 
-  // Show snap-back button when active line is off-screen (in manual mode OR when user scrolled away in auto mode)
-  const showSnapBack = isSynced && direction !== null && activeLineIndex !== null;
+  // Show snap-back button when the target line is off-screen (in manual mode
+  // OR when user scrolled away in auto mode). Gated by visibility, so a user
+  // parked on the last sung line during a solo sees nothing — quiet by default.
+  const showSnapBack = isSynced && direction !== null && snapTargetIndex !== null;
 
   return {
     scrollMode,
@@ -277,7 +340,8 @@ export function useLyricsScrollSync({
     showSnapBack,
     handleSnapBack,
     handleToggleScrollMode,
-    markProgrammaticScroll
+    markProgrammaticScroll,
+    snapTargetIndex
   };
 }
 
