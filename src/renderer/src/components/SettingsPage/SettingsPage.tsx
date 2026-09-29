@@ -51,8 +51,10 @@ const SettingsHeader = () => {
   };
 
   return (
-    <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-1 mb-4 flex flex-wrap items-center justify-between gap-4 text-3xl font-medium">
-      <span>{t('settingsPage.settings')}</span>
+    <div className="title-container mt-1 mb-4 flex flex-wrap items-center justify-between gap-4">
+      <span className="text-font-color-highlight dark:text-dark-font-color-highlight text-3xl font-medium">
+        {t('settingsPage.settings')}
+      </span>
       <div className="flex items-center gap-3">
         <SettingsSearchInput />
         {collapseContext && (

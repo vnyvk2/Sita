@@ -175,7 +175,10 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
       : undefined;
 
   return (
-    <div ref={containerRef} className={`relative flex items-center ${className}`}>
+    <div
+      ref={containerRef}
+      className={`relative flex items-center text-sm font-normal text-font-color-black dark:text-font-color-white ${className}`}
+    >
       {/* Accessible Combobox Input */}
       <div className="relative flex items-center">
         <span className="material-icons-round text-font-color-dim dark:text-dark-font-color-dim pointer-events-none absolute left-3 text-lg">
@@ -233,7 +236,7 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
 
       {/* Dropdown Results Listbox */}
       {showDropdown && (
-        <div className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 animate-in fade-in slide-in-from-top-2 absolute top-full right-0 z-50 mt-2 max-h-96 w-96 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border shadow-xl [scrollbar-gutter:stable]">
+        <div className="bg-background-color-1 dark:bg-dark-background-color-1 border-background-color-2 dark:border-dark-background-color-2 animate-in fade-in slide-in-from-top-2 absolute top-full right-0 z-50 mt-2 max-h-96 w-96 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border text-sm font-normal text-font-color-black shadow-xl [scrollbar-gutter:stable] dark:text-font-color-white">
           {hasResults ? (
             <ul
               ref={listboxRef}
@@ -280,7 +283,7 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
                     </div>
 
                     {/* Setting Title */}
-                    <span className="mt-1 font-medium leading-tight">
+                    <span className="mt-1 text-sm font-medium leading-snug text-font-color-black dark:text-font-color-white">
                       <HighlightedText text={result.title} highlight={result.highlightQuery} />
                     </span>
 
