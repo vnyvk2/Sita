@@ -103,6 +103,7 @@
     "build:flatpak": "npm run fetch:binaries && npm run build && electron-builder --linux --dir --publish=never",
     "db:migrate": "drizzle-kit migrate",
     "fetch:binaries": "node scripts/fetch-binaries.mjs",
+    "build:engine": "cargo build --release --bin engine-cli && node scripts/copy-engine-binary.mjs",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:pull": "drizzle-kit pull",

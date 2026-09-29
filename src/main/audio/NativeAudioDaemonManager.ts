@@ -55,6 +55,7 @@ export class NativeAudioDaemonManager {
 
     const candidates = [
       app?.isPackaged ? path.join(process.resourcesPath, 'bin', binaryName) : null,
+      path.join(process.cwd(), 'resources', 'bin', binaryName),
       app?.getAppPath ? path.join(app.getAppPath(), 'target', 'release', binaryName) : null,
       app?.getAppPath ? path.join(app.getAppPath(), 'target', 'debug', binaryName) : null,
       path.join(process.cwd(), 'target', 'release', binaryName),
