@@ -80,7 +80,7 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
                 <button
                   type="button"
                   onClick={handleCloseClick}
-                  title="Close Panel (Ctrl+W)"
+                  title="Close Panel"
                   aria-label="Close Panel"
                   className="text-font-color-dimmed flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-900/40 dark:hover:text-rose-400"
                 >

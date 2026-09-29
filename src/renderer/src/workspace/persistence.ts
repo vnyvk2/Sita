@@ -1,9 +1,10 @@
-import { assertWorkspaceInvariants, normalizeWeights } from './ops';
+import { assertWorkspaceInvariants, normalizeWeights, pruneOrphanPanels } from './ops';
 import { DEFAULT_PRESET } from './presets/default';
 import { MUSICBEE_PRESET } from './presets/musicbee';
 import type { LayoutNode, Workspace, WorkspaceState } from './types';
 
 export const WORKSPACE_STORAGE_KEY = 'nora.workspaces.v1';
+export const WORKSPACE_BACKUP_STORAGE_KEY = 'nora.workspaces.v1.bak';
 export const CURRENT_SCHEMA_VERSION = 2;
 
 export function getInitialWorkspaceState(): WorkspaceState {
@@ -17,34 +18,31 @@ export function getInitialWorkspaceState(): WorkspaceState {
 }
 
 /**
- * Traverses layout tree and repairs split nodes with 0, missing, or drifting weights
- * before invariant checking.
+ * Traverses layout tree and repairs split nodes with 0, missing, or drifting weights before
+ * invariant checking.
  */
 function repairSplitWeights(node: LayoutNode): void {
   if (node.kind === 'split') {
     if (Array.isArray(node.children)) {
       const childCount = node.children.length;
-      if (childCount >= 2 && childCount <= 4) {
-        const needsRepair =
-          !Array.isArray(node.weights) ||
-          node.weights.length !== childCount ||
-          node.weights.some((w) => typeof w !== 'number' || !Number.isFinite(w) || w <= 0) ||
-          Math.abs(node.weights.reduce((sum, w) => sum + w, 0) - 1.0) > 0.015;
+      const weights = node.weights ?? [];
 
-        if (needsRepair) {
-          const rawWeights =
-            Array.isArray(node.weights) && node.weights.length === childCount
-              ? node.weights.map((w) =>
-                  typeof w === 'number' && Number.isFinite(w) && w > 0 ? w : 0.001
-                )
-              : new Array(childCount).fill(1 / childCount);
-          node.weights = normalizeWeights(rawWeights);
-        }
+      const hasInvalid =
+        weights.length !== childCount ||
+        weights.some((w) => typeof w !== 'number' || !Number.isFinite(w) || w <= 0);
+
+      if (hasInvalid) {
+        node.weights = normalizeWeights(Array.from({ length: childCount }, () => 1));
+      } else {
+        node.weights = normalizeWeights(weights);
       }
+
       for (const child of node.children) {
         repairSplitWeights(child);
       }
     }
+  } else if (node.kind === 'tabs') {
+    // Tabs do not have split weights
   }
 }
 
@@ -66,9 +64,12 @@ export function sanitizeWorkspace(untrusted: unknown): Workspace | null {
     // Self-heal any zero or drifted split weights before running strict invariant assertion
     repairSplitWeights(ws.root as LayoutNode);
 
+    // Prune orphan panels to ensure recoverable state is not rejected on reload (PR-05)
+    const prunedWs = pruneOrphanPanels(ws as Workspace);
+
     // Assert all invariants
-    assertWorkspaceInvariants(ws as Workspace);
-    return ws as Workspace;
+    assertWorkspaceInvariants(prunedWs);
+    return prunedWs;
   } catch (err) {
     console.warn(
       '[WorkspacePersistence] Workspace validation failed, falling back to default:',
@@ -85,12 +86,31 @@ export function loadWorkspaceState(): WorkspaceState {
   }
 
   try {
-    const raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    let raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    if (!raw) {
+      raw = window.localStorage.getItem(WORKSPACE_BACKUP_STORAGE_KEY);
+    }
+
     if (!raw) {
       return getInitialWorkspaceState();
     }
 
-    const parsed = JSON.parse(raw) as Partial<WorkspaceState>;
+    let parsed: Partial<WorkspaceState> | null = null;
+    try {
+      parsed = JSON.parse(raw) as Partial<WorkspaceState>;
+    } catch (parseErr) {
+      console.warn(
+        '[WorkspacePersistence] Primary storage JSON corrupted, attempting backup recovery (PR-03):',
+        parseErr
+      );
+      const backupRaw = window.localStorage.getItem(WORKSPACE_BACKUP_STORAGE_KEY);
+      if (backupRaw) {
+        parsed = JSON.parse(backupRaw) as Partial<WorkspaceState>;
+      } else {
+        throw parseErr;
+      }
+    }
+
     if (!parsed || !parsed.workspaces || typeof parsed.workspaces !== 'object') {
       return getInitialWorkspaceState();
     }
@@ -101,7 +121,10 @@ export function loadWorkspaceState(): WorkspaceState {
       if (sanitized) {
         if (id === DEFAULT_PRESET.id && (sanitized.schemaVersion ?? 1) < CURRENT_SCHEMA_VERSION) {
           sanitizedWorkspaces[id] = DEFAULT_PRESET;
-        } else if (id === MUSICBEE_PRESET.id && (sanitized.schemaVersion ?? 1) < CURRENT_SCHEMA_VERSION) {
+        } else if (
+          id === MUSICBEE_PRESET.id &&
+          (sanitized.schemaVersion ?? 1) < CURRENT_SCHEMA_VERSION
+        ) {
           sanitizedWorkspaces[id] = MUSICBEE_PRESET;
         } else {
           sanitizedWorkspaces[id] = sanitized;
@@ -142,7 +165,9 @@ export function saveWorkspaceStateDebounced(state: WorkspaceState, delay = 300):
 
   debounceTimer = setTimeout(() => {
     try {
-      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(state));
+      const serialized = JSON.stringify(state);
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, serialized);
+      window.localStorage.setItem(WORKSPACE_BACKUP_STORAGE_KEY, serialized);
     } catch (err) {
       console.error('[WorkspacePersistence] Failed to persist workspace state:', err);
     }
@@ -159,7 +184,9 @@ export function saveWorkspaceStateImmediate(state: WorkspaceState): void {
   }
 
   try {
-    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(state));
+    const serialized = JSON.stringify(state);
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, serialized);
+    window.localStorage.setItem(WORKSPACE_BACKUP_STORAGE_KEY, serialized);
   } catch (err) {
     console.error('[WorkspacePersistence] Failed to persist workspace state immediately:', err);
   }

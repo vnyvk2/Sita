@@ -107,6 +107,21 @@ export const TabGroup: FC<TabGroupProps> = memo(({ node }) => {
       <div
         role="tablist"
         aria-label="Workspace Tabs"
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            const currentIndex = node.tabs.indexOf(node.active);
+            if (currentIndex === -1) return;
+            const nextIndex =
+              e.key === 'ArrowLeft'
+                ? (currentIndex - 1 + node.tabs.length) % node.tabs.length
+                : (currentIndex + 1) % node.tabs.length;
+            const nextPanelId = node.tabs[nextIndex];
+            if (nextPanelId) {
+              handleTabClick(nextPanelId);
+            }
+          }
+        }}
         className="tab-strip bg-background-color-2/50 dark:bg-dark-background-color-2/50 text-font-color-black dark:text-font-color-white flex h-9 shrink-0 items-center gap-1 overflow-x-auto overflow-y-hidden border-b border-stone-200/60 px-2 select-none dark:border-stone-800/60"
       >
         {node.tabs.map((panelId) => {

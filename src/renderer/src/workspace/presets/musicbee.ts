@@ -4,6 +4,7 @@ export const MUSICBEE_PRESET: Workspace = {
   id: 'preset-musicbee',
   name: 'MusicBee',
   schemaVersion: 2,
+  sourcePresetId: 'preset-musicbee',
   frame: {
     playerBar: 'bottom',
     playerBarCompact: false

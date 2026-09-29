@@ -576,7 +576,9 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
         at: { k: 'split-into', targetPanelId: 'p_main_mb', axis: 'x', before: false }
       });
       expect(() => assertWorkspaceInvariants(ws)).not.toThrow();
-      const visualizerCount = Object.values(ws.panels).filter((p) => p.type === 'visualizer').length;
+      const visualizerCount = Object.values(ws.panels).filter(
+        (p) => p.type === 'visualizer'
+      ).length;
       expect(visualizerCount).toBe(2);
     });
 
@@ -869,4 +871,3 @@ describe('Workspace System - Phase 0 Invariants and Operations', () => {
     });
   });
 });
-

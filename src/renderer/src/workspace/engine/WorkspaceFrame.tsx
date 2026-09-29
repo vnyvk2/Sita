@@ -33,7 +33,7 @@ export const WorkspaceFrame: FC = memo(() => {
               onClick={() => workspaceActions.setSidebarMode('expanded')}
               title="Expand Sidebar (Click to show)"
               aria-label="Expand Sidebar"
-              className="group absolute top-1/2 left-0 z-40 flex -translate-y-1/2 cursor-pointer items-center gap-1 rounded-r-xl border border-l-0 border-accent/60 bg-background-color-1/95 py-3.5 pr-2.5 pl-1.5 text-accent shadow-2xl backdrop-blur-md transition-all hover:bg-accent hover:text-white dark:border-accent/60 dark:bg-dark-background-color-1/95"
+              className="group border-accent/60 bg-background-color-1/95 text-accent hover:bg-accent dark:border-accent/60 dark:bg-dark-background-color-1/95 absolute top-1/2 left-0 z-40 flex -translate-y-1/2 cursor-pointer items-center gap-1 rounded-r-xl border border-l-0 py-3.5 pr-2.5 pl-1.5 shadow-2xl backdrop-blur-md transition-all hover:text-white"
             >
               <span className="material-symbols-rounded text-lg transition-transform group-hover:scale-125">
                 chevron_right

@@ -4,6 +4,7 @@ export const DEFAULT_PRESET: Workspace = {
   id: 'preset-default',
   name: 'Default',
   schemaVersion: 2,
+  sourcePresetId: 'preset-default',
   frame: {
     playerBar: 'bottom',
     playerBarCompact: false

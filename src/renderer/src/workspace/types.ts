@@ -55,6 +55,7 @@ export interface Workspace {
   root: LayoutNode;
   panels: Record<PanelInstanceId, PanelInstance>;
   frame: WorkspaceFrameConfig;
+  sourcePresetId?: string;
 }
 
 export interface WorkspaceState {

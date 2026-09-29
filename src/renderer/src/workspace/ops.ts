@@ -199,10 +199,7 @@ export function normalizeWeights(weights: number[]): number[] {
         maxIdx = i;
       }
     }
-    rounded[maxIdx] = Math.max(
-      MIN_WEIGHT,
-      Math.round((rounded[maxIdx] + diff) * 10000) / 10000
-    );
+    rounded[maxIdx] = Math.max(MIN_WEIGHT, Math.round((rounded[maxIdx] + diff) * 10000) / 10000);
   }
 
   // Defensive sanity check: guarantee no weight is non-positive
@@ -258,7 +255,10 @@ export function findTabGroupNode(root: LayoutNode, tabsId: string): TabGroupNode
   return null;
 }
 
-export function findTabGroupContainingPanel(root: LayoutNode, panelId: string): TabGroupNode | null {
+export function findTabGroupContainingPanel(
+  root: LayoutNode,
+  panelId: string
+): TabGroupNode | null {
   if (root.kind === 'tabs') {
     if (root.tabs.includes(panelId)) return root;
   } else if (root.kind === 'split') {
@@ -290,9 +290,7 @@ export function findRightsideTabGroup(ws: Workspace): TabGroupNode | null {
   if (!routerPanel) return null;
 
   if (ws.root.kind === 'split' && ws.root.axis === 'x') {
-    const routerIdx = ws.root.children.findIndex((c) =>
-      collectAllPanelIds(c).has(routerPanel.id)
-    );
+    const routerIdx = ws.root.children.findIndex((c) => collectAllPanelIds(c).has(routerPanel.id));
     if (routerIdx !== -1) {
       for (let i = routerIdx + 1; i < ws.root.children.length; i++) {
         const tgs = findAllTabGroups(ws.root.children[i]);
@@ -323,9 +321,7 @@ export function findRightsideSecondaryPanel(ws: Workspace): PanelInstance | null
   if (!routerPanel) return null;
 
   if (ws.root.kind === 'split' && ws.root.axis === 'x') {
-    const routerIdx = ws.root.children.findIndex((c) =>
-      collectAllPanelIds(c).has(routerPanel.id)
-    );
+    const routerIdx = ws.root.children.findIndex((c) => collectAllPanelIds(c).has(routerPanel.id));
     if (routerIdx !== -1) {
       for (let i = routerIdx + 1; i < ws.root.children.length; i++) {
         const child = ws.root.children[i];
@@ -349,11 +345,11 @@ export function findRightsideSecondaryPanel(ws: Workspace): PanelInstance | null
 }
 
 /**
- * Normalizes and guards drop targets to uphold structural invariants:
- * - router-view must NEVER be converted into a TabGroup or hidden. If target is tab-into router-view,
- *   it redirects to a right-side TabGroup, a right-side secondary panel, or a split-into on the right.
- * - Left-side singleton panels (playlists, navigation) must NEVER be converted into a TabGroup
- *   by an incoming tool widget.
+ * Normalizes and guards drop targets to uphold structural invariants: - router-view must NEVER be
+ * converted into a TabGroup or hidden. If target is tab-into router-view, it redirects to a
+ * right-side TabGroup, a right-side secondary panel, or a split-into on the right. - Left-side
+ * singleton panels (playlists, navigation) must NEVER be converted into a TabGroup by an incoming
+ * tool widget.
  */
 export function resolveSafeDropTarget(
   ws: Workspace,
@@ -368,7 +364,11 @@ export function resolveSafeDropTarget(
         return { ...at, tabsId: rightTg.id };
       }
       const rightSecondary = findRightsideSecondaryPanel(ws);
-      if (rightSecondary && rightSecondary.id !== movingPanelId && rightSecondary.id !== targetPanel.id) {
+      if (
+        rightSecondary &&
+        rightSecondary.id !== movingPanelId &&
+        rightSecondary.id !== targetPanel.id
+      ) {
         return { ...at, tabsId: rightSecondary.id };
       }
       return {
@@ -1261,6 +1261,16 @@ export function applyLayoutOp(ws: Workspace, op: LayoutOp): Workspace {
 
     case 'tabs.extract': {
       // Extracts a tab from TabGroup into a SplitNode along axis
+      const targetDepth = getNodeDepth(
+        ws.root,
+        (n) => n.kind === 'tabs' && (n as TabGroupNode).tabs.includes(op.panelId)
+      );
+      if (targetDepth >= 3) {
+        // If the TabGroup is already at max depth (depth >= 3), wrapping it in a SplitNode
+        // would exceed the invariant max depth of 3. Return unchanged to reject invalid op gracefully (CF-01).
+        return ws;
+      }
+
       nextWs = {
         ...ws,
         root: updateNodeRecursively(

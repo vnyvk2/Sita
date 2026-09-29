@@ -341,9 +341,13 @@ describe('WorkspaceToolbar', () => {
       expect(screen.getByTitle('Workspace Layout: Studio Pro (Copy)')).toBeDefined();
 
       // Test Delete on the duplicated layout
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       fireEvent.click(screen.getByTitle('Workspace Layout: Studio Pro (Copy)'));
       const deleteBtn = screen.getByLabelText('Delete Studio Pro (Copy)');
       fireEvent.click(deleteBtn);
+      expect(confirmSpy).toHaveBeenCalledWith(
+        'Are you sure you want to delete "Studio Pro (Copy)"?'
+      );
 
       // Verify duplicated layout was deleted and active switched back
       expect(workspaceStore.state.workspaces[activeWs.id]).toBeUndefined();

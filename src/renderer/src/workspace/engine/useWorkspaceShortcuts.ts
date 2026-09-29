@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { dndStore, workspaceActions } from '../store';
+import { dndStore, workspaceActions, workspaceStore } from '../store';
 
 export function useWorkspaceShortcuts(): void {
   useEffect(() => {
@@ -14,12 +14,7 @@ export function useWorkspaceShortcuts(): void {
           target.getAttribute?.('contenteditable') === 'true' ||
           target.getAttribute?.('contenteditable') === '' ||
           Boolean(target.closest?.('[contenteditable="true"], [contenteditable=""]'));
-        if (
-          tagName === 'input' ||
-          tagName === 'textarea' ||
-          tagName === 'select' ||
-          isEditable
-        ) {
+        if (tagName === 'input' || tagName === 'textarea' || tagName === 'select' || isEditable) {
           return;
         }
       }
@@ -35,6 +30,31 @@ export function useWorkspaceShortcuts(): void {
         }
         if (isSaveLayoutModalOpen) {
           workspaceActions.closeSaveLayoutModal();
+        }
+        return;
+      }
+
+      // CF-05: Toggle maximize panel shortcut (Ctrl+Alt+M or Cmd+Alt+M)
+      if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'm' || e.key === 'M')) {
+        e.preventDefault();
+        const { maximizedPanelId } = dndStore.state;
+        if (maximizedPanelId) {
+          workspaceActions.setMaximizedPanel(null);
+        } else {
+          const focusedPanelEl = (document.activeElement as HTMLElement | null)?.closest(
+            '[data-panel-id]'
+          );
+          const focusedPanelId = focusedPanelEl?.getAttribute('data-panel-id');
+          if (focusedPanelId) {
+            workspaceActions.toggleMaximizePanel(focusedPanelId);
+          } else {
+            const activeWs = workspaceStore.state.workspaces[workspaceStore.state.active];
+            const routerPanel =
+              activeWs && Object.values(activeWs.panels).find((p) => p.type === 'router-view');
+            if (routerPanel) {
+              workspaceActions.toggleMaximizePanel(routerPanel.id);
+            }
+          }
         }
       }
     };

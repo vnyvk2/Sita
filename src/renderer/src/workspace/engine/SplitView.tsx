@@ -155,6 +155,9 @@ export const SplitView: FC<SplitViewProps> = memo(({ node }) => {
             {/* Divider between children */}
             {index < node.children.length - 1 && (
               <div
+                role="separator"
+                aria-orientation={isHorizontal ? 'vertical' : 'horizontal'}
+                tabIndex={0}
                 onPointerDown={(e) => handleDividerPointerDown(index, e)}
                 title="Drag to resize split"
                 className={`split-divider group relative z-30 shrink-0 touch-none select-none ${

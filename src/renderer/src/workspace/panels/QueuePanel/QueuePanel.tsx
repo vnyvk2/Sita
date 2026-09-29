@@ -4,15 +4,7 @@ import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import {
-  memo,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  type FC,
-  type MouseEvent
-} from 'react';
+import { memo, useCallback, useContext, useMemo, useRef, type FC, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Virtuoso } from 'react-virtuoso';
 
@@ -167,7 +159,7 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
       </div>
 
       {/* Song list */}
-      <div className="flex-1 min-h-0 overflow-hidden p-1">
+      <div className="min-h-0 flex-1 overflow-hidden p-1">
         {songIds.length === 0 ? (
           <div className="text-font-color-dimmed flex h-full w-full flex-col items-center justify-center p-6 text-center">
             <span className="material-symbols-rounded mb-2 text-3xl opacity-60">queue_music</span>

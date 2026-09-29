@@ -68,12 +68,8 @@ export const CompactSongRow = memo(
     const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
       useSongSelection(songId);
 
-    const {
-      playSong,
-      toggleIsFavorite,
-      toggleMultipleSelections,
-      updateMultipleSelections
-    } = useContext(AppUpdateContext);
+    const { playSong, toggleIsFavorite, toggleMultipleSelections, updateMultipleSelections } =
+      useContext(AppUpdateContext);
     const { t } = useTranslation();
 
     const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
@@ -146,28 +142,27 @@ export const CompactSongRow = memo(
     }, [isAFavorite, isCurrentSong, songId, toggleIsFavorite, triggerBurst]);
 
     // Shared context menu hook delivering complete multi-selection parity with StandardSongRow
-    const { handleContextMenu, handleMoreOptionsClick } =
-      useSongContextMenu({
-        songId,
-        title,
-        artists,
-        album,
-        duration,
-        year,
-        path,
-        isBlacklisted,
-        genres,
-        discNo,
-        trackNo,
-        isAFavorite,
-        isCurrentSong,
-        isAMultipleSelection,
-        isMultipleSelectionEnabled,
-        additionalContextMenuItems,
-        handlePlayBtnClick,
-        toggleSingleSongFavorite,
-        isCompact: true
-      });
+    const { handleContextMenu, handleMoreOptionsClick } = useSongContextMenu({
+      songId,
+      title,
+      artists,
+      album,
+      duration,
+      year,
+      path,
+      isBlacklisted,
+      genres,
+      discNo,
+      trackNo,
+      isAFavorite,
+      isCurrentSong,
+      isAMultipleSelection,
+      isMultipleSelectionEnabled,
+      additionalContextMenuItems,
+      handlePlayBtnClick,
+      toggleSingleSongFavorite,
+      isCompact: true
+    });
 
     // Duration formatting
     const { minutes, seconds } = useMemo(() => {
@@ -205,13 +200,13 @@ export const CompactSongRow = memo(
         data-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
-        className={`compact-song-row group relative flex h-[38px] max-h-[38px] min-h-[38px] w-full items-center select-none text-xs transition-none border-b border-background-color-2/30 dark:border-dark-background-color-2/30 cursor-pointer ${
+        className={`compact-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[38px] max-h-[38px] min-h-[38px] w-full cursor-pointer items-center border-b text-xs transition-none select-none ${
           isCurrentSong
             ? 'bg-accent/8 dark:bg-accent/12'
             : isAMultipleSelection
               ? 'bg-accent/15 dark:bg-accent/20'
               : 'hover:bg-background-color-2/60 dark:hover:bg-dark-background-color-2/40'
-        } ${isDragging ? 'shadow-lg opacity-85 z-20' : ''} ${className}`}
+        } ${isDragging ? 'z-20 opacity-85 shadow-lg' : ''} ${className}`}
         onContextMenu={handleContextMenu}
         onClick={(e) => {
           e.preventDefault();
@@ -228,12 +223,12 @@ export const CompactSongRow = memo(
         ref={ref}
       >
         {/* Left 28px indicator slot */}
-        <div className="compact-indicator-slot relative flex h-[38px] w-[28px] shrink-0 items-center justify-center px-1.5 -mx-1.5">
+        <div className="compact-indicator-slot relative -mx-1.5 flex h-[38px] w-[28px] shrink-0 items-center justify-center px-1.5">
           {isMultipleSelectionEnabled ? (
             <MultipleSelectionCheckbox id={songId} selectionType="songs" className="m-0" />
           ) : isBlacklisted ? (
             <span
-              className="material-icons-round text-base opacity-60 text-font-color-dimmed"
+              className="material-icons-round text-font-color-dimmed text-base opacity-60"
               title={t('notifications.songBlacklisted', { title })}
             >
               block
@@ -247,7 +242,7 @@ export const CompactSongRow = memo(
               <button
                 type="button"
                 onClick={handlePlayBtnClick}
-                className="hidden group-hover:flex items-center justify-center text-accent hover:scale-110 transition-transform cursor-pointer"
+                className="text-accent hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110"
                 title={isSongPlaying ? t('common.pause') : t('common.play')}
               >
                 <span className="material-icons-round text-base leading-none">
@@ -259,7 +254,7 @@ export const CompactSongRow = memo(
             <button
               type="button"
               onClick={handlePlayBtnClick}
-              className="hidden group-hover:flex items-center justify-center text-font-color-black dark:text-font-color-white hover:scale-110 transition-transform cursor-pointer"
+              className="text-font-color-black dark:text-font-color-white hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110"
               title={t('common.play')}
             >
               <span className="material-icons-round text-base leading-none">play_arrow</span>
@@ -268,7 +263,7 @@ export const CompactSongRow = memo(
         </div>
 
         {/* Title column */}
-        <div className="flex flex-1 min-w-0 items-center pl-3 pr-2">
+        <div className="flex min-w-0 flex-1 items-center pr-2 pl-3">
           <NavLink
             to="/main-player/songs/$songId"
             params={{ songId: String(songId) }}
@@ -286,7 +281,7 @@ export const CompactSongRow = memo(
 
         {/* Artist column */}
         <div
-          className={`song-artists w-[22%] min-w-0 pl-3 pr-2 truncate text-xs ${
+          className={`song-artists w-[22%] min-w-0 truncate pr-2 pl-3 text-xs ${
             isCurrentSong ? 'text-accent/90' : 'text-font-color-dimmed'
           }`}
         >
@@ -294,7 +289,7 @@ export const CompactSongRow = memo(
         </div>
 
         {/* Album column */}
-        <div className="song-album w-[20%] min-w-0 pl-3 pr-2 truncate text-xs text-font-color-dimmed sm:hidden md:hidden lg:flex">
+        <div className="song-album text-font-color-dimmed hidden w-[20%] min-w-0 truncate pr-2 pl-3 text-xs @[640px]/songs:flex">
           {album?.name ? (
             <NavLink
               to="/main-player/albums/$albumId"
@@ -311,19 +306,21 @@ export const CompactSongRow = memo(
         </div>
 
         {/* Duration column */}
-        <div className="song-duration min-w-[4rem] text-right pr-3 font-mono text-xs text-font-color-dimmed opacity-75">
+        <div className="song-duration text-font-color-dimmed min-w-[4rem] pr-3 text-right font-mono text-xs opacity-75">
           {minutes}:{seconds}
         </div>
 
         {/* Actions column */}
-        <div className="song-actions min-w-[4.5rem] shrink-0 flex items-center justify-end gap-1 pr-2">
+        <div className="song-actions flex min-w-[4.5rem] shrink-0 items-center justify-end gap-1 pr-2">
           <Button
-            className="m-0! rounded-none! border-0! bg-transparent p-0! text-inherit! outline-offset-1 focus-visible:outline! dark:bg-transparent cursor-pointer"
+            className="m-0! cursor-pointer rounded-none! border-0! bg-transparent p-0! text-inherit! outline-offset-1 focus-visible:outline! dark:bg-transparent"
             iconName="favorite"
             iconClassName={`${
               isAFavorite ? 'material-icons-round' : 'material-icons-round-outlined'
             } ${isBursting ? 'fx-heart-pop' : ''} leading-none! text-base! font-light! ${
-              isAFavorite ? 'text-font-color-favorite!' : 'text-font-color-dimmed opacity-60 hover:opacity-100'
+              isAFavorite
+                ? 'text-font-color-favorite!'
+                : 'text-font-color-dimmed opacity-60 hover:opacity-100'
             }`}
             tooltipLabel={t(`song.${isAFavorite ? 'likedThisSong' : 'dislikedThisSong'}`)}
             clickHandler={(e) => {
@@ -334,7 +331,7 @@ export const CompactSongRow = memo(
           <HeartBurst isBursting={isBursting} />
 
           <Button
-            className="m-0! rounded-none! border-0! bg-transparent p-0! text-font-color-dimmed opacity-60 hover:opacity-100 outline-offset-1 focus-visible:outline! dark:bg-transparent cursor-pointer"
+            className="text-font-color-dimmed m-0! cursor-pointer rounded-none! border-0! bg-transparent p-0! opacity-60 outline-offset-1 hover:opacity-100 focus-visible:outline! dark:bg-transparent"
             iconName="more_horiz"
             iconClassName="text-base leading-none"
             tooltipLabel={t('common.moreOptions')}

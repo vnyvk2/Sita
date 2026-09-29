@@ -1,5 +1,3 @@
-import { describe, expect, it } from 'vitest';
-import fc from 'fast-check';
 import {
   applyLayoutOp,
   assertWorkspaceInvariants,
@@ -16,6 +14,8 @@ import type {
   SplitNode,
   Workspace
 } from '@renderer/workspace/types';
+import fc from 'fast-check';
+import { describe, expect, it } from 'vitest';
 
 interface WorkspaceModel {
   ws: Workspace;
@@ -64,7 +64,11 @@ class InsertPanelCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> {
     const targetPanel = m.ws.panels[targetPanelId];
 
     let at: DropTarget;
-    if (this.isTabTarget && targetPanel?.type !== 'router-view' && targetPanel?.type !== 'playlists') {
+    if (
+      this.isTabTarget &&
+      targetPanel?.type !== 'router-view' &&
+      targetPanel?.type !== 'playlists'
+    ) {
       at = { k: 'tab-into', tabsId: targetPanelId };
     } else {
       at = {
@@ -180,7 +184,10 @@ class MovePanelCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> {
 
 // Command 4: Split Weights
 class SplitWeightsCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> {
-  constructor(readonly splitIndexChoice: number, readonly rawWeights: number[]) {}
+  constructor(
+    readonly splitIndexChoice: number,
+    readonly rawWeights: number[]
+  ) {}
 
   check(m: Readonly<WorkspaceModel>): boolean {
     const splits = getAllSplitNodes(m.ws.root);
@@ -219,7 +226,10 @@ class SplitWeightsCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> 
 
 // Command 5: Tabs Activate
 class TabsActivateCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> {
-  constructor(readonly tgIndexChoice: number, readonly tabIndexChoice: number) {}
+  constructor(
+    readonly tgIndexChoice: number,
+    readonly tabIndexChoice: number
+  ) {}
 
   check(m: Readonly<WorkspaceModel>): boolean {
     const tabGroups = findAllTabGroups(m.ws.root);
@@ -251,30 +261,54 @@ describe('Workspace Layout Invariant Model-Based Testing (Fast-Check)', () => {
   it('Property: 500 random valid operational command sequences preserve all structural invariants', async () => {
     const commandsArbitrary = fc.commands(
       [
-        fc.record({
-          panelType: fc.constantFrom(...availablePanelTypes),
-          axis: fc.constantFrom('x' as const, 'y' as const),
-          before: fc.boolean(),
-          targetIndexChoice: fc.nat(),
-          isTabTarget: fc.boolean()
-        }).map(r => new InsertPanelCommand(r.panelType, r.axis, r.before, r.targetIndexChoice, r.isTabTarget)),
-        fc.record({
-          panelIndexChoice: fc.nat()
-        }).map(r => new ClosePanelCommand(r.panelIndexChoice)),
-        fc.record({
-          sourceIndexChoice: fc.nat(),
-          targetIndexChoice: fc.nat(),
-          axis: fc.constantFrom('x' as const, 'y' as const),
-          before: fc.boolean()
-        }).map(r => new MovePanelCommand(r.sourceIndexChoice, r.targetIndexChoice, r.axis, r.before)),
-        fc.record({
-          splitIndexChoice: fc.nat(),
-          rawWeights: fc.array(fc.double({ min: 0.05, max: 0.95 }), { minLength: 2, maxLength: 4 })
-        }).map(r => new SplitWeightsCommand(r.splitIndexChoice, r.rawWeights)),
-        fc.record({
-          tgIndexChoice: fc.nat(),
-          tabIndexChoice: fc.nat()
-        }).map(r => new TabsActivateCommand(r.tgIndexChoice, r.tabIndexChoice))
+        fc
+          .record({
+            panelType: fc.constantFrom(...availablePanelTypes),
+            axis: fc.constantFrom('x' as const, 'y' as const),
+            before: fc.boolean(),
+            targetIndexChoice: fc.nat(),
+            isTabTarget: fc.boolean()
+          })
+          .map(
+            (r) =>
+              new InsertPanelCommand(
+                r.panelType,
+                r.axis,
+                r.before,
+                r.targetIndexChoice,
+                r.isTabTarget
+              )
+          ),
+        fc
+          .record({
+            panelIndexChoice: fc.nat()
+          })
+          .map((r) => new ClosePanelCommand(r.panelIndexChoice)),
+        fc
+          .record({
+            sourceIndexChoice: fc.nat(),
+            targetIndexChoice: fc.nat(),
+            axis: fc.constantFrom('x' as const, 'y' as const),
+            before: fc.boolean()
+          })
+          .map(
+            (r) => new MovePanelCommand(r.sourceIndexChoice, r.targetIndexChoice, r.axis, r.before)
+          ),
+        fc
+          .record({
+            splitIndexChoice: fc.nat(),
+            rawWeights: fc.array(fc.double({ min: 0.05, max: 0.95 }), {
+              minLength: 2,
+              maxLength: 4
+            })
+          })
+          .map((r) => new SplitWeightsCommand(r.splitIndexChoice, r.rawWeights)),
+        fc
+          .record({
+            tgIndexChoice: fc.nat(),
+            tabIndexChoice: fc.nat()
+          })
+          .map((r) => new TabsActivateCommand(r.tgIndexChoice, r.tabIndexChoice))
       ],
       { maxCommands: 25 }
     );

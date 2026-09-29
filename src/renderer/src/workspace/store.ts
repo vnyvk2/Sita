@@ -2,12 +2,17 @@ import { Store } from '@tanstack/store';
 
 import {
   applyLayoutOp,
+  assertWorkspaceInvariants,
   findRightsideSecondaryPanel,
   findRightsideTabGroup,
   findTabGroupContainingPanel,
   generateRandomId
 } from './ops';
-import { loadWorkspaceState, saveWorkspaceStateDebounced } from './persistence';
+import {
+  loadWorkspaceState,
+  saveWorkspaceStateDebounced,
+  saveWorkspaceStateImmediate
+} from './persistence';
 import { DEFAULT_PRESET } from './presets/default';
 import { MUSICBEE_PRESET } from './presets/musicbee';
 import type {
@@ -24,7 +29,10 @@ export type SidebarMode = 'expanded' | 'compact' | 'hidden';
 
 const initialToolbarCollapsed = (() => {
   try {
-    return typeof localStorage !== 'undefined' && localStorage.getItem('nora:workspace-toolbar-collapsed') === 'true';
+    return (
+      typeof localStorage !== 'undefined' &&
+      localStorage.getItem('nora:workspace-toolbar-collapsed') === 'true'
+    );
   } catch {
     return false;
   }
@@ -32,7 +40,8 @@ const initialToolbarCollapsed = (() => {
 
 const initialSidebarMode: SidebarMode = (() => {
   try {
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('nora:sidebar-mode') : null;
+    const saved =
+      typeof localStorage !== 'undefined' ? localStorage.getItem('nora:sidebar-mode') : null;
     if (saved === 'expanded' || saved === 'compact' || saved === 'hidden') {
       return saved;
     }
@@ -76,8 +85,39 @@ workspaceStore.subscribe((nextState) => {
   saveWorkspaceStateDebounced(nextState);
 });
 
+// CF-04: Immediate flush on window close or tab backgrounding
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    saveWorkspaceStateImmediate(workspaceStore.state);
+  });
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      saveWorkspaceStateImmediate(workspaceStore.state);
+    }
+  });
+}
+
+/** Resets all ephemeral drag, drop, and modal state across workspace transitions (CF-06) */
+export function resetTransientWorkspaceState(): void {
+  dndStore.setState((s) => ({
+    ...s,
+    maximizedPanelId: null,
+    isDragging: false,
+    currentDrag: null,
+    hoveredDropTarget: null,
+    targetWorkspaceId: null,
+    isSaveLayoutModalOpen: false,
+    saveLayoutModalMode: 'save'
+  }));
+}
+
 export const workspaceActions = {
   dispatchOp(op: LayoutOp): void {
+    if (op.t === 'panel.close' && dndStore.state.maximizedPanelId === op.panelId) {
+      dndStore.setState((s) => ({ ...s, maximizedPanelId: null }));
+    }
     workspaceStore.setState((state) => {
       const activeWs = state.workspaces[state.active];
       if (!activeWs) return state;
@@ -101,9 +141,11 @@ export const workspaceActions = {
         active: id
       };
     });
+    resetTransientWorkspaceState();
   },
 
   saveWorkspace(ws: Workspace): void {
+    assertWorkspaceInvariants(ws);
     workspaceStore.setState((state) => ({
       ...state,
       workspaces: {
@@ -225,10 +267,14 @@ export const workspaceActions = {
       if (!activeWs) return state;
 
       newId = generateRandomId('ws');
+      const originPreset =
+        activeWs.sourcePresetId ||
+        (activeWs.id === MUSICBEE_PRESET.id ? MUSICBEE_PRESET.id : DEFAULT_PRESET.id);
       const newWs: Workspace = {
         ...activeWs,
         id: newId,
         name: name.trim() || activeWs.name,
+        sourcePresetId: originPreset,
         root: JSON.parse(JSON.stringify(activeWs.root)),
         panels: JSON.parse(JSON.stringify(activeWs.panels)),
         frame: { ...activeWs.frame }
@@ -305,11 +351,15 @@ export const workspaceActions = {
       if (!sourceWs) return state;
 
       newId = generateRandomId('ws');
+      const originPreset =
+        sourceWs.sourcePresetId ||
+        (sourceWs.id === MUSICBEE_PRESET.id ? MUSICBEE_PRESET.id : DEFAULT_PRESET.id);
       const finalName = newName?.trim() || `${sourceWs.name} (Copy)`;
       const duplicatedWs: Workspace = {
         ...sourceWs,
         id: newId,
         name: finalName,
+        sourcePresetId: originPreset,
         root: JSON.parse(JSON.stringify(sourceWs.root)),
         panels: JSON.parse(JSON.stringify(sourceWs.panels)),
         frame: { ...sourceWs.frame }

@@ -23,26 +23,26 @@ const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
           ref={ref}
           data-skeleton-index={index}
           style={{ ...style, height: 38 }}
-          className={`compact-song-skeleton relative flex h-[38px] w-full items-center select-none text-xs border-b border-background-color-2/30 dark:border-dark-background-color-2/30 px-2 animate-pulse ${
+          className={`compact-song-skeleton border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[38px] w-full animate-pulse items-center border-b px-2 text-xs select-none ${
             isOdd
               ? 'bg-background-color-2/40! dark:bg-dark-background-color-2/30!'
               : 'bg-background-color-1! dark:bg-dark-background-color-1!'
           } ${className}`}
           aria-hidden="true"
         >
-          <div className="w-[28px] shrink-0 flex items-center justify-center">
+          <div className="flex w-[28px] shrink-0 items-center justify-center">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-3 w-3 rounded-sm opacity-50" />
           </div>
-          <div className="flex-1 min-w-0 pl-3 pr-2">
+          <div className="min-w-0 flex-1 pr-2 pl-3">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-3 w-[70%] rounded-full opacity-60" />
           </div>
-          <div className="w-[22%] min-w-0 pl-3 pr-2">
+          <div className="w-[22%] min-w-0 pr-2 pl-3">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-2.5 w-[80%] rounded-full opacity-50" />
           </div>
-          <div className="w-[20%] min-w-0 pl-3 pr-2 sm:hidden md:hidden lg:block">
+          <div className="hidden w-[20%] min-w-0 pr-2 pl-3 @[640px]/songs:block">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-2.5 w-[65%] rounded-full opacity-40" />
           </div>
-          <div className="min-w-[4rem] flex justify-end pr-3">
+          <div className="flex min-w-[4rem] justify-end pr-3">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-2.5 w-8 rounded-full opacity-50" />
           </div>
           <div className="min-w-[4.5rem] shrink-0" />

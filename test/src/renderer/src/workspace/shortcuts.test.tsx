@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { useWorkspaceShortcuts } from '@renderer/workspace/engine/useWorkspaceShortcuts';
-import { dndStore, workspaceActions } from '@renderer/workspace/store';
+import { dndStore, workspaceActions, workspaceStore } from '@renderer/workspace/store';
 import { act, fireEvent, render, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -26,7 +26,9 @@ describe('useWorkspaceShortcuts Hook', () => {
   describe('Alt Panel Shortcuts Delegation', () => {
     it('does not intercept Alt shortcuts, delegating them to global useKeyboardShortcuts', () => {
       const spy = vi.spyOn(workspaceActions, 'toggleOrOpenPanel').mockImplementation(() => {});
-      const modalSpy = vi.spyOn(workspaceActions, 'openSaveLayoutModal').mockImplementation(() => {});
+      const modalSpy = vi
+        .spyOn(workspaceActions, 'openSaveLayoutModal')
+        .mockImplementation(() => {});
       const { unmount } = renderHook(() => useWorkspaceShortcuts());
 
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'q', altKey: true }));
@@ -64,6 +66,62 @@ describe('useWorkspaceShortcuts Hook', () => {
 
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
       expect(spy).toHaveBeenCalled();
+
+      unmount();
+    });
+  });
+
+  describe('Ctrl+Alt+M Maximize Shortcut Handling (CF-05)', () => {
+    it('un-maximizes when a panel is currently maximized', () => {
+      const spy = vi.spyOn(workspaceActions, 'setMaximizedPanel').mockImplementation(() => {});
+      dndStore.setState((s) => ({ ...s, maximizedPanelId: 'p_max' }));
+
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, altKey: true, cancelable: true })
+      );
+      expect(spy).toHaveBeenCalledWith(null);
+
+      unmount();
+    });
+
+    it('maximizes focused panel if active element is inside data-panel-id', () => {
+      const toggleSpy = vi
+        .spyOn(workspaceActions, 'toggleMaximizePanel')
+        .mockImplementation(() => {});
+
+      const panelDiv = document.createElement('div');
+      panelDiv.setAttribute('data-panel-id', 'test-panel-queue');
+      const innerButton = document.createElement('button');
+      panelDiv.appendChild(innerButton);
+      document.body.appendChild(panelDiv);
+      innerButton.focus();
+
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, altKey: true, cancelable: true })
+      );
+      expect(toggleSpy).toHaveBeenCalledWith('test-panel-queue');
+
+      unmount();
+      document.body.removeChild(panelDiv);
+    });
+
+    it('falls back to maximizing router-view if no panel is focused', () => {
+      const toggleSpy = vi
+        .spyOn(workspaceActions, 'toggleMaximizePanel')
+        .mockImplementation(() => {});
+
+      const { unmount } = renderHook(() => useWorkspaceShortcuts());
+
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'm', ctrlKey: true, altKey: true, cancelable: true })
+      );
+      const activeWs = workspaceStore.state.workspaces[workspaceStore.state.active];
+      const routerPanel = Object.values(activeWs.panels).find((p) => p.type === 'router-view');
+      expect(toggleSpy).toHaveBeenCalledWith(routerPanel?.id);
 
       unmount();
     });

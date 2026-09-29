@@ -848,7 +848,7 @@ function SongsPage() {
                 onSelectLetter={handleSelectLetter}
               />
             )}
-            <div className="flex h-full min-w-0 flex-1 flex-col">
+            <div className="@container/songs flex h-full min-w-0 flex-1 flex-col">
               {isCompactSongView && <CompactListHeader />}
               <div className="min-h-0 flex-1">
                 <VirtualizedList

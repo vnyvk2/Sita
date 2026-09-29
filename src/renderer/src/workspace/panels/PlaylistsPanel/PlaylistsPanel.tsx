@@ -169,7 +169,7 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
               featured_play_list
             </span>
             <span className="text-xs font-semibold">{t('common.playlist_other', 'Playlists')}</span>
-            <span className="text-font-color-dimmed bg-background-color-2/60 dark:bg-dark-background-color-2/60 rounded-full px-1.5 py-0.2 text-[10px]">
+            <span className="text-font-color-dimmed bg-background-color-2/60 dark:bg-dark-background-color-2/60 py-0.2 rounded-full px-1.5 text-[10px]">
               {playlists.length}
             </span>
           </div>
@@ -220,9 +220,7 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
           </div>
         ) : filteredPlaylists.length === 0 ? (
           <div className="text-font-color-dimmed flex h-full w-full flex-col items-center justify-center p-6 text-center">
-            <span className="material-symbols-rounded mb-2 text-3xl opacity-60">
-              queue_music
-            </span>
+            <span className="material-symbols-rounded mb-2 text-3xl opacity-60">queue_music</span>
             <p className="text-xs">
               {searchQuery
                 ? t('searchPage.noResults', 'No playlists match your search')
@@ -248,9 +246,7 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
                   <span className="material-symbols-rounded text-xs">push_pin</span>
                   <span>{t('playlist.pinned', 'Pinned')}</span>
                 </div>
-                <ul className="flex flex-col gap-0.5">
-                  {pinnedPlaylists.map(renderPlaylistItem)}
-                </ul>
+                <ul className="flex flex-col gap-0.5">{pinnedPlaylists.map(renderPlaylistItem)}</ul>
               </div>
             )}
 
