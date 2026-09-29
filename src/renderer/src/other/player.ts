@@ -36,6 +36,7 @@ type PlayerEventType =
   | 'seeking'
   | 'seeked'
   | 'ended'
+  | 'canplay'
   | 'error'
   | 'volumeChange'
   | 'mutedChange'
@@ -44,6 +45,7 @@ type PlayerEventType =
   | 'repeatAll'
   | 'playbackComplete'
   | 'songLoaded'
+  | 'songChange'
   | 'loadError'
   | 'recordListening'
   | 'repeatSong'
@@ -136,6 +138,7 @@ class AudioPlayer {
   private isNativeEngineActive: boolean = false;
   private nativeIsPlaying: boolean = false;
   private nativeCurrentPosition: number = 0;
+  private nativeLoadedSongId: number | null = null;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -289,6 +292,7 @@ class AudioPlayer {
   private fallbackToWebAudio() {
     this.isNativeEngineActive = false;
     this.nativeIsPlaying = false;
+    this.nativeLoadedSongId = null;
     if (this.nativeBackend) {
       this.nativeBackend.destroy();
       this.nativeBackend = null;
@@ -414,6 +418,7 @@ class AudioPlayer {
 
   private setupAudioEventListenersFor(element: HTMLAudioElement, slot: 'A' | 'B') {
     element.addEventListener('ended', () => {
+      if (this.isNativeEngineActive) return;
       if (this.activeSlot === slot) {
         if (this.abLoopController.isActive()) {
           this.executeLoopSeek(this.abLoopController.pointA!);
@@ -430,6 +435,7 @@ class AudioPlayer {
     });
 
     element.addEventListener('timeupdate', () => {
+      if (this.isNativeEngineActive) return;
       if (this.activeSlot === slot) {
         this.emit('timeUpdate', element.currentTime);
         if (this.abLoopController.phase !== 'active') {
@@ -442,6 +448,7 @@ class AudioPlayer {
     });
 
     element.addEventListener('loadedmetadata', () => {
+      if (this.isNativeEngineActive) return;
       if (this.activeSlot === slot) {
         this.emit('durationChange', element.duration);
         if (
@@ -461,6 +468,7 @@ class AudioPlayer {
     });
 
     element.addEventListener('play', () => {
+      if (this.isNativeEngineActive) return;
       if (this.activeSlot === slot) {
         this.emit('play');
         window.api?.lyrics?.syncPlayStateToFloatingLyrics?.(true);
@@ -468,6 +476,7 @@ class AudioPlayer {
     });
 
     element.addEventListener('pause', () => {
+      if (this.isNativeEngineActive) return;
       if (this.activeSlot === slot) {
         this.emit('pause');
         window.api?.lyrics?.syncPlayStateToFloatingLyrics?.(false);
@@ -475,18 +484,21 @@ class AudioPlayer {
     });
 
     element.addEventListener('error', (e) => {
+      if (this.isNativeEngineActive) return;
       if (this.activeSlot === slot) {
         this.emit('error', e);
       }
     });
 
     element.addEventListener('seeking', () => {
+      if (this.isNativeEngineActive) return;
       if (this.activeSlot === slot) {
         this.emit('seeking');
       }
     });
 
     element.addEventListener('seeked', () => {
+      if (this.isNativeEngineActive) return;
       if (this.activeSlot === slot) {
         this.loopJumpPending = false;
         this.emit('seeked', element.currentTime);
@@ -558,7 +570,8 @@ class AudioPlayer {
     if (
       this.currentSongData?.songId === songId &&
       this.audio.src &&
-      !this.inFlightLoad
+      !this.inFlightLoad &&
+      (!this.isNativeEngineActive || this.nativeLoadedSongId === songId)
     ) {
       logPlayer('[AudioPerf] loadSong_already_loaded', {
         songId,
@@ -568,7 +581,7 @@ class AudioPlayer {
         dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: this.currentSongData });
         storage.playback.setCurrentSongOptions('songId', this.currentSongData.songId);
       }
-      if (options?.autoPlay && this.audio.paused) {
+      if (options?.autoPlay && this.paused) {
         this.play().catch((err) =>
           console.error('[AudioPlayer] Fast-path auto-play failed:', err)
         );
@@ -641,9 +654,11 @@ class AudioPlayer {
         if (this.isNativeEngineActive && this.nativeBackend) {
           try {
             await this.nativeBackend.load(this.activeSlot, songData.path);
+            this.nativeLoadedSongId = songData.songId;
             this.audio.src = songData.path;
             if (effectiveAutoPlay) {
               await this.nativeBackend.play();
+              this.nativeIsPlaying = true;
               this.emit('play');
             }
             if (effectiveUpdateStore) {
@@ -651,6 +666,7 @@ class AudioPlayer {
               storage.playback.setCurrentSongOptions('songId', songData.songId);
             }
             this.emit('songLoaded', songData);
+            this.emit('canplay');
             return songData;
           } catch (nativeLoadErr) {
             console.warn('[AudioPlayer] Native load failed, falling back to WebAudio:', nativeLoadErr);
@@ -865,6 +881,20 @@ class AudioPlayer {
    */
   off<T = unknown>(eventType: PlayerEventType, callback: PlayerEventCallback<T>): void {
     this.listeners.get(eventType)?.delete(callback as PlayerEventCallback<unknown>);
+  }
+
+  /**
+   * DOM EventTarget compatibility alias for `on`.
+   */
+  addEventListener(eventType: string, callback: (...args: any[]) => void): void {
+    this.on(eventType as PlayerEventType, callback as PlayerEventCallback<unknown>);
+  }
+
+  /**
+   * DOM EventTarget compatibility alias for `off`.
+   */
+  removeEventListener(eventType: string, callback: (...args: any[]) => void): void {
+    this.off(eventType as PlayerEventType, callback as PlayerEventCallback<unknown>);
   }
 
   /**
@@ -1108,13 +1138,22 @@ class AudioPlayer {
           if (useNative) {
             this.initNativeBackend();
             if (this.currentSongData) {
-              const currentPos = this.audio.currentTime;
-              const shouldPlay = !this.audio.paused;
+              const currentPos = this.currentTime;
+              const shouldPlay = !this.paused;
               this.audio.pause();
               this.nativeBackend?.load(this.activeSlot, this.currentSongData.path).then(() => {
+                this.nativeLoadedSongId = this.currentSongData?.songId ?? null;
                 if (currentPos > 0) this.nativeBackend?.seek(currentPos);
-                if (shouldPlay) this.nativeBackend?.play();
-              }).catch(() => {});
+                if (shouldPlay) {
+                  this.nativeBackend?.play().then(() => {
+                    this.nativeIsPlaying = true;
+                    this.emit('play');
+                  }).catch(() => {});
+                }
+              }).catch((err) => {
+                console.warn('[AudioPlayer] Failed to load song on native toggle:', err);
+                this.fallbackToWebAudio();
+              });
             }
           } else {
             this.fallbackToWebAudio();
@@ -1611,10 +1650,16 @@ class AudioPlayer {
   /** Starts or resumes audio playback with fade-in effect. */
   async play() {
     if (this.isNativeEngineActive && this.nativeBackend) {
-      await this.nativeBackend.play();
-      this.nativeIsPlaying = true;
-      this.emit('play');
-      return;
+      try {
+        await this.nativeBackend.play();
+        this.nativeIsPlaying = true;
+        this.emit('play');
+        return;
+      } catch (nativePlayErr) {
+        console.warn('[AudioPlayer] Native play failed, falling back to WebAudio:', nativePlayErr);
+        this.fallbackToWebAudio();
+        return;
+      }
     }
 
     if (this.currentContext.state === 'suspended') {

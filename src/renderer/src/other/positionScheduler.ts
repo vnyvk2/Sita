@@ -152,6 +152,7 @@ export class PositionTimerScheduler {
     this.player.on('pause', handlePause);
     this.player.on('seeked', handleSeeked);
     this.player.on('songLoaded', handleSongOrQueueChange);
+    this.player.on('songChange', handleSongOrQueueChange);
     this.player.on('queueChange', handleSongOrQueueChange);
     this.player.on('durationChange', handleSongOrQueueChange);
 
@@ -160,6 +161,7 @@ export class PositionTimerScheduler {
       this.player.off('pause', handlePause);
       this.player.off('seeked', handleSeeked);
       this.player.off('songLoaded', handleSongOrQueueChange);
+      this.player.off('songChange', handleSongOrQueueChange);
       this.player.off('queueChange', handleSongOrQueueChange);
       this.player.off('durationChange', handleSongOrQueueChange);
     });

@@ -41,7 +41,7 @@ pub struct SendStream(pub Stream);
 unsafe impl Send for SendStream {}
 unsafe impl Sync for SendStream {}
 
-/// Live audio output sink wrapping an active CPAL audio stream.
+/// Live audio output sink wrapping an active CPAL audio stream with real-time paced fallback.
 pub struct CpalBackend {
     host: Host,
     device: Option<Device>,
@@ -51,6 +51,8 @@ pub struct CpalBackend {
     is_open: bool,
     is_running: bool,
     device_error: Arc<AtomicBool>,
+    fallback_thread: Option<std::thread::JoinHandle<()>>,
+    fallback_stop: Arc<AtomicBool>,
 }
 
 impl Default for CpalBackend {
@@ -71,6 +73,8 @@ impl CpalBackend {
             is_open: false,
             is_running: false,
             device_error: Arc::new(AtomicBool::new(false)),
+            fallback_thread: None,
+            fallback_stop: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -116,6 +120,7 @@ impl CpalBackend {
     }
 
     /// Open CPAL output with a custom real-time audio render callback.
+    /// If hardware audio devices are unavailable, automatically falls back to a real-time paced clock.
     pub fn open_with_render_fn<F>(&mut self, spec: AudioSpec, mut render_fn: F) -> Result<(), SinkError>
     where
         F: FnMut(&mut [f32]) -> usize + Send + 'static,
@@ -125,89 +130,141 @@ impl CpalBackend {
         }
 
         if self.device.is_none() {
-            self.select_device(None)?;
+            let _ = self.select_device(None);
         }
 
-        let device = self.device.as_ref().ok_or(SinkError::NotOpen)?;
-        let supported_config = device
-            .default_output_config()
-            .map_err(|e| SinkError::CpalError(e.to_string()))?;
-
-        let sample_format = supported_config.sample_format();
-        let config: StreamConfig = supported_config.into();
-
-        let stats_clone = Arc::clone(&self.stats);
-        let error_flag = Arc::clone(&self.device_error);
-        let channels = config.channels as usize;
-
-        let err_fn = move |err: cpal::StreamError| {
-            log::error!("CPAL audio stream callback error: {}", err);
-            error_flag.store(true, Ordering::Release);
+        // Check if physical hardware output is accessible
+        let hardware_ready = if let Some(device) = self.device.as_ref() {
+            device.default_output_config().is_ok()
+        } else {
+            false
         };
 
-        let stream = match sample_format {
-            SampleFormat::F32 => {
-                let stats = stats_clone;
-                device
-                    .build_output_stream(
-                        &config,
-                        move |data: &mut [f32], _| {
-                            if stats.is_paused.load(Ordering::Relaxed) {
-                                // Continuous silence pause: fill with zero
-                                data.fill(0.0);
-                                return;
-                            }
-                            let written = render_fn(data);
-                            if written < data.len() {
-                                data[written..].fill(0.0);
-                            }
-                            stats.record_consumption(data.len(), channels as u16);
-                        },
-                        err_fn,
-                        None,
-                    )
-                    .map_err(|e| SinkError::CpalError(e.to_string()))?
-            }
-            SampleFormat::I16 => {
-                let stats = stats_clone;
-                let mut dither = XorShift32(123456789);
-                let mut scratch = vec![0.0f32; 4096];
-                device
-                    .build_output_stream(
-                        &config,
-                        move |data: &mut [i16], _| {
-                            if stats.is_paused.load(Ordering::Relaxed) {
-                                data.fill(0);
-                                return;
-                            }
-                            if scratch.len() < data.len() {
-                                scratch.resize(data.len(), 0.0);
-                            }
-                            let written = render_fn(&mut scratch[..data.len()]);
-                            if written < data.len() {
-                                scratch[written..data.len()].fill(0.0);
-                            }
-                            for (i, out) in data.iter_mut().enumerate() {
-                                let noise = dither.next_tpdf_i16();
-                                let sample = (scratch[i] + noise) * 32767.0;
-                                *out = sample.clamp(-32768.0, 32767.0) as i16;
-                            }
-                            stats.record_consumption(data.len(), channels as u16);
-                        },
-                        err_fn,
-                        None,
-                    )
-                    .map_err(|e| SinkError::CpalError(e.to_string()))?
-            }
-            _ => {
-                return Err(SinkError::CpalError(format!(
-                    "Unsupported CPAL sample format: {:?}",
-                    sample_format
-                )));
-            }
-        };
+        if hardware_ready {
+            let device = self.device.as_ref().unwrap();
+            let supported_config = device
+                .default_output_config()
+                .map_err(|e| SinkError::CpalError(e.to_string()))?;
 
-        self.stream = Some(SendStream(stream));
+            let sample_format = supported_config.sample_format();
+            let config: StreamConfig = supported_config.into();
+
+            let stats_clone = Arc::clone(&self.stats);
+            let error_flag = Arc::clone(&self.device_error);
+            let channels = config.channels as usize;
+
+            let err_fn = move |err: cpal::StreamError| {
+                log::error!("CPAL audio stream callback error: {}", err);
+                error_flag.store(true, Ordering::Release);
+            };
+
+            let stream = match sample_format {
+                SampleFormat::F32 => {
+                    let stats = stats_clone;
+                    device
+                        .build_output_stream(
+                            &config,
+                            move |data: &mut [f32], _| {
+                                if stats.is_paused.load(Ordering::Relaxed) {
+                                    // Continuous silence pause: fill with zero
+                                    data.fill(0.0);
+                                    return;
+                                }
+                                let written = render_fn(data);
+                                if written < data.len() {
+                                    data[written..].fill(0.0);
+                                }
+                                stats.record_consumption(data.len(), channels as u16);
+                            },
+                            err_fn,
+                            None,
+                        )
+                        .map_err(|e| SinkError::CpalError(e.to_string()))?
+                }
+                SampleFormat::I16 => {
+                    let stats = stats_clone;
+                    let mut dither = XorShift32(123456789);
+                    let mut scratch = vec![0.0f32; 4096];
+                    device
+                        .build_output_stream(
+                            &config,
+                            move |data: &mut [i16], _| {
+                                if stats.is_paused.load(Ordering::Relaxed) {
+                                    data.fill(0);
+                                    return;
+                                }
+                                if scratch.len() < data.len() {
+                                    scratch.resize(data.len(), 0.0);
+                                }
+                                let written = render_fn(&mut scratch[..data.len()]);
+                                if written < data.len() {
+                                    scratch[written..data.len()].fill(0.0);
+                                }
+                                for (i, out) in data.iter_mut().enumerate() {
+                                    let noise = dither.next_tpdf_i16();
+                                    let sample = (scratch[i] + noise) * 32767.0;
+                                    *out = sample.clamp(-32768.0, 32767.0) as i16;
+                                }
+                                stats.record_consumption(data.len(), channels as u16);
+                            },
+                            err_fn,
+                            None,
+                        )
+                        .map_err(|e| SinkError::CpalError(e.to_string()))?
+                }
+                _ => {
+                    return Err(SinkError::CpalError(format!(
+                        "Unsupported CPAL sample format: {:?}",
+                        sample_format
+                    )));
+                }
+            };
+
+            self.stream = Some(SendStream(stream));
+        } else {
+            // Physical audio device unavailable — start real-time paced fallback thread
+            log::warn!("Audio output device unavailable; starting real-time paced fallback clock");
+            let stats_clone = Arc::clone(&self.stats);
+            let stop_flag = Arc::new(AtomicBool::new(false));
+            self.fallback_stop = Arc::clone(&stop_flag);
+
+            let channels = spec.channels as usize;
+            let sample_rate = spec.sample_rate as usize;
+            let chunk_frames = (sample_rate / 50).max(256); // 20ms chunk
+            let chunk_samples = chunk_frames * channels;
+
+            let handle = std::thread::Builder::new()
+                .name("engine-paced-sink".to_string())
+                .spawn(move || {
+                    let frame_duration = std::time::Duration::from_millis(20);
+                    let mut scratch = vec![0.0f32; chunk_samples];
+                    let mut next_tick = std::time::Instant::now();
+
+                    while !stop_flag.load(Ordering::Relaxed) {
+                        let now = std::time::Instant::now();
+                        if now < next_tick {
+                            std::thread::sleep(next_tick - now);
+                        }
+                        next_tick += frame_duration;
+                        if next_tick < std::time::Instant::now() {
+                            next_tick = std::time::Instant::now();
+                        }
+
+                        if stats_clone.is_paused.load(Ordering::Relaxed) {
+                            continue;
+                        }
+
+                        let written = render_fn(&mut scratch);
+                        if written > 0 {
+                            stats_clone.record_consumption(written, channels as u16);
+                        }
+                    }
+                })
+                .map_err(|e| SinkError::CpalError(e.to_string()))?;
+
+            self.fallback_thread = Some(handle);
+        }
+
         self.spec = Some(spec);
         self.is_open = true;
         self.is_running = false;
@@ -251,6 +308,11 @@ impl OutputBackend for CpalBackend {
             let _ = stream.0.pause();
         }
 
+        self.fallback_stop.store(true, Ordering::Release);
+        if let Some(handle) = self.fallback_thread.take() {
+            let _ = handle.join();
+        }
+
         self.stats.is_paused.store(false, Ordering::Release);
         self.stats.is_active.store(false, Ordering::Release);
         self.is_open = false;
@@ -269,5 +331,11 @@ impl OutputBackend for CpalBackend {
 
     fn is_running(&self) -> bool {
         self.is_running
+    }
+}
+
+impl Drop for CpalBackend {
+    fn drop(&mut self) {
+        let _ = self.stop();
     }
 }

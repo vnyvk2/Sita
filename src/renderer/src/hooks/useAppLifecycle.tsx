@@ -40,10 +40,7 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
     windowManagement
   } = dependencies;
 
-  const player =
-    playerInstance instanceof HTMLAudioElement
-      ? playerInstance
-      : (playerInstance as AudioPlayer).audio;
+  const player = playerInstance as unknown as (AudioPlayer & HTMLAudioElement);
 
   const manager = getQueuesManager();
 
