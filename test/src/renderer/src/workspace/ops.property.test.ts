@@ -69,7 +69,13 @@ class InsertPanelCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> {
       targetPanel?.type !== 'router-view' &&
       targetPanel?.type !== 'playlists'
     ) {
-      at = { k: 'tab-into', tabsId: targetPanelId };
+      const existingTabGroups = findAllTabGroups(m.ws.root);
+      if (existingTabGroups.length > 0) {
+        const tg = existingTabGroups[this.targetIndexChoice % existingTabGroups.length];
+        at = { k: 'tab-into', tabsId: tg.id };
+      } else {
+        at = { k: 'tab-into', tabsId: targetPanelId };
+      }
     } else {
       at = {
         k: 'split-into',
@@ -257,6 +263,144 @@ class TabsActivateCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> 
   }
 }
 
+// Command 6: Tabs Extract (CF-01)
+class TabsExtractCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> {
+  constructor(
+    readonly tgIndexChoice: number,
+    readonly tabIndexChoice: number,
+    readonly axis: 'x' | 'y'
+  ) {}
+
+  check(m: Readonly<WorkspaceModel>): boolean {
+    const tabGroups = findAllTabGroups(m.ws.root);
+    return tabGroups.some((tg) => tg.tabs.length > 1);
+  }
+
+  async run(m: WorkspaceModel, _real: Workspace): Promise<void> {
+    const tabGroups = findAllTabGroups(m.ws.root).filter((tg) => tg.tabs.length > 1);
+    const targetTg = tabGroups[this.tgIndexChoice % tabGroups.length];
+    const targetPanelId = targetTg.tabs[this.tabIndexChoice % targetTg.tabs.length];
+
+    const op: LayoutOp = {
+      t: 'tabs.extract',
+      panelId: targetPanelId,
+      axis: this.axis
+    };
+
+    const previousWs = m.ws;
+    try {
+      const nextWs = applyLayoutOp(m.ws, op);
+      assertWorkspaceInvariants(nextWs);
+      m.ws = nextWs;
+    } catch {
+      assertWorkspaceInvariants(previousWs);
+    }
+  }
+
+  toString(): string {
+    return `TabsExtract(axis=${this.axis})`;
+  }
+}
+
+// Command 7: Tabs Reorder
+class TabsReorderCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> {
+  constructor(readonly tgIndexChoice: number) {}
+
+  check(m: Readonly<WorkspaceModel>): boolean {
+    const tabGroups = findAllTabGroups(m.ws.root);
+    return tabGroups.some((tg) => tg.tabs.length > 1);
+  }
+
+  async run(m: WorkspaceModel, _real: Workspace): Promise<void> {
+    const tabGroups = findAllTabGroups(m.ws.root).filter((tg) => tg.tabs.length > 1);
+    const targetTg = tabGroups[this.tgIndexChoice % tabGroups.length];
+    const reversed = [...targetTg.tabs].reverse();
+
+    const op: LayoutOp = {
+      t: 'tabs.reorder',
+      tabsId: targetTg.id,
+      order: reversed
+    };
+
+    const previousWs = m.ws;
+    try {
+      const nextWs = applyLayoutOp(m.ws, op);
+      assertWorkspaceInvariants(nextWs);
+      m.ws = nextWs;
+    } catch {
+      assertWorkspaceInvariants(previousWs);
+    }
+  }
+
+  toString(): string {
+    return `TabsReorder`;
+  }
+}
+
+// Command 8: Workspace Reset (CF-07)
+class WorkspaceResetCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> {
+  check(_m: Readonly<WorkspaceModel>): boolean {
+    return true;
+  }
+
+  async run(m: WorkspaceModel, _real: Workspace): Promise<void> {
+    const originPreset =
+      m.ws.sourcePresetId === MUSICBEE_PRESET.id ? MUSICBEE_PRESET : DEFAULT_PRESET;
+    const op: LayoutOp = {
+      t: 'ws.reset',
+      id: m.ws.id,
+      defaultPreset: originPreset
+    };
+
+    const nextWs = applyLayoutOp(m.ws, op);
+    assertWorkspaceInvariants(nextWs);
+    m.ws = nextWs;
+  }
+
+  toString(): string {
+    return `WorkspaceReset`;
+  }
+}
+
+// Command 9: Split Collapse
+class SplitCollapseCommand implements fc.AsyncCommand<WorkspaceModel, Workspace> {
+  constructor(
+    readonly splitIndexChoice: number,
+    readonly childIndexChoice: number,
+    readonly collapse: boolean
+  ) {}
+
+  check(m: Readonly<WorkspaceModel>): boolean {
+    const splits = getAllSplitNodes(m.ws.root);
+    return splits.length > 0;
+  }
+
+  async run(m: WorkspaceModel, _real: Workspace): Promise<void> {
+    const splits = getAllSplitNodes(m.ws.root);
+    const targetSplit = splits[this.splitIndexChoice % splits.length];
+    const childIndex = this.collapse ? this.childIndexChoice % targetSplit.children.length : null;
+
+    const op: LayoutOp = {
+      t: 'split.collapse',
+      splitId: targetSplit.id,
+      childIndex
+    };
+
+    const previousWs = m.ws;
+    try {
+      const nextWs = applyLayoutOp(m.ws, op);
+      assertWorkspaceInvariants(nextWs);
+      m.ws = nextWs;
+    } catch {
+      assertWorkspaceInvariants(previousWs);
+    }
+  }
+
+  toString(): string {
+    return `SplitCollapse(${this.collapse})`;
+  }
+}
+
 describe('Workspace Layout Invariant Model-Based Testing (Fast-Check)', () => {
   it('Property: 500 random valid operational command sequences preserve all structural invariants', async () => {
     const commandsArbitrary = fc.commands(
@@ -308,7 +452,27 @@ describe('Workspace Layout Invariant Model-Based Testing (Fast-Check)', () => {
             tgIndexChoice: fc.nat(),
             tabIndexChoice: fc.nat()
           })
-          .map((r) => new TabsActivateCommand(r.tgIndexChoice, r.tabIndexChoice))
+          .map((r) => new TabsActivateCommand(r.tgIndexChoice, r.tabIndexChoice)),
+        fc
+          .record({
+            tgIndexChoice: fc.nat(),
+            tabIndexChoice: fc.nat(),
+            axis: fc.constantFrom('x' as const, 'y' as const)
+          })
+          .map((r) => new TabsExtractCommand(r.tgIndexChoice, r.tabIndexChoice, r.axis)),
+        fc
+          .record({
+            tgIndexChoice: fc.nat()
+          })
+          .map((r) => new TabsReorderCommand(r.tgIndexChoice)),
+        fc.constant(new WorkspaceResetCommand()),
+        fc
+          .record({
+            splitIndexChoice: fc.nat(),
+            childIndexChoice: fc.nat(),
+            collapse: fc.boolean()
+          })
+          .map((r) => new SplitCollapseCommand(r.splitIndexChoice, r.childIndexChoice, r.collapse))
       ],
       { maxCommands: 25 }
     );

@@ -1,8 +1,10 @@
 import { findTabGroupContainingPanel } from '@renderer/workspace/ops';
 import {
   getInitialWorkspaceState,
+  loadWorkspaceState,
   sanitizeWorkspace,
   saveWorkspaceStateImmediate,
+  WORKSPACE_BACKUP_STORAGE_KEY,
   WORKSPACE_STORAGE_KEY
 } from '@renderer/workspace/persistence';
 import { DEFAULT_PRESET } from '@renderer/workspace/presets/default';
@@ -58,6 +60,55 @@ describe('Workspace Store and Persistence', () => {
       const stored = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
       expect(stored).toBeTruthy();
       expect(JSON.parse(stored!).active).toBe(DEFAULT_PRESET.id);
+    });
+
+    it('recovers from backup when primary localStorage JSON is corrupt', () => {
+      const customWs = {
+        ...DEFAULT_PRESET,
+        id: 'ws_custom_bak',
+        name: 'Recovered Layout'
+      };
+      const validBackupState = {
+        active: 'ws_custom_bak',
+        workspaces: {
+          [DEFAULT_PRESET.id]: DEFAULT_PRESET,
+          [MUSICBEE_PRESET.id]: MUSICBEE_PRESET,
+          ws_custom_bak: customWs
+        }
+      };
+
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, 'invalid{{{json');
+      window.localStorage.setItem(WORKSPACE_BACKUP_STORAGE_KEY, JSON.stringify(validBackupState));
+
+      const loaded = loadWorkspaceState();
+      expect(loaded.active).toBe('ws_custom_bak');
+      expect(loaded.workspaces.ws_custom_bak).toBeDefined();
+    });
+
+    it('recovers from backup when primary localStorage is valid JSON but invalid schema/shape', () => {
+      const customWs = {
+        ...DEFAULT_PRESET,
+        id: 'ws_custom_shape_bak',
+        name: 'Shape Recovered'
+      };
+      const validBackupState = {
+        active: 'ws_custom_shape_bak',
+        workspaces: {
+          [DEFAULT_PRESET.id]: DEFAULT_PRESET,
+          [MUSICBEE_PRESET.id]: MUSICBEE_PRESET,
+          ws_custom_shape_bak: customWs
+        }
+      };
+
+      window.localStorage.setItem(
+        WORKSPACE_STORAGE_KEY,
+        JSON.stringify({ invalid: true, notWorkspaces: 123 })
+      );
+      window.localStorage.setItem(WORKSPACE_BACKUP_STORAGE_KEY, JSON.stringify(validBackupState));
+
+      const loaded = loadWorkspaceState();
+      expect(loaded.active).toBe('ws_custom_shape_bak');
+      expect(loaded.workspaces.ws_custom_shape_bak).toBeDefined();
     });
   });
 
@@ -162,10 +213,12 @@ describe('Workspace Store and Persistence', () => {
         expect(workspaceActions.deleteWorkspace('non_existent_id')).toBe(false);
       });
 
-      it('cleans up maximizedPanelId and targetWorkspaceId when deleting active workspace', () => {
+      it('cleans up all transient workspace state when deleting active workspace', () => {
         const customId = workspaceActions.saveCurrentLayoutAs('To Delete');
         dndStore.setState((s) => ({
           ...s,
+          isDragging: true,
+          hoveredDropTarget: { nodeId: 'test_node', edge: 'left' },
           maximizedPanelId: 'some_panel',
           targetWorkspaceId: customId,
           isSaveLayoutModalOpen: true,
@@ -174,6 +227,8 @@ describe('Workspace Store and Persistence', () => {
 
         const result = workspaceActions.deleteWorkspace(customId);
         expect(result).toBe(true);
+        expect(dndStore.state.isDragging).toBe(false);
+        expect(dndStore.state.hoveredDropTarget).toBeNull();
         expect(dndStore.state.maximizedPanelId).toBeNull();
         expect(dndStore.state.targetWorkspaceId).toBeNull();
         expect(dndStore.state.isSaveLayoutModalOpen).toBe(false);

@@ -79,40 +79,12 @@ export function sanitizeWorkspace(untrusted: unknown): Workspace | null {
   }
 }
 
-/** Loads workspace state from localStorage with migration and corruption recovery. */
-export function loadWorkspaceState(): WorkspaceState {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return getInitialWorkspaceState();
-  }
-
+function tryParseAndSanitize(rawString: string | null): WorkspaceState | null {
+  if (!rawString) return null;
   try {
-    let raw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
-    if (!raw) {
-      raw = window.localStorage.getItem(WORKSPACE_BACKUP_STORAGE_KEY);
-    }
-
-    if (!raw) {
-      return getInitialWorkspaceState();
-    }
-
-    let parsed: Partial<WorkspaceState> | null = null;
-    try {
-      parsed = JSON.parse(raw) as Partial<WorkspaceState>;
-    } catch (parseErr) {
-      console.warn(
-        '[WorkspacePersistence] Primary storage JSON corrupted, attempting backup recovery (PR-03):',
-        parseErr
-      );
-      const backupRaw = window.localStorage.getItem(WORKSPACE_BACKUP_STORAGE_KEY);
-      if (backupRaw) {
-        parsed = JSON.parse(backupRaw) as Partial<WorkspaceState>;
-      } else {
-        throw parseErr;
-      }
-    }
-
+    const parsed = JSON.parse(rawString) as Partial<WorkspaceState>;
     if (!parsed || !parsed.workspaces || typeof parsed.workspaces !== 'object') {
-      return getInitialWorkspaceState();
+      return null;
     }
 
     const sanitizedWorkspaces: Record<string, Workspace> = {};
@@ -147,6 +119,35 @@ export function loadWorkspaceState(): WorkspaceState {
       active: activeId,
       workspaces: sanitizedWorkspaces
     };
+  } catch {
+    return null;
+  }
+}
+
+/** Loads workspace state from localStorage with migration and corruption recovery. */
+export function loadWorkspaceState(): WorkspaceState {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return getInitialWorkspaceState();
+  }
+
+  try {
+    const primaryRaw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    const primaryState = tryParseAndSanitize(primaryRaw);
+    if (primaryState) {
+      return primaryState;
+    }
+
+    // Primary failed (missing, corrupted JSON, or bad shape). Attempt recovery from .bak (PR-03)
+    const backupRaw = window.localStorage.getItem(WORKSPACE_BACKUP_STORAGE_KEY);
+    const backupState = tryParseAndSanitize(backupRaw);
+    if (backupState) {
+      console.warn(
+        '[WorkspacePersistence] Primary storage corrupted or bad shape; successfully recovered from backup slot (PR-03).'
+      );
+      return backupState;
+    }
+
+    return getInitialWorkspaceState();
   } catch (err) {
     console.error('[WorkspacePersistence] Error reading workspace state:', err);
     return getInitialWorkspaceState();

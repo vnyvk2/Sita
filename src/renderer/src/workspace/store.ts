@@ -309,13 +309,16 @@ export const workspaceActions = {
         active: state.active === id ? DEFAULT_PRESET.id : state.active
       };
     });
-    dndStore.setState((s) => ({
-      ...s,
-      maximizedPanelId: isActiveDeleted ? null : s.maximizedPanelId,
-      targetWorkspaceId: isTargetRenamingDeleted ? null : s.targetWorkspaceId,
-      isSaveLayoutModalOpen: isTargetRenamingDeleted ? false : s.isSaveLayoutModalOpen,
-      saveLayoutModalMode: isTargetRenamingDeleted ? 'save' : s.saveLayoutModalMode
-    }));
+    if (isActiveDeleted) {
+      resetTransientWorkspaceState();
+    } else if (isTargetRenamingDeleted) {
+      dndStore.setState((s) => ({
+        ...s,
+        targetWorkspaceId: null,
+        isSaveLayoutModalOpen: false,
+        saveLayoutModalMode: 'save'
+      }));
+    }
     return true;
   },
 
