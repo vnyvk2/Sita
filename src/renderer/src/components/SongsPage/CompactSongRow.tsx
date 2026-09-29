@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
-import { songCacheKeys } from '../../queries/songs';
+import { songCacheKeys, songQuery } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
 import { store } from '../../store/store';
 import Button from '../Button';
@@ -52,6 +52,7 @@ export const CompactSongRow = memo(
       genres,
       discNo,
       trackNo,
+      isDelegated = false,
       onContextMenu: directContextMenu,
       onMoreOptionsClick: directMoreOptionsClick
     } = props;
@@ -123,6 +124,18 @@ export const CompactSongRow = memo(
         return changed ? updated : old;
       });
 
+      // Optimistically update legacy/non-windowed song queries
+      queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
+        { queryKey: songQuery.all._def },
+        (old) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((s) => (s.songId === songId ? { ...s, isAFavorite: nextFav } : s))
+          };
+        }
+      );
+
       if (isCurrentSong) {
         toggleIsFavorite(nextFav, true);
       }
@@ -133,6 +146,23 @@ export const CompactSongRow = memo(
           if (likeMutationSeqRef.current !== currentSeq) return;
           if (res && res.likes.length + res.dislikes.length === 0) {
             setOptimisticFavorite({ songId, isFavorite: !nextFav });
+            queryClient.setQueriesData<SongData[]>(
+              { queryKey: songCacheKeys.windowsRoot },
+              (old) => {
+                if (!Array.isArray(old)) return old;
+                return old.map((s) => (s && s.songId === songId ? { ...s, isAFavorite: !nextFav } : s));
+              }
+            );
+            queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
+              { queryKey: songQuery.all._def },
+              (old) => {
+                if (!old?.data) return old;
+                return {
+                  ...old,
+                  data: old.data.map((s) => (s.songId === songId ? { ...s, isAFavorite: !nextFav } : s))
+                };
+              }
+            );
           } else {
             queryClient.invalidateQueries({ queryKey: ['songs', 'favorites'] });
           }
@@ -166,9 +196,12 @@ export const CompactSongRow = memo(
       isCompact: true
     });
 
-    const handleContextMenu = directContextMenu ?? fallbackContextMenu.handleContextMenu;
-    const handleMoreOptionsClick =
-      directMoreOptionsClick ?? fallbackContextMenu.handleMoreOptionsClick;
+    const handleContextMenu = isDelegated
+      ? directContextMenu
+      : (directContextMenu ?? fallbackContextMenu.handleContextMenu);
+    const handleMoreOptionsClick = isDelegated
+      ? directMoreOptionsClick
+      : (directMoreOptionsClick ?? fallbackContextMenu.handleMoreOptionsClick);
 
     // Duration formatting
     const { minutes, seconds } = useMemo(() => {

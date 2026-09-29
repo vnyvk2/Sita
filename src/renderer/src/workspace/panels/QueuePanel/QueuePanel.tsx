@@ -43,8 +43,14 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
   const viewingQueue = manager?.queues?.[activeQueueIndex] ?? manager?.getActiveQueue();
   const queueId = viewingQueue?.id ?? currentQueue?.id ?? `queue-${activeQueueIndex}`;
 
-  // Robust versioning: use queue's membershipVersion if present, else FNV-1a hash of songIds
+  // Robust versioning: use queue's structureVersion and membershipVersion if present, else FNV-1a hash of songIds
   const queueVersion = useMemo(() => {
+    if (
+      viewingQueue?.structureVersion !== undefined &&
+      viewingQueue?.membershipVersion !== undefined
+    ) {
+      return `${queueId}:${viewingQueue.structureVersion}:${viewingQueue.membershipVersion}`;
+    }
     if (viewingQueue?.membershipVersion !== undefined) {
       return `${queueId}:${viewingQueue.membershipVersion}`;
     }
@@ -54,7 +60,7 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
       hash = Math.imul(hash, 16777619);
     }
     return `${queueId}:${songIds.length}:${hash >>> 0}`;
-  }, [viewingQueue?.membershipVersion, queueId, songIds]);
+  }, [viewingQueue?.structureVersion, viewingQueue?.membershipVersion, queueId, songIds]);
 
   // Stable item identity mapping to preserve Virtuoso element recycling across queue mutations
   const nextKeyRef = useRef(1);

@@ -11,7 +11,7 @@ import {
   updateMissingLyricsForSongs,
   type SongDataForAutoTag
 } from '../../utils/autoTagUtils';
-import { songQuery } from '../../queries/songs';
+import { songCacheKeys, songQuery } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
 import { store } from '../../store/store';
 
@@ -160,6 +160,18 @@ export async function buildSongContextMenuItems(
       .toggleLikeSongs([songId], nextFav)
       .then((res) => {
         if (res && (res.likes.length > 0 || res.dislikes.length > 0)) {
+          queryClient.setQueriesData<SongData[]>({ queryKey: songCacheKeys.windowsRoot }, (old) => {
+            if (!Array.isArray(old)) return old;
+            let changed = false;
+            const updated = old.map((s) => {
+              if (s && s.songId === songId) {
+                changed = true;
+                return { ...s, isAFavorite: nextFav };
+              }
+              return s;
+            });
+            return changed ? updated : old;
+          });
           queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
             { queryKey: songQuery.all._def },
             (old) => {

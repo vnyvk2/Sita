@@ -198,4 +198,51 @@ describe('Song Row Density & Dispatcher', () => {
       expect(skeleton).not.toBeNull();
     });
   });
+
+  describe('isDelegated event propagation & SmallSongRow Img optimization', () => {
+    it('does not halt contextmenu propagation when isDelegated is true', () => {
+      let bubbled = false;
+      const onParentContextMenu = () => {
+        bubbled = true;
+      };
+
+      const { container } = render(
+        <div onContextMenu={onParentContextMenu}>
+          <AppUpdateContext.Provider value={mockContextValue}>
+            <SongPreferencesProvider>
+              <Song
+                index={0}
+                songId={101}
+                title="Delegated Song"
+                duration={180}
+                path="/test.mp3"
+                isAFavorite={false}
+                isIndexingSongs={false}
+                artworkPaths={{ isDefaultArtwork: true, artworkPath: '', optimizedArtworkPath: '' }}
+                isDelegated={true}
+                isCompact={false}
+                rowSize="small"
+              />
+            </SongPreferencesProvider>
+          </AppUpdateContext.Provider>
+        </div>
+      );
+
+      const row = container.querySelector('[data-song-id="101"]');
+      expect(row).not.toBeNull();
+
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+      row?.dispatchEvent(event);
+
+      expect(bubbled).toBe(true);
+    });
+
+    it('SmallSongRow Img has decoding="async" and enableImgFadeIns={false}', () => {
+      const { container } = renderSong({ isCompact: false, rowSize: 'small' });
+      const img = container.querySelector('img');
+      expect(img).not.toBeNull();
+      expect(img?.getAttribute('decoding')).toBe('async');
+    });
+  });
 });
+

@@ -18,7 +18,7 @@ import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
-import { songCacheKeys } from '../../queries/songs';
+import { songCacheKeys, songQuery } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
 import { store } from '../../store/store';
 import Button from '../Button';
@@ -56,6 +56,7 @@ export const SmallSongRow = memo(
       genres,
       discNo,
       trackNo,
+      isDelegated = false,
       onContextMenu: directContextMenu,
       onMoreOptionsClick: directMoreOptionsClick
     } = props;
@@ -123,6 +124,18 @@ export const SmallSongRow = memo(
         return changed ? updated : old;
       });
 
+      // Optimistically update legacy/non-windowed song queries
+      queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
+        { queryKey: songQuery.all._def },
+        (old) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.map((s) => (s.songId === songId ? { ...s, isAFavorite: nextFav } : s))
+          };
+        }
+      );
+
       if (isCurrentSong) {
         toggleIsFavorite(nextFav, true);
       }
@@ -133,6 +146,23 @@ export const SmallSongRow = memo(
           if (likeMutationSeqRef.current !== currentSeq) return;
           if (res && res.likes.length + res.dislikes.length === 0) {
             setOptimisticFavorite({ songId, isFavorite: !nextFav });
+            queryClient.setQueriesData<SongData[]>(
+              { queryKey: songCacheKeys.windowsRoot },
+              (old) => {
+                if (!Array.isArray(old)) return old;
+                return old.map((s) => (s && s.songId === songId ? { ...s, isAFavorite: !nextFav } : s));
+              }
+            );
+            queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
+              { queryKey: songQuery.all._def },
+              (old) => {
+                if (!old?.data) return old;
+                return {
+                  ...old,
+                  data: old.data.map((s) => (s.songId === songId ? { ...s, isAFavorite: !nextFav } : s))
+                };
+              }
+            );
           } else {
             queryClient.invalidateQueries({ queryKey: ['songs', 'favorites'] });
           }
@@ -167,8 +197,12 @@ export const SmallSongRow = memo(
       isCompact: false
     });
 
-    const handleContextMenu = directContextMenu ?? fallbackContextMenu.handleContextMenu;
-    const handleMoreOptionsClick = directMoreOptionsClick ?? fallbackContextMenu.handleMoreOptionsClick;
+    const handleContextMenu = isDelegated
+      ? directContextMenu
+      : (directContextMenu ?? fallbackContextMenu.handleContextMenu);
+    const handleMoreOptionsClick = isDelegated
+      ? directMoreOptionsClick
+      : (directMoreOptionsClick ?? fallbackContextMenu.handleMoreOptionsClick);
 
     const { minutes, seconds } = useMemo(() => {
       const addZero = (num: number) => (num < 10 ? `0${num}` : num.toString());
@@ -285,6 +319,8 @@ export const SmallSongRow = memo(
             alt={title}
             className="h-full w-full object-cover"
             loading="lazy"
+            decoding="async"
+            enableImgFadeIns={false}
           />
         </div>
 

@@ -219,6 +219,12 @@ const QueueContainer = (props: Props) => {
   const queueId = currentQueue?.id ?? viewingQueue?.id ?? 'active';
 
   const queueVersion = useMemo(() => {
+    if (
+      viewingQueue?.structureVersion !== undefined &&
+      viewingQueue?.membershipVersion !== undefined
+    ) {
+      return `${queueId}:${viewingQueue.structureVersion}:${viewingQueue.membershipVersion}`;
+    }
     if (viewingQueue?.membershipVersion !== undefined) {
       return `${queueId}:${viewingQueue.membershipVersion}`;
     }
@@ -228,7 +234,7 @@ const QueueContainer = (props: Props) => {
       hash = Math.imul(hash, 16777619);
     }
     return `${queueId}:${songIds.length}:${hash >>> 0}`;
-  }, [viewingQueue?.membershipVersion, queueId, songIds]);
+  }, [viewingQueue?.structureVersion, viewingQueue?.membershipVersion, queueId, songIds]);
 
   const activePosition = queue.queues[queue.currentQueueIndex]?.position ?? -1;
   const isViewingActiveQueue = viewingQueueIndex === queue.currentQueueIndex;

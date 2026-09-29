@@ -475,6 +475,7 @@ function SongsPage() {
             selectAllHandler={selectAllHandler}
             hasBodyBackgroundImage={hasBodyBackgroundImage}
             isCompact={isCompactSongView}
+            isDelegated={true}
             rowSize={songViewMode === 'small' ? 'small' : 'normal'}
             {...song}
           />

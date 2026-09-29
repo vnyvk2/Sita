@@ -71,6 +71,8 @@ export interface SongProp {
   isCompact?: boolean;
   /** Active row size for views with artwork ('normal' = 60px card, 'small' = 48px row). Defaults to 'normal'. */
   rowSize?: 'normal' | 'small';
+  /** When true, contextmenu and more-options click events bubble to list container without local interception */
+  isDelegated?: boolean;
   /** Optional direct contextmenu handler for tests/delegation */
   onContextMenu?: (e: React.MouseEvent) => void;
   /** Optional direct more options click handler for tests/delegation */
@@ -105,6 +107,7 @@ export const StandardSongRow = memo(
       onPlayClick,
       highlightText,
       hasBodyBackgroundImage,
+      isDelegated = false,
       onContextMenu: directContextMenu
     } = props;
 
@@ -362,7 +365,9 @@ export const StandardSongRow = memo(
       isCompact: false
     });
 
-    const handleContextMenu = directContextMenu ?? fallbackContextMenu.handleContextMenu;
+    const handleContextMenu = isDelegated
+      ? directContextMenu
+      : (directContextMenu ?? fallbackContextMenu.handleContextMenu);
 
     return (
       <div
