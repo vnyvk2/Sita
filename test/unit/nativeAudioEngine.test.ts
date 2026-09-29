@@ -225,4 +225,28 @@ describe('Native Audio Backend - Anchored RAF Interpolation', () => {
 
     backend.destroy();
   });
+
+  it('dispatches set_dsp command with karaoke toggle to daemon', async () => {
+    const backend = new NativeAudioBackend(callbacks);
+
+    await backend.setDsp({ karaoke: true });
+    expect(sendMock).toHaveBeenCalledWith({
+      cmd: 'set_dsp',
+      bypass: false,
+      rg_db: 0.0,
+      karaoke: true,
+      limiter: true
+    });
+
+    await backend.setDsp({ karaoke: false });
+    expect(sendMock).toHaveBeenCalledWith({
+      cmd: 'set_dsp',
+      bypass: false,
+      rg_db: 0.0,
+      karaoke: false,
+      limiter: true
+    });
+
+    backend.destroy();
+  });
 });

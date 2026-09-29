@@ -271,6 +271,8 @@ class AudioPlayer {
       this.isNativeEngineActive = true;
       const vol = store.state.player?.volume?.value ?? this.currentVolume;
       this.nativeBackend.setVolume(vol / 100).catch(() => {});
+      const isKaraoke = storage.playback.getPlaybackOptions('isKaraoke') ?? false;
+      this.nativeBackend.setDsp({ karaoke: isKaraoke }).catch(() => {});
     } catch (err) {
       console.warn('[AudioPlayer] Failed to initialize native audio backend, using WebAudio:', err);
       this.isNativeEngineActive = false;
@@ -1950,6 +1952,9 @@ class AudioPlayer {
         storage.playback.setPlaybackOptions('karaokeLevel', level);
       }
       this.emit('karaokeChange', { enabled, level: this.karaokeNode.level });
+    }
+    if (this.isNativeEngineActive && this.nativeBackend) {
+      this.nativeBackend.setDsp({ karaoke: enabled }).catch(() => {});
     }
   }
 

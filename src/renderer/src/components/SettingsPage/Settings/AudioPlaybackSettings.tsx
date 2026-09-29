@@ -1,4 +1,4 @@
-import { dispatch, store } from '@renderer/store/store';
+import { dispatch, flushPendingLocalStorage, store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 import { lazy, useContext, useEffect, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +37,10 @@ const AudioPlaybackSettings = () => {
     store,
     (state) => state.localStorage?.playback?.audioFx?.preset ?? 'normal'
   );
+  const useNativeEngine = useStore(
+    store,
+    (state) => state.localStorage?.playback?.useNativeAudioEngine ?? false
+  );
 
   const { t } = useTranslation();
   const { changePromptMenuData } = useContext(AppUpdateContext);
@@ -48,14 +52,12 @@ const AudioPlaybackSettings = () => {
   const [preampDb, setPreampDb] = useState(0);
   const [preventClipping, setPreventClipping] = useState(true);
   const [crossfadeDuration, setCrossfadeDuration] = useState(0);
-  const [useNativeEngine, setUseNativeEngine] = useState(false);
 
   useEffect(() => {
     const interval = storage.preferences.getPreferences('seekbarScrollInterval');
     const playbackRate = storage.playback.getPlaybackOptions('playbackRate');
     const rg = storage.playback.getPlaybackOptions('replayGain');
     const cf = storage.playback.getPlaybackOptions('crossfade');
-    const nativeEngine = storage.playback.getPlaybackOptions('useNativeAudioEngine');
 
     setPlaybackRateInterval(playbackRate);
     setSeekbarScrollInterval(interval.toString());
@@ -69,22 +71,17 @@ const AudioPlaybackSettings = () => {
     if (cf && typeof cf.duration === 'number') {
       setCrossfadeDuration(cf.duration);
     }
-
-    if (typeof nativeEngine === 'boolean') {
-      setUseNativeEngine(nativeEngine);
-    }
   }, []);
 
   const updateUseNativeEngine = (enabled: boolean) => {
-    setUseNativeEngine(enabled);
     storage.playback.setPlaybackOptions('useNativeAudioEngine', enabled);
-    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: storage.getLocalStorage() });
+    flushPendingLocalStorage();
   };
 
   const updateCrossfade = (duration: number) => {
     setCrossfadeDuration(duration);
     storage.playback.setPlaybackOptions('crossfade', { duration });
-    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: storage.getLocalStorage() });
+    flushPendingLocalStorage();
   };
 
   const updateReplayGain = (
@@ -101,7 +98,7 @@ const AudioPlaybackSettings = () => {
     };
     const next = { ...current, ...updated };
     storage.playback.setPlaybackOptions('replayGain', next);
-    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: storage.getLocalStorage() });
+    flushPendingLocalStorage();
   };
 
   const playbackRateSeekBarCssProperties: CSSProperties = {};
