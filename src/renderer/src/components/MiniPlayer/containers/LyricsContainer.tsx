@@ -28,14 +28,7 @@ const LyricsContainer = (props: Props) => {
   const isSynced = Boolean(lyrics?.lyrics?.isSynced);
   const activeLineIndex = useActiveLyricIndex(isLyricsVisible ? lyrics : null);
 
-  const {
-    scrollMode,
-    isAutoScrolling,
-    direction,
-    showSnapBack,
-    handleSnapBack,
-    handleToggleScrollMode
-  } = useLyricsScrollSync({
+  const { isAutoScrolling, direction, showSnapBack, handleSnapBack } = useLyricsScrollSync({
     containerRef: scrollContainerRef,
     activeLineIndex,
     isSynced,
@@ -72,62 +65,35 @@ const LyricsContainer = (props: Props) => {
 
   return (
     <div
-      className={`absolute inset-0 z-30 transition-all duration-200 select-none ${
-        isLyricsVisible ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+      ref={scrollContainerRef}
+      className={`mini-player-lyrics-container absolute inset-0 z-20 flex flex-col items-center overflow-x-hidden overflow-y-auto px-4 py-12 transition-all duration-200 select-none ${
+        isLyricsVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
       }`}
+      id="miniPlayerLyricsContainer"
     >
-      {/* Scroll Mode Toggle (Top-Left corner, below the 32px title bar drag region) */}
-      {isLyricsVisible && isSynced && lyricsComponents.length > 0 && (
-        <button
-          type="button"
-          onClick={handleToggleScrollMode}
-          title={
-            scrollMode === 'auto'
-              ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
-              : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
-          }
-          className="[-webkit-app-region:no-drag] absolute top-9.5 left-2.5 z-50 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md bg-black/60 backdrop-blur-md transition-all hover:scale-105 hover:bg-black/80 active:scale-95"
-        >
-          <span
-            className={`material-symbols-rounded text-base ${
-              scrollMode === 'auto' ? 'text-accent' : 'text-white/70'
-            }`}
-          >
-            {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
-          </span>
-        </button>
+      {isLyricsVisible && lyricsComponents.length > 0 && lyrics && (
+        <>
+          {lyricsComponents}
+          {lyricsSource}
+        </>
+      )}
+      {isLyricsVisible && lyrics && lyricsComponents.length === 0 && (
+        <div className="text-font-color-white flex h-full w-full items-center justify-center opacity-75">
+          {t('lyricsPage.noLyrics')}
+        </div>
+      )}
+      {isLyricsVisible && lyrics === undefined && (
+        <div className="text-font-color-white flex h-full w-full items-center justify-center">
+          {t('lyricsPage.noLyrics')}
+        </div>
       )}
 
-      {/* Main lyrics scroll container */}
-      <div
-        ref={scrollContainerRef}
-        className="mini-player-lyrics-container flex h-full w-full flex-col items-center overflow-x-hidden overflow-y-auto px-4 py-12 select-none"
-        id="miniPlayerLyricsContainer"
-      >
-        {isLyricsVisible && lyricsComponents.length > 0 && lyrics && (
-          <>
-            {lyricsComponents}
-            {lyricsSource}
-          </>
-        )}
-        {isLyricsVisible && lyrics && lyricsComponents.length === 0 && (
-          <div className="text-font-color-white flex h-full w-full items-center justify-center opacity-75">
-            {t('lyricsPage.noLyrics')}
-          </div>
-        )}
-        {isLyricsVisible && lyrics === undefined && (
-          <div className="text-font-color-white flex h-full w-full items-center justify-center">
-            {t('lyricsPage.noLyrics')}
-          </div>
-        )}
-      </div>
-
-      {/* Floating bidirectional snap-back button */}
+      {/* Snap-back pill — inside the scroll container so it doesn't block window controls */}
       {showSnapBack && direction && (
         <FloatingLyricsSnapBackBtn
           direction={direction}
           onClick={handleSnapBack}
-          className={direction === 'up' ? 'top-10' : 'bottom-14'}
+          className={`sticky ${direction === 'up' ? 'top-0' : 'bottom-0'}`}
         />
       )}
     </div>
