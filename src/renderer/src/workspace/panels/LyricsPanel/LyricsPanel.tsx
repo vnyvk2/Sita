@@ -1,14 +1,15 @@
+import FloatingLyricsSnapBackBtn from '@renderer/components/LyricsPage/FloatingLyricsSnapBackBtn';
 import LyricsAmbientBackground from '@renderer/components/LyricsPage/LyricsAmbientBackground';
 import { renderLyricsLines } from '@renderer/components/LyricsPage/lyricsUtils';
 import NoLyrics from '@renderer/components/LyricsPage/NoLyrics';
 import { useActiveLyricIndex } from '@renderer/components/LyricsPage/useActiveLyricIndex';
+import { useLyricsScrollSync } from '@renderer/components/LyricsPage/useLyricsScrollSync';
 import useSkipLyricsLines from '@renderer/hooks/useSkipLyricsLines';
 import { useLyricsQuery } from '@renderer/queries/lyrics';
 import { store } from '@renderer/store/store';
-import storage from '@renderer/utils/localStorage';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type FC } from 'react';
+import { memo, useMemo, useRef, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PanelProps } from '../../registry';
@@ -21,8 +22,7 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const abLoop = useStore(store, (state) => state.player.abLoop);
 
-  const scrollMode = preferences?.lyricsScrollMode ?? 'auto';
-  const isAutoScrolling = scrollMode === 'auto';
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { data: lyrics, isPending: isLoadingLyrics } = useLyricsQuery({
     enabled: Boolean(currentSongData.songId)
@@ -30,7 +30,22 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
 
   useSkipLyricsLines(lyrics);
 
+  const isSynced = Boolean(lyrics?.lyrics?.isSynced);
   const activeLineIndex = useActiveLyricIndex(lyrics ?? null);
+
+  const {
+    scrollMode,
+    isAutoScrolling,
+    direction,
+    showSnapBack,
+    handleSnapBack,
+    handleToggleScrollMode
+  } = useLyricsScrollSync({
+    containerRef: scrollContainerRef,
+    activeLineIndex,
+    isSynced,
+    songId: currentSongData.songId
+  });
 
   const lyricsComponents = useMemo(() => {
     return renderLyricsLines(
@@ -50,73 +65,7 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
     });
   };
 
-  const handleToggleScrollMode = useCallback(() => {
-    const next = scrollMode === 'auto' ? 'manual' : 'auto';
-    storage.preferences.setPreferences('lyricsScrollMode', next);
-  }, [scrollMode]);
-
-  // --- Floating snap-back button logic ---
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [showSnapBack, setShowSnapBack] = useState(false);
-  const userScrolledRef = useRef(false);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
-
-  // Detect user-initiated scroll (wheel/touch) to show the snap-back button
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const handleUserScroll = () => {
-      userScrolledRef.current = true;
-      setShowSnapBack(true);
-
-      // In auto mode, briefly show snap-back then hide after auto-scroll catches up
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-      if (isAutoScrolling) {
-        scrollTimeoutRef.current = setTimeout(() => {
-          userScrolledRef.current = false;
-          setShowSnapBack(false);
-        }, 3000);
-      }
-    };
-
-    container.addEventListener('wheel', handleUserScroll, { passive: true });
-    container.addEventListener('touchmove', handleUserScroll, { passive: true });
-
-    return () => {
-      container.removeEventListener('wheel', handleUserScroll);
-      container.removeEventListener('touchmove', handleUserScroll);
-      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
-    };
-  }, [isAutoScrolling]);
-
-  // Hide snap-back when active line changes in auto mode (auto-scroll caught up)
-  useEffect(() => {
-    if (isAutoScrolling && !userScrolledRef.current) {
-      setShowSnapBack(false);
-    }
-  }, [activeLineIndex, isAutoScrolling]);
-
-  // Snap-back: scroll to the currently active lyric line
-  const handleSnapBack = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container || activeLineIndex == null) return;
-
-    // Find the active lyric line element via data-active-line or fallback to highlight class
-    const activeLine =
-      container.querySelector('[data-active-line="true"]') ??
-      container.querySelectorAll('.highlight')[activeLineIndex === -1 ? 0 : activeLineIndex + 1];
-
-    if (activeLine) {
-      activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    userScrolledRef.current = false;
-    setShowSnapBack(false);
-  }, [activeLineIndex]);
-
   const hasLyrics = lyricsComponents.length > 0;
-  const isSynced = Boolean(lyrics?.lyrics?.isSynced);
 
   return (
     <div className="lyrics-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white relative flex h-full w-full flex-col overflow-hidden">
@@ -150,18 +99,18 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
               type="button"
               onClick={handleToggleScrollMode}
               title={
-                isAutoScrolling
+                scrollMode === 'auto'
                   ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
                   : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
               }
               className={`flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
-                isAutoScrolling
+                scrollMode === 'auto'
                   ? 'text-accent hover:bg-stone-200 dark:hover:bg-stone-700'
                   : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200 dark:hover:bg-stone-700'
               }`}
             >
               <span className="material-symbols-rounded text-sm">
-                {isAutoScrolling ? 'swap_vert' : 'swipe_up'}
+                {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
               </span>
             </button>
           )}
@@ -207,17 +156,13 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
         )}
       </div>
 
-      {/* Floating snap-back button (Spotify-style) */}
-      {!isAutoScrolling && isSynced && hasLyrics && showSnapBack && activeLineIndex != null && (
-        <button
-          type="button"
+      {/* Floating bidirectional snap-back button */}
+      {showSnapBack && direction && (
+        <FloatingLyricsSnapBackBtn
+          direction={direction}
           onClick={handleSnapBack}
-          title={t('lyricsPage.scrollToCurrentLine', 'Scroll to current line')}
-          className="bg-accent absolute bottom-6 left-1/2 z-20 flex -translate-x-1/2 cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-xl transition-all hover:scale-105 hover:shadow-2xl active:scale-95"
-        >
-          <span className="material-symbols-rounded text-base">keyboard_double_arrow_down</span>
-          <span>{t('lyricsPage.currentLine', 'Current line')}</span>
-        </button>
+          className={direction === 'up' ? 'top-11' : 'bottom-4'}
+        />
       )}
     </div>
   );
