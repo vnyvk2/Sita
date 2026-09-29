@@ -102,10 +102,10 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
     const container = scrollContainerRef.current;
     if (!container || activeLineIndex == null) return;
 
-    // Find the active lyric line element via the highlight/isActive class pattern
-    const allLines = container.querySelectorAll('.highlight');
+    // Find the active lyric line element via data-active-line or fallback to highlight class
     const activeLine =
-      activeLineIndex === -1 ? allLines[0] : allLines[activeLineIndex >= 0 ? activeLineIndex + 1 : 0];
+      container.querySelector('[data-active-line="true"]') ??
+      container.querySelectorAll('.highlight')[activeLineIndex === -1 ? 0 : activeLineIndex + 1];
 
     if (activeLine) {
       activeLine.scrollIntoView({ behavior: 'smooth', block: 'center' });

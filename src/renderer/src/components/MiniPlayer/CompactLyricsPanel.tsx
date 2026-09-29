@@ -2,8 +2,9 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import { SYNCED_LYRICS_REGEX } from '@common/isLyricsSynced';
 import { store } from '@renderer/store/store';
+import storage from '@renderer/utils/localStorage';
 import { useStore } from '@tanstack/react-store';
-import { useCallback, useContext, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
@@ -36,6 +37,9 @@ const CompactLyricsPanel = (props: Props) => {
   const { isLyricsVisible, onClose } = props;
 
   const currentSongData = useStore(store, (state) => state.currentSongData);
+  const preferences = useStore(store, (state) => state.localStorage.preferences);
+  const scrollMode = preferences?.lyricsScrollMode ?? 'auto';
+  const isAutoScrolling = scrollMode === 'auto';
 
   const { updateSongPosition } = useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -48,9 +52,11 @@ const CompactLyricsPanel = (props: Props) => {
   const lineRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const isUserScrollingRef = useRef(false);
   const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showSnapBack, setShowSnapBack] = useState(false);
 
   // Auto-scroll isolated to the lyrics viewport (does NOT scroll parent containers)
   useEffect(() => {
+    if (!isAutoScrolling) return;
     if (isUserScrollingRef.current) return;
     if (currentLineIndex >= 0 && scrollContainerRef.current) {
       const lineEl = lineRefs.current.get(currentLineIndex);
@@ -68,18 +74,28 @@ const CompactLyricsPanel = (props: Props) => {
         }
       }
     }
-  }, [currentLineIndex]);
+  }, [currentLineIndex, isAutoScrolling]);
 
   // Handle user manual scroll via wheel/touch with temporary pause on auto-scroll
   const handleUserInteraction = useCallback(() => {
     isUserScrollingRef.current = true;
+    setShowSnapBack(true);
     if (userScrollTimeoutRef.current) {
       clearTimeout(userScrollTimeoutRef.current);
     }
-    userScrollTimeoutRef.current = setTimeout(() => {
-      isUserScrollingRef.current = false;
-    }, 2500);
-  }, []);
+    if (isAutoScrolling) {
+      userScrollTimeoutRef.current = setTimeout(() => {
+        isUserScrollingRef.current = false;
+        setShowSnapBack(false);
+      }, 2500);
+    }
+  }, [isAutoScrolling]);
+
+  useEffect(() => {
+    if (isAutoScrolling && !isUserScrollingRef.current) {
+      setShowSnapBack(false);
+    }
+  }, [currentLineIndex, isAutoScrolling]);
 
   useEffect(() => {
     return () => {
@@ -88,6 +104,32 @@ const CompactLyricsPanel = (props: Props) => {
       }
     };
   }, []);
+
+  const handleToggleScrollMode = useCallback(() => {
+    const next = scrollMode === 'auto' ? 'manual' : 'auto';
+    storage.preferences.setPreferences('lyricsScrollMode', next);
+  }, [scrollMode]);
+
+  const handleSnapBack = useCallback(() => {
+    if (currentLineIndex >= 0 && scrollContainerRef.current) {
+      const lineEl = lineRefs.current.get(currentLineIndex);
+      if (lineEl) {
+        const container = scrollContainerRef.current;
+        const targetScrollTop =
+          lineEl.offsetTop - container.clientHeight / 2 + lineEl.clientHeight / 2;
+        if (typeof container.scrollTo === 'function') {
+          container.scrollTo({
+            top: Math.max(0, targetScrollTop),
+            behavior: 'smooth'
+          });
+        } else {
+          container.scrollTop = Math.max(0, targetScrollTop);
+        }
+      }
+    }
+    isUserScrollingRef.current = false;
+    setShowSnapBack(false);
+  }, [currentLineIndex]);
 
   const parsedLyrics = useMemo(
     () => lyrics?.lyrics?.parsedLyrics ?? [],
@@ -117,15 +159,37 @@ const CompactLyricsPanel = (props: Props) => {
         <div className="absolute inset-0 bg-black/60" />
       </div>
 
-      {/* ── Layer 2: Floating Close Button (z-30) ── */}
-      <button
-        type="button"
-        className="text-font-color-white/70 absolute top-2 right-2 z-30 flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-[#e81123] hover:text-white"
-        onClick={onClose}
-        title={t('common.close', 'Close')}
-      >
-        <CloseIcon className="h-2 w-2" />
-      </button>
+      {/* ── Layer 2: Floating Header Controls (z-30) ── */}
+      <div className="absolute top-2 right-2 z-30 flex items-center gap-1.5">
+        {lyrics && isSynced && parsedLyrics.length > 0 && (
+          <button
+            type="button"
+            onClick={handleToggleScrollMode}
+            title={
+              isAutoScrolling
+                ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
+                : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
+            }
+            className={`flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 backdrop-blur-xs transition-colors ${
+              isAutoScrolling
+                ? 'text-accent hover:bg-black/60'
+                : 'text-font-color-white/70 hover:bg-black/60 hover:text-white'
+            }`}
+          >
+            <span className="material-symbols-rounded text-xs">
+              {isAutoScrolling ? 'swap_vert' : 'swipe_up'}
+            </span>
+          </button>
+        )}
+        <button
+          type="button"
+          className="text-font-color-white/70 flex h-5 w-5 cursor-pointer items-center justify-center rounded-sm bg-black/40 transition-colors hover:bg-[#e81123] hover:text-white"
+          onClick={onClose}
+          title={t('common.close', 'Close')}
+        >
+          <CloseIcon className="h-2 w-2" />
+        </button>
+      </div>
 
       {/* ── Layer 3: Lyrics Scrollable Viewport (Strict min-h-0 flex-1 container at z-10) ── */}
       <div
@@ -189,6 +253,23 @@ const CompactLyricsPanel = (props: Props) => {
           </div>
         )}
       </div>
+
+      {/* ── Floating Snap-Back Button (z-30) ── */}
+      {!isAutoScrolling &&
+        isSynced &&
+        parsedLyrics.length > 0 &&
+        showSnapBack &&
+        currentLineIndex >= 0 && (
+          <button
+            type="button"
+            onClick={handleSnapBack}
+            title={t('lyricsPage.scrollToCurrentLine', 'Scroll to current line')}
+            className="bg-accent absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 cursor-pointer items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-medium text-white shadow-xl backdrop-blur-md transition-all hover:scale-105 hover:shadow-2xl active:scale-95"
+          >
+            <span className="material-symbols-rounded text-xs">keyboard_double_arrow_down</span>
+            <span>{t('lyricsPage.currentLine', 'Current line')}</span>
+          </button>
+        )}
 
       {/* ── Layer 4: Pinned Attribution Footer (z-10 outside scrolling viewport) ── */}
       {lyrics?.source && (
