@@ -186,7 +186,7 @@ describe('SettingsSearchInput component', () => {
     expect(document.activeElement).not.toBe(searchInput);
   });
 
-  it('triggers jumpToSetting when an option receives onMouseDown and prevents default blur', () => {
+  it('prevents default on onMouseDown to avoid blur race, and executes jumpToSetting exactly once on click', () => {
     renderComponent();
 
     const input = screen.getByRole('combobox');
@@ -195,9 +195,13 @@ describe('SettingsSearchInput component', () => {
     const options = screen.getAllByRole('option');
     const mouseDownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
     fireEvent(options[0], mouseDownEvent);
-
-    expect(mockJumpToSetting).toHaveBeenCalledTimes(1);
     expect(mouseDownEvent.defaultPrevented).toBe(true);
+
+    // Click triggers selection
+    fireEvent.click(options[0]);
+
+    // Must be called exactly once (no double fire)
+    expect(mockJumpToSetting).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
@@ -279,6 +283,28 @@ describe('SettingsSearchInput component', () => {
     fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
 
     expect(document.activeElement).toBe(otherInput);
+    expect(document.activeElement).not.toBe(searchInput);
+  });
+
+  it('does NOT intercept Ctrl+F when a select element is focused', () => {
+    render(
+      <div>
+        <select data-testid="other-select">
+          <option value="1">Option 1</option>
+        </select>
+        <SettingsCollapseContext.Provider value={mockCollapseContext}>
+          <SettingsSearchInput />
+        </SettingsCollapseContext.Provider>
+      </div>
+    );
+
+    const otherSelect = screen.getByTestId('other-select');
+    const searchInput = screen.getByPlaceholderText('Search settings... (Ctrl+F or /)');
+
+    otherSelect.focus();
+    fireEvent.keyDown(window, { key: 'f', ctrlKey: true });
+
+    expect(document.activeElement).toBe(otherSelect);
     expect(document.activeElement).not.toBe(searchInput);
   });
 

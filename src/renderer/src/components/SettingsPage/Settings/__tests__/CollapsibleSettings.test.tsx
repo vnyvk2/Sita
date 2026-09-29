@@ -362,6 +362,10 @@ describe('SettingsCollapseProvider integration', () => {
     expect(target.getAttribute('tabindex')).toBe('-1');
     expect(document.activeElement).toBe(target);
 
+    // When focus leaves the element, temporary tabindex should be cleaned up (no DOM pollution)
+    fireEvent.blur(target);
+    expect(target.hasAttribute('tabindex')).toBe(false);
+
     window.requestAnimationFrame = originalRaf;
   });
 

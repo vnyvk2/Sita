@@ -608,6 +608,11 @@
     "lastScan": "Last scan: {{time}}",
     "lastScanNever": "Last scan: Never",
 
+    "metadataSources": "Metadata & AutoTag Sources",
+    "downloads": {
+      "title": "Online downloads"
+    },
+
     "storage": "Storage",
     "storageDescription": "See how Nora manages your library and utilizes your storage.",
 

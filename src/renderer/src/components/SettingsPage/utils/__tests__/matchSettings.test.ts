@@ -122,4 +122,21 @@ describe('matchSettings engine', () => {
     const matchedDescriptions = results.filter((r) => r.matchedField === 'description');
     expect(matchedDescriptions).toHaveLength(0);
   });
+
+  it('does not downgrade an alias prefix match (score 50) when multi-word tokens also match combined scope', () => {
+    const testCatalog: SettingCatalogEntry[] = [
+      {
+        id: 'setting-theme-palette',
+        sectionKey: 'appearance',
+        titleKey: 'settingsPage.themePreset',
+        defaultTitle: 'Theme Preset Selection',
+        keywords: ['preset selector', 'palette theme']
+      }
+    ];
+
+    const results = matchSettings('preset selector', testCatalog, mockTranslate);
+    expect(results.length).toBe(1);
+    // Score should be at least 50 (or 55 for multi-token full alias match), never downgraded to 45
+    expect(results[0].score).toBeGreaterThanOrEqual(50);
+  });
 });

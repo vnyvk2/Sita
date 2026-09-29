@@ -143,7 +143,9 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
           activeEl !== inputRef.current &&
           (activeEl?.tagName === 'INPUT' ||
             activeEl?.tagName === 'TEXTAREA' ||
-            (activeEl as HTMLElement)?.isContentEditable);
+            activeEl?.tagName === 'SELECT' ||
+            (activeEl as HTMLElement)?.isContentEditable ||
+            Boolean(activeEl?.closest('[role="dialog"]')));
 
         if (!isOtherInputFocused) {
           e.preventDefault();
@@ -252,8 +254,8 @@ export const SettingsSearchInput = memo(({ className = '' }: SettingsSearchInput
                     role="option"
                     aria-selected={isSelected}
                     onMouseDown={(e) => {
+                      // Prevent input blur before click handler processes
                       e.preventDefault();
-                      handleSelectResult(result);
                     }}
                     onClick={() => handleSelectResult(result)}
                     onMouseEnter={() => setActiveIndex(index)}

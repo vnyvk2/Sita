@@ -173,8 +173,20 @@ export const SettingsCollapseProvider = ({
 
         // Accessibility: Transfer focus so screen-reader and keyboard users follow the jump
         if (typeof element.focus === 'function') {
-          if (!element.hasAttribute('tabindex')) {
+          const addedTemporaryTabIndex = !element.hasAttribute('tabindex');
+          if (addedTemporaryTabIndex) {
             element.setAttribute('tabindex', '-1');
+            element.dataset.temporaryTabindex = 'true';
+            element.addEventListener(
+              'blur',
+              () => {
+                if (element.dataset.temporaryTabindex === 'true') {
+                  element.removeAttribute('tabindex');
+                  delete element.dataset.temporaryTabindex;
+                }
+              },
+              { once: true }
+            );
           }
           element.focus({ preventScroll: true });
         }
@@ -194,6 +206,10 @@ export const SettingsCollapseProvider = ({
 
         cleanupTimerRef.current = setTimeout(() => {
           element.classList.remove('setting-spotlight-active');
+          if (element.dataset.temporaryTabindex === 'true' && document.activeElement !== element) {
+            element.removeAttribute('tabindex');
+            delete element.dataset.temporaryTabindex;
+          }
           setHighlightedSettingId((curr) => (curr === id ? null : curr));
         }, 2200);
 
@@ -225,7 +241,7 @@ export const SettingsCollapseProvider = ({
     };
   }, [pendingTarget, expandedMap]);
 
-  // Cleanup spotlight timer and active classes on unmount
+  // Cleanup spotlight timer, active classes, and temporary tabindices on unmount
   useEffect(() => {
     return () => {
       if (cleanupTimerRef.current) {
@@ -233,6 +249,10 @@ export const SettingsCollapseProvider = ({
       }
       document.querySelectorAll('.setting-spotlight-active').forEach((el) => {
         el.classList.remove('setting-spotlight-active');
+      });
+      document.querySelectorAll('[data-temporary-tabindex="true"]').forEach((el) => {
+        el.removeAttribute('tabindex');
+        delete (el as HTMLElement).dataset.temporaryTabindex;
       });
     };
   }, []);

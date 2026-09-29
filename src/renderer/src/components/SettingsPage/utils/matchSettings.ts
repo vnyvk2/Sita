@@ -161,15 +161,15 @@ export const matchSettings = (
     }
 
     // Check Multi-word token match across Title + Aliases (e.g. "battery animation")
-    if (bestScore < 60 && queryTokens.length > 1) {
+    if (queryTokens.length > 1) {
       const matchingAlias = allAliases.find((alias) =>
         queryTokens.every((token) => normalizePunctuation(normalizeText(alias)).includes(token))
       );
-      if (matchingAlias) {
+      if (matchingAlias && bestScore < 55) {
         bestScore = 55;
         matchedField = 'alias';
         matchedAlias = matchingAlias;
-      } else {
+      } else if (bestScore < 45) {
         const combinedScope = `${cleanTitle} ${allAliases.map(normalizePunctuation).join(' ')}`;
         if (queryTokens.every((token) => combinedScope.includes(token))) {
           bestScore = 45;

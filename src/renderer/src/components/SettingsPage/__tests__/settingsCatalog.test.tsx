@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import en from '../../../assets/locales/en/en.json';
 import { settingsQuery } from '../../../queries/settings';
 import { SETTINGS_SECTION_KEYS } from '../Settings/SettingsCollapseContext';
-import { settingsCatalog } from '../settingsCatalog';
+import { SECTION_METADATA, settingsCatalog } from '../settingsCatalog';
 import SettingsPage from '../SettingsPage';
 
 // Mock react-i18next
@@ -230,6 +230,29 @@ describe('settingsCatalog integrity test', () => {
       // Keywords must be non-empty array of strings
       expect(Array.isArray(entry.keywords)).toBe(true);
       expect(entry.keywords.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('validates that all SECTION_METADATA titleKeys resolve in en.json', () => {
+    for (const sectionKey of SETTINGS_SECTION_KEYS) {
+      const meta = SECTION_METADATA[sectionKey];
+      expect(meta).toBeDefined();
+      expect(meta.defaultTitle).toBeTruthy();
+
+      const parts = meta.titleKey.split('.');
+      let current: unknown = en;
+      for (const part of parts) {
+        if (current && typeof current === 'object' && part in current) {
+          current = (current as Record<string, unknown>)[part];
+        } else {
+          current = undefined;
+          break;
+        }
+      }
+      expect(
+        typeof current,
+        `Expected section "${sectionKey}" titleKey "${meta.titleKey}" to exist in en.json`
+      ).toBe('string');
     }
   });
 

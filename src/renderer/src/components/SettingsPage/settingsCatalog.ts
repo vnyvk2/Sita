@@ -34,7 +34,7 @@ export const SECTION_METADATA: Record<SettingsSectionKey, SectionMeta> = {
   metadata: { titleKey: 'settingsPage.metadataSources', defaultTitle: 'Metadata & AutoTag Sources' },
   accessibility: { titleKey: 'settingsPage.accessibility', defaultTitle: 'Accessibility' },
   performance: { titleKey: 'settingsPage.performance', defaultTitle: 'Performance' },
-  downloads: { titleKey: 'settingsPage.downloads.title', defaultTitle: 'Downloads' },
+  downloads: { titleKey: 'settingsPage.downloads.title', defaultTitle: 'Online downloads' },
   library: { titleKey: 'settingsPage.libraryScanning', defaultTitle: 'Library & Folders' },
   startup: { titleKey: 'settingsPage.startupAndWindowCustomization', defaultTitle: 'Startup & Window' },
   storage: { titleKey: 'settingsPage.storage', defaultTitle: 'Storage' },
