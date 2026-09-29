@@ -1,6 +1,7 @@
 import { type ForwardedRef, forwardRef, memo } from 'react';
 
 import CompactSongRow from './CompactSongRow';
+import SmallSongRow from './SmallSongRow';
 import StandardSongRow, { type SongProp } from './StandardSongRow';
 
 export type { SongProp };
@@ -9,6 +10,9 @@ export const Song = memo(
   forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => {
     if (props.isCompact) {
       return <CompactSongRow ref={ref} {...props} />;
+    }
+    if (props.rowSize === 'small') {
+      return <SmallSongRow ref={ref} {...props} />;
     }
     return <StandardSongRow ref={ref} {...props} />;
   })

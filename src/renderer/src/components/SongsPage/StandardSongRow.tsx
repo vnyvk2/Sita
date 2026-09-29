@@ -69,6 +69,14 @@ export interface SongProp {
   hasBodyBackgroundImage?: boolean;
   /** When true, renders compact 38px MusicBee-style row without artwork */
   isCompact?: boolean;
+  /** Active row size for views with artwork ('normal' = 60px card, 'small' = 48px row). Defaults to 'normal'. */
+  rowSize?: 'normal' | 'small';
+  /** Optional direct contextmenu handler for tests/delegation */
+  onContextMenu?: (e: React.MouseEvent) => void;
+  /** Optional direct more options click handler for tests/delegation */
+  onMoreOptionsClick?: (
+    e: React.MouseEvent<HTMLButtonElement> | React.KeyboardEvent<HTMLButtonElement>
+  ) => void;
 }
 
 export const StandardSongRow = memo(
@@ -96,7 +104,8 @@ export const StandardSongRow = memo(
       isDragging = false,
       onPlayClick,
       highlightText,
-      hasBodyBackgroundImage
+      hasBodyBackgroundImage,
+      onContextMenu: directContextMenu
     } = props;
 
     // Granular store subscriptions: only subscribe to primitives relevant to this specific song
@@ -330,34 +339,37 @@ export const StandardSongRow = memo(
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [artistsKey, isCurrentSong, isAMultipleSelection, t]);
 
-    const { handleContextMenu } =
-      useSongContextMenu({
-        songId,
-        title,
-        artists,
-        album,
-        duration,
-        year,
-        path,
-        isBlacklisted,
-        genres,
-        discNo,
-        trackNo,
-        isAFavorite,
-        isCurrentSong,
-        artworkPaths,
-        isAMultipleSelection,
-        isMultipleSelectionEnabled,
-        additionalContextMenuItems,
-        handlePlayBtnClick,
-        toggleSingleSongFavorite,
-        isCompact: false
-      });
+    const fallbackContextMenu = useSongContextMenu({
+      songId,
+      title,
+      artists,
+      album,
+      duration,
+      year,
+      path,
+      isBlacklisted,
+      genres,
+      discNo,
+      trackNo,
+      isAFavorite,
+      isCurrentSong,
+      artworkPaths,
+      isAMultipleSelection,
+      isMultipleSelectionEnabled,
+      additionalContextMenuItems,
+      handlePlayBtnClick,
+      toggleSingleSongFavorite,
+      isCompact: false
+    });
+
+    const handleContextMenu = directContextMenu ?? fallbackContextMenu.handleContextMenu;
 
     return (
       <div
         style={style}
         data-index={index}
+        data-song-id={songId}
+        data-song-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
         className={`song-item list-row [contain:layout] ${songId} group relative mr-4 mb-2 flex h-13 w-[98%] rounded-lg p-[0.2rem] px-2 -outline-offset-2 transition-[background,color,opacity] duration-150 ease-in-out focus-visible:outline! ${

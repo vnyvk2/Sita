@@ -8,9 +8,13 @@ export type SubFilterToolId =
   | 'favoriteAlbums'
   | 'clearDuplicates';
 
+import type { SongViewMode } from '@renderer/utils/songViewMode';
+
 export interface ToolRenderProps {
   isCompact: boolean;
   onToggleCompact: () => void;
+  songViewMode?: SongViewMode;
+  onViewModeChange?: (mode: SongViewMode) => void;
   language?: string;
   languageOptions?: { label: string; value: string }[];
   onLanguageChange?: (val: string) => void;

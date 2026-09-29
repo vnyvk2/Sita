@@ -14,6 +14,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
@@ -22,13 +23,15 @@ import { queryClient } from '../../queryClient';
 import { store } from '../../store/store';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
+import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
+import SongArtist from './SongArtist';
 import type { SongProp } from './StandardSongRow';
 import useSongContextMenu from './useSongContextMenu';
 
-export const CompactSongRow = memo(
+export const SmallSongRow = memo(
   forwardRef((props: SongProp, ref: ForwardedRef<HTMLDivElement>) => {
     const {
       index,
@@ -39,6 +42,7 @@ export const CompactSongRow = memo(
       additionalContextMenuItems,
       artists,
       album,
+      artworkPaths,
       style,
       selectAllHandler,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -94,14 +98,10 @@ export const CompactSongRow = memo(
           ? optimisticFavorite.isFavorite
           : props.isAFavorite;
 
-    const handlePlayBtnClick = useCallback(
-      (e?: React.MouseEvent) => {
-        e?.stopPropagation();
-        if (onPlayClick) return onPlayClick(songId);
-        return playSong(songId);
-      },
-      [onPlayClick, playSong, songId]
-    );
+    const handlePlayBtnClick = useCallback(() => {
+      if (onPlayClick) return onPlayClick(songId);
+      return playSong(songId);
+    }, [onPlayClick, playSong, songId]);
 
     const toggleSingleSongFavorite = useCallback(() => {
       const nextFav = !isAFavorite;
@@ -143,7 +143,7 @@ export const CompactSongRow = memo(
         });
     }, [isAFavorite, isCurrentSong, songId, toggleIsFavorite, triggerBurst]);
 
-    // Shared context menu hook delivering complete multi-selection parity with StandardSongRow
+    // Local context menu fallback for isolated testing or non-delegated contexts
     const fallbackContextMenu = useSongContextMenu({
       songId,
       title,
@@ -158,57 +158,58 @@ export const CompactSongRow = memo(
       trackNo,
       isAFavorite,
       isCurrentSong,
+      artworkPaths,
       isAMultipleSelection,
       isMultipleSelectionEnabled,
       additionalContextMenuItems,
       handlePlayBtnClick,
       toggleSingleSongFavorite,
-      isCompact: true
+      isCompact: false
     });
 
     const handleContextMenu = directContextMenu ?? fallbackContextMenu.handleContextMenu;
-    const handleMoreOptionsClick =
-      directMoreOptionsClick ?? fallbackContextMenu.handleMoreOptionsClick;
+    const handleMoreOptionsClick = directMoreOptionsClick ?? fallbackContextMenu.handleMoreOptionsClick;
 
-    // Duration formatting
     const { minutes, seconds } = useMemo(() => {
-      const totalSec = Math.floor(duration);
-      const min = Math.floor(totalSec / 60);
-      const sec = totalSec % 60;
+      const addZero = (num: number) => (num < 10 ? `0${num}` : num.toString());
+      const min = Math.floor((duration || 0) / 60);
+      const sec = Math.floor((duration || 0) % 60);
       return {
-        minutes: String(min),
-        seconds: sec < 10 ? `0${sec}` : String(sec)
+        minutes: Number.isNaN(min) ? undefined : addZero(min),
+        seconds: Number.isNaN(sec) ? undefined : addZero(sec)
       };
     }, [duration]);
 
-    // Artists element
+    const artistsKey = useMemo(
+      () => artists?.map((a) => a.artistId).join(',') ?? '',
+      [artists]
+    );
+
     const songArtists = useMemo(() => {
       if (Array.isArray(artists) && artists.length > 0) {
-        return artists.map((artist, idx) => (
-          <span key={artist.artistId}>
-            <NavLink
-              to="/main-player/artists/$artistId"
-              params={{ artistId: String(artist.artistId) }}
-              className="hover:underline focus-visible:outline!"
-            >
-              {artist.name}
-            </NavLink>
-            {idx < artists.length - 1 && ', '}
+        return artists.map((artist, i) => (
+          <span key={artist.artistId} className="truncate">
+            <SongArtist
+              artistId={artist.artistId}
+              name={artist.name}
+              className={`${(isCurrentSong || isAMultipleSelection) && 'text-accent font-medium'}`}
+            />
+            {i !== (artists?.length ?? 1) - 1 && <span className="mr-1">,</span>}
           </span>
         ));
       }
-      return t('common.unknownArtist');
-    }, [artists, t]);
+      return <span className="opacity-60">{t('common.unknownArtist')}</span>;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [artistsKey, isCurrentSong, isAMultipleSelection, t]);
 
     return (
       <div
-        style={{ ...style, height: 38 }}
-        data-index={index}
+        style={style}
         data-song-id={songId}
         data-song-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
-        className={`compact-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[38px] max-h-[38px] min-h-[38px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none select-none ${
+        className={`small-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none select-none ${
           isCurrentSong
             ? 'bg-accent/8 dark:bg-accent/12'
             : isAMultipleSelection
@@ -230,8 +231,8 @@ export const CompactSongRow = memo(
         }}
         ref={ref}
       >
-        {/* Left 28px indicator slot */}
-        <div className="compact-indicator-slot relative flex h-[38px] w-[28px] shrink-0 items-center justify-center">
+        {/* Indicator slot (24px) */}
+        <div className="small-indicator-slot relative flex h-[48px] w-[24px] shrink-0 items-center justify-center">
           {isMultipleSelectionEnabled ? (
             <MultipleSelectionCheckbox id={songId} selectionType="songs" className="m-0" />
           ) : isBlacklisted ? (
@@ -243,7 +244,6 @@ export const CompactSongRow = memo(
             </span>
           ) : isCurrentSong ? (
             <>
-              {/* MusicBee style: musical note when playing, pause bars when paused */}
               <span className="material-icons-round text-accent text-sm leading-none group-hover:hidden">
                 {isSongPlaying ? 'music_note' : 'pause'}
               </span>
@@ -259,19 +259,37 @@ export const CompactSongRow = memo(
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={handlePlayBtnClick}
-              className="text-font-color-black dark:text-font-color-white hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110"
-              title={t('common.play')}
-            >
-              <span className="material-icons-round text-base leading-none">play_arrow</span>
-            </button>
+            <>
+              <span className="text-font-color-dimmed text-xs font-mono group-hover:hidden opacity-75">
+                {typeof trackNo === 'number' || (typeof trackNo === 'string' && trackNo.trim().length > 0)
+                  ? trackNo
+                  : index + 1}
+              </span>
+              <button
+                type="button"
+                onClick={handlePlayBtnClick}
+                className="text-font-color-black dark:text-font-color-white hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110"
+                title={t('common.play')}
+              >
+                <span className="material-icons-round text-base leading-none">play_arrow</span>
+              </button>
+            </>
           )}
         </div>
 
+        {/* 32px Thumbnail artwork */}
+        <div className="relative mr-2.5 ml-1.5 h-8 w-8 shrink-0 overflow-hidden rounded-md shadow-xs">
+          <Img
+            src={artworkPaths?.optimizedArtworkPath || artworkPaths?.artworkPath || DefaultSongCover}
+            fallbackSrc={DefaultSongCover}
+            alt={title}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        </div>
+
         {/* Title column */}
-        <div className="flex min-w-0 flex-1 items-center pr-2 pl-3">
+        <div className="flex min-w-0 flex-1 items-center pr-2 pl-2">
           <NavLink
             to="/main-player/songs/$songId"
             params={{ songId: String(songId) }}
@@ -314,7 +332,7 @@ export const CompactSongRow = memo(
         </div>
 
         {/* Duration column */}
-        <div className="song-duration text-font-color-dimmed min-w-[4rem] pr-3 text-right font-mono text-xs opacity-75">
+        <div className="song-duration text-font-color-dimmed min-w-[3.5rem] pr-3 text-right font-mono text-xs opacity-75">
           {minutes}:{seconds}
         </div>
 
@@ -352,5 +370,5 @@ export const CompactSongRow = memo(
   })
 );
 
-CompactSongRow.displayName = 'CompactSongRow';
-export default CompactSongRow;
+SmallSongRow.displayName = 'SmallSongRow';
+export default SmallSongRow;

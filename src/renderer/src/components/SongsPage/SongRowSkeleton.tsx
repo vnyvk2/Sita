@@ -6,15 +6,16 @@ interface SongRowSkeletonProps {
   style?: CSSProperties;
   className?: string;
   isCompact?: boolean;
+  rowSize?: 'normal' | 'small';
 }
 
 /**
  * Layout-stable placeholder for a not-yet-hydrated Song row.
  *
- * Mirrors the Song row's 60px or 38px grid so swapping in the real row causes zero layout shift.
+ * Mirrors the Song row's 60px, 48px, or 38px grid so swapping in the real row causes zero layout shift.
  */
 const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
-  ({ index, height: _height, style, className = '', isCompact = false }, ref) => {
+  ({ index, height: _height, style, className = '', isCompact = false, rowSize = 'normal' }, ref) => {
     const isOdd = typeof index === 'number' && (index + 1) % 2 === 1;
 
     if (isCompact) {
@@ -43,6 +44,42 @@ const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-2.5 w-[65%] rounded-full opacity-40" />
           </div>
           <div className="flex min-w-[4rem] justify-end pr-3">
+            <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-2.5 w-8 rounded-full opacity-50" />
+          </div>
+          <div className="min-w-[4.5rem] shrink-0" />
+        </div>
+      );
+    }
+
+    if (rowSize === 'small') {
+      return (
+        <div
+          ref={ref}
+          data-skeleton-index={index}
+          style={{ ...style, height: 48 }}
+          className={`small-song-skeleton border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full animate-pulse items-center border-b px-2 text-xs select-none ${
+            isOdd
+              ? 'bg-background-color-2/40! dark:bg-dark-background-color-2/30!'
+              : 'bg-background-color-1! dark:bg-dark-background-color-1!'
+          } ${className}`}
+          aria-hidden="true"
+        >
+          <div className="flex w-[24px] shrink-0 items-center justify-center">
+            <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-3 w-3 rounded-sm opacity-50" />
+          </div>
+          <div className="mx-2 h-8 w-8 shrink-0 overflow-hidden rounded">
+            <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-full w-full opacity-60" />
+          </div>
+          <div className="min-w-0 flex-1 pr-2 pl-1">
+            <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-3 w-[70%] rounded-full opacity-60" />
+          </div>
+          <div className="w-[22%] min-w-0 pr-2 pl-2">
+            <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-2.5 w-[80%] rounded-full opacity-50" />
+          </div>
+          <div className="hidden w-[20%] min-w-0 pr-2 pl-2 @[640px]/songs:block">
+            <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-2.5 w-[65%] rounded-full opacity-40" />
+          </div>
+          <div className="flex min-w-[4rem] justify-end pr-2">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-2.5 w-8 rounded-full opacity-50" />
           </div>
           <div className="min-w-[4.5rem] shrink-0" />

@@ -532,6 +532,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
       queue: false
     },
     isCompactSongView: false,
+    songViewMode: 'normal' as const,
     pinnedSubFilterTools: ['compactView', 'language', 'genre']
   },
   playback: {

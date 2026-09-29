@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useStore } from '@tanstack/react-store';
 import { store } from '@renderer/store/store';
+import { resolveSongViewMode, type SongViewMode } from '@renderer/utils/songViewMode';
 
 export interface SongPreferences {
   showTrackNumberAsSongIndex: boolean;
@@ -9,6 +10,7 @@ export interface SongPreferences {
   doNotShowBlacklistSongConfirm: boolean;
   bodyBackgroundImage: boolean;
   isCompactSongView: boolean;
+  songViewMode: SongViewMode;
   pinnedSubFilterTools: string[];
 }
 
@@ -19,6 +21,7 @@ export const defaultSongPreferences: SongPreferences = {
   doNotShowBlacklistSongConfirm: false,
   bodyBackgroundImage: false,
   isCompactSongView: false,
+  songViewMode: 'normal',
   pinnedSubFilterTools: ['compactView', 'language', 'genre']
 };
 
@@ -48,10 +51,17 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
     (state) => Boolean(state.localStorage?.preferences?.doNotShowBlacklistSongConfirm)
   );
   const bodyBackgroundImage = useStore(store, (state) => Boolean(state.bodyBackgroundImage));
-  const isCompactSongView = useStore(
+  const rawSongViewMode = useStore(
     store,
-    (state) => Boolean(state.localStorage?.preferences?.isCompactSongView)
+    (state) => state.localStorage?.preferences?.songViewMode
   );
+  const rawIsCompact = useStore(
+    store,
+    (state) => state.localStorage?.preferences?.isCompactSongView
+  );
+  const songViewMode = resolveSongViewMode(rawSongViewMode, rawIsCompact);
+  const isCompactSongView = songViewMode === 'compact';
+
   const pinnedSubFilterTools = useStore(
     store,
     (state) => state.localStorage?.preferences?.pinnedSubFilterTools ?? defaultSongPreferences.pinnedSubFilterTools
@@ -65,6 +75,7 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
       doNotShowBlacklistSongConfirm,
       bodyBackgroundImage,
       isCompactSongView,
+      songViewMode,
       pinnedSubFilterTools
     }),
     [
@@ -74,6 +85,7 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
       doNotShowBlacklistSongConfirm,
       bodyBackgroundImage,
       isCompactSongView,
+      songViewMode,
       pinnedSubFilterTools
     ]
   );

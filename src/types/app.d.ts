@@ -635,6 +635,7 @@ declare global {
     alphabetScrubberPosition?: 'off' | 'top-horizontal' | 'left-vertical';
     playerBarControlsIn3Dots?: PlayerBarControlsIn3Dots;
     isCompactSongView?: boolean;
+    songViewMode?: 'compact' | 'small' | 'normal';
     pinnedSubFilterTools?: string[];
   }
 

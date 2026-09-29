@@ -21,11 +21,15 @@ export interface SubFilterToolbarProps extends ToolRenderProps {
   className?: string;
 }
 
+import type { SongViewMode } from '@renderer/utils/songViewMode';
+
 export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
   const {
     context,
     isCompact,
     onToggleCompact,
+    songViewMode,
+    onViewModeChange,
     language = 'all',
     languageOptions = [],
     onLanguageChange,
@@ -100,20 +104,51 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
   // Render individual pinned tool pill
   const renderToolPill = (id: SubFilterToolId): ReactNode => {
     switch (id) {
-      case 'compactView':
+      case 'compactView': {
+        const currentMode: SongViewMode = songViewMode ?? (isCompact ? 'compact' : 'normal');
+        const nextModeMap: Record<SongViewMode, SongViewMode> = {
+          normal: 'small',
+          small: 'compact',
+          compact: 'normal'
+        };
+        const handlePillClick = () => {
+          if (onViewModeChange) {
+            onViewModeChange(nextModeMap[currentMode]);
+          } else if (onToggleCompact) {
+            onToggleCompact();
+          }
+        };
+
+        const modeLabels: Record<SongViewMode, string> = {
+          normal: 'Normal (60px)',
+          small: 'Small (48px)',
+          compact: 'Compact (38px)'
+        };
+
+        const modeIcons: Record<SongViewMode, string> = {
+          normal: 'view_agenda',
+          small: 'density_medium',
+          compact: 'table_rows'
+        };
+
+        const tooltipLabel = onViewModeChange
+          ? `${t('common.compactView', 'Compact View')} / ${t('common.viewMode', 'Density')}: ${modeLabels[currentMode]} (${t('common.clickToCycle', 'click to cycle')})`
+          : t('common.compactView', 'Compact View');
+
         return (
           <Button
             key="compact-view-pill"
             className={`compact-view-pill mr-0! shrink-0 cursor-pointer rounded-3xl px-2.5 py-1 text-xs transition-colors md:text-sm ${
-              isCompact
+              currentMode !== 'normal'
                 ? 'bg-accent text-font-color-white font-medium shadow-xs'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
             }`}
-            iconName="table_rows"
-            tooltipLabel={t('common.compactView', 'Compact View')}
-            clickHandler={onToggleCompact}
+            iconName={modeIcons[currentMode]}
+            tooltipLabel={tooltipLabel}
+            clickHandler={handlePillClick}
           />
         );
+      }
       case 'language':
         if (!onLanguageChange || languageOptions.length === 0) return null;
         return (

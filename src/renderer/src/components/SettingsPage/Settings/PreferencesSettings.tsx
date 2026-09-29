@@ -3,6 +3,11 @@ import { useStore } from '@tanstack/react-store';
 import { useTranslation } from 'react-i18next';
 
 import storage from '../../../utils/localStorage';
+import {
+  resolveSongViewMode,
+  setSongViewMode,
+  type SongViewMode
+} from '../../../utils/songViewMode';
 import Checkbox from '../../Checkbox';
 import Dropdown, { type DropdownOption } from '../../Dropdown';
 import CollapsibleSettingsSection from './CollapsibleSettingsSection';
@@ -11,6 +16,12 @@ const alphabetScrubberOptions: DropdownOption<string>[] = [
   { label: 'Off', value: 'off' },
   { label: 'Top (Horizontal)', value: 'top-horizontal' },
   { label: 'Left (Vertical)', value: 'left-vertical' }
+];
+
+const songViewModeOptions: DropdownOption<string>[] = [
+  { label: 'Normal (60px card)', value: 'normal' },
+  { label: 'Small (48px compact with artwork)', value: 'small' },
+  { label: 'Compact (38px text table)', value: 'compact' }
 ];
 
 const PreferencesSettings = () => {
@@ -76,6 +87,31 @@ const PreferencesSettings = () => {
                 onChange={(e) => {
                   const val = e.currentTarget.value as 'off' | 'top-horizontal' | 'left-vertical';
                   storage.preferences.setPreferences('alphabetScrubberPosition', val);
+                }}
+              />
+            </div>
+          </div>
+        </li>
+
+        <li className="song-view-mode-settings-container mb-4">
+          <div className="secondary-container toggle-song-view-mode mb-4">
+            <div className="description">
+              {t(
+                'settingsPage.songViewModeDescription',
+                'Choose the row height and visual density for songs in the library.'
+              )}
+            </div>
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-sm font-medium">
+                {t('settingsPage.songViewMode', 'Song Row Density')}
+              </span>
+              <Dropdown
+                name="songViewMode"
+                value={resolveSongViewMode(preferences)}
+                options={songViewModeOptions}
+                onChange={(e) => {
+                  const val = e.currentTarget.value as SongViewMode;
+                  setSongViewMode(val);
                 }}
               />
             </div>

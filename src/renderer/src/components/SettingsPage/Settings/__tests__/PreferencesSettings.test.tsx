@@ -123,7 +123,8 @@ describe('PreferencesSettings Sidebar Tabs Navigation', () => {
       folders: false,
       artists: true,
       albums: true,
-      insights: true
+      insights: true,
+      online: true
     });
   });
 });

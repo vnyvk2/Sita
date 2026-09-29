@@ -49,13 +49,20 @@ export function useWindowHydration(
     compact?: boolean;
     /** When true, adapts lookahead window overscan for 38px high-density compact row rendering */
     isCompactView?: boolean;
+    /** Dynamic row height in pixels to automatically compute lookahead overscan rows */
+    rowHeight?: number;
   }
 ) {
+  const effectiveRowHeight = options?.rowHeight ?? (options?.isCompactView ? 38 : 60);
+  const defaultExtraBefore = Math.ceil(4500 / effectiveRowHeight);
+  const defaultExtraAfter = Math.ceil(9000 / effectiveRowHeight);
+
   const {
     enabled = true,
-    isCompactView = false,
-    extraRowsBefore = isCompactView ? 120 : 75,
-    extraRowsAfter = isCompactView ? 240 : 150,
+    isCompactView: _isCompactView = false,
+    rowHeight: _rowHeight,
+    extraRowsBefore = defaultExtraBefore,
+    extraRowsAfter = defaultExtraAfter,
     keyPrefix = 'songs',
     listIdentity = 'default',
     initialIndex = 0,

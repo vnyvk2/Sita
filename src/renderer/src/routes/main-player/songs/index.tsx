@@ -1,3 +1,5 @@
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+/* eslint-disable jsx-a11y/click-events-have-key-events */
 import NoSongsImage from '@assets/images/svg/Empty Inbox _Monochromatic.svg';
 import AlphabetScrubber from '@renderer/components/AlphabetScrubber/AlphabetScrubber';
 import Button from '@renderer/components/Button';
@@ -11,6 +13,7 @@ import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
 import { SubFilterToolbar } from '@renderer/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
+import { useSongListContextMenuDelegation } from '@renderer/components/SongsPage/useSongListContextMenuDelegation';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
@@ -18,6 +21,12 @@ import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getLibraryVersion } from '@renderer/other/libraryVersion';
 import { getQueuesManager } from '@renderer/other/queuesManager';
+import {
+  getSongRowHeight,
+  resolveSongViewMode,
+  setSongViewMode,
+  type SongViewMode
+} from '@renderer/utils/songViewMode';
 import {
   SONG_WINDOW_SIZE,
   SONG_WINDOW_STALE_TIME,
@@ -110,6 +119,9 @@ function SongsPage() {
   const isCompactSongView = useStore(store, (state) =>
     Boolean(state.localStorage.preferences.isCompactSongView)
   );
+  const songViewMode = useStore(store, (state) =>
+    resolveSongViewMode(state.localStorage.preferences)
+  );
   const preToggleAnchorIndexRef = useRef<number | null>(null);
   const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
 
@@ -168,17 +180,25 @@ function SongsPage() {
     ]
   );
 
+  const handleViewModeChange = useCallback(
+    (newMode: SongViewMode) => {
+      const currentAnchor =
+        latestVisibleRangeRef.current?.startIndex ??
+        (scrollKey ? scrollRegistry.getIndex(scrollKey) : 0) ??
+        0;
+      preToggleAnchorIndexRef.current = currentAnchor;
+      if (scrollKey) {
+        scrollRegistry.set(scrollKey, { index: currentAnchor });
+      }
+      setSongViewMode(newMode);
+    },
+    [scrollKey]
+  );
+
   const handleToggleCompactView = useCallback(() => {
-    const currentAnchor =
-      latestVisibleRangeRef.current?.startIndex ??
-      (scrollKey ? scrollRegistry.getIndex(scrollKey) : 0) ??
-      0;
-    preToggleAnchorIndexRef.current = currentAnchor;
-    if (scrollKey) {
-      scrollRegistry.set(scrollKey, { index: currentAnchor });
-    }
-    storage.preferences.setPreferences('isCompactSongView', !isCompactSongView);
-  }, [isCompactSongView, scrollKey]);
+    const nextMode: SongViewMode = songViewMode === 'compact' ? 'normal' : 'compact';
+    handleViewModeChange(nextMode);
+  }, [handleViewModeChange, songViewMode]);
 
   useLayoutEffect(() => {
     if (preToggleAnchorIndexRef.current === null) return;
@@ -197,7 +217,7 @@ function SongsPage() {
         behavior: 'auto'
       });
     });
-  }, [isCompactSongView]);
+  }, [songViewMode]);
 
   const songIdsParams = useMemo(
     () => ({
@@ -425,10 +445,22 @@ function SongsPage() {
       ? searchParams.scrollTopOffset
       : (savedPosition?.index ?? 0);
 
+  const fixedItemHeight = getSongRowHeight(songViewMode);
+
   const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
     listIdentity,
     initialIndex: initialScrollIndex,
-    isCompactView: isCompactSongView
+    isCompactView: isCompactSongView,
+    rowHeight: fixedItemHeight
+  });
+
+  const {
+    handleContextMenu: handleContainerContextMenu,
+    handleClick: handleContainerClick
+  } = useSongListContextMenuDelegation({
+    getItem,
+    isCompact: isCompactSongView,
+    onPlayClick: handleSongPlayBtnClick
   });
 
   const renderSong = useCallback(
@@ -443,11 +475,18 @@ function SongsPage() {
             selectAllHandler={selectAllHandler}
             hasBodyBackgroundImage={hasBodyBackgroundImage}
             isCompact={isCompactSongView}
+            rowSize={songViewMode === 'small' ? 'small' : 'normal'}
             {...song}
           />
         );
       }
-      return <SongRowSkeleton index={index} isCompact={isCompactSongView} />;
+      return (
+        <SongRowSkeleton
+          index={index}
+          isCompact={isCompactSongView}
+          rowSize={songViewMode === 'small' ? 'small' : 'normal'}
+        />
+      );
     },
     [
       getItem,
@@ -455,7 +494,8 @@ function SongsPage() {
       handleSongPlayBtnClick,
       selectAllHandler,
       hasBodyBackgroundImage,
-      isCompactSongView
+      isCompactSongView,
+      songViewMode
     ]
   );
 
@@ -732,6 +772,8 @@ function SongsPage() {
         context="songs"
         isCompact={isCompactSongView}
         onToggleCompact={handleToggleCompactView}
+        songViewMode={songViewMode}
+        onViewModeChange={handleViewModeChange}
         language={language}
         languageOptions={languageDropdownOptions}
         onLanguageChange={(val) => {
@@ -850,12 +892,16 @@ function SongsPage() {
             )}
             <div className="@container/songs flex h-full min-w-0 flex-1 flex-col">
               {isCompactSongView && <CompactListHeader />}
-              <div className="min-h-0 flex-1">
+              <div
+                className="min-h-0 flex-1"
+                onContextMenu={handleContainerContextMenu}
+                onClick={handleContainerClick}
+              >
                 <VirtualizedList
-                  key={isCompactSongView ? 'compact' : 'standard'}
+                  key={isCompactSongView ? 'compact' : `standard-${songViewMode}`}
                   ref={virtuosoRef}
                   data={filteredSongIds}
-                  fixedItemHeight={isCompactSongView ? 38 : 60}
+                  fixedItemHeight={fixedItemHeight}
                   scrollKey={scrollKey}
                   itemContent={renderSong}
                   onChange={handleListRangeChange}
