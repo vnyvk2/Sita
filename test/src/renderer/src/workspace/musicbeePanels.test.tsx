@@ -4,6 +4,7 @@ import { QueuePanel } from '@renderer/workspace/panels/QueuePanel/QueuePanel';
 import { getInitialWorkspaceState } from '@renderer/workspace/persistence';
 import { MUSICBEE_PRESET } from '@renderer/workspace/presets/musicbee';
 import { workspaceStore } from '@renderer/workspace/store';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -74,7 +75,12 @@ describe('MusicBee Widgets: QueuePanel and LyricsPanel', () => {
         local: {}
       };
 
-      render(<QueuePanel instance={mockInstance} api={mockApi} />);
+      const queryClient = new QueryClient();
+      render(
+        <QueryClientProvider client={queryClient}>
+          <QueuePanel instance={mockInstance} api={mockApi} />
+        </QueryClientProvider>
+      );
       expect(screen.getByText('Queue 1')).toBeDefined();
       expect(screen.getByText('Queue is empty')).toBeDefined();
     });
