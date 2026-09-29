@@ -165,4 +165,54 @@ describe('SettingsCollapseProvider integration', () => {
     expect(screen.getByTestId('advanced-content')).toBeDefined();
     expect(collapseAllBtn.textContent).toBe('Collapse all');
   });
+
+  it('automatically uncollapses section and mounts DOM target when jumpToSetting is invoked', () => {
+    const JumpConsumer = () => {
+      const collapse = useSettingsCollapse()!;
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() => collapse.jumpToSetting('target-item', 'advanced')}
+            data-testid="jump-btn"
+          >
+            Jump to Advanced
+          </button>
+          <button
+            type="button"
+            onClick={collapse.collapseAll}
+            data-testid="collapse-all-btn"
+          >
+            Collapse all
+          </button>
+          <CollapsibleSettingsSection
+            id="advanced-container"
+            sectionKey="advanced"
+            title="Advanced"
+          >
+            <div id="target-item" data-testid="target-item">
+              Target Setting
+            </div>
+          </CollapsibleSettingsSection>
+        </div>
+      );
+    };
+
+    render(
+      <SettingsCollapseProvider>
+        <JumpConsumer />
+      </SettingsCollapseProvider>
+    );
+
+    // 1. Collapse all sections
+    fireEvent.click(screen.getByTestId('collapse-all-btn'));
+    expect(screen.queryByTestId('target-item')).toBeNull();
+
+    // 2. Trigger jumpToSetting
+    fireEvent.click(screen.getByTestId('jump-btn'));
+
+    // 3. Section should now be automatically expanded and item mounted in DOM
+    expect(screen.getByTestId('target-item')).toBeDefined();
+  });
 });
+

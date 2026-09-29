@@ -28,7 +28,7 @@ const AdvancedSettings = () => {
       className="advanced-settings-container"
     >
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
-        <li className="secondary-container toggle-save-verbose-logs mb-4">
+        <li id="setting-advanced-save-verbose-logs" className="secondary-container toggle-save-verbose-logs mb-4">
           <div className="description">{t('settingsPage.saveVerboseLogsDescription')}</div>
           <Checkbox
             id="toggleSaveVerboseLogs"

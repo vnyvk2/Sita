@@ -156,7 +156,7 @@ const EqualizerSettings = () => {
       className="equalizer-settings-container"
     >
       <div className="pl-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between" id="setting-equalizer-preset">
           <Dropdown
             name="EqualizerPresetsDropdown"
             options={equalizerPresets}
@@ -185,7 +185,7 @@ const EqualizerSettings = () => {
         </div>
 
         <div
-          id="equalizer"
+          id="setting-equalizer-sliders"
           className="equalizer relative mx-auto mt-4 flex max-w-6xl items-center justify-around px-8"
         >
           <span className="zero-line bg-background-color-2 dark:bg-dark-background-color-2 absolute mb-8 ml-12 h-0.5! w-[85%]! opacity-75" />

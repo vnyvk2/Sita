@@ -75,7 +75,7 @@ const StorageSettings = () => {
 
       {storageMetrics && (
         <div>
-          <div className="mx-auto mt-6 w-4/5">
+          <div id="setting-storage-metrics" className="mx-auto mt-6 w-4/5">
             <div className="flex items-center justify-between text-sm uppercase opacity-50">
               <span> {t('settingsPage.fullStorageSpace')}</span>{' '}
               <span>

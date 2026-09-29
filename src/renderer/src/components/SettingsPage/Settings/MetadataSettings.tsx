@@ -287,7 +287,7 @@ const MetadataSettings: React.FC = () => {
 
       <ul className="marker:bg-background-color-3 dark:marker:bg-dark-background-color-3 list-disc pl-6">
         {/* Search Providers & Priority */}
-        <li className="mb-6">
+        <li id="setting-metadata-providers" className="mb-6">
           <div className="secondary-container mb-2">
             <div className="mb-1 text-base font-semibold">Release Discovery Sources & Priority</div>
             <div className="description text-font-color-dim mb-3 text-xs">

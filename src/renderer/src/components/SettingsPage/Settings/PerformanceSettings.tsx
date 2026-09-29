@@ -21,7 +21,7 @@ const PerformanceSettings = () => {
       className="performance-settings-container"
     >
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 list-disc pl-6">
-        <li className="secondary-container toggle-remove-animations-on-battery-power mb-4">
+        <li id="setting-performance-battery-animations" className="secondary-container toggle-remove-animations-on-battery-power mb-4">
           <div className="description">{t('settingsPage.removeAnimationOnBatteryDescription')}</div>
           <Checkbox
             id="removeAnimationsOnBatteryPower"
@@ -35,7 +35,7 @@ const PerformanceSettings = () => {
             }
           />
         </li>
-        <li className="secondary-container toggle-reduce-visual-effects-on-battery mb-4">
+        <li id="setting-performance-visual-effects" className="secondary-container toggle-reduce-visual-effects-on-battery mb-4">
           <div className="description">
             {t('settingsPage.reduceVisualEffectsOnBatteryDescription')}
           </div>
@@ -51,7 +51,7 @@ const PerformanceSettings = () => {
             }
           />
         </li>
-        <li className="secondary-container toggle-allow-to-prevent-screen-sleeping mb-4">
+        <li id="setting-performance-screen-sleep" className="secondary-container toggle-allow-to-prevent-screen-sleeping mb-4">
           <div className="description">
             {t('settingsPage.allowToPreventScreenSleepingDescription')}
           </div>

@@ -189,7 +189,7 @@ const AccountsSettings = () => {
     >
       <ul className="marker:bg-background-color-3 dark:marker:bg-background-color-3 appear-from-bottom list-disc pl-6">
           {/* Spotify Integration */}
-          <li className="spotify-integration mb-8">
+          <li id="setting-accounts-spotify" className="spotify-integration mb-8">
             <div className="description">
               Connect your Spotify account to import and sync playlists.
             </div>
@@ -292,7 +292,7 @@ const AccountsSettings = () => {
           </li>
 
           {/* Discord RPC */}
-          <li className="discord-rpc-integration mb-4">
+          <li id="setting-accounts-discord-rpc" className="discord-rpc-integration mb-4">
             <div className="description">{t('settingsPage.enableDiscordRpcDescription')}</div>
             <Checkbox
               id="enableDiscordRpc"
@@ -303,7 +303,7 @@ const AccountsSettings = () => {
           </li>
 
           {/* Last.fm Integration */}
-          <li className="last-fm-integration mb-4">
+          <li id="setting-accounts-lastfm" className="last-fm-integration mb-4">
             <div className="description">{t('settingsPage.integrateLastFm')}</div>
             <div className="flex p-4 pb-0">
               <img
@@ -419,7 +419,7 @@ const AccountsSettings = () => {
           </li>
 
           {/* ListenBrainz Integration */}
-          <li className="listenbrainz-integration mb-8">
+          <li id="setting-accounts-listenbrainz" className="listenbrainz-integration mb-8">
             <div className="description">{t('settingsPage.integrateListenBrainz')}</div>
             <div className="flex items-start p-4 pb-0">
               <div className="mr-4 flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#EB743B]/10 text-[#EB743B]">
