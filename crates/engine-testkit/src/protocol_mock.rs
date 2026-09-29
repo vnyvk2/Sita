@@ -79,6 +79,8 @@ pub enum DaemonEvent {
     },
     StateChanged {
         state: PlaybackState,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        position_secs: Option<f64>,
     },
     SlotEnd {
         slot: SlotId,

@@ -416,6 +416,7 @@ fn test_daemon_push_event_heartbeat_4hz_schema() {
 fn test_daemon_push_event_state_changed() {
     let event = DaemonEvent::StateChanged {
         state: PlaybackState::Paused,
+        position_secs: None,
     };
     let json = serde_json::to_string(&event).unwrap();
     assert!(json.contains("\"event\":\"state_changed\""));

@@ -55,3 +55,7 @@ path = "tests/tier3_cross_feature_combinations.rs"
 [[test]]
 name = "tier4_real_world_scenarios"
 path = "tests/tier4_real_world_scenarios.rs"
+
+[[test]]
+name = "rt_alloc_audit"
+path = "tests/rt_alloc_audit.rs"

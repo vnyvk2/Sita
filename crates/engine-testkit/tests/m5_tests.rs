@@ -75,6 +75,7 @@ fn test_all_8_daemon_events_json_roundtrip() {
         },
         DaemonEvent::StateChanged {
             state: PlaybackState::Playing,
+            position_secs: Some(12.34),
         },
         DaemonEvent::SlotEnd { slot: SlotId::A },
         DaemonEvent::TrackEnd { slot: SlotId::A },
