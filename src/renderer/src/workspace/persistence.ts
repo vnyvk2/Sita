@@ -85,12 +85,13 @@ export function validateWorkspace(untrusted: unknown): Workspace | null {
     return null;
   }
 
-  const ws = untrusted as Partial<Workspace>;
-  if (!ws.id || !ws.name || !ws.root || !ws.panels || typeof ws.panels !== 'object') {
-    return null;
-  }
-
   try {
+    // Deep clone to ensure validation never mutates live store state
+    const ws = JSON.parse(JSON.stringify(untrusted)) as Partial<Workspace>;
+    if (!ws.id || !ws.name || !ws.root || !ws.panels || typeof ws.panels !== 'object') {
+      return null;
+    }
+
     // 1. Whitelist panel types and sanitize local dictionary BEFORE invariants run.
     // Degrade unknown or non-object panel instances to 'empty' (never delete to avoid dangling tree refs).
     for (const [panelId, p] of Object.entries(ws.panels)) {
@@ -242,14 +243,32 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 function persistValidatedWorkspaceState(state: WorkspaceState): void {
   if (typeof window === 'undefined' || !window.localStorage) return;
 
-  // 1. Guard against persisting structurally corrupted state (looping all workspaces)
-  if (!isValidWorkspaceState(state)) {
+  if (!state || typeof state !== 'object' || !state.workspaces) {
     console.warn('[WorkspacePersistence] Dropping invalid workspace state save.');
     return;
   }
 
+  // 1. Validate and sanitize each workspace, ensuring pruned & validated state is persisted
+  const sanitizedWorkspaces: Record<string, Workspace> = {};
+  for (const [id, ws] of Object.entries(state.workspaces)) {
+    const validWs = validateWorkspace(ws);
+    if (!validWs) {
+      console.warn(`[WorkspacePersistence] Workspace ${id} failed validation; dropping save.`);
+      return;
+    }
+    sanitizedWorkspaces[id] = validWs;
+  }
+
+  const activeId =
+    state.active && sanitizedWorkspaces[state.active] ? state.active : DEFAULT_PRESET.id;
+
+  const sanitizedState: WorkspaceState = {
+    active: activeId,
+    workspaces: sanitizedWorkspaces
+  };
+
   try {
-    const serialized = JSON.stringify(state);
+    const serialized = JSON.stringify(sanitizedState);
     const existingPrimaryRaw = window.localStorage.getItem(WORKSPACE_STORAGE_KEY);
 
     // 2. Validate existing primary before promoting to backup slot (never promote corruption)

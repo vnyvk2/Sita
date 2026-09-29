@@ -25,7 +25,7 @@ const normalizeText = (str: string): string => {
 const splitArtists = (artistStr: string): string[] => {
   if (!artistStr) return [];
   return artistStr
-    .split(/,\s*|\s+(?:feat\.?|ft\.?|&|x)\s+/i)
+    .split(/,\s*|\s+[/]\s+|\s*(?:&)\s*|\s+(?:feat\.?|ft\.?)\s+|\s+[xX]\s+(?![&,/]|feat\.?|ft\.?)/i)
     .map((a) => normalizeText(a))
     .filter((a) => a.length > 0);
 };
