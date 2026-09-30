@@ -110,6 +110,30 @@ describe('Native Audio Daemon Manager - Lifecycle & Supervision', () => {
 
     expect(manager.isAvailable()).toBe(false);
   });
+
+  it('tracks userSoundProfile preference and updates on setSoundProfilePreference', async () => {
+    const manager = new NativeAudioDaemonManager();
+    expect(manager.getSoundProfilePreference()).toBe('studio_reference');
+
+    manager.setSoundProfilePreference('vocal_nuance_boost');
+    expect(manager.getSoundProfilePreference()).toBe('vocal_nuance_boost');
+
+    // Intercept set_sound_profile command when daemon is running
+    const fakeStdin = { write: vi.fn() };
+    (manager as any).child = { stdin: fakeStdin, killed: false };
+
+    const promise = manager.sendCommand({ cmd: 'set_sound_profile', profile: 'studio_reference' });
+    expect(manager.getSoundProfilePreference()).toBe('studio_reference');
+    expect(fakeStdin.write).toHaveBeenCalled();
+
+    // Clean up pending requests
+    const pending = (manager as any).pendingRequests;
+    for (const [id, req] of pending.entries()) {
+      clearTimeout(req.timer);
+      req.resolve({ id, status: 'ok' });
+    }
+    await promise;
+  });
 });
 
 describe('Native Audio Backend - Anchored RAF Interpolation', () => {
@@ -124,6 +148,7 @@ describe('Native Audio Backend - Anchored RAF Interpolation', () => {
       onTrackEnd: vi.fn(),
       onSlotEnd: vi.fn(),
       onTransitionComplete: vi.fn(),
+      onSoundProfileChange: vi.fn(),
       onStateChange: vi.fn(),
       onError: vi.fn()
     };
@@ -267,5 +292,126 @@ describe('Native Audio Backend - Anchored RAF Interpolation', () => {
 
     backend.destroy();
   });
-});
 
+  it('dispatches set_sound_profile command to daemon', async () => {
+    const backend = new NativeAudioBackend(callbacks);
+    sendMock.mockResolvedValueOnce({
+      id: 1,
+      status: 'ok',
+      data: {
+        profile: 'vocal_nuance_boost',
+        status: 'active',
+        boot_id: 1,
+        sequence_id: 1
+      }
+    });
+
+    await backend.setSoundProfile('vocal_nuance_boost');
+    expect(sendMock).toHaveBeenCalledWith({
+      cmd: 'set_sound_profile',
+      profile: 'vocal_nuance_boost'
+    });
+
+    backend.destroy();
+  });
+
+  it('filters sound_profile_changed events by boot epoch and sequence ordering', () => {
+    const backend = new NativeAudioBackend(callbacks);
+
+    // Initial ready event setting boot epoch 2
+    eventHandler!({
+      event: 'ready',
+      protocol_version: 1,
+      engine_version: '0.1.0',
+      boot_id: 2
+    } as any);
+
+    // 1. Stale boot epoch event (boot_id: 1) should be dropped
+    eventHandler!({
+      event: 'sound_profile_changed',
+      profile: 'vocal_nuance_boost',
+      status: 'active',
+      boot_id: 1,
+      sequence_id: 10
+    } as any);
+    expect(callbacks.onSoundProfileChange).not.toHaveBeenCalled();
+
+    // 2. In-order event in boot epoch 2 (sequence_id: 1) should be accepted
+    eventHandler!({
+      event: 'sound_profile_changed',
+      profile: 'vocal_nuance_boost',
+      status: 'active',
+      boot_id: 2,
+      sequence_id: 1
+    } as any);
+    expect(callbacks.onSoundProfileChange).toHaveBeenCalledWith('vocal_nuance_boost', 'active');
+    expect(callbacks.onSoundProfileChange).toHaveBeenCalledTimes(1);
+
+    // 3. Duplicate/out-of-order sequence_id in same epoch should be rejected
+    eventHandler!({
+      event: 'sound_profile_changed',
+      profile: 'studio_reference',
+      status: 'active',
+      boot_id: 2,
+      sequence_id: 1
+    } as any);
+    expect(callbacks.onSoundProfileChange).toHaveBeenCalledTimes(1);
+
+    // 4. Newer sequence_id in same epoch should be accepted
+    eventHandler!({
+      event: 'sound_profile_changed',
+      profile: 'studio_reference',
+      status: 'active',
+      boot_id: 2,
+      sequence_id: 2
+    } as any);
+    expect(callbacks.onSoundProfileChange).toHaveBeenCalledWith('studio_reference', 'active');
+    expect(callbacks.onSoundProfileChange).toHaveBeenCalledTimes(2);
+
+    // 5. Higher boot epoch resets sequence requirement and is accepted
+    eventHandler!({
+      event: 'sound_profile_changed',
+      profile: 'vocal_nuance_boost',
+      status: 'active',
+      boot_id: 3,
+      sequence_id: 1
+    } as any);
+    expect(callbacks.onSoundProfileChange).toHaveBeenCalledWith('vocal_nuance_boost', 'active');
+    expect(callbacks.onSoundProfileChange).toHaveBeenCalledTimes(3);
+
+    backend.destroy();
+  });
+
+  it('reconciles timeout or error on setSoundProfile via authoritative getState query', async () => {
+    const backend = new NativeAudioBackend(callbacks);
+
+    // sendMock rejects on set_sound_profile, then resolves with getState
+    sendMock
+      .mockRejectedValueOnce(
+        new Error('Timeout after 2000ms waiting for response to set_sound_profile')
+      )
+      .mockResolvedValueOnce({
+        id: 2,
+        status: 'ok',
+        data: {
+          active_slot: 'a',
+          slot_a_state: 'stopped',
+          slot_b_state: 'stopped',
+          device_id: null,
+          xrun_count: 0,
+          sound_profile: 'vocal_nuance_boost',
+          sound_profile_status: 'active'
+        }
+      });
+
+    const result = await backend.setSoundProfile('vocal_nuance_boost');
+
+    // Should have queried get_state for reconciliation
+    expect(sendMock).toHaveBeenCalledWith({ cmd: 'get_state' });
+    // Should have reconciled profile from daemon state
+    expect(callbacks.onSoundProfileChange).toHaveBeenCalledWith('vocal_nuance_boost', 'active');
+    expect(result.profile).toBe('vocal_nuance_boost');
+
+    backend.destroy();
+  });
+});

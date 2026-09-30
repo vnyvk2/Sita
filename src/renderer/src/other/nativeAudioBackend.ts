@@ -3,8 +3,12 @@ import type {
   DaemonLoadResultData,
   DaemonPushEvent,
   DaemonResponse,
+  DaemonSoundProfileResultData,
+  DaemonStateResultData,
   PlaybackState,
-  SlotId
+  SlotId,
+  SoundProfile,
+  SoundProfileStatus
 } from '@common/audioEngineProtocol';
 
 export interface NativeAudioBackendCallbacks {
@@ -13,6 +17,7 @@ export interface NativeAudioBackendCallbacks {
   onTrackEnd: (slot: 'A' | 'B') => void;
   onSlotEnd?: (slot: 'A' | 'B') => void;
   onTransitionComplete?: (activeSlot: 'A' | 'B') => void;
+  onSoundProfileChange?: (profile: SoundProfile, status: SoundProfileStatus) => void;
   onStateChange: (state: PlaybackState) => void;
   onError: (error: Error) => void;
 }
@@ -28,9 +33,9 @@ const cancelFrame =
     : (id: number) => clearTimeout(id as unknown as NodeJS.Timeout);
 
 /**
- * Native Audio Engine Renderer Backend.
- * Communicates with the background Rust audio daemon via Electron IPC.
- * Features an anchored requestAnimationFrame interpolator for jitter-free 60/120fps seekbar updates.
+ * Native Audio Engine Renderer Backend. Communicates with the background Rust audio daemon via
+ * Electron IPC. Features an anchored requestAnimationFrame interpolator for jitter-free 60/120fps
+ * seekbar updates.
  */
 export class NativeAudioBackend {
   private anchor = {
@@ -42,6 +47,8 @@ export class NativeAudioBackend {
   private isPlaying = false;
   private rafId: number | null = null;
   private unsubscribeEvents?: () => void;
+  private currentBootId = 0;
+  private lastSeenSequenceId = 0;
 
   constructor(private callbacks: NativeAudioBackendCallbacks) {
     this.startRafLoop();
@@ -112,6 +119,28 @@ export class NativeAudioBackend {
           this.callbacks.onTransitionComplete?.(event.active_slot === 'a' ? 'A' : 'B');
           break;
 
+        case 'ready':
+          this.currentBootId = event.boot_id;
+          this.lastSeenSequenceId = 0;
+          break;
+
+        case 'sound_profile_changed':
+          if (event.boot_id < this.currentBootId) {
+            // Stale daemon instance: reject events from older boot epochs
+            break;
+          }
+          if (
+            event.boot_id === this.currentBootId &&
+            event.sequence_id <= this.lastSeenSequenceId
+          ) {
+            // Out-of-order or duplicate event within current boot epoch: reject
+            break;
+          }
+          this.currentBootId = event.boot_id;
+          this.lastSeenSequenceId = event.sequence_id;
+          this.callbacks.onSoundProfileChange?.(event.profile, event.status);
+          break;
+
         case 'device_error':
           this.callbacks.onError(new Error(event.message));
           break;
@@ -127,10 +156,7 @@ export class NativeAudioBackend {
         const elapsedSecs = (performance.now() - this.anchor.clientTimestampMs) / 1000.0;
         // Cap extrapolation to at most 500ms past the last heartbeat to prevent runaway drift
         const cappedElapsed = Math.min(elapsedSecs, 0.5);
-        const interpolated = Math.min(
-          this.totalDurationSecs,
-          this.anchor.posSecs + cappedElapsed
-        );
+        const interpolated = Math.min(this.totalDurationSecs, this.anchor.posSecs + cappedElapsed);
         this.callbacks.onTimeUpdate(interpolated, this.totalDurationSecs);
       }
       this.rafId = scheduleFrame(tick);
@@ -235,6 +261,72 @@ export class NativeAudioBackend {
       karaoke: options.karaoke ?? false,
       limiter: options.limiter ?? true
     });
+  }
+
+  public async getState(): Promise<DaemonStateResultData> {
+    const res = await this.send({ cmd: 'get_state' });
+    return (res.status === 'ok' ? res.data : undefined) as DaemonStateResultData;
+  }
+
+  public async setSoundProfile(profile: SoundProfile): Promise<DaemonSoundProfileResultData> {
+    try {
+      const res = await this.send({ cmd: 'set_sound_profile', profile });
+      const data = (res.status === 'ok' ? res.data : undefined) as DaemonSoundProfileResultData;
+      if (data?.boot_id && data?.sequence_id) {
+        if (data.boot_id > this.currentBootId) {
+          this.currentBootId = data.boot_id;
+          this.lastSeenSequenceId = data.sequence_id;
+        } else if (
+          data.boot_id === this.currentBootId &&
+          data.sequence_id > this.lastSeenSequenceId
+        ) {
+          this.lastSeenSequenceId = data.sequence_id;
+        }
+      }
+      return data!;
+    } catch (err: any) {
+      const isTimeout =
+        typeof err?.message === 'string' &&
+        (err.message.toLowerCase().includes('time') ||
+          err.message.toLowerCase().includes('timed out'));
+      if (isTimeout) {
+        // Timeout as unknown outcome: query authoritative state from daemon
+        try {
+          const state = await this.getState();
+          if (state?.sound_profile) {
+            if (state.boot_id && state.boot_id > this.currentBootId) {
+              this.currentBootId = state.boot_id;
+              this.lastSeenSequenceId = state.sequence_id ?? 0;
+            }
+            this.callbacks.onSoundProfileChange?.(
+              state.sound_profile,
+              state.sound_profile_status ?? 'active'
+            );
+            return {
+              profile: state.sound_profile,
+              transition_ms: 0,
+              boot_id: this.currentBootId,
+              sequence_id: this.lastSeenSequenceId
+            };
+          }
+        } catch (reconcileErr) {
+          this.callbacks.onError(
+            new Error(
+              `Sound profile command timed out and state reconciliation failed: ${reconcileErr}`
+            )
+          );
+        }
+      }
+      throw err;
+    }
+  }
+
+  public get bootId(): number {
+    return this.currentBootId;
+  }
+
+  public get sequenceId(): number {
+    return this.lastSeenSequenceId;
   }
 
   public get playing(): boolean {

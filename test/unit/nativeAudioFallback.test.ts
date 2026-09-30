@@ -192,4 +192,32 @@ describe('Gate C: Native Audio to WebAudio Fallback Scenarios', () => {
     expect(player.audioA.volume).toBe(1.0);
     expect(player.audioB.volume).toBe(1.0);
   });
+
+  it('Scenario 5: fallback with studio_reference profile configures WebAudio bypass and dry limiter', () => {
+    (player as any).isNativeEngineActive = true;
+    (player as any).nativeIsPlaying = false;
+    (player as any).currentSongData = { songId: 105, path: 'nora://songs/track105.flac' };
+
+    player.setSoundProfile('studio_reference', true);
+    (player as any).fallbackToWebAudio();
+
+    expect(player.getSoundProfile()).toBe('studio_reference');
+    expect(player.vocalNuanceNode.isEnabled()).toBe(false);
+    expect(player.limiterDryGainNode.gain.setValueAtTime).toHaveBeenCalledWith(1.0, 0);
+    expect(player.limiterWetGainNode.gain.setValueAtTime).toHaveBeenCalledWith(0.0, 0);
+  });
+
+  it('Scenario 6: fallback with vocal_nuance_boost profile activates WebAudio nuance node and wet limiter', () => {
+    (player as any).isNativeEngineActive = true;
+    (player as any).nativeIsPlaying = false;
+    (player as any).currentSongData = { songId: 106, path: 'nora://songs/track106.flac' };
+
+    player.setSoundProfile('vocal_nuance_boost', true);
+    (player as any).fallbackToWebAudio();
+
+    expect(player.getSoundProfile()).toBe('vocal_nuance_boost');
+    expect(player.vocalNuanceNode.isEnabled()).toBe(true);
+    expect(player.limiterDryGainNode.gain.setValueAtTime).toHaveBeenCalledWith(0.0, 0);
+    expect(player.limiterWetGainNode.gain.setValueAtTime).toHaveBeenCalledWith(1.0, 0);
+  });
 });

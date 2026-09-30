@@ -10,7 +10,8 @@ import type {
   DaemonCommand,
   DaemonPushEvent,
   DaemonRequest,
-  DaemonResponse
+  DaemonResponse,
+  SoundProfile
 } from '../../common/audioEngineProtocol';
 import { removeDefaultAppProtocolFromFilePath } from '../fs/resolveFilePaths';
 import logger from '../logger';
@@ -57,6 +58,15 @@ export class NativeAudioDaemonManager {
   private listeners = new Set<(event: DaemonPushEvent) => void>();
   private crashTimestamps: number[] = [];
   private exceededCrashLimit = false;
+  private userSoundProfile: SoundProfile = 'studio_reference';
+
+  public setSoundProfilePreference(profile: SoundProfile): void {
+    this.userSoundProfile = profile;
+  }
+
+  public getSoundProfilePreference(): SoundProfile {
+    return this.userSoundProfile;
+  }
 
   public findBinaryPath(): string | null {
     const binaryName = process.platform === 'win32' ? 'engine-cli.exe' : 'engine-cli';
@@ -187,6 +197,17 @@ export class NativeAudioDaemonManager {
       });
 
       await this.readyPromise;
+
+      // Restore user's sound profile preference before returning so subsequent audio commands
+      // execute with the restored profile already in effect.
+      try {
+        await this.sendCommand({ cmd: 'set_sound_profile', profile: this.userSoundProfile });
+        logger.info('Restored user sound profile preference on daemon startup:', {
+          profile: this.userSoundProfile
+        });
+      } catch (profileErr) {
+        logger.error('Failed to restore user sound profile on daemon startup:', { profileErr });
+      }
     } catch (err) {
       this.isStarting = false;
       this.child = null;
@@ -291,6 +312,10 @@ export class NativeAudioDaemonManager {
 
     if (!this.child || !this.child.stdin || this.child.killed) {
       throw new Error('Native audio daemon child process is not running or stdin is closed.');
+    }
+
+    if (command.cmd === 'set_sound_profile') {
+      this.userSoundProfile = command.profile;
     }
 
     // Translate audio path to local disk path if needed

@@ -1,22 +1,20 @@
+import type { SoundProfile } from '@common/audioEngineProtocol';
 import type { Subscription } from '@tanstack/react-store';
 
 import { dispatch, store } from '../store/store';
 import storage from '../utils/localStorage';
+import { AbLoopController, type AbLoopState, type SetPointResult } from './abLoopController';
+import KaraokeNode from './audioFx/karaokeNode';
+import { NightModeNode, type NightModePreset } from './audioFx/nightModeNode';
 import { getOrCreateReverbBuffer } from './audioFx/reverbImpulse';
 import { AUDIO_FX_PRESETS, type AudioFxOptions, type AudioFxPresetType } from './audioFx/types';
+import { VocalNuanceNode } from './audioFx/vocalNuanceNode';
+import { CrossfadeScheduler, type CrossfadeDelegate } from './crossfade/CrossfadeScheduler';
 import { equalizerBandHertzData } from './equalizerData';
+import { NativeAudioBackend } from './nativeAudioBackend';
 import PlayerQueue from './playerQueue';
 import type { QueuesManager } from './queuesManager';
 import { computeEffectiveReplayGain } from './replayGainCalculator';
-import { CrossfadeScheduler, type CrossfadeDelegate } from './crossfade/CrossfadeScheduler';
-import KaraokeNode from './audioFx/karaokeNode';
-import { NightModeNode, type NightModePreset } from './audioFx/nightModeNode';
-import {
-  AbLoopController,
-  type AbLoopState,
-  type SetPointResult
-} from './abLoopController';
-import { NativeAudioBackend } from './nativeAudioBackend';
 
 const DEBUG_PLAYER = false;
 
@@ -55,6 +53,7 @@ type PlayerEventType =
   | 'audioFxChange'
   | 'karaokeChange'
   | 'nightModeChange'
+  | 'soundProfileChange'
   | 'abLoopChange';
 
 type PlayerEventCallback<T = unknown> = (data: T) => void;
@@ -95,10 +94,14 @@ class AudioPlayer {
   fxLowPassNode: BiquadFilterNode;
   nightcoreTrebleBoostNode: BiquadFilterNode;
   safetyLimiterNode: DynamicsCompressorNode;
+  limiterDryGainNode: GainNode;
+  limiterWetGainNode: GainNode;
   karaokeNode: KaraokeNode;
   nightModeNode: NightModeNode;
+  vocalNuanceNode: VocalNuanceNode;
   gainNode: GainNode;
 
+  private currentSoundProfile: SoundProfile = 'studio_reference';
   private isConvolverConnected = false;
   private currentAudioFx: AudioFxOptions = AUDIO_FX_PRESETS.normal;
 
@@ -204,9 +207,13 @@ class AudioPlayer {
     this.safetyLimiterNode.attack.value = 0.003;
     this.safetyLimiterNode.release.value = 0.15;
 
+    this.limiterDryGainNode = this.currentContext.createGain();
+    this.limiterWetGainNode = this.currentContext.createGain();
+
     this.gainNode = this.currentContext.createGain();
     this.karaokeNode = new KaraokeNode(this.currentContext);
     this.nightModeNode = new NightModeNode(this.currentContext);
+    this.vocalNuanceNode = new VocalNuanceNode(this.currentContext);
 
     this.currentVolume = 100;
     this.gainNode.gain.value = 1.0;
@@ -305,6 +312,14 @@ class AudioPlayer {
             this.nativeIsPlaying = false;
           }
         },
+        onSoundProfileChange: (profile) => {
+          if (!this.isNativeEngineActive) return;
+          this.currentSoundProfile = profile;
+          storage.playback.setPlaybackOptions('soundProfile', profile);
+          dispatch({ type: 'SET_SOUND_PROFILE', data: profile });
+          this.emit('soundProfileChange', profile);
+          this.applySoundProfileToWebAudio(profile, true);
+        },
         onError: (err) => {
           console.error('[AudioPlayer] NativeAudioBackend error:', err);
           this.emit('error', err);
@@ -318,10 +333,12 @@ class AudioPlayer {
       const vol = store.state.player?.volume?.value ?? this.currentVolume;
       this.nativeBackend.setVolume(vol / 100).catch(() => {});
       const isKaraoke = storage.playback.getPlaybackOptions('isKaraoke') ?? false;
-      this.nativeBackend
-        .setDsp({ rgDb: this.lastNativeRgDb, karaoke: isKaraoke })
-        .catch(() => {});
+      this.nativeBackend.setDsp({ rgDb: this.lastNativeRgDb, karaoke: isKaraoke }).catch(() => {});
       this.syncNativeEqualizer();
+      const savedSoundProfile =
+        storage.playback.getPlaybackOptions('soundProfile') ?? 'studio_reference';
+      this.currentSoundProfile = savedSoundProfile;
+      this.nativeBackend.setSoundProfile(savedSoundProfile).catch(() => {});
     } catch (err) {
       console.warn('[AudioPlayer] Failed to initialize native audio backend, using WebAudio:', err);
       this.isNativeEngineActive = false;
@@ -330,16 +347,15 @@ class AudioPlayer {
   }
 
   /**
-   * Push the persisted 10-band EQ preset into the native DSP chain.
-   * Called on init + every native load so EQ presets are not silent no-ops.
+   * Push the persisted 10-band EQ preset into the native DSP chain. Called on init + every native
+   * load so EQ presets are not silent no-ops.
    */
   public syncNativeEqualizer(): void {
     if (!this.isNativeEngineActive || !this.nativeBackend) return;
     try {
-      const preset =
-        storage.equalizerPreset.getEqualizerPreset() as unknown as
-          | Partial<Record<EqualizerBandFilters, number>>
-          | undefined;
+      const preset = storage.equalizerPreset.getEqualizerPreset() as unknown as
+        | Partial<Record<EqualizerBandFilters, number>>
+        | undefined;
       const gains = [
         preset?.thirtyTwoHertzFilter ?? 0,
         preset?.sixtyFourHertzFilter ?? 0,
@@ -359,9 +375,9 @@ class AudioPlayer {
   }
 
   /**
-   * Next-track id per the same rules as the crossfade delegate: repeat-one
-   * yields nothing (handleSongEnd restarts in place), otherwise queue order
-   * with repeat-all wrap. Used by the gapless-at-0 preload path.
+   * Next-track id per the same rules as the crossfade delegate: repeat-one yields nothing
+   * (handleSongEnd restarts in place), otherwise queue order with repeat-all wrap. Used by the
+   * gapless-at-0 preload path.
    */
   private peekNextTrackId(): number | null {
     if (this.repeatMode === 'one') return null;
@@ -375,10 +391,9 @@ class AudioPlayer {
   }
 
   /**
-   * Gapless-at-0 standby arming: when the crossfade scheduler stands down
-   * (duration 0), prime the daemon's standby slot near track end so the
-   * mixer auto-splices instead of gaping on decode+prime latency.
-   * No-ops while a preload is in flight or the standby already matches.
+   * Gapless-at-0 standby arming: when the crossfade scheduler stands down (duration 0), prime the
+   * daemon's standby slot near track end so the mixer auto-splices instead of gaping on
+   * decode+prime latency. No-ops while a preload is in flight or the standby already matches.
    */
   private maybePreloadNextNative(positionSecs: number): void {
     if (!this.isNativeEngineActive || !this.nativeBackend) return;
@@ -416,10 +431,9 @@ class AudioPlayer {
   }
 
   /**
-   * Adopt an auto-spliced standby WITHOUT reloading: the daemon is already
-   * playing it. Sets identity/position/store state, then advances the queue;
-   * the resulting loadSong hits the already-loaded fast path instead of
-   * re-priming (which would restart the track audibly).
+   * Adopt an auto-spliced standby WITHOUT reloading: the daemon is already playing it. Sets
+   * identity/position/store state, then advances the queue; the resulting loadSong hits the
+   * already-loaded fast path instead of re-priming (which would restart the track audibly).
    */
   private adoptPreloadedStandby(preloaded: AudioPlayerData): void {
     this.currentSongData = preloaded;
@@ -444,9 +458,9 @@ class AudioPlayer {
   }
 
   /**
-   * Standby staleness guard: after a manual (non-adopted) load, a previously
-   * preloaded standby names the wrong track and would auto-splice into it at
-   * the next EOS. Refresh it fire-and-forget toward the true next track.
+   * Standby staleness guard: after a manual (non-adopted) load, a previously preloaded standby
+   * names the wrong track and would auto-splice into it at the next EOS. Refresh it fire-and-forget
+   * toward the true next track.
    */
   private refreshNativeStandby(loadedSongId: number): void {
     if (!this.isNativeEngineActive || !this.nativeBackend) return;
@@ -501,6 +515,9 @@ class AudioPlayer {
     }
 
     logPlayer('[AudioPlayer] Falling back to WebAudio backend');
+    const savedSoundProfile =
+      storage.playback.getPlaybackOptions('soundProfile') ?? 'studio_reference';
+    this.applySoundProfileToWebAudio(savedSoundProfile, true);
     if (this.currentSongData) {
       this.audio.src = this.currentSongData.path;
       this.audio.load();
@@ -783,9 +800,7 @@ class AudioPlayer {
         storage.playback.setCurrentSongOptions('songId', this.currentSongData.songId);
       }
       if (options?.autoPlay && this.paused) {
-        this.play().catch((err) =>
-          console.error('[AudioPlayer] Fast-path auto-play failed:', err)
-        );
+        this.play().catch((err) => console.error('[AudioPlayer] Fast-path auto-play failed:', err));
       }
       return this.currentSongData;
     }
@@ -847,7 +862,7 @@ class AudioPlayer {
         const effectiveUpdateStore =
           this.inFlightLoad?.songId === songId
             ? this.inFlightLoad.updateStore
-            : (options?.updateStore !== false);
+            : options?.updateStore !== false;
 
         this.currentSongData = songData;
         this.clearAbLoop('TRACK_LOAD');
@@ -885,7 +900,10 @@ class AudioPlayer {
             this.refreshNativeStandby(songData.songId);
             return songData;
           } catch (nativeLoadErr) {
-            console.warn('[AudioPlayer] Native load failed, falling back to WebAudio:', nativeLoadErr);
+            console.warn(
+              '[AudioPlayer] Native load failed, falling back to WebAudio:',
+              nativeLoadErr
+            );
             this.fallbackToWebAudio();
           }
         }
@@ -999,6 +1017,9 @@ class AudioPlayer {
     this.clearAbLoop('DESTROY');
     this.karaokeNode.destroy();
     this.nightModeNode.destroy();
+    this.vocalNuanceNode.destroy();
+    this.limiterDryGainNode.disconnect();
+    this.limiterWetGainNode.disconnect();
     this.crossfadeScheduler.cancel();
     this.cancelActiveFade();
     this.inFlightLoad = null;
@@ -1105,16 +1126,12 @@ class AudioPlayer {
     this.listeners.get(eventType)?.delete(callback as PlayerEventCallback<unknown>);
   }
 
-  /**
-   * DOM EventTarget compatibility alias for `on`.
-   */
+  /** DOM EventTarget compatibility alias for `on`. */
   addEventListener(eventType: string, callback: (...args: any[]) => void): void {
     this.on(eventType as PlayerEventType, callback as PlayerEventCallback<unknown>);
   }
 
-  /**
-   * DOM EventTarget compatibility alias for `off`.
-   */
+  /** DOM EventTarget compatibility alias for `off`. */
   removeEventListener(eventType: string, callback: (...args: any[]) => void): void {
     this.off(eventType as PlayerEventType, callback as PlayerEventCallback<unknown>);
   }
@@ -1187,12 +1204,23 @@ class AudioPlayer {
     this.wetGainNode.connect(this.nightcoreTrebleBoostNode);
     this.isConvolverConnected = false;
 
-    // 4. Treble boost -> Karaoke Node -> Night Mode Node -> Safety Limiter -> Master Gain -> Destination
+    // 4. Treble boost -> Karaoke Node -> Night Mode Node -> Vocal Nuance Node -> Parallel Limiter (Dry/Wet) -> Master Gain -> Destination
     this.nightcoreTrebleBoostNode.connect(this.karaokeNode.input);
     this.karaokeNode.output.connect(this.nightModeNode.input);
-    this.nightModeNode.output.connect(this.safetyLimiterNode);
-    this.safetyLimiterNode.connect(this.gainNode);
+    this.nightModeNode.output.connect(this.vocalNuanceNode.input);
+
+    this.vocalNuanceNode.output.connect(this.limiterDryGainNode);
+    this.limiterDryGainNode.connect(this.gainNode);
+
+    this.vocalNuanceNode.output.connect(this.safetyLimiterNode);
+    this.safetyLimiterNode.connect(this.limiterWetGainNode);
+    this.limiterWetGainNode.connect(this.gainNode);
+
     this.gainNode.connect(this.currentContext.destination);
+
+    const savedSoundProfile =
+      storage.playback.getPlaybackOptions('soundProfile') ?? 'studio_reference';
+    this.applySoundProfileToWebAudio(savedSoundProfile, true);
 
     const savedKaraoke = storage.playback.getPlaybackOptions('isKaraoke') ?? false;
     const savedKaraokeLevel = storage.playback.getPlaybackOptions('karaokeLevel') ?? 100;
@@ -1210,14 +1238,8 @@ class AudioPlayer {
       this.currentAudioFx = { ...options };
     }
 
-    const {
-      playbackRate,
-      preservesPitch,
-      reverbWet,
-      reverbDecay,
-      lowPassCutoff,
-      trebleBoostGain
-    } = this.currentAudioFx;
+    const { playbackRate, preservesPitch, reverbWet, reverbDecay, lowPassCutoff, trebleBoostGain } =
+      this.currentAudioFx;
 
     const ctx = this.currentContext;
     const now = ctx.currentTime;
@@ -1313,7 +1335,7 @@ class AudioPlayer {
         ...(customOptions ?? {})
       };
     } else if (preset === 'normal') {
-      const userBaseRate = store ? store.state.player.playbackRate ?? 1.0 : 1.0;
+      const userBaseRate = store ? (store.state.player.playbackRate ?? 1.0) : 1.0;
       targetOptions = {
         ...AUDIO_FX_PRESETS.normal,
         playbackRate: userBaseRate
@@ -1363,19 +1385,25 @@ class AudioPlayer {
               const currentPos = this.currentTime;
               const shouldPlay = !this.paused;
               this.audio.pause();
-              this.nativeBackend?.load(this.activeSlot, this.currentSongData.path).then(() => {
-                this.nativeLoadedSongId = this.currentSongData?.songId ?? null;
-                if (currentPos > 0) this.nativeBackend?.seek(currentPos);
-                if (shouldPlay) {
-                  this.nativeBackend?.play().then(() => {
-                    this.nativeIsPlaying = true;
-                    this.emit('play');
-                  }).catch(() => {});
-                }
-              }).catch((err) => {
-                console.warn('[AudioPlayer] Failed to load song on native toggle:', err);
-                this.fallbackToWebAudio();
-              });
+              this.nativeBackend
+                ?.load(this.activeSlot, this.currentSongData.path)
+                .then(() => {
+                  this.nativeLoadedSongId = this.currentSongData?.songId ?? null;
+                  if (currentPos > 0) this.nativeBackend?.seek(currentPos);
+                  if (shouldPlay) {
+                    this.nativeBackend
+                      ?.play()
+                      .then(() => {
+                        this.nativeIsPlaying = true;
+                        this.emit('play');
+                      })
+                      .catch(() => {});
+                  }
+                })
+                .catch((err) => {
+                  console.warn('[AudioPlayer] Failed to load song on native toggle:', err);
+                  this.fallbackToWebAudio();
+                });
             }
           } else {
             this.fallbackToWebAudio();
@@ -1414,6 +1442,12 @@ class AudioPlayer {
           nightModePreset !== this.getNightModePreset()
         ) {
           this.setNightMode(isNightMode, nightModePreset, false);
+        }
+
+        const soundProfile =
+          (localStorage?.playback?.soundProfile as SoundProfile) ?? 'studio_reference';
+        if (soundProfile !== this.getSoundProfile()) {
+          this.setSoundProfile(soundProfile, false);
         }
       }
     });
@@ -1607,11 +1641,14 @@ class AudioPlayer {
           this.preloadedSongData.songId !== incomingTrackId ||
           this.crossfadeScheduler.getSessionId() !== sessionId
         ) {
-          logPlayer('[AudioPlayer.startFade] Preloaded track mismatch or session expired; aborting fade', {
-            sessionId,
-            incomingTrackId,
-            preloadedId: this.preloadedSongData?.songId
-          });
+          logPlayer(
+            '[AudioPlayer.startFade] Preloaded track mismatch or session expired; aborting fade',
+            {
+              sessionId,
+              incomingTrackId,
+              preloadedId: this.preloadedSongData?.songId
+            }
+          );
           return;
         }
 
@@ -1755,9 +1792,8 @@ class AudioPlayer {
         const cancelGain = (gainNode: GainNode) => {
           try {
             if (
-              typeof (
-                gainNode.gain as unknown as { cancelAndHoldAtTime?: (time: number) => void }
-              ).cancelAndHoldAtTime === 'function'
+              typeof (gainNode.gain as unknown as { cancelAndHoldAtTime?: (time: number) => void })
+                .cancelAndHoldAtTime === 'function'
             ) {
               (
                 gainNode.gain as unknown as { cancelAndHoldAtTime: (time: number) => void }
@@ -1788,9 +1824,8 @@ class AudioPlayer {
   // ========== A-B LOOP INTERNAL WATCHERS & ENGINE ==========
 
   /**
-   * Private turnaround seek that directly assigns audio.currentTime,
-   * completely bypassing public seek() to avoid recursive loop clearing
-   * and redundant crossfade cancellation.
+   * Private turnaround seek that directly assigns audio.currentTime, completely bypassing public
+   * seek() to avoid recursive loop clearing and redundant crossfade cancellation.
    */
   private executeLoopSeek(targetTime: number) {
     if (this.loopJumpPending) return;
@@ -2237,9 +2272,10 @@ class AudioPlayer {
     return this.currentVolume / 100;
   }
 
-  /** Sets the volume (0-1). Single authority is gainNode (post-graph);
-   * media-element volume stays pinned at 1.0 so compressor drive is
-   * knob-invariant and output gain is V, never V^2. */
+  /**
+   * Sets the volume (0-1). Single authority is gainNode (post-graph); media-element volume stays
+   * pinned at 1.0 so compressor drive is knob-invariant and output gain is V, never V^2.
+   */
   set volume(volume: number) {
     const v = Math.max(0, Math.min(1, volume));
     this.currentVolume = v * 100;
@@ -2277,9 +2313,7 @@ class AudioPlayer {
     this.audioB.playbackRate = value;
   }
 
-  /**
-   * Sets the karaoke (vocal reducer) state.
-   */
+  /** Sets the karaoke (vocal reducer) state. */
   public setKaraoke(enabled: boolean, level?: number, immediate = false): void {
     if (this.karaokeNode) {
       this.karaokeNode.setEnabled(enabled, immediate, level);
@@ -2291,15 +2325,11 @@ class AudioPlayer {
     }
     if (this.isNativeEngineActive && this.nativeBackend) {
       // Preserve the current ReplayGain instead of clobbering it to 0 dB.
-      this.nativeBackend
-        .setDsp({ rgDb: this.lastNativeRgDb, karaoke: enabled })
-        .catch(() => {});
+      this.nativeBackend.setDsp({ rgDb: this.lastNativeRgDb, karaoke: enabled }).catch(() => {});
     }
   }
 
-  /**
-   * Sets the vocal reduction level (0 to 100).
-   */
+  /** Sets the vocal reduction level (0 to 100). */
   public setKaraokeLevel(level: number, immediate = false): void {
     if (this.karaokeNode) {
       this.karaokeNode.setLevel(level, immediate);
@@ -2308,32 +2338,24 @@ class AudioPlayer {
     }
   }
 
-  /**
-   * Toggles the karaoke mode on or off.
-   */
+  /** Toggles the karaoke mode on or off. */
   public toggleKaraoke(enabled?: boolean): boolean {
     const nextState = enabled ?? !this.isKaraokeEnabled();
     this.setKaraoke(nextState, undefined, false);
     return nextState;
   }
 
-  /**
-   * Returns whether karaoke mode is currently enabled.
-   */
+  /** Returns whether karaoke mode is currently enabled. */
   public isKaraokeEnabled(): boolean {
     return this.karaokeNode ? this.karaokeNode.enabled : false;
   }
 
-  /**
-   * Returns current karaoke vocal reduction level (0 to 100).
-   */
+  /** Returns current karaoke vocal reduction level (0 to 100). */
   public getKaraokeLevel(): number {
     return this.karaokeNode ? this.karaokeNode.level : 100;
   }
 
-  /**
-   * Sets the night mode (smart dynamic volume compressor) state.
-   */
+  /** Sets the night mode (smart dynamic volume compressor) state. */
   public setNightMode(enabled: boolean, preset?: NightModePreset, immediate = false): void {
     if (this.nightModeNode) {
       if (preset) {
@@ -2346,9 +2368,7 @@ class AudioPlayer {
     }
   }
 
-  /**
-   * Sets the night mode compressor profile preset.
-   */
+  /** Sets the night mode compressor profile preset. */
   public setNightModePreset(preset: NightModePreset, immediate = false): void {
     if (this.nightModeNode) {
       this.nightModeNode.setPreset(preset, immediate);
@@ -2357,33 +2377,88 @@ class AudioPlayer {
     }
   }
 
-  /**
-   * Returns whether night mode is currently enabled.
-   */
+  /** Returns whether night mode is currently enabled. */
   public isNightModeEnabled(): boolean {
     return this.nightModeNode ? this.nightModeNode.isEnabled() : false;
   }
 
-  /**
-   * Returns the current night mode preset profile.
-   */
+  /** Returns the current night mode preset profile. */
   public getNightModePreset(): NightModePreset {
     return this.nightModeNode ? this.nightModeNode.getPreset() : 'standard';
   }
 
-  /**
-   * Returns current live gain reduction in dB (negative float under compression, 0 when idle).
-   */
+  /** Returns current live gain reduction in dB (negative float under compression, 0 when idle). */
   public getNightModeReduction(): number {
     return this.nightModeNode ? this.nightModeNode.getReduction() : 0;
   }
 
-  // ========== A-B LOOP PUBLIC CONTROLS ==========
+  /**
+   * Sets the active sound profile ('studio_reference' or 'vocal_nuance_boost'). Applies crossfade
+   * in WebAudio or dispatches command to native daemon.
+   */
+  public setSoundProfile(profile: SoundProfile, immediate = false): void {
+    this.currentSoundProfile = profile;
+    storage.playback.setPlaybackOptions('soundProfile', profile);
+    dispatch({ type: 'SET_SOUND_PROFILE', data: profile });
+    this.emit('soundProfileChange', profile);
+
+    this.applySoundProfileToWebAudio(profile, immediate);
+
+    if (this.isNativeEngineActive && this.nativeBackend) {
+      this.nativeBackend.setSoundProfile(profile).catch((err) => {
+        console.warn('[AudioPlayer] Failed to set native sound profile:', err);
+      });
+    }
+  }
+
+  /** Returns the active sound profile. */
+  public getSoundProfile(): SoundProfile {
+    return this.currentSoundProfile;
+  }
 
   /**
-   * Sets Point A (loop start). Transitions to 'armed'.
-   * Does NOT cancel crossfade (arming only).
+   * Live gain reduction in dB from the Vocal Nuance upward compressor (0 if idle or studio
+   * reference).
    */
+  public getVocalNuanceReduction(): number {
+    return this.vocalNuanceNode ? this.vocalNuanceNode.getReduction() : 0;
+  }
+
+  /**
+   * Applies sound profile routing and crossfade to the WebAudio graph. In studio_reference: vocal
+   * nuance bypassed, limiter wet = 0, limiter dry = 1 (bit-exact null). In vocal_nuance_boost:
+   * vocal nuance active, limiter wet = 1, limiter dry = 0 (safety protection).
+   */
+  public applySoundProfileToWebAudio(profile: SoundProfile, immediate = false): void {
+    this.currentSoundProfile = profile;
+    const isVocal = profile === 'vocal_nuance_boost';
+
+    if (this.vocalNuanceNode) {
+      this.vocalNuanceNode.setEnabled(isVocal, immediate);
+    }
+
+    if (this.currentContext && this.limiterDryGainNode && this.limiterWetGainNode) {
+      const dryTarget = isVocal ? 0.0 : 1.0;
+      const wetTarget = isVocal ? 1.0 : 0.0;
+      const now = this.currentContext.currentTime;
+
+      if (immediate) {
+        this.limiterDryGainNode.gain.cancelScheduledValues(now);
+        this.limiterDryGainNode.gain.setValueAtTime(dryTarget, now);
+        this.limiterWetGainNode.gain.cancelScheduledValues(now);
+        this.limiterWetGainNode.gain.setValueAtTime(wetTarget, now);
+      } else {
+        this.limiterDryGainNode.gain.cancelScheduledValues(now);
+        this.limiterDryGainNode.gain.setTargetAtTime(dryTarget, now, 0.03);
+        this.limiterWetGainNode.gain.cancelScheduledValues(now);
+        this.limiterWetGainNode.gain.setTargetAtTime(wetTarget, now, 0.03);
+      }
+    }
+  }
+
+  // ========== A-B LOOP PUBLIC CONTROLS ==========
+
+  /** Sets Point A (loop start). Transitions to 'armed'. Does NOT cancel crossfade (arming only). */
   public setAbLoopPointA(time?: number): SetPointResult {
     const target = time !== undefined ? time : this.currentTime;
     const res = this.abLoopController.setPointA(target, this.duration);
@@ -2394,8 +2469,8 @@ class AudioPlayer {
   }
 
   /**
-   * Sets Point B (loop end). Requires Point A to be set.
-   * Cancels in-flight crossfade on activation to prevent collision.
+   * Sets Point B (loop end). Requires Point A to be set. Cancels in-flight crossfade on activation
+   * to prevent collision.
    */
   public setAbLoopPointB(time?: number): SetPointResult {
     const target = time !== undefined ? time : this.currentTime;
@@ -2413,8 +2488,8 @@ class AudioPlayer {
   }
 
   /**
-   * Sets both Point A and Point B atomically (e.g. from waveform Shift+Drag).
-   * Direction-agnostic. Cancels in-flight crossfade on activation.
+   * Sets both Point A and Point B atomically (e.g. from waveform Shift+Drag). Direction-agnostic.
+   * Cancels in-flight crossfade on activation.
    */
   public setAbLoopRange(start: number, end: number): SetPointResult {
     const res = this.abLoopController.setRange(start, end, this.duration);
@@ -2430,9 +2505,7 @@ class AudioPlayer {
     return res;
   }
 
-  /**
-   * Clears the active loop or armed state.
-   */
+  /** Clears the active loop or armed state. */
   public clearAbLoop(reason?: string): void {
     const res = this.abLoopController.clear();
     if (res.changed) {
