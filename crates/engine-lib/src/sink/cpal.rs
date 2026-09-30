@@ -97,7 +97,7 @@ impl CpalBackend {
             self.host
                 .output_devices()
                 .map_err(|e| SinkError::DeviceUnavailable(e.to_string()))?
-                .find(|d| d.name().map_or(false, |n| n == target))
+                .find(|d| d.name().is_ok_and(|n| n == target))
                 .ok_or_else(|| SinkError::DeviceUnavailable(format!("Device not found: {}", target)))?
         } else {
             self.host
@@ -114,9 +114,25 @@ impl CpalBackend {
         Arc::clone(&self.stats)
     }
 
+    /// Whether an output device has been selected (default or explicit).
+    pub fn has_device(&self) -> bool {
+        self.device.is_some()
+    }
+
     /// Check if an asynchronous device disconnect or error has occurred.
     pub fn has_device_error(&self) -> bool {
         self.device_error.load(Ordering::Acquire)
+    }
+
+    /// Sample rate of the device's default output config, if hardware is present.
+    /// The engine renders at this rate (resample-to-device policy); callers
+    /// use it to configure decoder resamplers, DSP coefficients, and the
+    /// playhead divisor from a single source instead of a hardcoded 48 kHz.
+    pub fn default_output_rate(&self) -> Option<u32> {
+        self.device
+            .as_ref()
+            .and_then(|d| d.default_output_config().ok())
+            .map(|c| c.sample_rate().0)
     }
 
     /// Open CPAL output with a custom real-time audio render callback.

@@ -10,7 +10,7 @@ use engine_testkit::c4_soak_test::{SoakConfig, SoakMonitor};
 use engine_testkit::c5_seek_latency::SeekLatencyTimer;
 use engine_testkit::generator::{SignalGenerator, SineGenerator};
 use engine_testkit::mock_backend::MockBackendController;
-use engine_testkit::protocol_mock::{DaemonCommand, ProtocolHarness, SlotId};
+use engine_testkit::protocol_mock::{DaemonCommand, DaemonRequest, ProtocolHarness, SlotId};
 use std::time::Duration;
 
 /// Scenario 1: Continuous Multi-Track Gapless Album Playback.
@@ -91,18 +91,18 @@ fn test_scenario2_dj_crossfade_and_cueing() {
         slot: SlotId::A,
         path: "club_track_a.flac".to_string(),
     };
-    let _ = ProtocolHarness::serialize_command(&load_a).unwrap();
+    let _ = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: load_a.clone() }).unwrap();
     controller.process_frames(44100);
 
     // Step 2: Cue Track B into standby Slot B
     let preload_b = DaemonCommand::Preload {
         path: "club_track_b.flac".to_string(),
     };
-    let _ = ProtocolHarness::serialize_command(&preload_b).unwrap();
+    let _ = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: preload_b.clone() }).unwrap();
 
     // Step 3: Trigger 3-second equal-power crossfade
     let crossfade_cmd = DaemonCommand::Crossfade { duration_ms: 3000 };
-    let _ = ProtocolHarness::serialize_command(&crossfade_cmd).unwrap();
+    let _ = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: crossfade_cmd.clone() }).unwrap();
 
     // Crossfade audio simulation
     let mut gen_a = SineGenerator::new(120.0, 44100, 0.8, 2);
@@ -128,7 +128,7 @@ fn test_scenario2_dj_crossfade_and_cueing() {
     let preload_c = DaemonCommand::Preload {
         path: "club_track_c.flac".to_string(),
     };
-    let _ = ProtocolHarness::serialize_command(&preload_c).unwrap();
+    let _ = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: preload_c.clone() }).unwrap();
     controller.process_frames(44100);
 
     assert_eq!(
@@ -151,7 +151,7 @@ fn test_scenario3_scrub_storm_resilience() {
         let seek_cmd = DaemonCommand::Seek {
             position_secs: target,
         };
-        let json = ProtocolHarness::serialize_command(&seek_cmd).unwrap();
+        let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: seek_cmd.clone() }).unwrap();
         assert!(json.contains("\"cmd\":\"seek\""));
 
         // Simulate turnaround latency (varying between 5ms and 22ms on local SSD)
@@ -186,7 +186,7 @@ fn test_scenario4_dynamic_dsp_presets() {
         karaoke: false,
         limiter: false,
     };
-    let _ = ProtocolHarness::serialize_command(&p1).unwrap();
+    let _ = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: p1.clone() }).unwrap();
 
     // Preset 2: Bass Boost (+6dB EQ) + Limiter
     let p2 = DaemonCommand::SetDsp {
@@ -195,7 +195,7 @@ fn test_scenario4_dynamic_dsp_presets() {
         karaoke: false,
         limiter: true,
     };
-    let _ = ProtocolHarness::serialize_command(&p2).unwrap();
+    let _ = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: p2.clone() }).unwrap();
 
     // Preset 3: Karaoke Vocal Remover
     let p3 = DaemonCommand::SetDsp {
@@ -204,7 +204,7 @@ fn test_scenario4_dynamic_dsp_presets() {
         karaoke: true,
         limiter: true,
     };
-    let _ = ProtocolHarness::serialize_command(&p3).unwrap();
+    let _ = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: p3.clone() }).unwrap();
 
     // Verify audio stream continuity across transitions
     let audit = CrossfadeAuditor::audit(&audio_stream, 2, 0.05, 480);

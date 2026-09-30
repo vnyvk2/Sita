@@ -29,7 +29,7 @@ fn test_replaygain_scaling_and_formula() {
     assert!(!rg.is_enabled());
 
     // -6.02 dB ~= 0.5 linear amplitude
-    rg.set_gain_db(-6.0205999);
+    rg.set_gain_db(-6.020_6);
     assert!(rg.is_enabled());
     assert!((rg.linear_multiplier() - 0.5).abs() < 1e-4);
 

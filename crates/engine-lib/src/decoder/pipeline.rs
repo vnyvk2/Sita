@@ -44,7 +44,7 @@ impl DecoderPipeline {
             .find(|t| t.id == probed.track_id)
             .ok_or(DecodeError::NoAudioTrack)?;
 
-        let is_source_mono = track.codec_params.channels.map_or(false, |c| c.count() == 1);
+        let is_source_mono = track.codec_params.channels.is_some_and(|c| c.count() == 1);
 
         Ok(Self {
             format: probed.format,

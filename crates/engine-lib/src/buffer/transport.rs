@@ -30,9 +30,7 @@ impl BoundedAudioTransport {
         if spec.sample_rate < 8000 || spec.sample_rate > 384000 || spec.channels == 0 {
             return 8000 * 2;
         }
-        let clamped_secs = duration_secs
-            .max(MIN_BUFFER_DURATION_SECS)
-            .min(MAX_BUFFER_DURATION_SECS);
+        let clamped_secs = duration_secs.clamp(MIN_BUFFER_DURATION_SECS, MAX_BUFFER_DURATION_SECS);
 
         let cap = ((spec.sample_rate as f64) * (spec.channels as f64) * clamped_secs).round() as usize;
         cap.max(1024)

@@ -1,21 +1,30 @@
 //! Daemon loop and asynchronous command dispatcher for engine-cli.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::protocol::{
+use engine_protocol::{
     DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, DaemonResult, PlaybackState, SlotId,
 };
 use engine_lib::buffer::BoundedAudioTransport;
-use engine_lib::decoder::DecoderPipeline;
+use engine_lib::decoder::{DecoderPipeline, StereoResampler};
 use engine_lib::dsp::{DspConfig, DspPipeline};
 use engine_lib::mixer::{DualSlotMixer, SlotId as LibSlotId};
 use engine_lib::sink::{AudioSource, CpalBackend, OutputBackend};
 use engine_lib::types::{AudioSpec, SinkError};
 
 /// Core daemon controller managing background decoder threads, audio sinks, and the 4Hz heartbeat.
+///
+/// # Rate policy: resample-to-device
+///
+/// The engine renders at the output device's default rate (`output_rate`,
+/// resolved when the backend opens; 48 kHz fallback clock when headless).
+/// File content at any other rate is sinc-resampled (rubato FFT) in the
+/// decoder thread — never linear hold. DSP coefficients, crossfade lengths,
+/// and the playhead divisor all derive from `output_rate`: one source of
+/// truth, not a hardcoded 48 kHz scattered across call sites.
 pub struct EngineDaemon {
     running: Arc<AtomicBool>,
     is_playing: Arc<AtomicBool>,
@@ -29,6 +38,7 @@ pub struct EngineDaemon {
     slot_base_secs: Arc<(AtomicU64, AtomicU64)>, // per-slot playhead base in f64 bits
     slot_paths: Arc<Mutex<[Option<String>; 2]>>, // last loaded path per slot for seek respawn
     eos_notified: Arc<(AtomicBool, AtomicBool)>, // TrackEnd already emitted per slot
+    output_rate: Arc<AtomicU32>, // device render rate in Hz; single source of truth
 }
 
 impl Default for EngineDaemon {
@@ -52,6 +62,7 @@ impl EngineDaemon {
             slot_base_secs: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
             slot_paths: Arc::new(Mutex::new([None, None])),
             eos_notified: Arc::new((AtomicBool::new(false), AtomicBool::new(false))),
+            output_rate: Arc::new(AtomicU32::new(48000)),
         }
     }
 
@@ -66,6 +77,21 @@ impl EngineDaemon {
     pub fn ensure_backend_open(&mut self) -> Result<(), SinkError> {
         if self.backend.is_open() {
             return Ok(());
+        }
+
+        // Resolve the render rate BEFORE opening: device default when hardware
+        // is present, 48 kHz fallback clock otherwise. Everything downstream
+        // (resamplers, DSP, playhead) derives from this one value.
+        if !self.backend.has_device() {
+            let _ = self.backend.select_device(None);
+        }
+        if let Some(rate) = self.backend.default_output_rate() {
+            self.output_rate.store(rate, Ordering::Release);
+        }
+        let target_rate = self.output_rate.load(Ordering::Acquire);
+        // Retune rate-sensitive DSP to the render rate exactly once per open.
+        if let Ok(mut guard) = self.shared_engine.lock() {
+            guard.1.set_sample_rate(target_rate as f32);
         }
 
         let shared_cb = Arc::clone(&self.shared_engine);
@@ -102,8 +128,13 @@ impl EngineDaemon {
             }
         };
 
-        let spec = AudioSpec::new_f32_stereo(48000);
+        let spec = AudioSpec::new_f32_stereo(target_rate);
         self.backend.open_with_render_fn(spec, render_fn)
+    }
+
+    #[inline]
+    fn output_rate_hz(&self) -> u32 {
+        self.output_rate.load(Ordering::Acquire).max(8000)
     }
 
     fn slot_idx(slot: SlotId) -> usize {
@@ -141,7 +172,7 @@ impl EngineDaemon {
         } else {
             0
         };
-        base + frames as f64 / 48000.0
+        base + frames as f64 / self.output_rate_hz() as f64
     }
 
     fn duration_secs(&self, idx: usize) -> f64 {
@@ -156,6 +187,8 @@ impl EngineDaemon {
     ///
     /// `start_secs > 0` seeks the pipeline first so Seek reuses the exact
     /// same streaming path as Load (no separate stub logic to drift).
+    /// Content is sinc-resampled (rubato FFT) to the device render rate;
+    /// equal rates pass through bit-exact.
     fn spawn_decoder_thread(
         path: String,
         start_secs: f64,
@@ -174,7 +207,22 @@ impl EngineDaemon {
                 let _ = pipeline.seek(start_secs);
             }
             let in_rate = pipeline.spec().sample_rate;
-            let mut resample_staging: Vec<f32> = Vec::new();
+            let Ok(mut resampler) = StereoResampler::new(in_rate, target_rate) else {
+                log::error!("resampler construction failed ({} -> {})", in_rate, target_rate);
+                stop_flag.store(true, Ordering::Relaxed);
+                return;
+            };
+            let mut staging: Vec<f32> = Vec::new();
+
+            // Push helper: backpressure-write, aborting on stop/cancel.
+            let mut push_out = |staging: &mut Vec<f32>| -> bool {
+                if staging.is_empty() {
+                    return true;
+                }
+                let ok = producer.push_with_backpressure(staging, &stop_flag).is_ok();
+                staging.clear();
+                ok
+            };
 
             while !stop_flag.load(Ordering::Relaxed) {
                 match pipeline.decode_next() {
@@ -184,46 +232,20 @@ impl EngineDaemon {
                         if samples.len() < 2 || samples.len() % 2 != 0 {
                             continue;
                         }
-                        let push_slice = if in_rate == target_rate {
-                            samples
-                        } else {
-                            // Linear interpolation resampler for interleaved stereo
-                            let in_frames = samples.len() / 2;
-                            if in_frames == 0 {
-                                continue;
-                            }
-                            let out_frames = ((in_frames as f64) * (target_rate as f64) / (in_rate as f64)).round() as usize;
-                            if out_frames == 0 {
-                                continue;
-                            }
-                            resample_staging.clear();
-                            resample_staging.reserve(out_frames * 2);
-                            let ratio = in_rate as f64 / target_rate as f64;
-                            for i in 0..out_frames {
-                                let src_pos = i as f64 * ratio;
-                                let idx0 = (src_pos.floor() as usize).min(in_frames - 1);
-                                let frac = (src_pos - idx0 as f64) as f32;
-                                let idx1 = (idx0 + 1).min(in_frames - 1);
-
-                                let l0 = samples[idx0 * 2];
-                                let r0 = samples[idx0 * 2 + 1];
-                                let l1 = samples[idx1 * 2];
-                                let r1 = samples[idx1 * 2 + 1];
-
-                                resample_staging.push(l0 * (1.0 - frac) + l1 * frac);
-                                resample_staging.push(r0 * (1.0 - frac) + r1 * frac);
-                            }
-                            &resample_staging[..]
-                        };
-
-                        if producer.push_with_backpressure(push_slice, &stop_flag).is_err() {
+                        if resampler.push_interleaved(samples, &mut staging).is_err() {
+                            break;
+                        }
+                        if !push_out(&mut staging) {
                             break;
                         }
                     }
                     Ok(None) => {
-                        // Natural EOF: producer finished. Signal so the slot
-                        // can transition to Eos and the heartbeat can emit
-                        // TrackEnd (auto-advance depends on it).
+                        // Natural EOF: flush the resampler tail so the exact
+                        // file length lands in the ring, then signal so the
+                        // slot can transition to Eos and the heartbeat can
+                        // emit TrackEnd (auto-advance depends on it).
+                        let _ = resampler.flush(&mut staging);
+                        let _ = push_out(&mut staging);
                         stop_flag.store(true, Ordering::Relaxed);
                         break;
                     }
@@ -270,12 +292,12 @@ impl EngineDaemon {
                     paths[Self::slot_idx(slot)] = Some(path.clone());
                 }
 
-                let target_rate = 48000;
+                let target_rate = self.output_rate_hz();
                 let spec = AudioSpec::new_f32_stereo(target_rate);
                 let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
                 let stop_signal = Arc::new(AtomicBool::new(false));
 
-                // Spawn background decoder thread with sample-rate adaptation
+                // Spawn background decoder thread with sinc resampling
                 Self::spawn_decoder_thread(path.clone(), 0.0, producer, Arc::clone(&stop_signal), target_rate);
 
                 // prime() signals any previous decoder on this slot to exit
@@ -375,7 +397,7 @@ impl EngineDaemon {
                 // prime() retires the old decoder (no orphan) and resets
                 // frames_consumed. Base is set while holding the mixer lock so
                 // the audio callback cannot interleave a torn seek.
-                let target_rate = 48000;
+                let target_rate = self.output_rate_hz();
                 let spec = AudioSpec::new_f32_stereo(target_rate);
                 let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
                 let stop_signal = Arc::new(AtomicBool::new(false));
@@ -404,7 +426,8 @@ impl EngineDaemon {
                 DaemonResult::Ok { data: None }
             }
             DaemonCommand::Crossfade { duration_ms } => {
-                let frames = ((duration_ms as f64 / 1000.0) * 48000.0).round() as usize;
+                let frames =
+                    ((duration_ms as f64 / 1000.0) * self.output_rate_hz() as f64).round() as usize;
                 if let Ok(mut guard) = self.shared_engine.lock() {
                     if let Err(e) = guard.0.start_crossfade(frames) {
                         return DaemonResult::Error { message: e.to_string() };
@@ -500,6 +523,7 @@ impl EngineDaemon {
         let active_slot_hb = Arc::clone(&self.active_slot);
         let slot_durations_hb = Arc::clone(&self.slot_durations);
         let slot_base_hb = Arc::clone(&self.slot_base_secs);
+        let output_rate_hb = Arc::clone(&self.output_rate);
         let eos_notified_hb = Arc::clone(&self.eos_notified);
         let shared_hb = Arc::clone(&self.shared_engine);
         let stdout_hb = Arc::clone(&stdout_lock);
@@ -522,13 +546,15 @@ impl EngineDaemon {
                 } else {
                     slot_durations_hb.1.load(Ordering::Relaxed)
                 });
-                // Per-slot position: base + frames consumed by that slot.
+                // Per-slot position: base + frames consumed by that slot,
+                // divided by the render rate (single source of truth).
                 let position_secs = {
                     let base = f64::from_bits(if slot_idx == 0 {
                         slot_base_hb.0.load(Ordering::Acquire)
                     } else {
                         slot_base_hb.1.load(Ordering::Acquire)
                     });
+                    let rate = output_rate_hb.load(Ordering::Acquire).max(8000) as f64;
                     let frames = shared_hb
                         .lock()
                         .ok()
@@ -537,7 +563,7 @@ impl EngineDaemon {
                             g.0.slot(id).frames_consumed
                         })
                         .unwrap_or(0);
-                    base + frames as f64 / 48000.0
+                    base + frames as f64 / rate
                 };
 
                 let mut events: Vec<DaemonEvent> = Vec::new();

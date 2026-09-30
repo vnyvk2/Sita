@@ -8,6 +8,7 @@ description = "Test harness, synthetic generators, splice auditors, and verifica
 
 [dependencies]
 engine-lib = { path = "../engine-lib" }
+engine-protocol.workspace = true
 hound.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true

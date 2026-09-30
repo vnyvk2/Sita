@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/engine-protocol",
     "crates/engine-lib",
     "crates/engine-cli",
     "crates/engine-testkit",
@@ -24,6 +25,7 @@ hound = "3.5"
 # Serialization & CLI Protocol
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+engine-protocol = { path = "crates/engine-protocol" }
 
 # Error Handling & Telemetry Logging
 thiserror = "1.0"

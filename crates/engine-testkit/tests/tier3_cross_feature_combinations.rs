@@ -8,7 +8,7 @@ use engine_testkit::generator::{
     DeterministicNoiseGenerator, SignalGenerator, SignalMetrics, SineGenerator,
 };
 use engine_testkit::mock_backend::{InjectedError, MockBackendController};
-use engine_testkit::protocol_mock::{DaemonCommand, ProtocolHarness};
+use engine_testkit::protocol_mock::{DaemonCommand, DaemonRequest, ProtocolHarness};
 
 #[test]
 fn test_combo_crossfade_with_active_dsp_and_replaygain() {
@@ -44,8 +44,8 @@ fn test_combo_seek_dispatched_during_in_flight_crossfade() {
     let crossfade_cmd = DaemonCommand::Crossfade { duration_ms: 2000 };
     let seek_cmd = DaemonCommand::Seek { position_secs: 45.0 };
 
-    let cf_json = ProtocolHarness::serialize_command(&crossfade_cmd).unwrap();
-    let seek_json = ProtocolHarness::serialize_command(&seek_cmd).unwrap();
+    let cf_json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: crossfade_cmd.clone() }).unwrap();
+    let seek_json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: seek_cmd.clone() }).unwrap();
 
     assert!(cf_json.contains("\"crossfade\""));
     assert!(seek_json.contains("\"seek\""));
@@ -139,7 +139,7 @@ fn test_combo_seek_command_while_in_paused_state() {
 
     // Seek to 120s
     let seek_cmd = DaemonCommand::Seek { position_secs: 120.0 };
-    let json = ProtocolHarness::serialize_command(&seek_cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: seek_cmd.clone() }).unwrap();
     assert!(json.contains("120.0"));
 
     // Backend must remain paused
@@ -151,7 +151,7 @@ fn test_combo_preload_slot_b_while_slot_a_is_streaming() {
     let load_b = DaemonCommand::Preload {
         path: "high_res_track.flac".to_string(),
     };
-    let json = ProtocolHarness::serialize_command(&load_b).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: load_b.clone() }).unwrap();
     assert!(json.contains("\"preload\""));
     assert!(json.contains("high_res_track.flac"));
 }
@@ -179,8 +179,8 @@ fn test_combo_rapid_volume_changes_during_limiter_delay_window() {
     let mut samples = gen.generate_duration(0.02); // 20ms
 
     // Apply sudden volume step at 10ms (sample 480)
-    for i in 480..samples.len() {
-        samples[i] *= 0.2;
+    for s in samples.iter_mut().skip(480) {
+        *s *= 0.2;
     }
 
     let report = CrossfadeAuditor::audit(&samples, 2, 0.25, 240);

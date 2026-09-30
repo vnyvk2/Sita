@@ -7,7 +7,7 @@ use engine_testkit::c1_null_test::NullTestAuditor;
 use engine_testkit::generator::{
     ImpulseGenerator, SignalGenerator, SignalMetrics, SilenceGenerator, SineGenerator,
 };
-use engine_testkit::protocol_mock::{DaemonCommand, ProtocolHarness};
+use engine_testkit::protocol_mock::{DaemonCommand, DaemonRequest, ProtocolHarness};
 use engine_testkit::wav_fixture::WavFixtureBuilder;
 
 // =========================================================================
@@ -180,7 +180,7 @@ fn test_boundary_ringbuffer_chunk_read_write() {
 #[test]
 fn test_boundary_seek_to_exact_origin_zero() {
     let cmd = DaemonCommand::Seek { position_secs: 0.0 };
-    let json = ProtocolHarness::serialize_command(&cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: cmd.clone() }).unwrap();
     assert!(json.contains("0.0"));
 }
 
@@ -191,7 +191,7 @@ fn test_boundary_seek_to_duration_minus_epsilon() {
     let cmd = DaemonCommand::Seek {
         position_secs: duration - eps,
     };
-    let json = ProtocolHarness::serialize_command(&cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: cmd.clone() }).unwrap();
     assert!(json.contains("239.999"));
 }
 
@@ -200,7 +200,7 @@ fn test_boundary_seek_to_exact_duration() {
     let cmd = DaemonCommand::Seek {
         position_secs: 180.0,
     };
-    let json = ProtocolHarness::serialize_command(&cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: cmd.clone() }).unwrap();
     assert!(json.contains("180.0"));
 }
 
@@ -210,7 +210,7 @@ fn test_boundary_seek_past_duration_clamping() {
     let cmd = DaemonCommand::Seek {
         position_secs: 999999.0,
     };
-    let json = ProtocolHarness::serialize_command(&cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: cmd.clone() }).unwrap();
     assert!(json.contains("999999.0"));
 }
 
@@ -219,7 +219,7 @@ fn test_boundary_negative_seek_clamped_to_zero() {
     let cmd = DaemonCommand::Seek {
         position_secs: -15.5,
     };
-    let json = ProtocolHarness::serialize_command(&cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: cmd.clone() }).unwrap();
     assert!(json.contains("-15.5"));
 }
 
@@ -260,14 +260,14 @@ fn test_boundary_replaygain_extreme_attenuation_minus_60db() {
 #[test]
 fn test_boundary_crossfade_zero_duration_0ms() {
     let cmd = DaemonCommand::Crossfade { duration_ms: 0 };
-    let json = ProtocolHarness::serialize_command(&cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: cmd.clone() }).unwrap();
     assert!(json.contains("\"duration_ms\":0"));
 }
 
 #[test]
 fn test_boundary_crossfade_sub_buffer_single_millisecond() {
     let cmd = DaemonCommand::Crossfade { duration_ms: 1 };
-    let json = ProtocolHarness::serialize_command(&cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: cmd.clone() }).unwrap();
     assert!(json.contains("\"duration_ms\":1"));
 }
 
@@ -276,7 +276,7 @@ fn test_boundary_crossfade_long_duration_30000ms() {
     let cmd = DaemonCommand::Crossfade {
         duration_ms: 30000,
     };
-    let json = ProtocolHarness::serialize_command(&cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: cmd.clone() }).unwrap();
     assert!(json.contains("\"duration_ms\":30000"));
 }
 

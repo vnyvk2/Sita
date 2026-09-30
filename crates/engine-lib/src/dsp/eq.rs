@@ -6,7 +6,7 @@ pub const EQ_CENTER_FREQUENCIES: [f32; 10] = [
 ];
 
 /// Quality factor (Q) for 1-octave band filters.
-pub const EQ_DEFAULT_Q: f32 = 1.4142;
+pub const EQ_DEFAULT_Q: f32 = std::f32::consts::SQRT_2;
 
 /// Direct Form I biquad filter coefficients and channel delay state.
 #[derive(Debug, Clone, Copy)]
@@ -180,13 +180,12 @@ impl EqualizerChain {
     }
 
     fn recalculate(&mut self) {
-        for i in 0..10 {
-            self.bands[i].update_peaking(
-                self.sample_rate,
-                EQ_CENTER_FREQUENCIES[i],
-                self.gains[i],
-                EQ_DEFAULT_Q,
-            );
+        for (band, (&freq, &gain)) in self
+            .bands
+            .iter_mut()
+            .zip(EQ_CENTER_FREQUENCIES.iter().zip(self.gains.iter()))
+        {
+            band.update_peaking(self.sample_rate, freq, gain, EQ_DEFAULT_Q);
         }
         self.update_active_status();
     }

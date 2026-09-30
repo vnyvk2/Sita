@@ -1,160 +1,18 @@
-//! JSON-Lines Daemon Protocol Mock & Schema Validator.
+//! Protocol test harness for the canonical `engine-protocol` schema.
 //!
-//! Provides schema models, serializes commands/requests, and validates push events
-//! according to amended R3 Daemon Protocol specifications.
+//! Re-exports the single source of truth and provides line-framing helpers
+//! for encoding correlated requests and decoding daemon stdout. There is
+//! intentionally NO legacy id-less serializer: every command on the wire
+//! carries a correlation id, and tests must exercise that contract.
 
-use serde::{Deserialize, Serialize};
-
-/// Slot identifier matching engine-lib.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SlotId {
-    A,
-    B,
-}
-
-/// Playback lifecycle state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum PlaybackState {
-    Playing,
-    Paused,
-    Stopped,
-}
-
-/// Inbound command envelope with explicit correlation ID.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DaemonRequest {
-    pub id: u64,
-    #[serde(flatten)]
-    pub command: DaemonCommand,
-}
-
-/// 13-Command Schema defined in R3 / PROJECT.md
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "cmd", rename_all = "snake_case")]
-pub enum DaemonCommand {
-    Load {
-        slot: SlotId,
-        path: String,
-    },
-    Preload {
-        path: String,
-    },
-    Play,
-    Pause,
-    Stop,
-    Seek {
-        position_secs: f64,
-    },
-    Crossfade {
-        duration_ms: u32,
-    },
-    SetVolume {
-        volume: f32,
-    },
-    SetEq {
-        gains: [f32; 10],
-    },
-    SetDsp {
-        bypass: bool,
-        rg_db: f32,
-        karaoke: bool,
-        limiter: bool,
-    },
-    ListDevices,
-    SetDevice {
-        device_id: String,
-    },
-    GetState,
-}
-
-/// Push-Event Schema defined in amended R3 specifications.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "event", rename_all = "snake_case")]
-pub enum DaemonEvent {
-    Ready {
-        protocol_version: u32,
-        engine_version: String,
-    },
-    StateChanged {
-        state: PlaybackState,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        position_secs: Option<f64>,
-    },
-    SlotEnd {
-        slot: SlotId,
-    },
-    TrackEnd {
-        slot: SlotId,
-    },
-    TransitionComplete {
-        active_slot: SlotId,
-    },
-    Xrun {
-        count: u64,
-    },
-    DeviceError {
-        message: String,
-    },
-    Heartbeat {
-        active_slot: SlotId,
-        position_secs: f64,
-        duration_secs: f64,
-        wallclock_ms: u64,
-        is_playing: bool,
-    },
-}
-
-/// Daemon response envelope for correlated command confirmations or errors.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DaemonResponse {
-    pub id: u64,
-    #[serde(flatten)]
-    pub result: DaemonResult,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "status", rename_all = "snake_case")]
-pub enum DaemonResult {
-    Ok {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        data: Option<serde_json::Value>,
-    },
-    Error {
-        message: String,
-    },
-}
-
-impl DaemonResponse {
-    pub fn ok(id: u64, data: Option<serde_json::Value>) -> Self {
-        Self {
-            id,
-            result: DaemonResult::Ok { data },
-        }
-    }
-
-    pub fn error<S: Into<String>>(id: u64, message: S) -> Self {
-        Self {
-            id,
-            result: DaemonResult::Error {
-                message: message.into(),
-            },
-        }
-    }
-}
+pub use engine_protocol::{
+    DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, DaemonResult, PlaybackState, SlotId,
+};
 
 /// Protocol testing harness for encoding commands and decoding responses/events.
 pub struct ProtocolHarness;
 
 impl ProtocolHarness {
-    /// Serialize a daemon command without correlation id (legacy format).
-    pub fn serialize_command(cmd: &DaemonCommand) -> Result<String, serde_json::Error> {
-        let mut json = serde_json::to_string(cmd)?;
-        json.push('\n');
-        Ok(json)
-    }
-
     /// Serialize a correlated daemon request into a newline-terminated JSON string.
     pub fn serialize_request(req: &DaemonRequest) -> Result<String, serde_json::Error> {
         let mut json = serde_json::to_string(req)?;

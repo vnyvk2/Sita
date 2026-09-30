@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Format of raw audio samples.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SampleType {
     /// 32-bit IEEE 754 floating-point (-1.0 to +1.0).
+    #[default]
     F32,
     /// 16-bit signed integer (-32768 to +32767).
     I16,
@@ -23,12 +24,6 @@ impl SampleType {
             SampleType::F32 => 4,
             SampleType::I16 => 2,
         }
-    }
-}
-
-impl Default for SampleType {
-    fn default() -> Self {
-        SampleType::F32
     }
 }
 

@@ -329,6 +329,7 @@ name = "engine-cli"
 version = "0.1.0"
 dependencies = [
  "engine-lib",
+ "engine-protocol",
  "env_logger",
  "log",
  "serde",
@@ -352,11 +353,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "engine-testkit"
 version = "0.1.0"
 dependencies = [
  "approx",
  "engine-lib",
+ "engine-protocol",
  "hound",
  "log",
  "rtrb",

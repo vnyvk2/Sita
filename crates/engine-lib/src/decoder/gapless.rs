@@ -206,6 +206,6 @@ impl GaplessTrimmer {
 
     /// Returns true if the configured valid frame budget has been exhausted.
     pub fn is_exhausted(&self) -> bool {
-        self.valid_samples_remaining.map_or(false, |r| r == 0)
+        self.valid_samples_remaining.is_some_and(|r| r == 0)
     }
 }

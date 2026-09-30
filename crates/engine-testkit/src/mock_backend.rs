@@ -53,6 +53,12 @@ pub struct MockBackendController {
     pub state: Arc<MockBackendState>,
 }
 
+impl Default for MockBackendController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MockBackendController {
     pub fn new() -> Self {
         Self {

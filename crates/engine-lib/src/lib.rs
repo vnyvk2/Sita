@@ -14,7 +14,7 @@ pub mod dsp;
 pub use types::*;
 pub use decoder::{
     parse_itunsmpb, parse_lame_tag, DecoderPipeline, GaplessInfo, GaplessMode, GaplessTrimmer,
-    probe_file, ProbedSource,
+    probe_file, ProbedSource, StereoResampler,
 };
 pub use buffer::{AudioConsumer, AudioProducer, BoundedAudioTransport, PlayheadTracker};
 pub use sink::{AudioSource, CpalBackend, NullSink, OutputBackend, WavSink};

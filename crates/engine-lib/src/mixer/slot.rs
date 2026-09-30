@@ -151,7 +151,7 @@ impl VoiceSlot {
     /// Check if slot has audio ready to be consumed.
     #[inline]
     pub fn has_audio(&self) -> bool {
-        self.consumer.as_ref().map_or(false, |c| c.available_samples() > 0)
+        self.consumer.as_ref().is_some_and(|c| c.available_samples() > 0)
     }
 
     /// Available samples currently in this slot's ring buffer.

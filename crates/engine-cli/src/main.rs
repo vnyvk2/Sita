@@ -1,7 +1,6 @@
 //! Nora Audio Engine Daemon (`engine-cli`) entrypoint.
 
 pub mod daemon;
-pub mod protocol;
 
 use daemon::EngineDaemon;
 

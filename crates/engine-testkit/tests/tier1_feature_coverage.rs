@@ -14,7 +14,7 @@ use engine_testkit::generator::{
 };
 use engine_testkit::mock_backend::{InjectedError, MockBackendController};
 use engine_testkit::protocol_mock::{
-    DaemonCommand, DaemonEvent, PlaybackState, ProtocolHarness, SlotId,
+    DaemonCommand, DaemonEvent, DaemonRequest, PlaybackState, ProtocolHarness, SlotId,
 };
 use engine_testkit::wav_fixture::WavFixtureBuilder;
 use std::time::Duration;
@@ -377,7 +377,7 @@ fn test_tpdf_dither_noise_amplitude_bound() {
 #[test]
 fn test_daemon_command_seek_roundtrip_serialization() {
     let cmd = DaemonCommand::Seek { position_secs: 42.5 };
-    let json = ProtocolHarness::serialize_command(&cmd).unwrap();
+    let json = ProtocolHarness::serialize_request(&DaemonRequest { id: 1, command: cmd.clone() }).unwrap();
     assert!(json.contains("\"cmd\":\"seek\""));
     assert!(json.contains("42.5"));
     assert!(json.ends_with('\n'));

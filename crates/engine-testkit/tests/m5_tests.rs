@@ -140,7 +140,7 @@ fn test_c4_bounded_memory_soak_monitor_simulation() {
     for tick in 1..=20 {
         let elapsed = Duration::from_secs(tick * 30);
         let simulated_rss_bytes: usize = (24 * 1024 * 1024) + ((tick as usize % 5) * 512 * 1024);
-        let samples_consumed = (tick as u64) * 30 * 192000;
+        let samples_consumed = tick * 30 * 192000;
         let xruns = 0; // Zero buffer underruns
         let low_watermark = (buffer_capacity as f64 * 0.45) as usize; // Safely at 45% capacity
 

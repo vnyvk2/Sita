@@ -8,6 +8,7 @@ description = "Standalone headless daemon executable exposing the JSON-lines std
 
 [dependencies]
 engine-lib = { path = "../engine-lib" }
+engine-protocol.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
