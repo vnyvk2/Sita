@@ -26,7 +26,21 @@ use engine_protocol::SoundProfile;
 use engine_testkit::measure_loudness;
 
 fn find_artifacts_dir() -> PathBuf {
-    let p = PathBuf::from("target/phase3_listening_artifacts");
+    let base = if let Ok(manifest) = std::env::var("CARGO_MANIFEST_DIR") {
+        let manifest_path = PathBuf::from(manifest);
+        if manifest_path.ends_with("engine-testkit") {
+            manifest_path
+                .parent()
+                .and_then(|p| p.parent())
+                .map(PathBuf::from)
+                .unwrap_or(manifest_path)
+        } else {
+            manifest_path
+        }
+    } else {
+        PathBuf::from(".")
+    };
+    let p = base.join("target").join("phase3_listening_artifacts");
     if !p.exists() {
         let _ = fs::create_dir_all(&p);
     }
@@ -338,6 +352,113 @@ fn generate_track5_orchestral_crescendo(sample_rate: u32) -> (String, Vec<f32>) 
 // PHASE 3 LISTENING VALIDATION HARNESS
 // =========================================================================
 
+#[derive(Debug, Clone)]
+pub struct TemporalTransitionEvent {
+    pub frame_index: usize,
+    pub timestamp_sec: f32,
+    pub pre_window_max_dbfs: f32,
+    pub crossing_peak_dbfs: f32,
+    pub max_15ms_gain_db: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct TemporalTransitionAnalysis {
+    pub total_transitions: usize,
+    pub max_transient_gain_db: Option<f32>,
+    pub events: Vec<TemporalTransitionEvent>,
+}
+
+/// Temporal Transition Detector:
+/// Explicitly identifies quiet -> loud transitions and measures maximum gain
+/// during the first 15 ms following the threshold crossing.
+///
+/// Transition Criteria:
+/// 1. Loud regime crossing: frame peak of reference signal reaches >= -12.0 dBFS
+///    (the threshold where VocalNuanceBoost target gain returns to unity 1.000000).
+/// 2. Sustained quiet pre-window: all frames in the preceding 50 ms are strictly < -12.0 dBFS.
+///
+/// For each detected transition:
+/// Measures the maximum sample-by-sample gain ratio y[n] / x[n] during the first 15 ms
+/// (tau_attack = 15 ms settling window) post-crossing on samples above noise floor (-60 dBFS).
+fn analyze_temporal_transitions(
+    out_ref: &[f32],
+    out_nuance: &[f32],
+    sample_rate: u32,
+) -> TemporalTransitionAnalysis {
+    let loud_thresh_linear = 10.0f32.powf(-12.0 / 20.0); // 0.25118864 (-12 dBFS)
+    let noise_thresh_linear = 10.0f32.powf(-60.0 / 20.0); // 0.001 (-60 dBFS)
+    let pre_window_frames = (0.050 * sample_rate as f32).round() as usize; // 50 ms
+    let post_window_frames = (0.015 * sample_rate as f32).round() as usize; // 15 ms
+
+    let total_frames = out_ref.len() / 2;
+    let mut events = Vec::new();
+    let mut overall_max_gain_linear = 0.0f32;
+
+    for i in pre_window_frames..total_frames {
+        let ref_l = out_ref[i * 2];
+        let ref_r = out_ref[i * 2 + 1];
+        let peak_i = ref_l.abs().max(ref_r.abs());
+
+        // Condition 1: Current frame reaches or exceeds loud threshold (-12 dBFS)
+        if peak_i >= loud_thresh_linear {
+            // Condition 2: All frames in preceding 50 ms window are strictly in quiet regime (< -12 dBFS)
+            let mut pre_quiet = true;
+            let mut pre_max = 0.0f32;
+            for j in (i - pre_window_frames)..i {
+                let p = out_ref[j * 2].abs().max(out_ref[j * 2 + 1].abs());
+                pre_max = pre_max.max(p);
+                if p >= loud_thresh_linear {
+                    pre_quiet = false;
+                    break;
+                }
+            }
+
+            if pre_quiet {
+                // Crossing event detected!
+                let end_frame = (i + post_window_frames).min(total_frames);
+                let mut window_max_gain_linear = 1.0f32;
+
+                for k in i..end_frame {
+                    for ch in 0..2 {
+                        let s_ref = out_ref[k * 2 + ch].abs();
+                        let s_nua = out_nuance[k * 2 + ch].abs();
+                        if s_ref > noise_thresh_linear {
+                            let gain = s_nua / s_ref;
+                            window_max_gain_linear = window_max_gain_linear.max(gain);
+                        }
+                    }
+                }
+
+                let max_15ms_gain_db = 20.0 * window_max_gain_linear.log10();
+                overall_max_gain_linear = overall_max_gain_linear.max(window_max_gain_linear);
+
+                let pre_window_max_dbfs = if pre_max > 0.0 { 20.0 * pre_max.log10() } else { -120.0 };
+                let crossing_peak_dbfs = 20.0 * peak_i.log10();
+
+                events.push(TemporalTransitionEvent {
+                    frame_index: i,
+                    timestamp_sec: i as f32 / sample_rate as f32,
+                    pre_window_max_dbfs,
+                    crossing_peak_dbfs,
+                    max_15ms_gain_db,
+                });
+            }
+        }
+    }
+
+    let max_transient_gain_db = if !events.is_empty() {
+        Some(20.0 * overall_max_gain_linear.log10())
+    } else {
+        None
+    };
+
+    TemporalTransitionAnalysis {
+        total_transitions: events.len(),
+        max_transient_gain_db,
+        events,
+    }
+}
+
 struct TrackEvaluationResult {
     track_name: String,
     ref_lufs: f32,
@@ -353,6 +474,7 @@ struct TrackEvaluationResult {
     attack_edge_delta_db: f32,
     max_gain_applied_db: f32,
     max_loud_transient_gain_db: Option<f32>,
+    temporal_transitions: TemporalTransitionAnalysis,
 }
 
 fn evaluate_track(
@@ -433,7 +555,10 @@ fn evaluate_track(
         None
     };
 
-    // 4. Export Native Render WAV Files for Critical Listening
+    // 4. Temporal Transition Detection (50 ms quiet pre-window -> first 15 ms post-crossing)
+    let temporal_transitions = analyze_temporal_transitions(&out_ref, &out_nuance, sample_rate);
+
+    // 5. Export Native Render WAV Files for Critical Listening
     let lift_tag = format!("{:0.1}db", provisional_lift_db).replace('.', "_");
     let ref_filename = format!("{}_studioreference.wav", track_id);
     let nuance_filename = format!("{}_nuance_{}.wav", track_id, lift_tag);
@@ -441,7 +566,7 @@ fn evaluate_track(
     write_wav_file(&artifacts_dir.join(&ref_filename), &out_ref, sample_rate);
     write_wav_file(&artifacts_dir.join(&nuance_filename), &out_nuance, sample_rate);
 
-    // 5. Export Loudness-Matched (-14.0 LUFS) WAV Files for Unbiased Listening Comparison
+    // 6. Export Loudness-Matched (-14.0 LUFS) WAV Files for Unbiased Listening Comparison
     let ref_matched = match_loudness(&out_ref, ref_loudness.integrated_lufs as f32, -14.0);
     let nuance_matched = match_loudness(&out_nuance, nuance_loudness.integrated_lufs as f32, -14.0);
 
@@ -466,6 +591,7 @@ fn evaluate_track(
         attack_edge_delta_db: attack_edge_delta,
         max_gain_applied_db,
         max_loud_transient_gain_db,
+        temporal_transitions,
     }
 }
 
@@ -559,7 +685,72 @@ fn test_phase3_listening_validation_across_genres() {
             r.attack_edge_delta_db
         );
     }
+
+    println!("\n======================================================================================================================");
+    println!("TEMPORAL QUIET -> LOUD TRANSITION AUDIT (Pre-Window 50 ms < -12 dBFS -> First 15 ms Post-Crossing)");
     println!("======================================================================================================================");
+    println!(
+        "{:<45} | {:<18} | {:>12} | {:>22} | {:<25}",
+        "Track Name", "Fixture Type", "Transitions", "Max 15ms Transient Gain", "Transition Behavior"
+    );
+    println!(
+        "{:-<45}-+-{:-<18}-+-{:-<12}-+-{:-<22}-+-{:-<25}",
+        "", "", "", "", ""
+    );
+
+    for (i, r) in results.iter().enumerate() {
+        let (fixture_type, behavior) = match i {
+            0 => ("Real Commercial", "Verse->chorus phrasing (Max @ t=2.41s)"),
+            1 => ("Synthetic Acoustic", "Peak < -12 dBFS (never reaches loud)"),
+            2 => ("Synthetic EDM", "Dense signal (no 50ms quiet pre-window)"),
+            3 => ("Synthetic Ambient", "Peak < -12 dBFS (never reaches loud)"),
+            4 => ("Synthetic Dynamic", "1-sample step crescendo @ t=6.00s"),
+            _ => ("Benchmark", ""),
+        };
+        let gain_str = match r.temporal_transitions.max_transient_gain_db {
+            Some(g) => format!("{:>+6.2} dB", g),
+            None => "N/A".to_string(),
+        };
+        println!(
+            "{:<45} | {:<18} | {:>12} | {:>22} | {:<25}",
+            r.track_name, fixture_type, r.temporal_transitions.total_transitions, gain_str, behavior
+        );
+    }
+    println!("======================================================================================================================");
+
+    // Invariant 4: Temporal Quiet -> Loud Transition Verification
+    // Track 1 (Commercial Master): must detect natural quiet -> loud transitions and stay bounded
+    assert!(
+        results[0].temporal_transitions.total_transitions > 0,
+        "Expected quiet -> loud transitions in commercial master Track 1"
+    );
+    let t1_transient = results[0].temporal_transitions.max_transient_gain_db.unwrap();
+    assert!(
+        t1_transient <= default_lift_db + 0.10,
+        "Commercial transient overshoot exceeded bound: {:.2} dB > {:.2} dB",
+        t1_transient,
+        default_lift_db
+    );
+
+    // Tracks 2 & 4: Never enter loud regime (pure quiet material)
+    assert_eq!(results[1].temporal_transitions.total_transitions, 0);
+    assert_eq!(results[3].temporal_transitions.total_transitions, 0);
+
+    // Track 3: Dense continuous material (never has 50 ms quiet pre-window)
+    assert_eq!(results[2].temporal_transitions.total_transitions, 0);
+
+    // Track 5 (Synthetic 1-Sample Step): Exactly 1 transition at t = 6.0s step
+    assert_eq!(
+        results[4].temporal_transitions.total_transitions, 1,
+        "Track 5 must have exactly 1 quiet -> loud transition at the 1-sample step"
+    );
+    let t5_step_gain = results[4].temporal_transitions.max_transient_gain_db.unwrap();
+    assert!(
+        (t5_step_gain - default_lift_db).abs() <= 0.10,
+        "Track 5 step transient gain {:.2} dB did not match locked lift {:.2} dB",
+        t5_step_gain,
+        default_lift_db
+    );
 }
 
 #[test]
@@ -575,12 +766,12 @@ fn test_phase3_orchestral_crescendo_lift_sweep_and_transient_forensics() {
     let sweep_lifts = [1.0f32, 1.5f32, 2.0f32, 2.5f32];
 
     println!(
-        "{:<15} | {:>9} | {:>7} | {:>8} | {:>7} | {:>10} | {:>8} | {:>18}",
-        "Lift Setting", "Int. LUFS", "ΔLUFS", "LRA (LU)", "ΔLRA", "ΔPeak Edge", "Nua dBTP", "Transient (>= -12dB)"
+        "{:<15} | {:>9} | {:>7} | {:>8} | {:>7} | {:>10} | {:>8} | {:>16} | {:>18}",
+        "Lift Setting", "Int. LUFS", "ΔLUFS", "LRA (LU)", "ΔLRA", "ΔPeak Edge", "Nua dBTP", "15ms Step Gain", "Transient (>= -12dB)"
     );
     println!(
-        "{:-<15}-+-{:-<9}-+-{:-<7}-+-{:-<8}-+-{:-<7}-+-{:-<10}-+-{:-<8}-+-{:-<18}",
-        "", "", "", "", "", "", "", ""
+        "{:-<15}-+-{:-<9}-+-{:-<7}-+-{:-<8}-+-{:-<7}-+-{:-<10}-+-{:-<8}-+-{:-<16}-+-{:-<18}",
+        "", "", "", "", "", "", "", "", ""
     );
 
     for &lift in &sweep_lifts {
@@ -589,8 +780,12 @@ fn test_phase3_orchestral_crescendo_lift_sweep_and_transient_forensics() {
             Some(g) => format!("{:>+6.2} dB", g),
             None => "N/A".to_string(),
         };
+        let step_gain_str = match res.temporal_transitions.max_transient_gain_db {
+            Some(g) => format!("{:>+6.2} dB", g),
+            None => "N/A".to_string(),
+        };
         println!(
-            "{:<15} | {:>7.2} LU | {:>+6.2} | {:>6.2} LU | {:>+6.2} | {:>+9.2}dB | {:>7.2}d | {:>18}",
+            "{:<15} | {:>7.2} LU | {:>+6.2} | {:>6.2} LU | {:>+6.2} | {:>+9.2}dB | {:>7.2}d | {:>16} | {:>18}",
             format!("+{:0.1} dB Lift", lift),
             res.nuance_lufs,
             res.delta_lufs,
@@ -598,6 +793,7 @@ fn test_phase3_orchestral_crescendo_lift_sweep_and_transient_forensics() {
             res.delta_lra,
             res.attack_edge_delta_db,
             res.nuance_tp_dbtp,
+            step_gain_str,
             loud_gain_str
         );
     }
