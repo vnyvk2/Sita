@@ -89,13 +89,21 @@ impl DspPipeline {
 
     /// Set bypass mode state.
     pub fn set_bypass(&mut self, bypass: bool) {
-        self.config.bypass = bypass;
+        if self.config.bypass != bypass {
+            self.config.bypass = bypass;
+            // Stale EQ histories / limiter delay / karaoke integrators would
+            // otherwise thump on re-enable.
+            self.reset_state();
+        }
     }
 
     /// Update sample rate across rate-sensitive DSP processors (EQ, Limiter).
     pub fn set_sample_rate(&mut self, sample_rate: f32) {
         self.eq.set_sample_rate(sample_rate);
+        self.karaoke.set_sample_rate(sample_rate);
         self.limiter.set_sample_rate(sample_rate);
+        // Old delay lines/histories are at the previous rate's length.
+        self.reset_state();
     }
 
     /// Process a contiguous buffer of interleaved stereo f32 samples in-place.

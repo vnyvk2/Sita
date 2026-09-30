@@ -25,11 +25,17 @@ pub struct BoundedAudioTransport;
 impl BoundedAudioTransport {
     /// Compute the required capacity in 32-bit float samples for a given spec and duration.
     pub fn compute_capacity(spec: &AudioSpec, duration_secs: f64) -> usize {
+        // Guard against zero/invalid specs: RingBuffer::new(0) would panic or
+        // create a degenerate buffer. Floor at 1s stereo @ 8kHz.
+        if spec.sample_rate < 8000 || spec.sample_rate > 384000 || spec.channels == 0 {
+            return 8000 * 2;
+        }
         let clamped_secs = duration_secs
             .max(MIN_BUFFER_DURATION_SECS)
             .min(MAX_BUFFER_DURATION_SECS);
 
-        ((spec.sample_rate as f64) * (spec.channels as f64) * clamped_secs).round() as usize
+        let cap = ((spec.sample_rate as f64) * (spec.channels as f64) * clamped_secs).round() as usize;
+        cap.max(1024)
     }
 
     /// Allocate a new lock-free SPSC ring buffer sized for the requested duration.
@@ -117,6 +123,10 @@ impl AudioProducer {
 
                     chunk.commit_all();
                     pushed += to_write;
+                } else {
+                    // Lost the slots() -> write_chunk race: back off instead of
+                    // hot-spinning at 100% CPU.
+                    std::thread::sleep(Duration::from_millis(1));
                 }
             } else {
                 // Backpressure wait: sleep 5ms to allow audio output thread to drain samples.
@@ -217,10 +227,16 @@ impl AudioConsumer {
 
     /// Discard all buffered samples (e.g. on seek or track flush).
     pub fn flush(&mut self) {
-        let available = self.consumer.slots();
-        if available > 0 {
-            if let Ok(chunk) = self.consumer.read_chunk(available) {
-                chunk.commit_all();
+        // Drain in a loop: a single read_chunk may not cover wrap-around or
+        // concurrent arrivals, and ignoring Err leaves stale pre-seek audio.
+        loop {
+            let available = self.consumer.slots();
+            if available == 0 {
+                break;
+            }
+            match self.consumer.read_chunk(available) {
+                Ok(chunk) => chunk.commit_all(),
+                Err(_) => break,
             }
         }
     }

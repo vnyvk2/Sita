@@ -29,6 +29,10 @@ impl CrossfadeState {
     /// Calculate the instantaneous equal-power gains `(gain_from, gain_to)` for the current frame
     /// and advance the transition by one frame.
     ///
+    /// Frames step `(i+1)/N` so the final emitted frame reaches exactly
+    /// `(0.0, 1.0)` before `is_complete()` fires — no hard-switch residue,
+    /// and `N == 1` emits 100% new audio instead of a cut to old.
+    ///
     /// Real-time safe: Pure trigonometric evaluation with zero allocations.
     #[inline]
     pub fn step_frame(&mut self) -> (f32, f32) {
@@ -36,8 +40,8 @@ impl CrossfadeState {
             return (0.0, 1.0);
         }
 
-        let progress = (self.current_frame as f32) / (self.total_frames as f32);
-        let theta = progress * FRAC_PI_2;
+        let progress = ((self.current_frame + 1) as f32) / (self.total_frames as f32);
+        let theta = progress.min(1.0) * FRAC_PI_2;
 
         let gain_from = theta.cos();
         let gain_to = theta.sin();

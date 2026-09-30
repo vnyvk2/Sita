@@ -139,6 +139,7 @@ class AudioPlayer {
   private nativeIsPlaying: boolean = false;
   private nativeCurrentPosition: number = 0;
   private nativeLoadedSongId: number | null = null;
+  private lastNativeRgDb: number = 0;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -221,6 +222,11 @@ class AudioPlayer {
   }
 
   private initNativeBackend() {
+    // Guard against double-init leaking the previous rAF + IPC subscription.
+    if (this.nativeBackend) {
+      this.nativeBackend.destroy();
+      this.nativeBackend = null;
+    }
     try {
       this.nativeBackend = new NativeAudioBackend({
         onTimeUpdate: (pos, _dur) => {
@@ -258,6 +264,15 @@ class AudioPlayer {
           this.crossfadeScheduler.cancel();
           this.handleSongEnd();
         },
+        onSlotEnd: () => {
+          if (!this.isNativeEngineActive) return;
+          // Informational only; track_end drives auto-advance.
+        },
+        onTransitionComplete: (activeSlot) => {
+          if (!this.isNativeEngineActive) return;
+          this.activeSlot = activeSlot;
+          this.emit('songChange', this.currentSongData);
+        },
         onStateChange: (state) => {
           if (!this.isNativeEngineActive) return;
           if (state === 'playing') {
@@ -266,6 +281,8 @@ class AudioPlayer {
           } else if (state === 'paused') {
             this.nativeIsPlaying = false;
             this.emit('pause');
+          } else if (state === 'stopped') {
+            this.nativeIsPlaying = false;
           }
         },
         onError: (err) => {
@@ -281,11 +298,43 @@ class AudioPlayer {
       const vol = store.state.player?.volume?.value ?? this.currentVolume;
       this.nativeBackend.setVolume(vol / 100).catch(() => {});
       const isKaraoke = storage.playback.getPlaybackOptions('isKaraoke') ?? false;
-      this.nativeBackend.setDsp({ karaoke: isKaraoke }).catch(() => {});
+      this.nativeBackend
+        .setDsp({ rgDb: this.lastNativeRgDb, karaoke: isKaraoke })
+        .catch(() => {});
+      this.syncNativeEqualizer();
     } catch (err) {
       console.warn('[AudioPlayer] Failed to initialize native audio backend, using WebAudio:', err);
       this.isNativeEngineActive = false;
       this.nativeIsPlaying = false;
+    }
+  }
+
+  /**
+   * Push the persisted 10-band EQ preset into the native DSP chain.
+   * Called on init + every native load so EQ presets are not silent no-ops.
+   */
+  public syncNativeEqualizer(): void {
+    if (!this.isNativeEngineActive || !this.nativeBackend) return;
+    try {
+      const preset =
+        storage.equalizerPreset.getEqualizerPreset() as unknown as
+          | Partial<Record<EqualizerBandFilters, number>>
+          | undefined;
+      const gains = [
+        preset?.thirtyTwoHertzFilter ?? 0,
+        preset?.sixtyFourHertzFilter ?? 0,
+        preset?.hundredTwentyFiveHertzFilter ?? 0,
+        preset?.twoHundredFiftyHertzFilter ?? 0,
+        preset?.fiveHundredHertzFilter ?? 0,
+        preset?.thousandHertzFilter ?? 0,
+        preset?.twoThousandHertzFilter ?? 0,
+        preset?.fourThousandHertzFilter ?? 0,
+        preset?.eightThousandHertzFilter ?? 0,
+        preset?.sixteenThousandHertzFilter ?? 0
+      ] as [number, number, number, number, number, number, number, number, number, number];
+      this.nativeBackend.setEqualizer(gains).catch(() => {});
+    } catch {
+      // EQ sync is best-effort; WebAudio path remains authoritative.
     }
   }
 
@@ -653,9 +702,18 @@ class AudioPlayer {
 
         if (this.isNativeEngineActive && this.nativeBackend) {
           try {
+            // Reset the mirrored playhead BEFORE load: songLoaded fires
+            // synchronously after load and PositionTimerScheduler reads
+            // currentTime immediately — retaining the previous track's time
+            // painted e.g. 2m30s onto the new track's seekbar.
+            this.nativeCurrentPosition = 0;
             await this.nativeBackend.load(this.activeSlot, songData.path);
             this.nativeLoadedSongId = songData.songId;
             this.audio.src = songData.path;
+            // Push fresh ReplayGain + EQ into the native chain for this track
+            // (previously loadSong returned before applyReplayGain ran).
+            this.applyReplayGain();
+            this.syncNativeEqualizer();
             if (effectiveAutoPlay) {
               await this.nativeBackend.play();
               this.nativeIsPlaying = true;
@@ -786,6 +844,12 @@ class AudioPlayer {
     this.crossfadeScheduler.cancel();
     this.cancelActiveFade();
     this.inFlightLoad = null;
+    if (this.nativeBackend) {
+      this.nativeBackend.destroy();
+      this.nativeBackend = null;
+    }
+    this.isNativeEngineActive = false;
+    this.nativeIsPlaying = false;
     if (this.unsubscribeFunc) this.unsubscribeFunc.unsubscribe();
     if (this.pendingCanPlayHandler) {
       this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);
@@ -1228,6 +1292,16 @@ class AudioPlayer {
       this.replayGainNode.gain.value = calculation.targetLinearGain;
     }
 
+    // Forward to the native DSP chain (previously dead: loadSong returned
+    // before this ran and setDsp reset rg_db to 0 on every karaoke toggle).
+    this.lastNativeRgDb = calculation.appliedGainDb;
+    if (this.isNativeEngineActive && this.nativeBackend) {
+      const isKaraoke = storage.playback.getPlaybackOptions('isKaraoke') ?? false;
+      this.nativeBackend
+        .setDsp({ rgDb: calculation.appliedGainDb, karaoke: isKaraoke })
+        .catch(() => {});
+    }
+
     logPlayer('[AudioPlayer.applyReplayGain]', {
       songId: this.currentSongData?.songId,
       mode: settings.mode,
@@ -1389,6 +1463,10 @@ class AudioPlayer {
             this.activeSlot = this.activeSlot === 'A' ? 'B' : 'A';
             this.currentSongData = this.preloadedSongData;
             this.preloadedSongData = null;
+            // New track starts at 0; without this the old track's tail time
+            // lingers until the next heartbeat.
+            this.nativeCurrentPosition = 0;
+            this.nativeLoadedSongId = this.currentSongData?.songId ?? null;
             if (this.currentSongData) {
               dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: this.currentSongData });
               storage.playback.setCurrentSongOptions('songId', this.currentSongData.songId);
@@ -2039,7 +2117,10 @@ class AudioPlayer {
       this.emit('karaokeChange', { enabled, level: this.karaokeNode.level });
     }
     if (this.isNativeEngineActive && this.nativeBackend) {
-      this.nativeBackend.setDsp({ karaoke: enabled }).catch(() => {});
+      // Preserve the current ReplayGain instead of clobbering it to 0 dB.
+      this.nativeBackend
+        .setDsp({ rgDb: this.lastNativeRgDb, karaoke: enabled })
+        .catch(() => {});
     }
   }
 

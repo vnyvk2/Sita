@@ -49,10 +49,18 @@ impl PlayheadTracker {
     }
 
     /// Update the base frame offset on seek.
+    ///
+    /// CALLER MUST QUIESCE the audio callback (pause mixer / hold the mixer
+    /// lock) before invoking: the reset is two atomic stores and a concurrent
+    /// `fetch_add` from the RT thread would otherwise double-count or drop an
+    /// increment (torn seek).
     pub fn set_seek_target_frame(&self, target_frame: u64) {
-        self.base_frame_offset.store(target_frame, Ordering::Release);
-        // Reset the consumed counter for the new segment
-        self.stats.total_frames.store(0, Ordering::Release);
-        self.stats.total_samples.store(0, Ordering::Release);
+        self.stats.total_frames.store(0, Ordering::SeqCst);
+        self.stats.total_samples.store(0, Ordering::SeqCst);
+        self.base_frame_offset.store(target_frame, Ordering::SeqCst);
+        // Fresh telemetry segment: stale minima would otherwise poison
+        // post-seek underrun reporting.
+        self.stats.low_water_mark.store(usize::MAX, Ordering::Relaxed);
+        self.stats.xrun_count.store(0, Ordering::Relaxed);
     }
 }

@@ -110,7 +110,9 @@ impl DecoderPipeline {
                     continue;
                 }
                 Err(e) => {
-                    self.is_eos = true;
+                    // Transient container glitch: report but keep the pipeline
+                    // usable so the caller can continue or seek; only clean
+                    // EOF sets is_eos.
                     return Err(DecodeError::PacketDecodeFailed(e.to_string()));
                 }
             };
@@ -150,12 +152,26 @@ impl DecoderPipeline {
             // Initialize or re-allocate SampleBuffer if format spec changed
             let spec = *decoded.spec();
             if self.signal_spec != Some(spec) {
+                // Mid-stream channel changes are unsupported downstream (mixer
+                // and DSP assume stereo pairs); reject instead of misreading
+                // 5.1 as stereo.
+                let ch_count = spec.channels.count();
+                if ch_count != 1 && ch_count != 2 {
+                    return Err(DecodeError::UnsupportedFormat(format!(
+                        "Unsupported mid-stream channel count: {}",
+                        ch_count
+                    )));
+                }
                 self.sample_buf = Some(SampleBuffer::<f32>::new(decoded.capacity() as u64, spec));
                 self.signal_spec = Some(spec);
+                // Track mono/stereo flips mid-stream, not just at probe time.
+                self.is_source_mono = ch_count == 1;
             }
 
             let is_mono = self.is_source_mono;
-            let sample_buf = self.sample_buf.as_mut().unwrap();
+            let sample_buf = self.sample_buf.as_mut().ok_or_else(|| {
+                DecodeError::PacketDecodeFailed("Sample buffer not initialized".to_string())
+            })?;
             sample_buf.copy_interleaved_ref(decoded);
             let raw_samples = sample_buf.samples();
 
@@ -190,10 +206,13 @@ impl DecoderPipeline {
         };
 
         match self.format.seek(SeekMode::Accurate, seek_to) {
-            Ok(seeked_to) => {
+            Ok(_seeked_to) => {
                 self.decoder.reset();
                 self.is_eos = false;
-                let actual_frame = seeked_to.actual_ts;
+                // NOTE: `actual_ts` is in the track timebase (e.g. 90kHz
+                // ticks), NOT audio frames. Derive frames from wall time and
+                // the negotiated sample rate so playhead/duration stay exact.
+                let actual_frame = (target_seconds.max(0.0) * self.spec.sample_rate as f64).round() as u64;
                 self.frames_decoded = actual_frame;
                 Ok(actual_frame)
             }

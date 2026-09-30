@@ -38,19 +38,22 @@ fn test_itunsmpb_malformed_returns_none() {
 
 #[test]
 fn test_lame_tag_parsing() {
-    // Construct synthetic Xing header with LAME tag
+    // Construct synthetic Xing header with LAME tag.
+    // Real LAME layout: 4-byte tag + 9-byte version + 8 bytes of
+    // revision/VBR/lowpass/peak/replaygain fields, with delay/padding 21
+    // bytes past the tag start (NOT immediately after the version string).
     let mut header = vec![0u8; 256];
     // Write "Info" tag at offset 36
     header[36..40].copy_from_slice(b"Info");
     // Write "LAME3.100" at offset 156
     header[156..165].copy_from_slice(b"LAME3.100");
-    // Set delay = 576 (0x240), padding = 1152 (0x480)
-    // Byte 165: 0x24
-    // Byte 166: (0x0 << 4) | 0x4 = 0x04
-    // Byte 167: 0x80
-    header[165] = 0x24;
-    header[166] = 0x04;
-    header[167] = 0x80;
+    // Set delay = 576 (0x240), padding = 1152 (0x480) at offset 156+21=177
+    // Byte 177: 0x24
+    // Byte 178: (0x0 << 4) | 0x4 = 0x04
+    // Byte 179: 0x80
+    header[177] = 0x24;
+    header[178] = 0x04;
+    header[179] = 0x80;
 
     let info = parse_lame_tag(&header).expect("Failed to parse LAME header");
     assert_eq!(info.encoder_delay, 576);

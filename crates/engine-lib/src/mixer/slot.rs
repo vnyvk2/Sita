@@ -80,6 +80,14 @@ impl VoiceSlot {
         spec: AudioSpec,
         stop_signal: Arc<AtomicBool>,
     ) {
+        // Signal any previous decoder thread to exit BEFORE dropping its
+        // consumer: otherwise the orphaned thread spins forever on a full
+        // abandoned ring (push_with_backpressure never sees stop).
+        if let Some(old) = self.stop_signal.take() {
+            old.store(true, Ordering::Relaxed);
+        }
+        // Drop the previous consumer endpoint explicitly.
+        self.consumer = None;
         self.consumer = Some(consumer);
         self.spec = Some(spec);
         self.stop_signal = Some(stop_signal);

@@ -1,7 +1,5 @@
 //! 10-Band Peaking Graphic Equalizer using Robert Bristow-Johnson (RBJ) biquad filters.
 
-use std::f32::consts::PI;
-
 /// Center frequencies for standard 10-band ISO octave equalizer.
 pub const EQ_CENTER_FREQUENCIES: [f32; 10] = [
     31.25, 62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
@@ -54,11 +52,25 @@ impl BiquadFilter {
             return;
         }
 
+        // Bands above Nyquist cannot be represented: pass through instead of
+        // silently retuning to the wrong octave via clamping.
+        if freq_hz > 0.45 * sample_rate {
+            self.b0 = 1.0;
+            self.b1 = 0.0;
+            self.b2 = 0.0;
+            self.a1 = 0.0;
+            self.a2 = 0.0;
+            self.is_passthrough = true;
+            return;
+        }
+
         self.is_passthrough = false;
-        let clamped_gain = gain_db.clamp(-24.0, 24.0);
-        let a = 10.0f32.powf(clamped_gain / 40.0);
-        let w0 = 2.0 * PI * (freq_hz / sample_rate).min(0.49);
-        let alpha = w0.sin() / (2.0 * q.max(0.1));
+        // Compute in f64 for stability at low-freq/high-rate corners
+        // (e.g. 31.25 Hz @ 192 kHz), then cast to f32 state.
+        let clamped_gain = gain_db.clamp(-24.0, 24.0) as f64;
+        let a = 10.0f64.powf(clamped_gain / 40.0);
+        let w0 = 2.0 * std::f64::consts::PI * (freq_hz as f64 / sample_rate as f64);
+        let alpha = w0.sin() / (2.0 * (q.max(0.1) as f64));
 
         let b0 = 1.0 + alpha * a;
         let b1 = -2.0 * w0.cos();
@@ -67,11 +79,11 @@ impl BiquadFilter {
         let a1 = -2.0 * w0.cos();
         let a2 = 1.0 - alpha / a;
 
-        self.b0 = b0 / a0;
-        self.b1 = b1 / a0;
-        self.b2 = b2 / a0;
-        self.a1 = a1 / a0;
-        self.a2 = a2 / a0;
+        self.b0 = (b0 / a0) as f32;
+        self.b1 = (b1 / a0) as f32;
+        self.b2 = (b2 / a0) as f32;
+        self.a1 = (a1 / a0) as f32;
+        self.a2 = (a2 / a0) as f32;
     }
 
     /// Process a single channel sample through the biquad filter.
@@ -92,9 +104,11 @@ impl BiquadFilter {
         s[1] = x1;
         s[0] = input;
         s[3] = y1;
-        s[2] = out;
+        // Flush subnormals to zero: silent EQ histories otherwise decay into
+        // denormals and spike x86 CPUs without FTZ.
+        s[2] = if out.abs() < 1e-30 { 0.0 } else { out };
 
-        out
+        s[2]
     }
 
     /// Reset filter state variables to zero.

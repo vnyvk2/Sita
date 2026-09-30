@@ -110,6 +110,8 @@ impl PeakLimiter {
 
             // 4. Retrieve delayed samples from circular lookahead buffer
             let read_pos = (self.write_pos + MAX_LOOKAHEAD_SAMPLES - delay_samples) % MAX_LOOKAHEAD_SAMPLES;
+            debug_assert!(read_pos + 1 < MAX_LOOKAHEAD_SAMPLES);
+            debug_assert!((self.write_pos % 2) == 0);
             let delayed_l = self.delay_buffer[read_pos];
             let delayed_r = self.delay_buffer[read_pos + 1];
 
@@ -129,5 +131,31 @@ impl PeakLimiter {
         self.delay_buffer = [0.0; MAX_LOOKAHEAD_SAMPLES];
         self.write_pos = 0;
         self.gain = 1.0;
+    }
+
+    /// Drain the trailing lookahead tail held in the delay line at EOS.
+    /// Returns up to `out.len()` delayed samples so reverb tails are not cut.
+    /// Real-time safe: no allocation, caller provides the buffer.
+    pub fn flush_tail(&mut self, out: &mut [f32]) -> usize {
+        if !self.enabled {
+            return 0;
+        }
+        let delay_samples = self.lookahead_frames * 2;
+        let mut written = 0;
+        for chunk in out.chunks_exact_mut(2) {
+            if written + 2 > delay_samples {
+                break;
+            }
+            let read_pos =
+                (self.write_pos + MAX_LOOKAHEAD_SAMPLES - delay_samples) % MAX_LOOKAHEAD_SAMPLES;
+            debug_assert!(read_pos + 1 < MAX_LOOKAHEAD_SAMPLES);
+            chunk[0] = (self.delay_buffer[read_pos] * self.gain).clamp(-1.0, 1.0);
+            chunk[1] = (self.delay_buffer[read_pos + 1] * self.gain).clamp(-1.0, 1.0);
+            self.delay_buffer[self.write_pos] = 0.0;
+            self.delay_buffer[self.write_pos + 1] = 0.0;
+            self.write_pos = (self.write_pos + 2) % MAX_LOOKAHEAD_SAMPLES;
+            written += 2;
+        }
+        written
     }
 }

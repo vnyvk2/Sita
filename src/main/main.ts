@@ -573,6 +573,15 @@ app
 
     app.on('will-quit', closeDatabaseInstance);
 
+    mainWindow.on('close', (e) => {
+      if (!isCleanupComplete) {
+        e.preventDefault();
+        if (!isCleaningUp) {
+          app.quit();
+        }
+      }
+    });
+
     mainWindow.on('moved', manageAppMoveEvent);
 
     mainWindow.on('resized', () => {
@@ -741,11 +750,11 @@ async function handleBeforeQuit(e: Electron.Event) {
   void (async () => {
     try {
       await ShutdownCoordinator.shutdown('main.ts:handleBeforeQuit', mainWindow, currentSongPath);
+    } catch (error) {
+      logger.error('ShutdownCoordinator failed during handleBeforeQuit:', { error });
+    } finally {
       isCleanupComplete = true;
       app.quit();
-    } catch (error) {
-      isCleaningUp = false;
-      logger.error('ShutdownCoordinator failed during handleBeforeQuit:', { error });
     }
   })();
 }

@@ -11,6 +11,12 @@ extraMetadata:
 directories:
   buildResources: build
 
+extraResources:
+  - from: resources/bin
+    to: bin
+    filter:
+      - '**/*'
+
 files:
   - '!**/.vscode/*'
   - '!src/*'

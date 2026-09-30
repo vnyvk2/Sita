@@ -134,6 +134,13 @@ export class NativeAudioDaemonManager {
 
       const readyTimeout = setTimeout(() => {
         if (this.isStarting) {
+          // Orphan guard: a daemon that never handshakes must not linger
+          // holding the WASAPI endpoint while start() stays wedged.
+          try {
+            this.child?.kill('SIGKILL');
+          } catch {
+            // ignore kill errors; exit handler cleans up state
+          }
           reject(new Error('Native audio engine failed to emit ready handshake within 5000ms.'));
         }
       }, 5000);
@@ -216,6 +223,10 @@ export class NativeAudioDaemonManager {
           clearTimeout(pending.timer);
           this.pendingRequests.delete(id);
           pending.resolve(parsed as unknown as DaemonResponse);
+        } else {
+          // u64::MAX malformed errors + late responses after 5s timeout land
+          // here; log instead of silently dropping for protocol debugging.
+          logger.warn('Native audio daemon response with unknown id:', { id, trimmed });
         }
       }
     } catch (err) {

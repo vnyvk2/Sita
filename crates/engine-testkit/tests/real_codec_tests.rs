@@ -121,6 +121,15 @@ fn test_mp3_lame_decode_parity_with_ffmpeg_reference() {
     // Ensure sample stream is populated and closely aligned
     assert!(!symphonia_pcm.is_empty());
     assert!(!ffmpeg_pcm.is_empty());
+    // Lengths must agree within 5%: prefix-only comparison previously let
+    // truncated decodes pass.
+    let len_ratio = symphonia_pcm.len() as f64 / ffmpeg_pcm.len().max(1) as f64;
+    assert!(
+        (0.95..=1.05).contains(&len_ratio),
+        "MP3 decode length diverged: symphonia={} ffmpeg={}",
+        symphonia_pcm.len(),
+        ffmpeg_pcm.len()
+    );
 
     // Compare min length
     let compare_len = symphonia_pcm.len().min(ffmpeg_pcm.len());
@@ -151,22 +160,30 @@ fn test_aac_lc_decode_parity_with_ffmpeg_reference() {
     assert!(!symphonia_pcm.is_empty());
     assert!(!ffmpeg_pcm.is_empty());
 
-    // In MP4 AAC containers, initial_padding is 1024 frames = 2048 stereo samples.
-    // FFmpeg automatically skips initial_padding on decode.
-    let padding_samples = 1024 * 2;
-    let symphonia_aligned = if symphonia_pcm.len() > padding_samples {
-        &symphonia_pcm[padding_samples..]
-    } else {
-        &symphonia_pcm[..]
+    // Symphonia keeps container initial_padding (~1024 frames) while ffmpeg
+    // strips it, but the exact offset is version-sensitive. Try candidate
+    // alignments and keep the best RMS instead of hard-coding 1024*2.
+    let rms_for_offset = |offset: usize| -> f64 {
+        if offset >= symphonia_pcm.len() {
+            return f64::INFINITY;
+        }
+        let aligned = &symphonia_pcm[offset..];
+        let compare_len = aligned.len().min(ffmpeg_pcm.len());
+        if compare_len == 0 {
+            return f64::INFINITY;
+        }
+        let mut sum_sq_diff = 0.0f64;
+        for i in 0..compare_len {
+            let diff = (aligned[i] - ffmpeg_pcm[i]) as f64;
+            sum_sq_diff += diff * diff;
+        }
+        (sum_sq_diff / compare_len as f64).sqrt()
     };
-
-    let compare_len = symphonia_aligned.len().min(ffmpeg_pcm.len());
-    let mut sum_sq_diff = 0.0f64;
-    for i in 0..compare_len {
-        let diff = (symphonia_aligned[i] - ffmpeg_pcm[i]) as f64;
-        sum_sq_diff += diff * diff;
-    }
-    let rms_diff = (sum_sq_diff / compare_len as f64).sqrt();
+    let candidates = [0usize, 1024 * 2, 2048 * 2];
+    let rms_diff = candidates
+        .iter()
+        .map(|&o| rms_for_offset(o))
+        .fold(f64::INFINITY, f64::min);
     println!("AAC-LC Symphonia vs FFmpeg RMS difference: {:.6e}", rms_diff);
 
     assert!(
@@ -181,9 +198,12 @@ fn test_real_lame_split_pair_same_decoder_cancellation() {
     let part1_path = find_fixture("split_part1.mp3");
     let part2_path = find_fixture("split_part2.mp3");
 
-    if !part1_path.exists() || !part2_path.exists() {
-        return;
-    }
+    // Missing gapless fixtures must fail loudly, not silently pass: an early
+    // return previously turned this gate green on machines without fixtures.
+    assert!(
+        part1_path.exists() && part2_path.exists(),
+        "Gapless split fixtures missing: split_part1.mp3 / split_part2.mp3"
+    );
 
     // 1. Independent decodes with same decoder (Symphonia + GaplessTrimmer)
     let (spec, pcm1) = decode_file_to_f32_pcm(part1_path);

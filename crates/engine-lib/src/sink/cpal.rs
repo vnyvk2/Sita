@@ -173,8 +173,11 @@ impl CpalBackend {
                                 let written = render_fn(data);
                                 if written < data.len() {
                                     data[written..].fill(0.0);
+                                    // Only valid frames advance the playhead;
+                                    // padding is an underrun, not playback.
+                                    stats.record_xrun();
                                 }
-                                stats.record_consumption(data.len(), channels as u16);
+                                stats.record_consumption(written, channels as u16);
                             },
                             err_fn,
                             None,
@@ -184,7 +187,9 @@ impl CpalBackend {
                 SampleFormat::I16 => {
                     let stats = stats_clone;
                     let mut dither = XorShift32(123456789);
-                    let mut scratch = vec![0.0f32; 4096];
+                    // Pre-size for the largest plausible device buffer so the
+                    // RT callback never mallocs via resize().
+                    let mut scratch = vec![0.0f32; 32768];
                     device
                         .build_output_stream(
                             &config,
@@ -194,18 +199,21 @@ impl CpalBackend {
                                     return;
                                 }
                                 if scratch.len() < data.len() {
+                                    // Rare oversize buffer: grow outside the
+                                    // steady state; steady-state never allocs.
                                     scratch.resize(data.len(), 0.0);
                                 }
                                 let written = render_fn(&mut scratch[..data.len()]);
                                 if written < data.len() {
                                     scratch[written..data.len()].fill(0.0);
+                                    stats.record_xrun();
                                 }
                                 for (i, out) in data.iter_mut().enumerate() {
                                     let noise = dither.next_tpdf_i16();
                                     let sample = (scratch[i] + noise) * 32767.0;
-                                    *out = sample.clamp(-32768.0, 32767.0) as i16;
+                                    *out = sample.round().clamp(-32768.0, 32767.0) as i16;
                                 }
-                                stats.record_consumption(data.len(), channels as u16);
+                                stats.record_consumption(written, channels as u16);
                             },
                             err_fn,
                             None,

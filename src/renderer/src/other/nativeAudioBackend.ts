@@ -38,6 +38,7 @@ export class NativeAudioBackend {
     clientTimestampMs: 0
   };
   private totalDurationSecs = 0;
+  private lastEmittedDurationSecs = -1;
   private isPlaying = false;
   private rafId: number | null = null;
   private unsubscribeEvents?: () => void;
@@ -45,6 +46,19 @@ export class NativeAudioBackend {
   constructor(private callbacks: NativeAudioBackendCallbacks) {
     this.startRafLoop();
     this.subscribeToDaemonEvents();
+  }
+
+  private emitDurationChange(durationSecs: number): void {
+    // Heartbeats arrive at 4Hz: only forward genuine changes or the
+    // PositionTimerScheduler recomputes + dispatches 4x/sec needlessly.
+    if (
+      Number.isFinite(durationSecs) &&
+      durationSecs > 0 &&
+      Math.abs(durationSecs - this.lastEmittedDurationSecs) > 0.1
+    ) {
+      this.lastEmittedDurationSecs = durationSecs;
+      this.callbacks.onDurationChange(durationSecs);
+    }
   }
 
   private subscribeToDaemonEvents(): void {
@@ -62,7 +76,7 @@ export class NativeAudioBackend {
           };
           this.totalDurationSecs = event.duration_secs;
           this.isPlaying = event.is_playing;
-          this.callbacks.onDurationChange(event.duration_secs);
+          this.emitDurationChange(event.duration_secs);
           this.callbacks.onTimeUpdate(event.position_secs, event.duration_secs);
           break;
 
@@ -75,6 +89,12 @@ export class NativeAudioBackend {
               clientTimestampMs: performance.now()
             };
             this.callbacks.onTimeUpdate(event.position_secs, this.totalDurationSecs);
+          }
+          if (event.state === 'stopped' && typeof event.position_secs === 'number') {
+            this.anchor = {
+              posSecs: event.position_secs,
+              clientTimestampMs: performance.now()
+            };
           }
           this.callbacks.onStateChange(event.state);
           break;
@@ -140,12 +160,15 @@ export class NativeAudioBackend {
     const data = res.status === 'ok' ? (res.data as DaemonLoadResultData) : undefined;
     if (data?.duration_secs) {
       this.totalDurationSecs = data.duration_secs;
-      this.callbacks.onDurationChange(data.duration_secs);
+      this.emitDurationChange(data.duration_secs);
     }
     this.anchor = {
       posSecs: 0,
       clientTimestampMs: performance.now()
     };
+    // Fresh playhead segment: a late heartbeat for the previous track must
+    // not resurrect its position after load.
+    this.lastEmittedDurationSecs = this.totalDurationSecs;
     return data!;
   }
 
@@ -224,9 +247,11 @@ export class NativeAudioBackend {
       this.rafId = null;
     }
     this.unsubscribeEvents?.();
+    this.unsubscribeEvents = undefined;
     this.isPlaying = false;
-    if (typeof window?.api?.audioEngine?.stop === 'function') {
-      window.api.audioEngine.stop().catch(() => {});
-    }
+    // NOTE: intentionally does NOT call audioEngine.stop(): the daemon is a
+    // process singleton shared across backend instances. Stopping it here
+    // killed playback for everyone on toggle/HMR and forced a slow respawn.
+    // The owner (player fallback / app shutdown) stops the daemon explicitly.
   }
 }

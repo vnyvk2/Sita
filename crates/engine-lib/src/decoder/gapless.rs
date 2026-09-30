@@ -9,7 +9,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GaplessMode {
-    /// Automatically extract gapless metadata from tags; fall back to codec defaults if absent.
+    /// Apply metadata-specified delay/padding when present; otherwise pass
+    /// audio through untouched. (Symphonia already compensates MP3
+    /// delay/padding via `enable_gapless`, so no extra heuristic is applied
+    /// here to avoid double-trimming.)
     #[default]
     Auto,
     /// Strictly apply metadata-specified delay and padding; no heuristics.
@@ -58,6 +61,8 @@ pub fn parse_itunsmpb(s: &str) -> Option<GaplessInfo> {
         return None;
     }
 
+    // Strict: a corrupt delay/padding token must reject the whole tag rather
+    // than trim from a wrong offset; valid_frames alone cannot locate audio.
     let delay = u64::from_str_radix(tokens[1], 16).ok()?;
     let padding = u64::from_str_radix(tokens[2], 16).ok()?;
     let valid_frames = u64::from_str_radix(tokens[3], 16).ok();
@@ -82,17 +87,26 @@ pub fn parse_lame_tag(data: &[u8]) -> Option<GaplessInfo> {
     // Specifically, search for "LAME" or "Lavf" signature within the packet window.
     if let Some(lame_offset) = data[xing_pos..].windows(4).position(|w| w == b"LAME" || w == b"Lavc") {
         let abs_pos = xing_pos + lame_offset;
-        // The 3 bytes after the 9-byte LAME/Lavc version string contain delay and padding:
-        // Byte 9:  delay high 8 bits
-        // Byte 10: (delay low 4 bits << 4) | (padding high 4 bits)
-        // Byte 11: padding low 8 bits
-        if abs_pos + 9 + 3 <= data.len() {
-            let b0 = data[abs_pos + 9] as u64;
-            let b1 = data[abs_pos + 10] as u64;
-            let b2 = data[abs_pos + 11] as u64;
+        // Delay/padding live 21 bytes past the tag start (4-byte tag + 9-byte
+        // version string + 8 bytes of revision/VBR/filter fields), not
+        // immediately after the version string.
+        // Byte 21: delay high 8 bits
+        // Byte 22: (delay low 4 bits << 4) | (padding high 4 bits)
+        // Byte 23: padding low 8 bits
+        const DELAY_OFFSET: usize = 21;
+        if abs_pos + DELAY_OFFSET + 3 <= data.len() {
+            let b0 = data[abs_pos + DELAY_OFFSET] as u64;
+            let b1 = data[abs_pos + DELAY_OFFSET + 1] as u64;
+            let b2 = data[abs_pos + DELAY_OFFSET + 2] as u64;
 
             let delay = (b0 << 4) | (b1 >> 4);
             let padding = ((b1 & 0x0F) << 8) | b2;
+
+            // Sanity: MP3 encoder delay is ~2112 frames; reject garbage that
+            // would otherwise mute whole tracks.
+            if delay > 10_000 || padding > 10_000 {
+                return None;
+            }
 
             return Some(GaplessInfo {
                 encoder_delay: delay,
@@ -121,7 +135,10 @@ impl GaplessTrimmer {
         let (delay_samples, valid_samples) = match mode {
             GaplessMode::Off => (0, None),
             GaplessMode::Metadata | GaplessMode::Auto => {
-                let delay_s = (info.encoder_delay as usize).saturating_mul(ch);
+                // Clamp absurd budgets from corrupt tags so a bad header can
+                // never mute an entire file with perpetual empty slices.
+                let delay_frames = (info.encoder_delay as usize).min(10_000);
+                let delay_s = delay_frames.saturating_mul(ch);
                 let valid_s = info.valid_frames.map(|f| f.saturating_mul(ch as u64));
                 (delay_s, valid_s)
             }
@@ -167,7 +184,20 @@ impl GaplessTrimmer {
             }
             let take = (*remaining).min(available.len() as u64) as usize;
             let aligned_take = (take / self.channels) * self.channels;
+            if aligned_take == 0 && take > 0 {
+                // Remainder smaller than one frame (e.g. remaining == 1 sample
+                // with stereo): consume it now instead of spinning forever
+                // returning empty slices with a never-exhausting budget.
+                *remaining = 0;
+                return &[];
+            }
             *remaining = remaining.saturating_sub(aligned_take as u64);
+            // Guard against corrupt-huge delay budgets that would otherwise
+            // emit empty slices to end-of-file with no EOS signal.
+            if aligned_take == 0 {
+                *remaining = 0;
+                return &[];
+            }
             &available[..aligned_take]
         } else {
             available

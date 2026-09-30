@@ -93,6 +93,8 @@ impl DualSlotMixer {
     pub fn is_active(&self) -> bool {
         self.slot_a.state == SlotState::Playing
             || self.slot_b.state == SlotState::Playing
+            || self.slot_a.state == SlotState::Primed
+            || self.slot_b.state == SlotState::Primed
             || self.crossfade.is_some()
     }
 }
@@ -111,6 +113,9 @@ impl AudioSource for DualSlotMixer {
             return len;
         }
 
+        // Defensive clamp: fields are pub for the daemon's hot path, so an
+        // out-of-range write elsewhere must never invert polarity or clip.
+        let master = self.master_volume.clamp(0.0, 1.0);
         let mut written = 0;
 
         // -------------------------------------------------------------------
@@ -135,8 +140,8 @@ impl AudioSource for DualSlotMixer {
                 let s_to_l = if read_to >= 1 { temp_to[0] } else { 0.0 };
                 let s_to_r = if read_to >= 2 { temp_to[1] } else { s_to_l };
 
-                output[written] = (s_from_l * gain_from + s_to_l * gain_to) * self.master_volume;
-                output[written + 1] = (s_from_r * gain_from + s_to_r * gain_to) * self.master_volume;
+                output[written] = (s_from_l * gain_from + s_to_l * gain_to) * master;
+                output[written + 1] = (s_from_r * gain_from + s_to_r * gain_to) * master;
                 written += 2;
             }
 
@@ -157,13 +162,18 @@ impl AudioSource for DualSlotMixer {
         // -------------------------------------------------------------------
         while written < len {
             let active_id = self.active_slot;
+            // Keep frame alignment: an odd tail sample can never form a stereo
+            // frame, so terminate the frame loop and silence-fill it below.
+            if len - written < 2 {
+                break;
+            }
             let chunk_read = self.slot_mut(active_id).read_samples(&mut output[written..]);
 
             if chunk_read > 0 {
                 // Apply master volume
-                if (self.master_volume - 1.0).abs() > f32::EPSILON {
+                if (master - 1.0).abs() > f32::EPSILON {
                     for s in &mut output[written..written + chunk_read] {
-                        *s *= self.master_volume;
+                        *s *= master;
                     }
                 }
                 written += chunk_read;
@@ -172,8 +182,10 @@ impl AudioSource for DualSlotMixer {
                 let standby_id = self.active_slot.opposite();
 
                 if self.auto_splice && self.slot(standby_id).has_audio() {
-                    // Seamless Gapless Splice: Immediately transition to standby slot
-                    self.slot_mut(active_id).state = SlotState::Eos;
+                    // Seamless Gapless Splice: release the exhausted slot so
+                    // its decoder thread/consumer cannot leak, then continue
+                    // filling from the newly active slot.
+                    self.slot_mut(active_id).clear();
                     self.slot_mut(standby_id).state = SlotState::Playing;
                     self.active_slot = standby_id;
                     // Loop will continue and fill the remaining output slice from newly active slot!

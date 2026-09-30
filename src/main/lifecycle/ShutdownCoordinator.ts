@@ -10,7 +10,7 @@ import { adaptivePolicyEngine } from '@main/workers/adaptivePolicyEngine';
 import { libraryScheduler } from '@main/workers/jobScheduler';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
 import { nativeAudioDaemonManager } from '@main/audio/NativeAudioDaemonManager';
-import type { BrowserWindow } from 'electron';
+import { type BrowserWindow, ipcMain } from 'electron';
 
 import { ShutdownLogger } from './ShutdownLogger';
 import { ShutdownState } from './ShutdownState';
@@ -75,13 +75,6 @@ export class ShutdownCoordinator {
       logger.error('Error terminating media worker bridge during shutdown:', { error });
     }
 
-    try {
-      await nativeAudioDaemonManager.stop();
-    } catch (error) {
-      hasPartialFailures = true;
-      logger.error('Error stopping native audio daemon during shutdown:', { error });
-    }
-
     // 2. Save pending state
     ShutdownLogger.logShutdownTransition(ShutdownState.SavingState, source);
     try {
@@ -103,13 +96,53 @@ export class ShutdownCoordinator {
       logger.error('Error saving state during shutdown:', { error });
     }
 
-    // 3. Best-effort renderer notification
-    if (mainWindow && !mainWindow.isDestroyed()) {
+    // 3. Renderer Notification & State Flush with ACK
+    // The renderer persists stoppedPosition/shuffle/repeat from memory to
+    // disk; without the ACK wait the debounced write never lands before
+    // process exit. Daemon stop happens AFTER so currentTime stays readable.
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
       try {
-        mainWindow.webContents.send('app/beforeQuitEvent');
+        const flushPromise = new Promise<void>((resolve) => {
+          let resolved = false;
+          const cleanup = () => {
+            if (!resolved) {
+              resolved = true;
+              clearTimeout(timeout);
+              ipcMain.removeListener('app/beforeQuitEventAck', ackHandler);
+              mainWindow.webContents?.removeListener('destroyed', cleanup);
+              resolve();
+            }
+          };
+
+          const timeout = setTimeout(cleanup, 1500);
+
+          const ackHandler = () => {
+            cleanup();
+          };
+
+          ipcMain.once('app/beforeQuitEventAck', ackHandler);
+          mainWindow.webContents.once('destroyed', cleanup);
+
+          try {
+            mainWindow.webContents.send('app/beforeQuitEvent');
+          } catch {
+            cleanup();
+          }
+        });
+
+        await flushPromise;
       } catch (error) {
-        logger.warn('Could not send app/beforeQuitEvent to renderer (best-effort):', { error });
+        logger.warn('Could not complete app/beforeQuitEvent flush:', { error });
       }
+    }
+
+    // 3b. Stop the native daemon AFTER the renderer flush so the playhead is
+    // still queryable, releasing WASAPI before DB teardown.
+    try {
+      await nativeAudioDaemonManager.stop();
+    } catch (error) {
+      hasPartialFailures = true;
+      logger.error('Error stopping native audio daemon during shutdown:', { error });
     }
 
     // DB Write Barrier: If the scheduler had surviving job promises that did not

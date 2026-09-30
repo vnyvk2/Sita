@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 import type AudioPlayer from '../other/player';
 import { getQueuesManager } from '../other/queuesManager';
-import { dispatch, store } from '../store/store';
+import { dispatch, flushPendingLocalStorage, store } from '../store/store';
 import storage from '../utils/localStorage';
 
 export interface AppLifecycleDependencies {
@@ -158,9 +158,19 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
       window.api.playerControls.songPlaybackStateChange(false);
     };
     const handleBeforeQuitEvent = async () => {
-      storage.playback.setCurrentSongOptions('stoppedPosition', player.currentTime);
-      storage.playback.setPlaybackOptions('isRepeating', store.state.player.isRepeating);
-      storage.playback.setPlaybackOptions('isShuffling', store.state.player.isShuffling);
+      try {
+        // player.currentTime resolves through the native getter when the Rust
+        // engine is active, so stoppedPosition stays exact in both backends.
+        storage.playback.setCurrentSongOptions('stoppedPosition', player.currentTime);
+        storage.playback.setPlaybackOptions('isRepeating', store.state.player.isRepeating);
+        storage.playback.setPlaybackOptions('isShuffling', store.state.player.isShuffling);
+        flushPendingLocalStorage();
+      } catch (err) {
+        console.error('Failed to flush storage before quit:', err);
+      } finally {
+        await Promise.resolve();
+        window.api.quitEvent?.sendBeforeQuitEventAck?.();
+      }
     };
 
     player.addEventListener('error', handlePlayerErrorEvent);

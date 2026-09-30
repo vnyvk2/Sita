@@ -29,6 +29,22 @@ unsafe impl GlobalAlloc for CountingAllocator {
         System.alloc(layout)
     }
 
+    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        // Vec growth goes through realloc: missing this override silently
+        // undercounts and previously hid the I16 scratch.resize() RT malloc.
+        if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+            ALLOCATION_COUNT.fetch_add(1, Ordering::Relaxed);
+        }
+        System.realloc(ptr, layout, new_size)
+    }
+
+    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
+        if TRACK_ALLOCATIONS.load(Ordering::Relaxed) {
+            ALLOCATION_COUNT.fetch_add(1, Ordering::Relaxed);
+        }
+        System.alloc_zeroed(layout)
+    }
+
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         System.dealloc(ptr, layout)
     }
@@ -72,8 +88,22 @@ fn test_audio_callback_strict_zero_allocations() {
     ALLOCATION_COUNT.store(0, Ordering::SeqCst);
     TRACK_ALLOCATIONS.store(true, Ordering::SeqCst);
 
-    // Run 50 real-time callback rendering cycles
-    for _ in 0..50 {
+    // Run 50 real-time callback rendering cycles, including a crossfade
+    // transition so Option::take / auto-splice branches are measured too.
+    for i in 0..50 {
+        if i == 25 {
+            // Break tracking briefly to prime slot B (primes allocate by
+            // design: allocation-free applies to render, not setup).
+            TRACK_ALLOCATIONS.store(false, Ordering::SeqCst);
+            let (mut pb, cons_b) = BoundedAudioTransport::create(&spec, 2.0);
+            let stop_b = Arc::new(AtomicBool::new(false));
+            let fill = vec![0.25f32; 48000];
+            pb.push_with_backpressure(&fill, &stop_b).unwrap();
+            mixer.slot_mut(SlotId::B).prime(cons_b, spec, stop_b);
+            let _ = mixer.start_crossfade(512);
+            ALLOCATION_COUNT.store(0, Ordering::SeqCst);
+            TRACK_ALLOCATIONS.store(true, Ordering::SeqCst);
+        }
         let _ = mixer.render(&mut hardware_output_slice);
         dsp.process(&mut hardware_output_slice);
     }
