@@ -5,12 +5,14 @@
 //!
 //! When `bypass` mode is active, ReplayGain, EQ, Karaoke, and Limiter are completely short-circuited.
 
+use engine_protocol::{SoundProfile, SoundProfileStatus};
 use serde::{Deserialize, Serialize};
 
 use crate::dsp::eq::EqualizerChain;
 use crate::dsp::karaoke::KaraokeProcessor;
-use crate::dsp::limiter::PeakLimiter;
 use crate::dsp::replaygain::ReplayGainProcessor;
+use crate::dsp::sound_profile::SoundProfileStage;
+use crate::dsp::true_peak::TruePeakLimiter;
 
 /// Configuration snapshot controlling the DSP chain.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -23,8 +25,11 @@ pub struct DspConfig {
     pub eq_gains: [f32; 10],
     /// Enable mid-side center vocal reduction.
     pub karaoke: bool,
-    /// Enable 5ms lookahead peak safety limiter.
+    /// Enable digital true-peak safety limiter.
     pub limiter: bool,
+    /// Presentation sound profile (StudioReference default, VocalNuanceBoost optional).
+    #[serde(default)]
+    pub sound_profile: SoundProfile,
 }
 
 impl Default for DspConfig {
@@ -35,6 +40,7 @@ impl Default for DspConfig {
             eq_gains: [0.0; 10],
             karaoke: false,
             limiter: true,
+            sound_profile: SoundProfile::default(),
         }
     }
 }
@@ -45,7 +51,8 @@ pub struct DspPipeline {
     replaygain: ReplayGainProcessor,
     eq: EqualizerChain,
     karaoke: KaraokeProcessor,
-    limiter: PeakLimiter,
+    sound_profile: SoundProfileStage,
+    true_peak: TruePeakLimiter,
 }
 
 impl Default for DspPipeline {
@@ -61,14 +68,16 @@ impl DspPipeline {
         let replaygain = ReplayGainProcessor::new();
         let eq = EqualizerChain::new(sample_rate);
         let karaoke = KaraokeProcessor::new();
-        let limiter = PeakLimiter::new(sample_rate);
+        let sound_profile = SoundProfileStage::new(sample_rate);
+        let true_peak = TruePeakLimiter::new(sample_rate);
 
         Self {
             config,
             replaygain,
             eq,
             karaoke,
-            limiter,
+            sound_profile,
+            true_peak,
         }
     }
 
@@ -83,7 +92,8 @@ impl DspPipeline {
         self.replaygain.set_gain_db(config.replaygain_db);
         self.eq.set_gains(config.eq_gains);
         self.karaoke.set_enabled(config.karaoke);
-        self.limiter.set_enabled(config.limiter);
+        self.sound_profile.set_target_profile(config.sound_profile);
+        self.true_peak.set_enabled(config.limiter);
         self.config = config;
     }
 
@@ -97,11 +107,49 @@ impl DspPipeline {
         }
     }
 
-    /// Update sample rate across rate-sensitive DSP processors (EQ, Limiter).
+    /// Set presentation sound profile.
+    #[inline]
+    pub fn set_sound_profile(&mut self, profile: SoundProfile) {
+        self.config.sound_profile = profile;
+        self.sound_profile.set_target_profile(profile);
+    }
+
+    /// Current target sound profile.
+    #[inline]
+    pub fn sound_profile(&self) -> SoundProfile {
+        self.sound_profile.target_profile()
+    }
+
+    /// High-level profile transition status (Active vs Transitioning).
+    #[inline]
+    pub fn sound_profile_status(&self) -> SoundProfileStatus {
+        self.sound_profile.status()
+    }
+
+    /// Access internal sound profile stage.
+    #[inline]
+    pub fn sound_profile_stage(&self) -> &SoundProfileStage {
+        &self.sound_profile
+    }
+
+    /// Access internal true-peak limiter.
+    #[inline]
+    pub fn true_peak_limiter(&self) -> &TruePeakLimiter {
+        &self.true_peak
+    }
+
+    /// Mutable access to internal true-peak limiter.
+    #[inline]
+    pub fn true_peak_limiter_mut(&mut self) -> &mut TruePeakLimiter {
+        &mut self.true_peak
+    }
+
+    /// Update sample rate across rate-sensitive DSP processors (EQ, SoundProfile, Limiter).
     pub fn set_sample_rate(&mut self, sample_rate: f32) {
         self.eq.set_sample_rate(sample_rate);
         self.karaoke.set_sample_rate(sample_rate);
-        self.limiter.set_sample_rate(sample_rate);
+        self.sound_profile.set_sample_rate(sample_rate);
+        self.true_peak.set_sample_rate(sample_rate);
         // Old delay lines/histories are at the previous rate's length.
         self.reset_state();
     }
@@ -112,7 +160,8 @@ impl DspPipeline {
     /// 1. ReplayGain
     /// 2. 10-Band Peaking Equalizer
     /// 3. Mid-Side Karaoke vocal attenuator
-    /// 4. 5ms Lookahead Peak Limiter
+    /// 4. SoundProfile Stage (Zero lookahead Option A, smooth 30ms transition)
+    /// 5. Digital True-Peak Limiter (Sidechain-only 4x FIR, 1.08ms lookahead)
     ///
     /// Real-time safe: Zero allocations, zero syscalls, zero mutexes, never panics.
     #[inline]
@@ -130,14 +179,18 @@ impl DspPipeline {
         // 3. Mid-Side Karaoke
         self.karaoke.process(samples);
 
-        // 4. Peak Limiter
-        self.limiter.process(samples);
+        // 4. SoundProfile Stage
+        self.sound_profile.process(samples);
+
+        // 5. True-Peak Limiter
+        self.true_peak.process(samples);
     }
 
     /// Reset internal state across all constituent filters.
     pub fn reset_state(&mut self) {
         self.eq.reset_state();
         self.karaoke.reset_state();
-        self.limiter.reset_state();
+        self.sound_profile.reset_state();
+        self.true_peak.reset_state();
     }
 }

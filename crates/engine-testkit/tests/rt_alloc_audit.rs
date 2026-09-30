@@ -75,6 +75,7 @@ fn test_audio_callback_strict_zero_allocations() {
         eq_gains: [1.0, -1.0, 2.0, -2.0, 0.5, -0.5, 1.5, -1.5, 0.0, 0.0],
         karaoke: true,
         limiter: true,
+        sound_profile: Default::default(),
     });
 
     // Pre-allocate the hardware output buffer slice (simulating CPAL hardware callback buffer)

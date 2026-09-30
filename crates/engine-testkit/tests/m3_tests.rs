@@ -122,6 +122,7 @@ fn test_dsp_pipeline_strict_bypass_bit_transparency() {
         eq_gains: [6.0; 10],
         karaoke: true,
         limiter: true,
+        sound_profile: Default::default(),
     });
 
     let mut samples: Vec<f32> = (0..512).map(|i| (i as f32) * 0.001).collect();

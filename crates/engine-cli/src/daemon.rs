@@ -121,6 +121,7 @@ impl EngineDaemon {
         let is_playing_cb = Arc::clone(&self.is_playing);
         let contention_cb = Arc::clone(&self.cb_contention);
         let volume_cb = Arc::clone(&self.volume);
+        let sound_profile_cb = Arc::clone(&self.sound_profile);
 
         let render_fn = move |data: &mut [f32]| -> usize {
             if !is_playing_cb.load(Ordering::Relaxed) {
@@ -131,6 +132,15 @@ impl EngineDaemon {
 
             if let Ok(mut guard) = shared_cb.try_lock() {
                 let (mixer, dsp) = &mut *guard;
+                let profile_val = sound_profile_cb.load(Ordering::Acquire);
+                let target_profile = match profile_val {
+                    0 => SoundProfile::StudioReference,
+                    _ => SoundProfile::VocalNuanceBoost,
+                };
+                if dsp.sound_profile() != target_profile {
+                    dsp.set_sound_profile(target_profile);
+                }
+
                 // The mixer renders at unity gain: master volume is applied
                 // BELOW, after the DSP chain, so ReplayGain/EQ see full-scale
                 // audio and the peak limiter's threshold means what it says
@@ -515,12 +525,14 @@ impl EngineDaemon {
             DaemonCommand::SetDsp { bypass, rg_db, karaoke, limiter } => {
                 if let Ok(mut guard) = self.shared_engine.lock() {
                     let current_gains = guard.1.config().eq_gains;
+                    let current_profile = guard.1.config().sound_profile;
                     guard.1.update_config(DspConfig {
                         bypass,
                         replaygain_db: rg_db,
                         eq_gains: current_gains,
                         karaoke,
                         limiter,
+                        sound_profile: current_profile,
                     });
                 }
                 DaemonResult::Ok { data: None }
@@ -532,6 +544,9 @@ impl EngineDaemon {
                     SoundProfile::VocalNuanceBoost => 1,
                 };
                 self.sound_profile.store(profile_val, Ordering::Release);
+                if let Ok(mut guard) = self.shared_engine.lock() {
+                    guard.1.set_sound_profile(profile);
+                }
                 DaemonResult::Ok {
                     data: Some(serde_json::json!({
                         "profile": profile,
@@ -561,10 +576,15 @@ impl EngineDaemon {
                 } else {
                     SlotId::B
                 };
-                let profile = if self.sound_profile.load(Ordering::Relaxed) == 0 {
-                    SoundProfile::StudioReference
+                let (profile, status) = if let Ok(guard) = self.shared_engine.lock() {
+                    (guard.1.sound_profile(), guard.1.sound_profile_status())
                 } else {
-                    SoundProfile::VocalNuanceBoost
+                    let p = if self.sound_profile.load(Ordering::Relaxed) == 0 {
+                        SoundProfile::StudioReference
+                    } else {
+                        SoundProfile::VocalNuanceBoost
+                    };
+                    (p, SoundProfileStatus::Active)
                 };
                 DaemonResult::Ok {
                     data: Some(serde_json::json!({
@@ -576,7 +596,7 @@ impl EngineDaemon {
                         "position_secs": self.current_position_secs(),
                         "cb_contention": self.cb_contention.load(Ordering::Relaxed),
                         "sound_profile": profile,
-                        "sound_profile_status": SoundProfileStatus::Active,
+                        "sound_profile_status": status,
                         "boot_id": self.boot_id,
                         "sequence_id": self.sequence_id.load(Ordering::Relaxed),
                     })),

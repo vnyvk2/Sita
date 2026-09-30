@@ -342,6 +342,7 @@ name = "engine-lib"
 version = "0.1.0"
 dependencies = [
  "cpal",
+ "engine-protocol",
  "hound",
  "log",
  "rtrb",
