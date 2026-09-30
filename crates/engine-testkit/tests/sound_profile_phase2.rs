@@ -228,8 +228,8 @@ fn test_gate_2a_upward_nuance_boost_intent() {
     let delta_db = boosted_peak_db - (-30.0);
     println!("VocalNuanceBoost Low-Level Lift at -30 dBFS: +{delta_db:.2} dB");
     assert!(
-        (1.8..=2.3).contains(&delta_db),
-        "VocalNuanceBoost should lift quiet signals by provisional +2.0 dB, got +{delta_db:.2} dB"
+        (1.3..=1.7).contains(&delta_db),
+        "VocalNuanceBoost should lift quiet signals by locked +1.5 dB, got +{delta_db:.2} dB"
     );
 
     // 2. Test Loud-Passage Preservation (Product Invariant):

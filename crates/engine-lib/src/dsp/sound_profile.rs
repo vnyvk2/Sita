@@ -3,7 +3,7 @@
 //! Provides two presentation profiles:
 //! 1. `StudioReference`: Bit-transparent passthrough with zero tonal or dynamic coloration.
 //! 2. `VocalNuanceBoost`: Upward nuance shaping contour (primary zero-lookahead architecture per plan):
-//!    - Gentle upward lift for quiet details (< -24 dBFS, provisional +2.0 dB).
+//!    - Gentle upward lift for quiet details (< -24 dBFS, production default: +1.5 dB).
 //!    - Smooth C^1 cubic Hermite transition across mid-levels (-24 dBFS to -12 dBFS).
 //!    - Exact unity gain (0.0 dB / 1.000000) for loud material (>= -12 dBFS).
 //!    - No downward macro-dynamic compression. Peak crests and loud transients remain untouched.
@@ -68,7 +68,7 @@ impl SoundProfileStage {
             nuance_gain: 1.0,
             attack_coeff: 0.0,
             release_coeff: 0.0,
-            max_lift_db: 2.0,
+            max_lift_db: 1.5,
             low_threshold_db: -24.0,
             high_threshold_db: -12.0,
             noise_gate_db: -60.0,
@@ -147,7 +147,7 @@ impl SoundProfileStage {
     }
 
     /// Configure Upward Nuance Shaping parameters.
-    /// - `max_lift_db`: Maximum provisional lift applied to quiet signals (default: +2.0 dB).
+    /// - `max_lift_db`: Maximum lift applied to quiet signals (default: +1.5 dB).
     /// - `low_threshold_db`: dBFS level below which maximum lift is reached (default: -24.0 dBFS).
     /// - `high_threshold_db`: dBFS level above which gain is strictly unity / 0.0 dB (default: -12.0 dBFS).
     pub fn set_upward_nuance_params(
@@ -327,7 +327,7 @@ impl SoundProfileStage {
             // 3. Upward Nuance Shaping transfer function:
             // - For loud signals (>= high_threshold_db, e.g. -12 dBFS): 0.0 dB (unity gain, 100% untouched)
             // - For transition region (-24 dBFS .. -12 dBFS): smooth C^1 cubic Hermite spline
-            // - For quiet signals (-60 dBFS .. -24 dBFS): gentle upward lift (+max_lift_db, e.g. +2.0 dB)
+            // - For quiet signals (-60 dBFS .. -24 dBFS): gentle upward lift (+max_lift_db, e.g. +1.5 dB)
             // - Below -60 dBFS: smooth taper to 0.0 dB at -80 dBFS (noise floor protection)
             let env_db = 20.0 * (self.nuance_envelope.max(1e-6)).log10();
             let target_lift_db = if env_db >= self.high_threshold_db {
@@ -449,7 +449,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sound_profile_option_b_upward_nuance_behavior() {
+    fn test_sound_profile_upward_nuance_behavior() {
         let sample_rate = 48000.0f32;
         let mut stage = SoundProfileStage::new(sample_rate);
         stage.set_target_profile(SoundProfile::VocalNuanceBoost);
@@ -471,26 +471,26 @@ mod tests {
             "Loud material (>= -12 dBFS) must have 0.0 dB gain, got {loud_gain_db:+.3} dB (gain={loud_gain:.4})"
         );
 
-        // 2. Quiet nuance material (e.g. -30 dBFS): Must receive provisional lift (+2.0 dB)
+        // 2. Quiet nuance material (e.g. -30 dBFS): Must receive locked lift (+1.5 dB)
         let quiet_amp = 10.0f32.powf(-30.0 / 20.0);
         let mut quiet_buf = vec![quiet_amp; 240000]; // 2.5s to allow 250ms cascaded filters to fully settle
         stage.process(&mut quiet_buf);
         let quiet_gain = stage.nuance_gain();
         let quiet_gain_db = 20.0 * quiet_gain.log10();
         assert!(
-            (quiet_gain_db - 2.0).abs() < 0.05,
-            "Quiet material (< -24 dBFS) must receive provisional +2.0 dB lift, got {quiet_gain_db:+.3} dB"
+            (quiet_gain_db - 1.5).abs() < 0.05,
+            "Quiet material (< -24 dBFS) must receive locked +1.5 dB lift, got {quiet_gain_db:+.3} dB"
         );
 
-        // 3. Mid-level transition material (e.g. -18 dBFS): Smooth midway lift (~ +1.0 dB)
+        // 3. Mid-level transition material (e.g. -18 dBFS): Smooth midway lift (~ +0.75 dB)
         let mid_amp = 10.0f32.powf(-18.0 / 20.0);
         let mut mid_buf = vec![mid_amp; 240000];
         stage.process(&mut mid_buf);
         let mid_gain = stage.nuance_gain();
         let mid_gain_db = 20.0 * mid_gain.log10();
         assert!(
-            (mid_gain_db - 1.0).abs() < 0.10,
-            "Mid-level material (-18 dBFS) must receive ~ +1.0 dB lift, got {mid_gain_db:+.3} dB"
+            (mid_gain_db - 0.75).abs() < 0.10,
+            "Mid-level material (-18 dBFS) must receive ~ +0.75 dB lift, got {mid_gain_db:+.3} dB"
         );
 
         // 4. Deep silence (< -80 dBFS): Noise floor gate must prevent amplification

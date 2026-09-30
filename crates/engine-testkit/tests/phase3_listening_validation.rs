@@ -1,18 +1,18 @@
 //! Phase 3 Listening Validation & Golden Acceptance Suite
 //!
-//! Generates and evaluates real musical fixtures across 5 diverse categories:
-//! 1. Track 1: Vocal-Heavy Commercial Music ("Bora Dhiya" vocal rap/sung excerpt)
-//! 2. Track 2: Acoustic Fingerstyle Guitar & Intimate Vocal Recording
-//! 3. Track 3: Dense Electronic Dance Music (EDM) (Heavy sub-bass, 4-on-floor, bright hats)
-//! 4. Track 4: Delicate Piano & Ambient Room Decay (Low-level nuances, room reflections)
-//! 5. Track 5: High-Dynamic-Range Orchestral Crescendo (Macro dynamics & quiet->loud transient attack-edge analysis)
+//! Generates and evaluates audio fixtures across 5 diverse categories:
+//! 1. Track 1: Commercial Music Excerpt ("Bora Dhiya" vocal hip-hop from test/assets/test_song.mp3)
+//! 2. Track 2: Synthetic Acoustic Benchmark (Fingerstyle guitar arpeggios & vocal hum)
+//! 3. Track 3: Synthetic EDM Benchmark (Dense electronic dance music, 50Hz sub-bass, kick, hats, supersaw)
+//! 4. Track 4: Synthetic Ambient Benchmark (Delicate solo piano decay chords & low-level tape hiss)
+//! 5. Track 5: Synthetic Dynamic Benchmark (Orchestral crescendo with an abrupt 1-sample step at t = 6.0s from -22.0 dBFS to -1.0 dBFS)
 //!
 //! Evaluates each track across:
 //! - StudioReference (Bit-transparent baseline)
-//! - VocalNuanceBoost across provisional lift sweep (+1.0 dB, +1.5 dB, +2.0 dB, +2.5 dB)
+//! - VocalNuanceBoost locked production setting (+1.5 dB lift) and systematic candidate sweep (+1.0 to +2.5 dB)
 //! - Computes ITU-R BS.1770-4 / EBU R128 Integrated Loudness (LUFS) and Loudness Range (LRA)
 //! - Computes Sample Peak (dBFS) and Reconstructed True-Peak (dBTP)
-//! - Quantifies the transient attack-edge peak behavior (+0.48 dB phenomenon)
+//! - Measures transient attack-edge behavior across quiet->loud transitions
 //! - Renders both native and loudness-matched (-14.0 LUFS) WAV files to target/phase3_listening_artifacts/
 
 use std::fs;
@@ -351,6 +351,8 @@ struct TrackEvaluationResult {
     delta_lufs: f32,
     delta_lra: f32,
     attack_edge_delta_db: f32,
+    max_gain_applied_db: f32,
+    max_loud_transient_gain_db: Option<f32>,
 }
 
 fn evaluate_track(
@@ -404,6 +406,33 @@ fn evaluate_track(
     let delta_lra = (nuance_loudness.lra_lu - ref_loudness.lra_lu) as f32;
     let attack_edge_delta = nuance_loudness.peak_dbfs - ref_loudness.peak_dbfs;
 
+    // Measure dynamic gains across output vs reference (samples are time-aligned after 52-sample TruePeakLimiter latency):
+    let mut max_gain_linear = 1.0f32;
+    let mut max_loud_linear = 0.0f32;
+    let mut found_loud_sample = false;
+    let loud_thresh_linear = 10.0f32.powf(-12.0 / 20.0); // 0.25118864 (-12 dBFS)
+    let noise_thresh_linear = 10.0f32.powf(-60.0 / 20.0); // 0.001 (-60 dBFS)
+
+    for (s_ref, s_nua) in out_ref.iter().zip(out_nuance.iter()) {
+        let abs_ref = s_ref.abs();
+        let abs_nua = s_nua.abs();
+        if abs_ref > noise_thresh_linear {
+            let gain = abs_nua / abs_ref;
+            max_gain_linear = max_gain_linear.max(gain);
+            if abs_ref >= loud_thresh_linear {
+                found_loud_sample = true;
+                max_loud_linear = max_loud_linear.max(gain);
+            }
+        }
+    }
+
+    let max_gain_applied_db = 20.0 * max_gain_linear.log10();
+    let max_loud_transient_gain_db = if found_loud_sample {
+        Some(20.0 * max_loud_linear.log10())
+    } else {
+        None
+    };
+
     // 4. Export Native Render WAV Files for Critical Listening
     let lift_tag = format!("{:0.1}db", provisional_lift_db).replace('.', "_");
     let ref_filename = format!("{}_studioreference.wav", track_id);
@@ -435,6 +464,8 @@ fn evaluate_track(
         delta_lufs,
         delta_lra,
         attack_edge_delta_db: attack_edge_delta,
+        max_gain_applied_db,
+        max_loud_transient_gain_db,
     }
 }
 
@@ -442,11 +473,11 @@ fn evaluate_track(
 fn test_phase3_listening_validation_across_genres() {
     let sample_rate = 44100u32;
 
-    println!("\n==========================================================================================");
+    println!("\n======================================================================================================================");
     println!("PHASE 3 LISTENING VALIDATION & GOLDEN ACCEPTANCE HARNESS");
-    println!("Evaluation Across 5 Diverse Real-World Musical Categories");
-    println!("Testing Default Option B Prototype (+2.0 dB Provisional Lift)");
-    println!("==========================================================================================");
+    println!("Evaluation Across 5 Categories (1 Commercial Audio Excerpt + 4 Synthetic Benchmark Fixtures)");
+    println!("Testing Locked Production Profile (+1.5 dB Nuance Lift)");
+    println!("======================================================================================================================");
 
     let tracks = [
         load_or_generate_track1_vocal(sample_rate),
@@ -457,7 +488,7 @@ fn test_phase3_listening_validation_across_genres() {
     ];
 
     let track_ids = ["track1_vocal", "track2_acoustic", "track3_edm", "track4_piano", "track5_orchestral"];
-    let default_lift_db = 2.0f32;
+    let default_lift_db = 1.5f32;
 
     let mut results = Vec::new();
 
@@ -467,37 +498,41 @@ fn test_phase3_listening_validation_across_genres() {
     }
 
     println!(
-        "{:<38} | {:>7} | {:>7} | {:>6} | {:>6} | {:>8} | {:>7}",
+        "{:<45} | {:>7} | {:>7} | {:>6} | {:>7} | {:>7} | {:>7}",
         "Track Name", "Ref LUFS", "Nua LUFS", "ΔLUFS", "Ref LRA", "Nua LRA", "ΔLRA"
     );
     println!(
-        "{:-<38}-+-{:-<7}-+-{:-<7}-+-{:-<6}-+-{:-<6}-+-{:-<8}-+-{:-<7}",
+        "{:-<45}-+-{:-<7}-+-{:-<7}-+-{:-<6}-+-{:-<7}-+-{:-<7}-+-{:-<7}",
         "", "", "", "", "", "", ""
     );
 
     for r in &results {
         println!(
-            "{:<38} | {:>7.2} | {:>7.2} | {:>+6.2} | {:>6.2} | {:>8.2} | {:>+6.2}",
+            "{:<45} | {:>7.2} | {:>7.2} | {:>+6.2} | {:>7.2} | {:>7.2} | {:>+6.2}",
             r.track_name, r.ref_lufs, r.nuance_lufs, r.delta_lufs, r.ref_lra, r.nuance_lra, r.delta_lra
         );
     }
 
-    println!("\n==========================================================================================");
-    println!("PEAK & TRANSIENT ATTACK-EDGE INVESTIGATION (+0.48 dB PHENOMENON)");
-    println!("==========================================================================================");
+    println!("\n======================================================================================================================");
+    println!("PEAK & TRANSIENT ATTACK-EDGE INVESTIGATION ACROSS ALL 5 FIXTURES (+1.5 dB PRODUCTION LOCK)");
+    println!("======================================================================================================================");
     println!(
-        "{:<38} | {:>8} | {:>8} | {:>10} | {:>8} | {:>8}",
-        "Track Name", "Ref Peak", "Nua Peak", "ΔPeak Edge", "Ref dBTP", "Nua dBTP"
+        "{:<45} | {:>8} | {:>8} | {:>7} | {:>8} | {:>8} | {:>10} | {:>18}",
+        "Track Name", "Ref Peak", "Nua Peak", "ΔPeak", "Ref dBTP", "Nua dBTP", "Max Gain", "Transient (>= -12dB)"
     );
     println!(
-        "{:-<38}-+-{:-<8}-+-{:-<8}-+-{:-<10}-+-{:-<8}-+-{:-<8}",
-        "", "", "", "", "", ""
+        "{:-<45}-+-{:-<8}-+-{:-<8}-+-{:-<7}-+-{:-<8}-+-{:-<8}-+-{:-<10}-+-{:-<18}",
+        "", "", "", "", "", "", "", ""
     );
 
     for r in &results {
+        let loud_gain_str = match r.max_loud_transient_gain_db {
+            Some(g) => format!("{:>+6.2} dB", g),
+            None => "N/A (peak < -12dB)".to_string(),
+        };
         println!(
-            "{:<38} | {:>7.2}d | {:>7.2}d | {:>+9.2}dB | {:>7.2}d | {:>7.2}d",
-            r.track_name, r.ref_peak_dbfs, r.nuance_peak_dbfs, r.attack_edge_delta_db, r.ref_tp_dbtp, r.nuance_tp_dbtp
+            "{:<45} | {:>7.2}d | {:>7.2}d | {:>+6.2}d | {:>7.2}d | {:>7.2}d | {:>+9.2}dB | {:>18}",
+            r.track_name, r.ref_peak_dbfs, r.nuance_peak_dbfs, r.attack_edge_delta_db, r.ref_tp_dbtp, r.nuance_tp_dbtp, r.max_gain_applied_db, loud_gain_str
         );
 
         // Invariant 1: True peak must never exceed -0.10 dBTP (output protection)
@@ -508,7 +543,7 @@ fn test_phase3_listening_validation_across_genres() {
             r.nuance_tp_dbtp
         );
 
-        // Invariant 2: Dynamic range preservation (>88% of original LRA preserved across all genres)
+        // Invariant 2: Dynamic range preservation (|ΔLRA| <= 3.0 LU across all genres)
         assert!(
             r.delta_lra.abs() <= 3.0,
             "Macro dynamic range squashed on {}: ΔLRA = {:+.2} LU",
@@ -516,7 +551,7 @@ fn test_phase3_listening_validation_across_genres() {
             r.delta_lra
         );
 
-        // Invariant 3: Attack-edge peak increase must remain bounded by provisional lift (+2.0 dB)
+        // Invariant 3: Attack-edge peak increase must remain bounded by locked lift (+1.5 dB)
         assert!(
             r.attack_edge_delta_db <= default_lift_db + 0.10,
             "Transient attack-edge increase exceeded bound on {}: {:+.2} dB",
@@ -524,7 +559,7 @@ fn test_phase3_listening_validation_across_genres() {
             r.attack_edge_delta_db
         );
     }
-    println!("==========================================================================================");
+    println!("======================================================================================================================");
 }
 
 #[test]
@@ -532,34 +567,39 @@ fn test_phase3_orchestral_crescendo_lift_sweep_and_transient_forensics() {
     let sample_rate = 44100u32;
     let (name, samples) = generate_track5_orchestral_crescendo(sample_rate);
 
-    println!("\n==========================================================================================");
-    println!("PHASE 3 SYSTEMATIC LIFT SWEEP ON HIGH-DYNAMIC TRACK 5");
-    println!("Evaluating Audibility and Transient Edge (+1.0 dB to +2.5 dB)");
-    println!("==========================================================================================");
+    println!("\n======================================================================================================================");
+    println!("PHASE 3 SYSTEMATIC LIFT SWEEP ON SYNTHETIC BENCHMARK TRACK 5 (1-SAMPLE STEP CRESCENDO)");
+    println!("Evaluating Macro Dynamics and Transient Edge Overshoot (+1.0 dB to +2.5 dB)");
+    println!("======================================================================================================================");
 
     let sweep_lifts = [1.0f32, 1.5f32, 2.0f32, 2.5f32];
 
     println!(
-        "{:<15} | {:>9} | {:>7} | {:>8} | {:>7} | {:>10} | {:>8}",
-        "Lift Setting", "Int. LUFS", "ΔLUFS", "LRA (LU)", "ΔLRA", "ΔPeak Edge", "Nua dBTP"
+        "{:<15} | {:>9} | {:>7} | {:>8} | {:>7} | {:>10} | {:>8} | {:>18}",
+        "Lift Setting", "Int. LUFS", "ΔLUFS", "LRA (LU)", "ΔLRA", "ΔPeak Edge", "Nua dBTP", "Transient (>= -12dB)"
     );
     println!(
-        "{:-<15}-+-{:-<9}-+-{:-<7}-+-{:-<8}-+-{:-<7}-+-{:-<10}-+-{:-<8}",
-        "", "", "", "", "", "", ""
+        "{:-<15}-+-{:-<9}-+-{:-<7}-+-{:-<8}-+-{:-<7}-+-{:-<10}-+-{:-<8}-+-{:-<18}",
+        "", "", "", "", "", "", "", ""
     );
 
     for &lift in &sweep_lifts {
         let res = evaluate_track(&name, &samples, sample_rate, "track5_orchestral_sweep", lift);
+        let loud_gain_str = match res.max_loud_transient_gain_db {
+            Some(g) => format!("{:>+6.2} dB", g),
+            None => "N/A".to_string(),
+        };
         println!(
-            "{:<15} | {:>7.2} LU | {:>+6.2} | {:>6.2} LU | {:>+6.2} | {:>+9.2}dB | {:>7.2}d",
+            "{:<15} | {:>7.2} LU | {:>+6.2} | {:>6.2} LU | {:>+6.2} | {:>+9.2}dB | {:>7.2}d | {:>18}",
             format!("+{:0.1} dB Lift", lift),
             res.nuance_lufs,
             res.delta_lufs,
             res.nuance_lra,
             res.delta_lra,
             res.attack_edge_delta_db,
-            res.nuance_tp_dbtp
+            res.nuance_tp_dbtp,
+            loud_gain_str
         );
     }
-    println!("==========================================================================================");
+    println!("======================================================================================================================");
 }
