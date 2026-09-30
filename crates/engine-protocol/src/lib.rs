@@ -262,4 +262,39 @@ mod schema_tag_lock {
         let back: DaemonResponse = serde_json::from_str(&line).unwrap();
         assert_eq!(back, resp);
     }
+
+    /// Shape lock against the checked-in wire examples: any field rename,
+    /// type change, or optional-vs-required drift on either side fails here
+    /// (Rust exact-match) and in test/unit/audioEngineWireParity.test.ts
+    /// (TypeScript parse check) instead of desyncing silently.
+    #[test]
+    fn wire_examples_match_schema_exactly() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("wire-examples.json");
+        let raw = std::fs::read_to_string(&dir).expect("wire-examples.json");
+        let doc: serde_json::Value = serde_json::from_str(&raw).unwrap();
+
+        for req in doc["commands"].as_array().unwrap() {
+            let parsed: DaemonRequest =
+                serde_json::from_value(req.clone()).expect("command example must parse");
+            let roundtrip = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(
+                &roundtrip, req,
+                "command wire shape drifted: {req}"
+            );
+        }
+        for ev in doc["events"].as_array().unwrap() {
+            let parsed: DaemonEvent =
+                serde_json::from_value(ev.clone()).expect("event example must parse");
+            let roundtrip = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(&roundtrip, ev, "event wire shape drifted: {ev}");
+        }
+        for resp in doc["responses"].as_array().unwrap() {
+            let parsed: DaemonResponse =
+                serde_json::from_value(resp.clone()).expect("response example must parse");
+            let roundtrip = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(&roundtrip, resp, "response wire shape drifted: {resp}");
+        }
+        assert_eq!(doc["commands"].as_array().unwrap().len(), 13);
+        assert_eq!(doc["events"].as_array().unwrap().len(), 9);
+    }
 }

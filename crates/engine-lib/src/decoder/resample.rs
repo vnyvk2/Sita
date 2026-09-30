@@ -67,6 +67,17 @@ impl StereoResampler {
         self.inner.is_none()
     }
 
+    /// Fixed filter latency in output frames. The first `output_delay()`
+    /// frames of the stream are filter warmup (near-zero), not content —
+    /// callers doing sample-exact comparisons (and the daemon at track
+    /// starts) must account for this.
+    pub fn output_delay(&self) -> usize {
+        self.inner
+            .as_ref()
+            .map(rubato::Resampler::output_delay)
+            .unwrap_or(0)
+    }
+
     /// Push interleaved stereo samples; resampled output is appended to `out`.
     pub fn push_interleaved(
         &mut self,
@@ -173,14 +184,95 @@ mod tests {
 
     fn sine_rms(rate: u32, freq: f32, secs: f32) -> (Vec<f32>, f64) {
         let n = (rate as f32 * secs) as usize;
+        // Phase computed in f64: f32 phase quantization alone would floor the
+        // measurement near -60 dB and mask the true resampler SNR.
         let pcm: Vec<f32> = (0..n)
             .flat_map(|i| {
-                let s = (2.0 * std::f32::consts::PI * freq * i as f32 / rate as f32).sin() * 0.8;
-                [s, s]
+                let s = (2.0 * std::f64::consts::PI * freq as f64 * i as f64 / rate as f64).sin()
+                    * 0.8;
+                [s as f32, s as f32]
             })
             .collect();
         let rms = (pcm.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / pcm.len() as f64).sqrt();
         (pcm, rms)
+    }
+
+    /// Signal-to-noise ratio of the resampler at 1 kHz, 44.1 → 48 kHz.
+    /// The reference is evaluated ANALYTICALLY (f64 sine at exact fractional
+    /// times), so no interpolation error pollutes the measurement; the single
+    /// fitted parameter is the (possibly fractional) filter delay. What
+    /// remains after the fit is imaging and aliasing — exactly the energy
+    /// linear hold sprays out of band.
+    #[test]
+    fn snr_at_1khz_exceeds_90db() {
+        let (pcm, _) = sine_rms(44100, 1000.0, 1.0);
+        let mut r = StereoResampler::new(44100, 48000).unwrap();
+        let mut out = Vec::new();
+        for chunk in pcm.chunks(4096) {
+            let even = chunk.len() - chunk.len() % 2;
+            r.push_interleaved(&chunk[..even], &mut out).unwrap();
+        }
+        r.flush(&mut out).unwrap();
+
+        let out_frames = out.len() / 2;
+        let left: Vec<f32> = out.chunks_exact(2).map(|c| c[0]).collect();
+        // Steady state only: skip warmup at the head and flush tail.
+        let lo = 3000usize;
+        let hi = out_frames.saturating_sub(4000);
+        let tone =
+            |t_frames: f64| 0.8 * (2.0 * std::f64::consts::PI * 1000.0 * t_frames / 48000.0).sin();
+        // Fit fractional delay on a fine grid, then refine parabolically:
+        // a bare 0.1-frame grid caps unrefined fits near -44 dB (0.05-frame
+        // worst misfit on a 1 kHz tone), which would misattribute measurement
+        // granularity to the resampler.
+        let err_at = |d: f64| {
+            let mut sum = 0.0f64;
+            let mut n = 0usize;
+            let mut i = lo;
+            while i < hi {
+                let diff = left[i] as f64 - tone(i as f64 - d);
+                sum += diff * diff;
+                n += 1;
+                i += 7;
+            }
+            sum / n as f64
+        };
+        let mut best = (0.0f64, f64::INFINITY);
+        let mut d = 500.0;
+        while d < 700.0 {
+            let resid = err_at(d);
+            if resid < best.1 {
+                best = (d, resid);
+            }
+            d += 0.1;
+        }
+        let (e0, e1, e2) = (err_at(best.0 - 0.1), best.1, err_at(best.0 + 0.1));
+        let denom = e0 - 2.0 * e1 + e2;
+        let d_star = if denom > 0.0 { best.0 - 0.05 * (e2 - e0) / denom } else { best.0 };
+        let resid = err_at(d_star);
+        let tone_power = 0.8f64.powi(2) / 2.0;
+        let snr_db = 10.0 * (tone_power / resid).log10();
+        assert!(snr_db >= 90.0, "resampler SNR {snr_db:.1} dB below 90 dB");
+    }
+
+    /// 44.1 → 192 kHz (4.34:1) stresses the FFT stage differently than
+    /// 44.1 → 48 kHz — this is the DAC-session ratio, so it gets its own case.
+    #[test]
+    fn upsample_44100_to_192000_length_and_level() {
+        let (pcm, in_rms) = sine_rms(44100, 1000.0, 0.5);
+        let mut r = StereoResampler::new(44100, 192000).unwrap();
+        let mut out = Vec::new();
+        for chunk in pcm.chunks(4096) {
+            let even = chunk.len() - chunk.len() % 2;
+            r.push_interleaved(&chunk[..even], &mut out).unwrap();
+        }
+        r.flush(&mut out).unwrap();
+        let expected = (22050.0f64 * 192000.0 / 44100.0).round() as usize * 2;
+        assert_eq!(out.len(), expected);
+        let mid = &out[out.len() / 10..out.len() * 9 / 10];
+        let out_rms =
+            (mid.iter().map(|s| (*s as f64).powi(2)).sum::<f64>() / mid.len() as f64).sqrt();
+        assert!((out_rms - in_rms).abs() / in_rms < 0.02);
     }
 
     #[test]
@@ -204,8 +296,7 @@ mod tests {
     }
 
     #[test]
-    fn downsample_48000_to_44100_length_and_level() {
-        let (pcm, in_rms) = sine_rms(48000, 1000.0, 0.5);
+    fn downsample_48000_to_44100_length_and_level() {        let (pcm, in_rms) = sine_rms(48000, 1000.0, 0.5);
         let mut r = StereoResampler::new(48000, 44100).unwrap();
         let mut out = Vec::new();
         r.push_interleaved(&pcm, &mut out).unwrap();

@@ -39,6 +39,7 @@ pub struct EngineDaemon {
     slot_paths: Arc<Mutex<[Option<String>; 2]>>, // last loaded path per slot for seek respawn
     eos_notified: Arc<(AtomicBool, AtomicBool)>, // TrackEnd already emitted per slot
     output_rate: Arc<AtomicU32>, // device render rate in Hz; single source of truth
+    cb_contention: Arc<AtomicU64>, // RT callback lock losses; DAC-session audit instrument
 }
 
 impl Default for EngineDaemon {
@@ -63,6 +64,7 @@ impl EngineDaemon {
             slot_paths: Arc::new(Mutex::new([None, None])),
             eos_notified: Arc::new((AtomicBool::new(false), AtomicBool::new(false))),
             output_rate: Arc::new(AtomicU32::new(48000)),
+            cb_contention: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -97,6 +99,7 @@ impl EngineDaemon {
         let shared_cb = Arc::clone(&self.shared_engine);
         let active_slot_cb = Arc::clone(&self.active_slot);
         let is_playing_cb = Arc::clone(&self.is_playing);
+        let contention_cb = Arc::clone(&self.cb_contention);
 
         let render_fn = move |data: &mut [f32]| -> usize {
             if !is_playing_cb.load(Ordering::Relaxed) {
@@ -121,9 +124,17 @@ impl EngineDaemon {
                 active_slot_cb.store(slot_idx, Ordering::Relaxed);
                 written
             } else {
+                // Contention policy (documented, deliberate): the callback
+                // NEVER blocks — a mutex hold here risks priority inversion
+                // and a dropout far worse than one silent period. Holds are
+                // sub-microsecond (brief command application only; slot
+                // mutation structurally requires the lock, so an Arc-swap of
+                // "params" could not remove it), making this path rare and
+                // concentrated at transitions. It is counted, playhead-neutral
+                // (returns 0, sink records 0), and queryable via GetState's
+                // `cb_contention` for the DAC-session blip audit.
+                contention_cb.fetch_add(1, Ordering::Relaxed);
                 data.fill(0.0);
-                // Contended silence must NOT be counted as consumed audio or
-                // the playhead jumps during lock contention.
                 0
             }
         };
@@ -491,6 +502,7 @@ impl EngineDaemon {
                         "xrun_count": stats.xrun_count,
                         "low_water_mark": stats.low_water_mark,
                         "position_secs": self.current_position_secs(),
+                        "cb_contention": self.cb_contention.load(Ordering::Relaxed),
                     })),
                 }
             }

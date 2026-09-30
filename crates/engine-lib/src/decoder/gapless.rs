@@ -120,6 +120,15 @@ pub fn parse_lame_tag(data: &[u8]) -> Option<GaplessInfo> {
 }
 
 /// Stream trimmer that drops leading encoder delay and caps playback to valid frames.
+///
+/// NOTE — production status: the live daemon does NOT instantiate this trimmer.
+/// MP3/AAC gapless compensation is owned entirely by Symphonia
+/// (`FormatOptions { enable_gapless: true }` in `probe.rs`), and the mixer
+/// owns splice continuity. Wiring this trimmer on top would double-drop valid
+/// audio. It is retained, unit-tested, and available for containers where
+/// Symphonia gapless is disabled — do not apply it to the default pipeline
+/// without first disabling the Symphonia layer and re-running the real-codec
+/// gate (`real_codec_tests`).
 #[derive(Debug, Clone)]
 pub struct GaplessTrimmer {
     channels: usize,

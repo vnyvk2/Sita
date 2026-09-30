@@ -51,6 +51,13 @@ ffmpeg([
   '-ac', '2', '-c:a', 'pcm_f32le', out('ref_440hz_3s.wav')
 ]);
 
+// 1b. Same tone at 44.1 kHz: exercises the sinc resample + seek path on
+// 48 kHz outputs (and passthrough where the device is 44.1 kHz).
+ffmpeg([
+  '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3:sample_rate=44100',
+  '-ac', '2', '-c:a', 'pcm_f32le', out('ref_440hz_3s_44100.wav')
+]);
+
 // 2. Lossless derivations of the reference.
 ffmpeg(['-i', out('ref_440hz_3s.wav'), '-c:a', 'flac', '-sample_fmt', 's16', out('flac16_stereo.flac')]);
 ffmpeg(['-i', out('ref_440hz_3s.wav'), '-c:a', 'flac', '-sample_fmt', 's32', out('flac24_stereo.flac')]);

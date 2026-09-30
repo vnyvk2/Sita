@@ -132,11 +132,12 @@ fn daemon_stdio_load_play_seek_stop() {
 
     let mut events = Vec::new();
 
-    // 2. Fresh daemon reports position 0.
+    // 2. Fresh daemon reports position 0 and zero callback contention.
     daemon.send(1, r#"{"cmd":"get_state"}"#);
     let state = daemon.wait_response(1, Duration::from_secs(5), &mut events);
     assert_ok(&state);
     assert_eq!(state["data"]["position_secs"].as_f64(), Some(0.0));
+    assert_eq!(state["data"]["cb_contention"].as_u64(), Some(0));
 
     // 3. Load a real 3s WAV fixture.
     let path = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
@@ -167,6 +168,27 @@ fn daemon_stdio_load_play_seek_stop() {
         "seek did not reposition playhead, heartbeat shows {p3}"
     );
 
+    // 5b. Resample + seek end to end: reload the active slot with 44.1 kHz
+    // content (sinc path on 48 kHz outputs, passthrough where the device is
+    // 44.1 kHz — assertions hold either way), then seek. Each spawn builds a
+    // FRESH resampler and ring pair, so a seek cannot leak stale tail audio;
+    // this leg fails if it does.
+    let path44 = fixture("ref_440hz_3s_44100.wav").replace('\\', "\\\\");
+    daemon.send(10, &format!(r#"{{"cmd":"load","slot":"a","path":"{path44}"}}"#));
+    let loaded44 = daemon.wait_response(10, Duration::from_secs(10), &mut events);
+    assert_ok(&loaded44);
+    // Proves the mismatch leg is armed: file rate differs from a 48 kHz output.
+    // (On a 44.1 kHz device this is passthrough; assertions still hold.)
+    assert_eq!(loaded44["data"]["sample_rate"].as_u64(), Some(44100));
+    daemon.send(11, r#"{"cmd":"seek","position_secs":2.0}"#);
+    assert_ok(&daemon.wait_response(11, Duration::from_secs(5), &mut events));
+    let hb4 = daemon.wait_heartbeat(Duration::from_secs(5));
+    let p4 = hb4["position_secs"].as_f64().unwrap();
+    assert!(
+        (1.9..=3.0).contains(&p4),
+        "resampled seek did not reposition playhead, heartbeat shows {p4}"
+    );
+
     // 6. Malformed input gets the sentinel error id, never id 0.
     writeln!(daemon.stdin(), "this is not json").unwrap();
     daemon.stdin().flush().unwrap();
@@ -183,4 +205,38 @@ fn daemon_stdio_load_play_seek_stop() {
     let status = daemon.child.wait().expect("wait for daemon exit");
     assert!(start.elapsed() < Duration::from_secs(5), "daemon ignored stdin EOF");
     assert!(status.success() || status.code().is_some());
+}
+
+#[test]
+fn eof_during_active_playback_exits_cleanly() {
+    // The scenario that matters: parent dies MID-SONG with the stream open,
+    // decoder threads pumping, and heartbeats flowing. The prior suite only
+    // closed stdin after `stop` (idle path) — a hang here would orphan a
+    // WASAPI endpoint and a zombie process on every Electron crash.
+    let mut daemon = Daemon::spawn();
+    let ready: serde_json::Value =
+        serde_json::from_str(&daemon.next_line(Duration::from_secs(10))).unwrap();
+    assert_eq!(ready.get("event").and_then(|e| e.as_str()), Some("ready"));
+
+    let mut events = Vec::new();
+    let path = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"a","path":"{path}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+    daemon.send(2, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(2, Duration::from_secs(5), &mut events));
+
+    // Prove audio is flowing before killing the parent side.
+    let hb = daemon.wait_heartbeat(Duration::from_secs(5));
+    assert!(hb["position_secs"].as_f64().unwrap() >= 0.0);
+
+    // Parent death: close stdin mid-song, no stop command.
+    daemon.stdin.take();
+    let start = Instant::now();
+    let status = daemon.child.wait().expect("wait for daemon exit");
+    assert!(
+        start.elapsed() < Duration::from_secs(5),
+        "daemon hung on EOF during active playback"
+    );
+    assert!(status.success(), "daemon exit status: {status}");
+    // Drop's kill()+wait() on the already-reaped child are harmless no-ops.
 }
