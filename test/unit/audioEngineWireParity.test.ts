@@ -43,15 +43,16 @@ const COMMAND_FIELDS: Record<DaemonCommand['cmd'], string[]> = {
   set_volume: ['volume'],
   set_eq: ['gains'],
   set_dsp: ['bypass', 'rg_db', 'karaoke', 'limiter'],
+  set_sound_profile: ['profile'],
   list_devices: [],
   set_device: ['device_id'],
   get_state: []
 };
 
 describe('Audio engine wire parity (crates/engine-protocol)', () => {
-  it('covers all 13 commands with required fields', () => {
+  it('covers all 14 commands with required fields', () => {
     const { commands } = loadWire();
-    expect(commands).toHaveLength(13);
+    expect(commands).toHaveLength(14);
     const seen = new Set<string>();
     for (const req of commands) {
       expect(typeof req.id).toBe('number');
@@ -64,7 +65,7 @@ describe('Audio engine wire parity (crates/engine-protocol)', () => {
         ).not.toBeUndefined();
       }
     }
-    expect(seen.size).toBe(13);
+    expect(seen.size).toBe(14);
   });
 
   it('round-trips every command through JSON without loss', () => {
@@ -75,7 +76,7 @@ describe('Audio engine wire parity (crates/engine-protocol)', () => {
     }
   });
 
-  it('covers all 8 event kinds with discriminators', () => {
+  it('covers all 9 event kinds with discriminators', () => {
     const { events } = loadWire();
     const kinds = new Set(events.map((e) => e.event));
     expect(kinds).toEqual(
@@ -87,6 +88,7 @@ describe('Audio engine wire parity (crates/engine-protocol)', () => {
         'transition_complete',
         'xrun',
         'device_error',
+        'sound_profile_changed',
         'heartbeat'
       ])
     );
@@ -106,6 +108,13 @@ describe('Audio engine wire parity (crates/engine-protocol)', () => {
           break;
         case 'ready':
           expect(event.protocol_version).toBe(1);
+          expect(typeof event.boot_id).toBe('number');
+          break;
+        case 'sound_profile_changed':
+          expect(['studio_reference', 'vocal_nuance_boost']).toContain(event.profile);
+          expect(['active', 'transitioning']).toContain(event.status);
+          expect(typeof event.boot_id).toBe('number');
+          expect(typeof event.sequence_id).toBe('number');
           break;
         default:
           break;
@@ -115,7 +124,7 @@ describe('Audio engine wire parity (crates/engine-protocol)', () => {
 
   it('responses carry correlated ok/error shapes', () => {
     const { responses } = loadWire();
-    expect(responses.length).toBeGreaterThanOrEqual(3);
+    expect(responses.length).toBeGreaterThanOrEqual(4);
     for (const res of responses) {
       expect(typeof res.id).toBe('number');
       if (res.status === 'ok') {

@@ -1,11 +1,15 @@
 /**
  * Nora Native Audio Engine JSON-Lines Daemon Protocol Definitions.
- * Aligns strictly with crates/engine-cli/src/protocol.rs.
+ * Aligns strictly with crates/engine-protocol/src/lib.rs.
  */
 
 export type SlotId = 'a' | 'b';
 
 export type PlaybackState = 'playing' | 'paused' | 'stopped';
+
+export type SoundProfile = 'studio_reference' | 'vocal_nuance_boost';
+
+export type SoundProfileStatus = 'active' | 'transitioning';
 
 export type DaemonCommand =
   | { cmd: 'load'; slot: SlotId; path: string }
@@ -18,6 +22,7 @@ export type DaemonCommand =
   | { cmd: 'set_volume'; volume: number }
   | { cmd: 'set_eq'; gains: [number, number, number, number, number, number, number, number, number, number] }
   | { cmd: 'set_dsp'; bypass: boolean; rg_db: number; karaoke: boolean; limiter: boolean }
+  | { cmd: 'set_sound_profile'; profile: SoundProfile }
   | { cmd: 'list_devices' }
   | { cmd: 'set_device'; device_id: string }
   | { cmd: 'get_state' };
@@ -36,6 +41,13 @@ export interface DaemonLoadResultData {
   codec: string;
 }
 
+export interface DaemonSoundProfileResultData {
+  profile: SoundProfile;
+  transition_ms: number;
+  boot_id: number;
+  sequence_id: number;
+}
+
 export interface DaemonStateResultData {
   state: PlaybackState;
   active_slot: SlotId;
@@ -43,13 +55,17 @@ export interface DaemonStateResultData {
   backend: string;
   xrun_count: number;
   low_water_mark: number;
+  sound_profile?: SoundProfile;
+  sound_profile_status?: SoundProfileStatus;
+  boot_id?: number;
+  sequence_id?: number;
 }
 
 export type DaemonResponse =
   | {
       id: number;
       status: 'ok';
-      data?: DaemonLoadResultData | DaemonStateResultData | unknown;
+      data?: DaemonLoadResultData | DaemonSoundProfileResultData | DaemonStateResultData | unknown;
     }
   | {
       id: number;
@@ -62,6 +78,7 @@ export type DaemonPushEvent =
       event: 'ready';
       protocol_version: number;
       engine_version: string;
+      boot_id: number;
     }
   | {
       event: 'state_changed';
@@ -87,6 +104,13 @@ export type DaemonPushEvent =
   | {
       event: 'device_error';
       message: string;
+    }
+  | {
+      event: 'sound_profile_changed';
+      profile: SoundProfile;
+      status: SoundProfileStatus;
+      boot_id: number;
+      sequence_id: number;
     }
   | {
       event: 'heartbeat';

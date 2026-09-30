@@ -12,11 +12,11 @@ use std::time::Duration;
 
 use engine_testkit::{
     DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, PlaybackState, ProtocolHarness,
-    SeekLatencyTimer, SlotId, SoakConfig, SoakMonitor,
+    SeekLatencyTimer, SlotId, SoakConfig, SoakMonitor, SoundProfile, SoundProfileStatus,
 };
 
 #[test]
-fn test_all_13_daemon_commands_and_requests_json_roundtrip() {
+fn test_all_14_daemon_commands_and_requests_json_roundtrip() {
     let commands = vec![
         DaemonCommand::Load {
             slot: SlotId::A,
@@ -42,6 +42,9 @@ fn test_all_13_daemon_commands_and_requests_json_roundtrip() {
             karaoke: false,
             limiter: true,
         },
+        DaemonCommand::SetSoundProfile {
+            profile: SoundProfile::StudioReference,
+        },
         DaemonCommand::ListDevices,
         DaemonCommand::SetDevice {
             device_id: "wasapi_endpoint_default".to_string(),
@@ -49,7 +52,7 @@ fn test_all_13_daemon_commands_and_requests_json_roundtrip() {
         DaemonCommand::GetState,
     ];
 
-    assert_eq!(commands.len(), 13, "Must test exactly 13 commands from R3 spec");
+    assert_eq!(commands.len(), 14, "Must test exactly 14 commands from updated schema");
 
     for (i, cmd) in commands.into_iter().enumerate() {
         let req_id = (i as u64) + 1;
@@ -67,11 +70,12 @@ fn test_all_13_daemon_commands_and_requests_json_roundtrip() {
 }
 
 #[test]
-fn test_all_8_daemon_events_json_roundtrip() {
+fn test_all_9_daemon_events_json_roundtrip() {
     let events = vec![
         DaemonEvent::Ready {
             protocol_version: 1,
             engine_version: "0.1.0".to_string(),
+            boot_id: 12345678,
         },
         DaemonEvent::StateChanged {
             state: PlaybackState::Playing,
@@ -84,6 +88,12 @@ fn test_all_8_daemon_events_json_roundtrip() {
         DaemonEvent::DeviceError {
             message: "WASAPI audio device disconnected".to_string(),
         },
+        DaemonEvent::SoundProfileChanged {
+            profile: SoundProfile::VocalNuanceBoost,
+            status: SoundProfileStatus::Active,
+            boot_id: 12345678,
+            sequence_id: 1,
+        },
         DaemonEvent::Heartbeat {
             active_slot: SlotId::B,
             position_secs: 35.125,
@@ -93,7 +103,7 @@ fn test_all_8_daemon_events_json_roundtrip() {
         },
     ];
 
-    assert_eq!(events.len(), 8, "Must test all 8 push events in amended protocol");
+    assert_eq!(events.len(), 9, "Must test all 9 push events in updated protocol");
 
     for ev in events {
         let json_line = serde_json::to_string(&ev).expect("Event serialization must succeed");

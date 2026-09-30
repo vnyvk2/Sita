@@ -41,7 +41,7 @@ fn decode_and_render_to_wav(
     let mut decoder = DecoderPipeline::open(input_file).expect("Failed to open input audio");
     let in_spec = decoder.spec();
 
-    let mut resampler = if in_spec.sample_rate != target_sample_rate {
+    let resampler = if in_spec.sample_rate != target_sample_rate {
         Some(StereoResampler::new(in_spec.sample_rate, target_sample_rate).expect("Resampler failed"))
     } else {
         None
@@ -123,10 +123,10 @@ fn test_render_all_parity_reference_artifacts() {
     for i in 0..num_frames {
         let t = i as f32 / sr as f32;
         let mut amp_db = -24.0f32;
-        if t >= 1.0 && t < 2.5 {
+        if (1.0..2.5).contains(&t) {
             amp_db = -12.0;
         }
-        if t >= 2.5 && t < 3.2 {
+        if (2.5..3.2).contains(&t) {
             amp_db = -1.0;
         }
         if t >= 3.2 {

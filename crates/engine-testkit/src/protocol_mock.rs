@@ -6,7 +6,8 @@
 //! carries a correlation id, and tests must exercise that contract.
 
 pub use engine_protocol::{
-    DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, DaemonResult, PlaybackState, SlotId,
+    generate_boot_id, DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, DaemonResult,
+    PlaybackState, SlotId, SoundProfile, SoundProfileStatus,
 };
 
 /// Protocol testing harness for encoding commands and decoding responses/events.

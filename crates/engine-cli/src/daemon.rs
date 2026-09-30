@@ -6,7 +6,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use engine_protocol::{
-    DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, DaemonResult, PlaybackState, SlotId,
+    generate_boot_id, DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, DaemonResult,
+    PlaybackState, SlotId, SoundProfile, SoundProfileStatus,
 };
 use engine_lib::buffer::BoundedAudioTransport;
 use engine_lib::decoder::{DecoderPipeline, StereoResampler};
@@ -26,6 +27,9 @@ use engine_lib::types::{AudioSpec, SinkError};
 /// and the playhead divisor all derive from `output_rate`: one source of
 /// truth, not a hardcoded 48 kHz scattered across call sites.
 pub struct EngineDaemon {
+    boot_id: u64,
+    sequence_id: Arc<AtomicU64>,
+    sound_profile: Arc<AtomicU8>, // 0 for StudioReference, 1 for VocalNuanceBoost
     running: Arc<AtomicBool>,
     is_playing: Arc<AtomicBool>,
     state: PlaybackState,
@@ -50,7 +54,11 @@ impl Default for EngineDaemon {
 
 impl EngineDaemon {
     pub fn new() -> Self {
+        let boot_id = generate_boot_id();
         Self {
+            boot_id,
+            sequence_id: Arc::new(AtomicU64::new(0)),
+            sound_profile: Arc::new(AtomicU8::new(0)),
             running: Arc::new(AtomicBool::new(true)),
             is_playing: Arc::new(AtomicBool::new(false)),
             state: PlaybackState::Stopped,
@@ -68,11 +76,23 @@ impl EngineDaemon {
         }
     }
 
-    /// Process incoming correlated request.
-    pub fn handle_request(&mut self, req: DaemonRequest) -> DaemonResponse {
+    /// Process incoming correlated request and optional synchronous push event.
+    pub fn handle_request(&mut self, req: DaemonRequest) -> (DaemonResponse, Option<DaemonEvent>) {
         let id = req.id;
+        let maybe_event = match req.command {
+            DaemonCommand::SetSoundProfile { profile } => {
+                let seq = self.sequence_id.load(Ordering::Relaxed) + 1;
+                Some(DaemonEvent::SoundProfileChanged {
+                    profile,
+                    status: SoundProfileStatus::Active,
+                    boot_id: self.boot_id,
+                    sequence_id: seq,
+                })
+            }
+            _ => None,
+        };
         let res = self.handle_command(req.command);
-        DaemonResponse { id, result: res }
+        (DaemonResponse { id, result: res }, maybe_event)
     }
 
     /// Ensure CPAL live output stream is initialized and bound to the shared audio mixer.
@@ -505,6 +525,22 @@ impl EngineDaemon {
                 }
                 DaemonResult::Ok { data: None }
             }
+            DaemonCommand::SetSoundProfile { profile } => {
+                let seq = self.sequence_id.fetch_add(1, Ordering::SeqCst) + 1;
+                let profile_val = match profile {
+                    SoundProfile::StudioReference => 0,
+                    SoundProfile::VocalNuanceBoost => 1,
+                };
+                self.sound_profile.store(profile_val, Ordering::Release);
+                DaemonResult::Ok {
+                    data: Some(serde_json::json!({
+                        "profile": profile,
+                        "transition_ms": 30,
+                        "boot_id": self.boot_id,
+                        "sequence_id": seq,
+                    })),
+                }
+            }
             DaemonCommand::ListDevices => {
                 let devices = self.backend.list_output_devices();
                 DaemonResult::Ok {
@@ -525,6 +561,11 @@ impl EngineDaemon {
                 } else {
                     SlotId::B
                 };
+                let profile = if self.sound_profile.load(Ordering::Relaxed) == 0 {
+                    SoundProfile::StudioReference
+                } else {
+                    SoundProfile::VocalNuanceBoost
+                };
                 DaemonResult::Ok {
                     data: Some(serde_json::json!({
                         "state": self.state,
@@ -534,6 +575,10 @@ impl EngineDaemon {
                         "low_water_mark": stats.low_water_mark,
                         "position_secs": self.current_position_secs(),
                         "cb_contention": self.cb_contention.load(Ordering::Relaxed),
+                        "sound_profile": profile,
+                        "sound_profile_status": SoundProfileStatus::Active,
+                        "boot_id": self.boot_id,
+                        "sequence_id": self.sequence_id.load(Ordering::Relaxed),
                     })),
                 }
             }
@@ -547,10 +592,11 @@ impl EngineDaemon {
         // must never interleave partial JSON lines.
         let stdout_lock = Arc::new(Mutex::new(std::io::stdout()));
 
-        // 1. Emit Readiness Handshake event immediately
+        // 1. Emit Readiness Handshake event immediately with process boot_id
         let ready_event = DaemonEvent::Ready {
             protocol_version: 1,
             engine_version: env!("CARGO_PKG_VERSION").to_string(),
+            boot_id: self.boot_id,
         };
         if let Ok(line) = serde_json::to_string(&ready_event) {
             if let Ok(mut out) = stdout_lock.lock() {
@@ -722,11 +768,16 @@ impl EngineDaemon {
 
                     match serde_json::from_str::<DaemonRequest>(trimmed) {
                         Ok(req) => {
-                            let resp = self.handle_request(req);
+                            let (resp, maybe_event) = self.handle_request(req);
                             if let Ok(resp_json) = serde_json::to_string(&resp) {
                                 if let Ok(mut out) = stdout_lock.lock() {
                                     use std::io::Write;
                                     let _ = writeln!(out, "{}", resp_json);
+                                    if let Some(ev) = maybe_event {
+                                        if let Ok(ev_json) = serde_json::to_string(&ev) {
+                                            let _ = writeln!(out, "{}", ev_json);
+                                        }
+                                    }
                                     let _ = out.flush();
                                 }
                             }

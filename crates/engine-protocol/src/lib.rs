@@ -25,6 +25,37 @@ pub enum PlaybackState {
     Stopped,
 }
 
+/// Sound profile selection for output presentation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SoundProfile {
+    #[default]
+    StudioReference,
+    VocalNuanceBoost,
+}
+
+/// Transition lifecycle state for sound profile changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SoundProfileStatus {
+    Active,
+    Transitioning,
+}
+
+/// Generate a unique process-epoch identifier mixing process ID and system time.
+pub fn generate_boot_id() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let time_part = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let pid = std::process::id() as u128;
+    let mut x = (time_part ^ (pid << 48)) as u64;
+    x = x.wrapping_mul(0x517cc1b727220a95);
+    x ^= x >> 32;
+    x.max(1)
+}
+
 /// Inbound command envelope with explicit correlation ID.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DaemonRequest {
@@ -33,7 +64,7 @@ pub struct DaemonRequest {
     pub command: DaemonCommand,
 }
 
-/// 13-Command Schema for daemon control over stdin.
+/// 14-Command Schema for daemon control over stdin.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum DaemonCommand {
@@ -65,6 +96,9 @@ pub enum DaemonCommand {
         karaoke: bool,
         limiter: bool,
     },
+    SetSoundProfile {
+        profile: SoundProfile,
+    },
     ListDevices,
     SetDevice {
         device_id: String,
@@ -76,10 +110,11 @@ pub enum DaemonCommand {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum DaemonEvent {
-    /// Startup handshake verifying pipe readiness and protocol compatibility.
+    /// Startup handshake verifying pipe readiness, protocol compatibility, and process epoch.
     Ready {
         protocol_version: u32,
         engine_version: String,
+        boot_id: u64,
     },
     StateChanged {
         state: PlaybackState,
@@ -103,6 +138,13 @@ pub enum DaemonEvent {
     },
     DeviceError {
         message: String,
+    },
+    /// Sound profile state change notification with monotonic sequence epoch.
+    SoundProfileChanged {
+        profile: SoundProfile,
+        status: SoundProfileStatus,
+        boot_id: u64,
+        sequence_id: u64,
     },
     /// Monotonic 4Hz telemetry broadcast while playing.
     Heartbeat {
@@ -179,7 +221,7 @@ mod schema_tag_lock {
     }
 
     #[test]
-    fn all_13_command_tags_pinned() {
+    fn all_14_command_tags_pinned() {
         let cmds = [
             (
                 DaemonCommand::Load { slot: SlotId::A, path: String::new() },
@@ -197,11 +239,15 @@ mod schema_tag_lock {
                 DaemonCommand::SetDsp { bypass: false, rg_db: 0.0, karaoke: false, limiter: true },
                 "set_dsp",
             ),
+            (
+                DaemonCommand::SetSoundProfile { profile: SoundProfile::StudioReference },
+                "set_sound_profile",
+            ),
             (DaemonCommand::ListDevices, "list_devices"),
             (DaemonCommand::SetDevice { device_id: String::new() }, "set_device"),
             (DaemonCommand::GetState, "get_state"),
         ];
-        assert_eq!(cmds.len(), 13);
+        assert_eq!(cmds.len(), 14);
         for (cmd, expected) in cmds {
             assert_eq!(cmd_tag(&cmd), expected);
         }
@@ -215,10 +261,10 @@ mod schema_tag_lock {
     }
 
     #[test]
-    fn all_8_event_tags_pinned() {
+    fn all_9_event_tags_pinned() {
         let evs = [
             (
-                DaemonEvent::Ready { protocol_version: 1, engine_version: String::new() },
+                DaemonEvent::Ready { protocol_version: 1, engine_version: String::new(), boot_id: 1 },
                 "ready",
             ),
             (
@@ -234,6 +280,15 @@ mod schema_tag_lock {
             (DaemonEvent::Xrun { count: 0 }, "xrun"),
             (DaemonEvent::DeviceError { message: String::new() }, "device_error"),
             (
+                DaemonEvent::SoundProfileChanged {
+                    profile: SoundProfile::StudioReference,
+                    status: SoundProfileStatus::Active,
+                    boot_id: 1,
+                    sequence_id: 1,
+                },
+                "sound_profile_changed",
+            ),
+            (
                 DaemonEvent::Heartbeat {
                     active_slot: SlotId::A,
                     position_secs: 0.0,
@@ -244,7 +299,7 @@ mod schema_tag_lock {
                 "heartbeat",
             ),
         ];
-        assert_eq!(evs.len(), 8);
+        assert_eq!(evs.len(), 9);
         for (ev, expected) in evs {
             assert_eq!(event_tag(&ev), expected);
         }
@@ -294,7 +349,7 @@ mod schema_tag_lock {
             let roundtrip = serde_json::to_value(&parsed).unwrap();
             assert_eq!(&roundtrip, resp, "response wire shape drifted: {resp}");
         }
-        assert_eq!(doc["commands"].as_array().unwrap().len(), 13);
-        assert_eq!(doc["events"].as_array().unwrap().len(), 9);
+        assert_eq!(doc["commands"].as_array().unwrap().len(), 14);
+        assert_eq!(doc["events"].as_array().unwrap().len(), 10);
     }
 }
