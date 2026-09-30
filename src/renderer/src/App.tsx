@@ -162,10 +162,13 @@ export default function App() {
 
   // ? INITIALIZE LISTENING DATA
   // Listening data hook handles recording song playback sessions for analytics
-  const { recordListeningData } = useListeningData(audio);
+  const { recordListeningData } = useListeningData(player);
 
   // ? WIRE UP LISTENING DATA RECORDING TO PLAYER EVENTS
   // Listen for songLoaded events from AudioPlayer to record listening data
+  // NOTE: hooks below take the AudioPlayer (not player.audio) so play/pause/
+  // seeked/timeUpdate keep working when the Rust engine owns the sink and the
+  // HTML element stays paused. AudioPlayer mirrors the same surface.
   useEffect(() => {
     const handleSongLoaded = (songData: AudioPlayerData) => {
       recordListeningData(songData.songId, songData.duration, false, true);
@@ -323,7 +326,7 @@ export default function App() {
 
   // ? INITIALIZE MEDIA SESSION
   // Media session hook handles OS-level media controls and browser media notifications
-  useMediaSession(audio, {
+  useMediaSession(player, {
     toggleSongPlayback,
     handleSkipBackwardClick,
     handleSkipForwardClick,
@@ -332,7 +335,7 @@ export default function App() {
 
   // ? INITIALIZE DISCORD RPC
   // Discord RPC hook handles Discord Rich Presence integration
-  useDiscordRpc(audio);
+  useDiscordRpc(player);
 
   // Set up keyboard shortcuts with all required dependencies
   useKeyboardShortcuts({

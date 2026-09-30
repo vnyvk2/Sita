@@ -146,8 +146,12 @@ impl AudioSource for DualSlotMixer {
             }
 
             if xfade.is_complete() {
-                // Finalize crossfade transition
-                self.slot_mut(from_slot_id).clear();
+                // Finalize crossfade transition. The retired slot is marked
+                // Eos (NOT cleared): dropping its ring buffer here would free
+                // ~1 MB on the real-time thread, and the Eos marker is what
+                // the heartbeat uses to emit TrackEnd. The empty consumer is
+                // released later on the command thread by the next prime().
+                self.slot_mut(from_slot_id).state = SlotState::Eos;
                 self.slot_mut(to_slot_id).state = SlotState::Playing;
                 self.active_slot = to_slot_id;
                 self.crossfade = None;
@@ -182,10 +186,13 @@ impl AudioSource for DualSlotMixer {
                 let standby_id = self.active_slot.opposite();
 
                 if self.auto_splice && self.slot(standby_id).has_audio() {
-                    // Seamless Gapless Splice: release the exhausted slot so
-                    // its decoder thread/consumer cannot leak, then continue
-                    // filling from the newly active slot.
-                    self.slot_mut(active_id).clear();
+                    // Seamless Gapless Splice: mark the exhausted slot Eos
+                    // (NOT cleared — clearing would free the ring buffer on
+                    // the real-time thread, and Eos is the TrackEnd signal;
+                    // its empty consumer is released on the command thread by
+                    // the next prime()), then continue filling from the newly
+                    // active slot.
+                    self.slot_mut(active_id).state = SlotState::Eos;
                     self.slot_mut(standby_id).state = SlotState::Playing;
                     self.active_slot = standby_id;
                     // Loop will continue and fill the remaining output slice from newly active slot!

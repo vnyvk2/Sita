@@ -136,6 +136,11 @@ impl VoiceSlot {
     }
 
     /// Reset and release the slot resources.
+    ///
+    /// WARNING: never call from the real-time audio thread — dropping the
+    /// ring buffer frees heap memory. Render-path retirement uses Eos
+    /// marking instead; the empty consumer is released here (or by prime())
+    /// on command threads only.
     pub fn clear(&mut self) {
         if let Some(stop) = &self.stop_signal {
             stop.store(true, Ordering::Relaxed);

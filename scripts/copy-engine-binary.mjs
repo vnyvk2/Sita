@@ -13,7 +13,9 @@ const dstBinary = path.join(binDir, binaryName);
 
 if (!fs.existsSync(srcBinary)) {
   console.warn(`[copy-engine-binary] Source binary not found at ${srcBinary}. Run 'npm run build:engine' first.`);
-  process.exit(0);
+  // Release integrity: CI/packaging builds must never ship a dead toggle.
+  // Local dev stays lenient (WebAudio fallback) when CI is unset.
+  process.exit(process.env.CI ? 1 : 0);
 }
 
 if (!fs.existsSync(binDir)) {

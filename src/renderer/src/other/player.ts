@@ -140,6 +140,7 @@ class AudioPlayer {
   private nativeCurrentPosition: number = 0;
   private nativeLoadedSongId: number | null = null;
   private lastNativeRgDb: number = 0;
+  private nativePreloadInFlight: boolean = false;
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -239,6 +240,9 @@ class AudioPlayer {
           if (this.abLoopController.isActive()) {
             this.checkLoopTurnaround();
           }
+          // Gapless-at-0: the scheduler stands down when crossfade is
+          // disabled, so arm the standby slot directly near track end.
+          this.maybePreloadNextNative(pos);
         },
         onDurationChange: (dur) => {
           if (!this.isNativeEngineActive) return;
@@ -271,6 +275,15 @@ class AudioPlayer {
         onTransitionComplete: (activeSlot) => {
           if (!this.isNativeEngineActive) return;
           this.activeSlot = activeSlot;
+          // Auto-splice adoption (gapless-at-0 path): the daemon already
+          // switched to the preloaded standby. Adopt its metadata WITHOUT
+          // reloading — a reload would restart the track audibly. TrackEnd
+          // never fires for spliced transitions (daemon suppresses it while
+          // the standby is buffered), so this is the only advance signal.
+          const preloaded = this.preloadedSongData;
+          if (preloaded && preloaded.songId === this.peekNextTrackId()) {
+            this.adoptPreloadedStandby(preloaded);
+          }
           this.emit('songChange', this.currentSongData);
         },
         onStateChange: (state) => {
@@ -338,7 +351,129 @@ class AudioPlayer {
     }
   }
 
+  /**
+   * Next-track id per the same rules as the crossfade delegate: repeat-one
+   * yields nothing (handleSongEnd restarts in place), otherwise queue order
+   * with repeat-all wrap. Used by the gapless-at-0 preload path.
+   */
+  private peekNextTrackId(): number | null {
+    if (this.repeatMode === 'one') return null;
+    if (this.queue.hasNext) {
+      return this.queue.songIds[this.queue.position + 1] ?? null;
+    }
+    if (this.repeatMode === 'all' && this.queue.length > 0) {
+      return this.queue.songIds[0] ?? null;
+    }
+    return null;
+  }
+
+  /**
+   * Gapless-at-0 standby arming: when the crossfade scheduler stands down
+   * (duration 0), prime the daemon's standby slot near track end so the
+   * mixer auto-splices instead of gaping on decode+prime latency.
+   * No-ops while a preload is in flight or the standby already matches.
+   */
+  private maybePreloadNextNative(positionSecs: number): void {
+    if (!this.isNativeEngineActive || !this.nativeBackend) return;
+    if (!this.currentSongData || !Number.isFinite(this.currentSongData.duration)) return;
+    const cf = storage.playback.getPlaybackOptions('crossfade');
+    if ((cf?.duration ?? 0) > 0) return; // Scheduler owns preloading then.
+    if (this.repeatMode === 'one' || this.abLoopController.isActive()) return;
+    const remaining = this.currentSongData.duration - positionSecs;
+    if (!(remaining < 15 && remaining > 0)) return;
+    const nextId = this.peekNextTrackId();
+    if (nextId === null || this.preloadedSongData?.songId === nextId) return;
+    if (this.nativePreloadInFlight) return;
+    this.nativePreloadInFlight = true;
+    const mySong = this.currentSongData.songId;
+    void window.api.audioLibraryControls
+      .getSong(nextId, false)
+      .then((songData) => {
+        if (!songData) return undefined;
+        // Drop stale completions: user skipped again while fetching.
+        if (!this.isNativeEngineActive || this.currentSongData?.songId !== mySong) {
+          return undefined;
+        }
+        if (this.preloadedSongData?.songId === nextId) return undefined;
+        return this.nativeBackend?.preload(songData.path).then(() => {
+          if (this.isNativeEngineActive && this.currentSongData?.songId === mySong) {
+            this.preloadedSongData = songData;
+          }
+          return null;
+        });
+      })
+      .catch((err) => logPlayer('[AudioPlayer.nativePreload] failed', { nextId, err }))
+      .finally(() => {
+        this.nativePreloadInFlight = false;
+      });
+  }
+
+  /**
+   * Adopt an auto-spliced standby WITHOUT reloading: the daemon is already
+   * playing it. Sets identity/position/store state, then advances the queue;
+   * the resulting loadSong hits the already-loaded fast path instead of
+   * re-priming (which would restart the track audibly).
+   */
+  private adoptPreloadedStandby(preloaded: AudioPlayerData): void {
+    this.currentSongData = preloaded;
+    this.nativeLoadedSongId = preloaded.songId;
+    this.nativeCurrentPosition = 0;
+    this.nativeIsPlaying = true;
+    this.preloadedSongData = null;
+    this.clearAbLoop('TRACK_LOAD');
+    dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: preloaded });
+    storage.playback.setCurrentSongOptions('songId', preloaded.songId);
+    this.emit('songLoaded', preloaded);
+    this.emit('canplay');
+    // Advance queue position to match what is playing; loadSong fast-path
+    // absorbs this without re-priming (nativeLoadedSongId already matches).
+    this.pendingAutoPlay = true;
+    if (this.repeatMode === 'all' && !this.queue.hasNext && this.queue.length > 0) {
+      this.queue.moveToPosition(0);
+    } else {
+      this.queue.moveToNext();
+    }
+    this.pendingAutoPlay = false;
+  }
+
+  /**
+   * Standby staleness guard: after a manual (non-adopted) load, a previously
+   * preloaded standby names the wrong track and would auto-splice into it at
+   * the next EOS. Refresh it fire-and-forget toward the true next track.
+   */
+  private refreshNativeStandby(loadedSongId: number): void {
+    if (!this.isNativeEngineActive || !this.nativeBackend) return;
+    const nextId = this.peekNextTrackId();
+    if (nextId === null) {
+      this.preloadedSongData = null;
+      return;
+    }
+    if (this.preloadedSongData?.songId === nextId || this.nativePreloadInFlight) return;
+    this.nativePreloadInFlight = true;
+    void window.api.audioLibraryControls
+      .getSong(nextId, false)
+      .then((songData) => {
+        if (!songData) return undefined;
+        if (!this.isNativeEngineActive || this.currentSongData?.songId !== loadedSongId) {
+          return undefined;
+        }
+        return this.nativeBackend?.preload(songData.path).then(() => {
+          if (this.isNativeEngineActive && this.currentSongData?.songId === loadedSongId) {
+            this.preloadedSongData = songData;
+          }
+          return null;
+        });
+      })
+      .catch((err) => logPlayer('[AudioPlayer.nativeStandbyRefresh] failed', { nextId, err }))
+      .finally(() => {
+        this.nativePreloadInFlight = false;
+      });
+  }
+
   private fallbackToWebAudio() {
+    // Capture intent BEFORE flipping flags: paused routes natively while
+    // active, so read it first. Never auto-start playback the user paused.
+    const wasPlaying = !this.paused;
     this.isNativeEngineActive = false;
     this.nativeIsPlaying = false;
     this.nativeLoadedSongId = null;
@@ -365,7 +500,9 @@ class AudioPlayer {
       if (resumePos > 0) {
         this.audio.currentTime = resumePos;
       }
-      this.play().catch(() => {});
+      if (wasPlaying) {
+        this.play().catch(() => {});
+      }
     }
   }
 
@@ -564,8 +701,15 @@ class AudioPlayer {
     logPlayer('[AudioPlayer.handleSongEnd]', { repeatMode: this.repeatMode });
 
     if (this.repeatMode === 'one') {
-      this.audio.currentTime = 0;
-      await this.play();
+      if (this.isNativeEngineActive && this.nativeBackend) {
+        // The daemon slot sits at Eos: slot.play() cannot leave Eos, so
+        // re-stream from 0 through the real seek path before playing.
+        await this.seek(0);
+        await this.play();
+      } else {
+        this.audio.currentTime = 0;
+        await this.play();
+      }
       this.emit('repeatOne');
       return;
     }
@@ -707,6 +851,11 @@ class AudioPlayer {
             // currentTime immediately — retaining the previous track's time
             // painted e.g. 2m30s onto the new track's seekbar.
             this.nativeCurrentPosition = 0;
+            // A manual load invalidates any standby preloaded for a different
+            // upcoming track; refresh it toward the true next (async).
+            if (this.preloadedSongData?.songId !== songData.songId) {
+              this.preloadedSongData = null;
+            }
             await this.nativeBackend.load(this.activeSlot, songData.path);
             this.nativeLoadedSongId = songData.songId;
             this.audio.src = songData.path;
@@ -725,6 +874,7 @@ class AudioPlayer {
             }
             this.emit('songLoaded', songData);
             this.emit('canplay');
+            this.refreshNativeStandby(songData.songId);
             return songData;
           } catch (nativeLoadErr) {
             console.warn('[AudioPlayer] Native load failed, falling back to WebAudio:', nativeLoadErr);
@@ -1637,6 +1787,12 @@ class AudioPlayer {
   private executeLoopSeek(targetTime: number) {
     if (this.loopJumpPending) return;
     this.loopJumpPending = true;
+    if (this.isNativeEngineActive && this.nativeBackend) {
+      // Native seek completes asynchronously and emits 'seeked', which
+      // clears loopJumpPending (same contract as the element path below).
+      this.seek(targetTime);
+      return;
+    }
     try {
       if (this.audio.readyState > 0) {
         this.audio.currentTime = targetTime;
@@ -1648,7 +1804,7 @@ class AudioPlayer {
 
   private checkLoopTurnaround() {
     if (!this.abLoopController.isActive()) return;
-    const check = this.abLoopController.checkLoop(this.audio.currentTime);
+    const check = this.abLoopController.checkLoop(this.currentTime);
     if (check.shouldSeek) {
       this.executeLoopSeek(check.targetTime);
       this.schedulePredictionTimer();
@@ -1697,8 +1853,8 @@ class AudioPlayer {
     const pointB = this.abLoopController.pointB;
     if (pointB === null) return;
 
-    const current = this.audio.currentTime;
-    const rate = this.audio.playbackRate || 1.0;
+    const current = this.currentTime;
+    const rate = this.playbackRate || 1.0;
     const remainingSec = Math.max(0, (pointB - current) / rate);
     const delayMs = Math.round(remainingSec * 1000);
 
@@ -1706,7 +1862,7 @@ class AudioPlayer {
       this.loopPredictionTimerId = null;
       if (!this.abLoopController.isActive() || this.paused) return;
 
-      const check = this.abLoopController.checkLoop(this.audio.currentTime);
+      const check = this.abLoopController.checkLoop(this.currentTime);
       if (check.shouldSeek) {
         this.executeLoopSeek(check.targetTime);
         this.schedulePredictionTimer();
@@ -1824,6 +1980,9 @@ class AudioPlayer {
       this.nativeBackend
         .seek(time)
         .then(() => {
+          // Mirrors the element 'seeked' listener contract (which early-outs
+          // in native mode): releases pending loop jumps.
+          this.loopJumpPending = false;
           this.emit('seeked', time);
         })
         .catch((err) => {
@@ -1936,15 +2095,18 @@ class AudioPlayer {
    */
   skipBackward(): void {
     this.crossfadeScheduler.cancel();
+    // this.currentTime routes through the native playhead when the Rust
+    // engine owns the sink (audio.currentTime stays 0 there).
+    const position = this.currentTime;
     logPlayer('[AudioPlayer.skipBackward]', {
-      currentTime: this.audio.currentTime,
+      currentTime: position,
       position: this.queue.position,
       hasPrevious: this.queue.hasPrevious
     });
 
     // If more than 5 seconds into song, restart it
-    if (this.audio.currentTime > 5) {
-      this.audio.currentTime = 0;
+    if (position > 5) {
+      this.seek(0);
       return;
     }
 

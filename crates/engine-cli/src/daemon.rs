@@ -30,7 +30,7 @@ pub struct EngineDaemon {
     is_playing: Arc<AtomicBool>,
     state: PlaybackState,
     active_slot: Arc<AtomicU8>, // 0 for SlotId::A, 1 for SlotId::B
-    volume: f32,
+    volume: Arc<AtomicU32>, // master gain as f32 bits; applied post-DSP (see below)
     shared_engine: Arc<Mutex<(DualSlotMixer, DspPipeline)>>,
     backend: CpalBackend,
     start_time: Instant,
@@ -55,7 +55,7 @@ impl EngineDaemon {
             is_playing: Arc::new(AtomicBool::new(false)),
             state: PlaybackState::Stopped,
             active_slot: Arc::new(AtomicU8::new(0)),
-            volume: 1.0,
+            volume: Arc::new(AtomicU32::new(1.0f32.to_bits())),
             shared_engine: Arc::new(Mutex::new((DualSlotMixer::new(), DspPipeline::new(48000.0)))),
             backend: CpalBackend::new(),
             start_time: Instant::now(),
@@ -100,6 +100,7 @@ impl EngineDaemon {
         let active_slot_cb = Arc::clone(&self.active_slot);
         let is_playing_cb = Arc::clone(&self.is_playing);
         let contention_cb = Arc::clone(&self.cb_contention);
+        let volume_cb = Arc::clone(&self.volume);
 
         let render_fn = move |data: &mut [f32]| -> usize {
             if !is_playing_cb.load(Ordering::Relaxed) {
@@ -110,9 +111,19 @@ impl EngineDaemon {
 
             if let Ok(mut guard) = shared_cb.try_lock() {
                 let (mixer, dsp) = &mut *guard;
+                // The mixer renders at unity gain: master volume is applied
+                // BELOW, after the DSP chain, so ReplayGain/EQ see full-scale
+                // audio and the peak limiter's threshold means what it says
+                // at every volume setting.
                 let written = mixer.render(data);
                 if written > 0 {
                     dsp.process(&mut data[..written]);
+                    let vol = f32::from_bits(volume_cb.load(Ordering::Relaxed));
+                    if (vol - 1.0).abs() > f32::EPSILON {
+                        for s in &mut data[..written] {
+                            *s *= vol;
+                        }
+                    }
                 }
                 if written < data.len() {
                     data[written..].fill(0.0);
@@ -194,12 +205,55 @@ impl EngineDaemon {
         })
     }
 
+    /// Re-stream the active slot from `target_secs` through the same decode
+    /// path as Load: new ring pair, decoder seeks first, prime() retires the
+    /// old decoder (no orphan) and resets frames_consumed. Shared by Seek and
+    /// by Play-on-Eos (replay after natural end).
+    fn respawn_active_at(&mut self, target_secs: f64) -> Result<(), String> {
+        let idx = self.active_slot.load(Ordering::Relaxed) as usize;
+        let lib_slot = if idx == 0 { LibSlotId::A } else { LibSlotId::B };
+        let target = target_secs.max(0.0);
+        let duration = self.duration_secs(idx);
+        let clamped = if duration > 0.0 { target.min(duration) } else { target };
+
+        let path = self
+            .slot_paths
+            .lock()
+            .ok()
+            .and_then(|p| p[idx].clone())
+            .ok_or_else(|| "No track loaded in active slot".to_string())?;
+
+        let target_rate = self.output_rate_hz();
+        let spec = AudioSpec::new_f32_stereo(target_rate);
+        let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
+        let stop_signal = Arc::new(AtomicBool::new(false));
+        Self::spawn_decoder_thread(
+            path,
+            clamped,
+            producer,
+            Arc::clone(&stop_signal),
+            target_rate,
+        );
+
+        if let Ok(mut guard) = self.shared_engine.lock() {
+            guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
+            // Keep the freshly primed slot playing if we were playing.
+            if self.state == PlaybackState::Playing {
+                guard.0.slot_mut(lib_slot).play();
+            }
+            guard.1.reset_state();
+        }
+        self.set_base_secs(idx, clamped);
+        if idx == 0 {
+            self.eos_notified.0.store(false, Ordering::Release);
+        } else {
+            self.eos_notified.1.store(false, Ordering::Release);
+        }
+        Ok(())
+    }
     /// Spawn the background decode+resample pump for one slot.
-    ///
-    /// `start_secs > 0` seeks the pipeline first so Seek reuses the exact
-    /// same streaming path as Load (no separate stub logic to drift).
-    /// Content is sinc-resampled (rubato FFT) to the device render rate;
-    /// equal rates pass through bit-exact.
+    /// `start_secs` seeks the pipeline first; content is sinc-resampled to
+    /// the device rate (passthrough when equal). Runs off-RT; allocations OK.
     fn spawn_decoder_thread(
         path: String,
         start_secs: f64,
@@ -351,6 +405,21 @@ impl EngineDaemon {
                         };
                     }
                 }
+                // Replay after natural end: slot.play() cannot leave Eos, so
+                // re-stream from 0 instead of playing silence forever.
+                // (Separate scope: the lock temporary above must be dead
+                // before the mutable respawn borrows self.)
+                let at_eos = self
+                    .shared_engine
+                    .lock()
+                    .ok()
+                    .map(|g| g.0.slot(active_id).state == engine_lib::mixer::SlotState::Eos)
+                    .unwrap_or(false);
+                if at_eos {
+                    if let Err(message) = self.respawn_active_at(0.0) {
+                        return DaemonResult::Error { message };
+                    }
+                }
 
                 if let Err(e) = self.ensure_backend_open() {
                     return DaemonResult::Error {
@@ -386,55 +455,15 @@ impl EngineDaemon {
                 DaemonResult::Ok { data: None }
             }
             DaemonCommand::Seek { position_secs } => {
-                let idx = self.active_slot.load(Ordering::Relaxed) as usize;
-                let lib_slot = if idx == 0 { LibSlotId::A } else { LibSlotId::B };
-                let target = position_secs.max(0.0);
-                let duration = self.duration_secs(idx);
-                let clamped = if duration > 0.0 { target.min(duration) } else { target };
-
-                let path = self
-                    .slot_paths
-                    .lock()
-                    .ok()
-                    .and_then(|p| p[idx].clone());
-                let Some(path) = path else {
-                    return DaemonResult::Error {
-                        message: "No track loaded in active slot".to_string(),
-                    };
-                };
-
                 // Re-stream the slot from the target offset through the same
                 // decode path as Load: new ring pair, decoder seeks first,
                 // prime() retires the old decoder (no orphan) and resets
                 // frames_consumed. Base is set while holding the mixer lock so
                 // the audio callback cannot interleave a torn seek.
-                let target_rate = self.output_rate_hz();
-                let spec = AudioSpec::new_f32_stereo(target_rate);
-                let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
-                let stop_signal = Arc::new(AtomicBool::new(false));
-                Self::spawn_decoder_thread(
-                    path,
-                    clamped,
-                    producer,
-                    Arc::clone(&stop_signal),
-                    target_rate,
-                );
-
-                if let Ok(mut guard) = self.shared_engine.lock() {
-                    guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
-                    // Keep the freshly primed slot playing if we were playing.
-                    if self.state == PlaybackState::Playing {
-                        guard.0.slot_mut(lib_slot).play();
-                    }
-                    guard.1.reset_state();
+                match self.respawn_active_at(position_secs) {
+                    Ok(()) => DaemonResult::Ok { data: None },
+                    Err(message) => DaemonResult::Error { message },
                 }
-                self.set_base_secs(idx, clamped);
-                if idx == 0 {
-                    self.eos_notified.0.store(false, Ordering::Release);
-                } else {
-                    self.eos_notified.1.store(false, Ordering::Release);
-                }
-                DaemonResult::Ok { data: None }
             }
             DaemonCommand::Crossfade { duration_ms } => {
                 let frames =
@@ -447,10 +476,12 @@ impl EngineDaemon {
                 DaemonResult::Ok { data: None }
             }
             DaemonCommand::SetVolume { volume } => {
-                self.volume = volume.clamp(0.0, 1.0);
-                if let Ok(mut guard) = self.shared_engine.lock() {
-                    guard.0.set_volume(self.volume);
-                }
+                // Lock-free: the render closure reads this atomic post-DSP,
+                // so volume changes never contend with the audio callback.
+                // (DualSlotMixer::set_volume stays at unity in daemon use;
+                // its own API + tests are unchanged.)
+                self.volume
+                    .store(volume.clamp(0.0, 1.0).to_bits(), Ordering::Release);
                 DaemonResult::Ok { data: None }
             }
             DaemonCommand::SetEq { gains } => {
@@ -498,7 +529,7 @@ impl EngineDaemon {
                     data: Some(serde_json::json!({
                         "state": self.state,
                         "active_slot": slot_id,
-                        "volume": self.volume,
+                        "volume": f32::from_bits(self.volume.load(Ordering::Acquire)),
                         "xrun_count": stats.xrun_count,
                         "low_water_mark": stats.low_water_mark,
                         "position_secs": self.current_position_secs(),
@@ -537,6 +568,7 @@ impl EngineDaemon {
         let slot_base_hb = Arc::clone(&self.slot_base_secs);
         let output_rate_hb = Arc::clone(&self.output_rate);
         let eos_notified_hb = Arc::clone(&self.eos_notified);
+        let device_error_hb = self.backend.device_error_flag();
         let shared_hb = Arc::clone(&self.shared_engine);
         let stdout_hb = Arc::clone(&stdout_lock);
         let start_time = self.start_time;
@@ -544,6 +576,7 @@ impl EngineDaemon {
         thread::spawn(move || {
             use std::io::Write;
             let mut last_active: u8 = active_slot_hb.load(Ordering::Relaxed);
+            let mut last_device_error = false;
             while running_hb.load(Ordering::Relaxed) {
                 thread::sleep(Duration::from_millis(250));
 
@@ -558,32 +591,38 @@ impl EngineDaemon {
                 } else {
                     slot_durations_hb.1.load(Ordering::Relaxed)
                 });
-                // Per-slot position: base + frames consumed by that slot,
-                // divided by the render rate (single source of truth).
-                let position_secs = {
+                // Single mixer lock per beat: position, EOS state, and the
+                // standby buffer check come from one snapshot, halving
+                // contention with the RT callback (the other reducer is the
+                // lock-free SetVolume path; see contention policy above).
+                let (position_secs, eos) = {
                     let base = f64::from_bits(if slot_idx == 0 {
                         slot_base_hb.0.load(Ordering::Acquire)
                     } else {
                         slot_base_hb.1.load(Ordering::Acquire)
                     });
                     let rate = output_rate_hb.load(Ordering::Acquire).max(8000) as f64;
-                    let frames = shared_hb
+                    shared_hb
                         .lock()
                         .ok()
                         .map(|g| {
                             let id = if slot_idx == 0 { LibSlotId::A } else { LibSlotId::B };
-                            g.0.slot(id).frames_consumed
+                            let standby = if slot_idx == 0 { LibSlotId::B } else { LibSlotId::A };
+                            let pos = base + g.0.slot(id).frames_consumed as f64 / rate;
+                            let is_eos =
+                                g.0.slot(id).state == engine_lib::mixer::SlotState::Eos;
+                            // A beat landing between drain and splice would
+                            // otherwise emit a spurious TrackEnd for a track
+                            // that continues seamlessly: if the standby is
+                            // buffered, the next render splices — wait for it.
+                            let splice_imminent =
+                                is_eos && g.0.slot(standby).has_audio();
+                            (pos, is_eos && !splice_imminent)
                         })
-                        .unwrap_or(0);
-                    base + frames as f64 / rate
+                        .unwrap_or((base, false))
                 };
 
                 let mut events: Vec<DaemonEvent> = Vec::new();
-                // EOS detection: slot drained and producer signaled EOF.
-                let eos = shared_hb.lock().ok().map(|g| {
-                    let id = if slot_idx == 0 { LibSlotId::A } else { LibSlotId::B };
-                    g.0.slot(id).state == engine_lib::mixer::SlotState::Eos
-                }).unwrap_or(false);
                 // Crossfade completion: active slot index changed under us.
                 let active_now = active_slot_hb.load(Ordering::Relaxed);
                 if active_now != last_active {
@@ -619,6 +658,19 @@ impl EngineDaemon {
                         is_playing_hb.store(false, Ordering::Release);
                     }
                 }
+
+                // Device disconnect poll: the CPAL error callback only raises
+                // the flag — nobody was reading it, so unplugging a DAC hung
+                // playback forever. Surface rising edges; the renderer falls
+                // back to WebAudio on DeviceError.
+                let err_now = device_error_hb.load(Ordering::Acquire);
+                if err_now && !last_device_error {
+                    events.push(DaemonEvent::DeviceError {
+                        message: "Audio output device disconnected or failed".to_string(),
+                    });
+                    is_playing_hb.store(false, Ordering::Release);
+                }
+                last_device_error = err_now;
 
                 if let Ok(mut out) = stdout_hb.lock() {
                     for ev in events {

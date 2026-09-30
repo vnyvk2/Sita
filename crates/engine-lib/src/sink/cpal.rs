@@ -106,6 +106,8 @@ impl CpalBackend {
         };
 
         self.device = Some(target_device);
+        // Fresh device, fresh error state: a prior disconnect must not stick.
+        self.device_error.store(false, Ordering::Release);
         Ok(())
     }
 
@@ -122,6 +124,12 @@ impl CpalBackend {
     /// Check if an asynchronous device disconnect or error has occurred.
     pub fn has_device_error(&self) -> bool {
         self.device_error.load(Ordering::Acquire)
+    }
+
+    /// Shared ownership of the device-error flag for non-owning threads
+    /// (the heartbeat poller) that must observe disconnects.
+    pub fn device_error_flag(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.device_error)
     }
 
     /// Sample rate of the device's default output config, if hardware is present.
@@ -177,28 +185,92 @@ impl CpalBackend {
             let stream = match sample_format {
                 SampleFormat::F32 => {
                     let stats = stats_clone;
-                    device
-                        .build_output_stream(
-                            &config,
-                            move |data: &mut [f32], _| {
-                                if stats.is_paused.load(Ordering::Relaxed) {
-                                    // Continuous silence pause: fill with zero
-                                    data.fill(0.0);
-                                    return;
-                                }
-                                let written = render_fn(data);
-                                if written < data.len() {
-                                    data[written..].fill(0.0);
-                                    // Only valid frames advance the playhead;
-                                    // padding is an underrun, not playback.
-                                    stats.record_xrun();
-                                }
-                                stats.record_consumption(written, channels as u16);
-                            },
-                            err_fn,
-                            None,
-                        )
-                        .map_err(|e| SinkError::CpalError(e.to_string()))?
+                    // The engine renders stereo pairs. Most devices are stereo
+                    // (fast path below); otherwise map explicitly instead of
+                    // streaming stereo into N-channel buffers (which plays at
+                    // the wrong speed and routes channels to wrong speakers).
+                    if channels == 2 {
+                        device
+                            .build_output_stream(
+                                &config,
+                                move |data: &mut [f32], _| {
+                                    if stats.is_paused.load(Ordering::Relaxed) {
+                                        // Continuous silence pause: fill with zero
+                                        data.fill(0.0);
+                                        return;
+                                    }
+                                    let written = render_fn(data);
+                                    if written < data.len() {
+                                        data[written..].fill(0.0);
+                                        // Only valid frames advance the playhead;
+                                        // padding is an underrun, not playback.
+                                        stats.record_xrun();
+                                    }
+                                    stats.record_consumption(written, channels as u16);
+                                },
+                                err_fn,
+                                None,
+                            )
+                            .map_err(|e| SinkError::CpalError(e.to_string()))?
+                    } else {
+                        log::warn!(
+                            "Device has {} channels; mapping stereo engine output (L/R + silence)",
+                            channels
+                        );
+                        device
+                            .build_output_stream(
+                                &config,
+                                move |data: &mut [f32], _| {
+                                    if stats.is_paused.load(Ordering::Relaxed) {
+                                        data.fill(0.0);
+                                        return;
+                                    }
+                                    // Stack scratch, chunked: no RT allocation
+                                    // regardless of device buffer size.
+                                    let mut stereo = [0.0f32; 2048];
+                                    let total_frames = data.len() / channels.max(1);
+                                    let mut valid_frames = 0usize;
+                                    let mut f = 0usize;
+                                    while f < total_frames {
+                                        let want =
+                                            (total_frames - f).min(stereo.len() / 2);
+                                        let got = render_fn(&mut stereo[..want * 2]) / 2;
+                                        for k in 0..want {
+                                            let base = (f + k) * channels;
+                                            if k < got {
+                                                let l = stereo[k * 2];
+                                                let r = stereo[k * 2 + 1];
+                                                if channels == 1 {
+                                                    data[base] = (l + r) * 0.5;
+                                                } else {
+                                                    data[base] = l;
+                                                    data[base + 1] = r;
+                                                    for c in 2..channels {
+                                                        data[base + c] = 0.0;
+                                                    }
+                                                }
+                                            } else {
+                                                for c in 0..channels {
+                                                    data[base + c] = 0.0;
+                                                }
+                                            }
+                                        }
+                                        valid_frames += got;
+                                        if got < want {
+                                            break;
+                                        }
+                                        f += want;
+                                    }
+                                    if valid_frames < total_frames {
+                                        stats.record_xrun();
+                                    }
+                                    stats.record_consumption(valid_frames * 2, 2);
+                                },
+                                err_fn,
+                                None,
+                            )
+                            .map_err(|e| SinkError::CpalError(e.to_string()))?
+                    }
                 }
                 SampleFormat::I16 => {
                     let stats = stats_clone;
@@ -206,35 +278,90 @@ impl CpalBackend {
                     // Pre-size for the largest plausible device buffer so the
                     // RT callback never mallocs via resize().
                     let mut scratch = vec![0.0f32; 32768];
-                    device
-                        .build_output_stream(
-                            &config,
-                            move |data: &mut [i16], _| {
-                                if stats.is_paused.load(Ordering::Relaxed) {
-                                    data.fill(0);
-                                    return;
-                                }
-                                if scratch.len() < data.len() {
-                                    // Rare oversize buffer: grow outside the
-                                    // steady state; steady-state never allocs.
-                                    scratch.resize(data.len(), 0.0);
-                                }
-                                let written = render_fn(&mut scratch[..data.len()]);
-                                if written < data.len() {
-                                    scratch[written..data.len()].fill(0.0);
-                                    stats.record_xrun();
-                                }
-                                for (i, out) in data.iter_mut().enumerate() {
-                                    let noise = dither.next_tpdf_i16();
-                                    let sample = (scratch[i] + noise) * 32767.0;
-                                    *out = sample.round().clamp(-32768.0, 32767.0) as i16;
-                                }
-                                stats.record_consumption(written, channels as u16);
-                            },
-                            err_fn,
-                            None,
-                        )
-                        .map_err(|e| SinkError::CpalError(e.to_string()))?
+                    if channels == 2 {
+                        device
+                            .build_output_stream(
+                                &config,
+                                move |data: &mut [i16], _| {
+                                    if stats.is_paused.load(Ordering::Relaxed) {
+                                        data.fill(0);
+                                        return;
+                                    }
+                                    if scratch.len() < data.len() {
+                                        // Rare oversize buffer: grow outside the
+                                        // steady state; steady-state never allocs.
+                                        scratch.resize(data.len(), 0.0);
+                                    }
+                                    let written = render_fn(&mut scratch[..data.len()]);
+                                    if written < data.len() {
+                                        scratch[written..data.len()].fill(0.0);
+                                        stats.record_xrun();
+                                    }
+                                    for (i, out) in data.iter_mut().enumerate() {
+                                        let noise = dither.next_tpdf_i16();
+                                        let sample = (scratch[i] + noise) * 32767.0;
+                                        *out = sample.round().clamp(-32768.0, 32767.0) as i16;
+                                    }
+                                    stats.record_consumption(written, channels as u16);
+                                },
+                                err_fn,
+                                None,
+                            )
+                            .map_err(|e| SinkError::CpalError(e.to_string()))?
+                    } else {
+                        log::warn!(
+                            "Device has {} channels; mapping stereo engine output (L/R + silence)",
+                            channels
+                        );
+                        device
+                            .build_output_stream(
+                                &config,
+                                move |data: &mut [i16], _| {
+                                    if stats.is_paused.load(Ordering::Relaxed) {
+                                        data.fill(0);
+                                        return;
+                                    }
+                                    let total_frames = data.len() / channels.max(1);
+                                    if scratch.len() < total_frames * 2 {
+                                        scratch.resize(total_frames * 2, 0.0);
+                                    }
+                                    let written =
+                                        render_fn(&mut scratch[..total_frames * 2]) / 2;
+                                    if written < total_frames {
+                                        scratch[written * 2..total_frames * 2].fill(0.0);
+                                        stats.record_xrun();
+                                    }
+                                    for f in 0..total_frames {
+                                        let (l, r) = if f < written {
+                                            (scratch[f * 2], scratch[f * 2 + 1])
+                                        } else {
+                                            (0.0, 0.0)
+                                        };
+                                        let base = f * channels;
+                                        if channels == 1 {
+                                            let s = ((l + r) * 0.5 + dither.next_tpdf_i16())
+                                                * 32767.0;
+                                            data[base] =
+                                                s.round().clamp(-32768.0, 32767.0) as i16;
+                                        } else {
+                                            let sl = (l + dither.next_tpdf_i16()) * 32767.0;
+                                            let sr = (r + dither.next_tpdf_i16()) * 32767.0;
+                                            data[base] =
+                                                sl.round().clamp(-32768.0, 32767.0) as i16;
+                                            data[base + 1] =
+                                                sr.round().clamp(-32768.0, 32767.0) as i16;
+                                            for c in 2..channels {
+                                                data[base + c] = 0;
+                                            }
+                                        }
+                                    }
+                                    stats.record_consumption(written * 2, 2);
+                                },
+                                err_fn,
+                                None,
+                            )
+                            .map_err(|e| SinkError::CpalError(e.to_string()))?
+                    }
                 }
                 _ => {
                     return Err(SinkError::CpalError(format!(
