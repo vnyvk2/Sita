@@ -1,9 +1,13 @@
 //! Ordered DSP processing chain enforcing architectural invariants.
 //!
 //! Chain execution order:
-//! `Mixer / Crossfade -> ReplayGain -> 10-Band EQ -> Mid-Side Karaoke -> 5ms Limiter -> Output`
+//! `Mixer / Crossfade -> ReplayGain -> 10-Band EQ -> Mid-Side Karaoke -> SoundProfileStage -> TruePeakLimiter -> Master Volume -> Output`
 //!
-//! When `bypass` mode is active, ReplayGain, EQ, Karaoke, and Limiter are completely short-circuited.
+//! When `bypass` mode is active, ReplayGain, EQ, Karaoke, SoundProfile, and Limiter are completely short-circuited.
+//! When StudioReference is active (with flat EQ, 0 dB ReplayGain, Karaoke disabled):
+//! For a signal that has never caused protection to engage (or after the limiter has fully settled
+//! back to steady-state release) and whose estimated true peak remains below the threshold,
+//! gain remains exactly 1.000000.
 
 use engine_protocol::{SoundProfile, SoundProfileStatus};
 use serde::{Deserialize, Serialize};
@@ -130,6 +134,12 @@ impl DspPipeline {
     #[inline]
     pub fn sound_profile_stage(&self) -> &SoundProfileStage {
         &self.sound_profile
+    }
+
+    /// Mutable access to internal sound profile stage.
+    #[inline]
+    pub fn sound_profile_stage_mut(&mut self) -> &mut SoundProfileStage {
+        &mut self.sound_profile
     }
 
     /// Access internal true-peak limiter.

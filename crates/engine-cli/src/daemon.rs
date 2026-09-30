@@ -82,6 +82,10 @@ impl EngineDaemon {
         let maybe_event = match req.command {
             DaemonCommand::SetSoundProfile { profile } => {
                 let seq = self.sequence_id.load(Ordering::Relaxed) + 1;
+                // Intentionally emit status: SoundProfileStatus::Active synchronously
+                // to commit the new profile target to the client/UI epoch, while the
+                // real-time audio thread executes the 30ms smooth cosine-squared ramp.
+                // Any live state queries during the ramp via GetState report Transitioning.
                 Some(DaemonEvent::SoundProfileChanged {
                     profile,
                     status: SoundProfileStatus::Active,
@@ -547,6 +551,8 @@ impl EngineDaemon {
                 if let Ok(mut guard) = self.shared_engine.lock() {
                     guard.1.set_sound_profile(profile);
                 }
+                // transition_ms: 30 informs the client of the smooth DSP cross-modulation
+                // ramp duration applied asynchronously on the audio callback thread.
                 DaemonResult::Ok {
                     data: Some(serde_json::json!({
                         "profile": profile,

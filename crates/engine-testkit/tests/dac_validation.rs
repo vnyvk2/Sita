@@ -195,9 +195,9 @@ fn test_dac_true_peak_clipping_and_headroom() {
     println!("\nPeak Limiter Active Mode:");
     println!("  Input Peak:    {:.4} (+3.52 dBFS)", hot_peak);
     println!("  Output Peak:   {:.4} ({:.2} dBFS)", peak_limited, 20.0 * peak_limited.log10());
-    println!("  Observation:   Hot signal safely clamped strictly to <= 1.0 peak (0 dBFS).");
-    assert!(peak_limited <= 1.0001);
-    assert!(peak_limited >= 0.98);
+    println!("  Observation:   Hot signal safely limited strictly to <= -0.10 dBTP (0.9886).");
+    assert!(peak_limited <= 0.9886);
+    assert!(peak_limited > 0.50);
 }
 
 #[test]

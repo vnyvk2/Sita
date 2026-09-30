@@ -1,12 +1,18 @@
 //! Digital True-Peak Output Limiter for the Nora Native Audio Engine.
 //!
 //! Provides strict Digital True-Peak Protection per ITU-R BS.1770-4:
+//! - Architecture: Smooth gain envelope with a final per-frame ceiling constraint.
 //! - 4x oversampling polyphase FIR detector running exclusively on the sidechain.
 //! - Audio path is purely delayed through a circular lookahead buffer (NEVER passed through FIR).
-//! - Under No-Intervention (true peaks <= -0.10 dBTP), gain is exactly 1.000000,
+//! - Lookahead horizon peak tracking across the 52-frame window with 5.0ms peak-hold state to eliminate zero-crossing flutter.
+//! - Envelope smoothing: Fast attack (tau = 0.25ms, fitting >4 time constants within the 1.08ms lookahead budget) and musical release (tau = 50.0ms).
+//! - Per-frame ceiling constraint: Gain applied to the exiting frame is bounded by g[n] <= min(g[n], target_ceiling / p_exiting[n]),
+//!   ensuring mathematical peak containment (<= -0.10 dBTP / 0.988553 linear) without relying on audio-path hard clipping.
+//! - Under No-Intervention: For a signal that has never caused protection to engage
+//!   (or after the limiter has fully settled back to steady-state release) and whose
+//!   estimated true peak remains below the threshold, gain remains exactly 1.000000,
 //!   preserving mathematical bit-transparency when latency-compensated.
 //! - Ceiling threshold: -0.10 dBTP (10^(-0.1/20) approx 0.9885531).
-//! - Slew-rate contract: 1.0ms attack time constant, 50.0ms release time constant.
 //! - Pipeline latency: 1.0ms lookahead (48 frames at 48kHz) + 4 frames FIR group delay = 52 frames (1.08ms).
 
 /// Maximum supported lookahead frames (supports up to 192kHz * 0.002s = 384 frames).
@@ -14,11 +20,11 @@ const MAX_LOOKAHEAD_FRAMES: usize = 512;
 const MAX_LOOKAHEAD_SAMPLES: usize = MAX_LOOKAHEAD_FRAMES * 2;
 
 /// Number of active FIR taps per polyphase branch (32 taps total across 4 phases).
-const POLYPHASE_TAPS: usize = 8;
+pub const POLYPHASE_TAPS: usize = 8;
 
 /// Normalized 4-phase polyphase FIR interpolation filter coefficients (DC sum = 1.0 per phase).
 /// Group delay: 16 taps at 4x rate = 4 frames at 1x rate.
-const POLYPHASE_COEFFS: [[f32; POLYPHASE_TAPS]; 4] = [
+pub const POLYPHASE_COEFFS: [[f32; POLYPHASE_TAPS]; 4] = [
     [
         0.0,
         0.0,
@@ -76,6 +82,12 @@ pub struct TruePeakLimiter {
     detector_history_l: [f32; POLYPHASE_TAPS],
     detector_history_r: [f32; POLYPHASE_TAPS],
     detector_pos: usize,
+    // Lookahead peak buffer and peak-hold state
+    peak_buffer: [f32; MAX_LOOKAHEAD_FRAMES],
+    peak_write_pos: usize,
+    held_peak: f32,
+    hold_frames: usize,
+    hold_timer: usize,
     // Gain tracking and smoothing
     gain: f32,
     target_ceiling: f32, // -0.10 dBTP (10^(-0.1/20) approx 0.9885531)
@@ -106,6 +118,11 @@ impl TruePeakLimiter {
             detector_history_l: [0.0; POLYPHASE_TAPS],
             detector_history_r: [0.0; POLYPHASE_TAPS],
             detector_pos: 0,
+            peak_buffer: [0.0; MAX_LOOKAHEAD_FRAMES],
+            peak_write_pos: 0,
+            held_peak: 0.0,
+            hold_frames: 240,
+            hold_timer: 0,
             gain: 1.0,
             target_ceiling: 0.9885531, // -0.10 dBTP
             attack_coeff: 0.0,
@@ -168,11 +185,14 @@ impl TruePeakLimiter {
         self.fir_group_delay_frames = 4; // 16 samples at 4x rate = 4 frames at 1x
         self.total_delay_frames = (la + self.fir_group_delay_frames).min(MAX_LOOKAHEAD_FRAMES);
 
-        // One-pole smoothing: tau_attack = 1.0ms, tau_release = 50.0ms
-        let attack_sec = 0.0010f32;
+        // One-pole smoothing: tau_attack = 0.25ms (>= 4.3 time constants in lookahead), tau_release = 50.0ms
+        let attack_sec = 0.00025f32;
         let release_sec = 0.0500f32;
         self.attack_coeff = (-1.0 / (attack_sec * self.sample_rate)).exp();
         self.release_coeff = (-1.0 / (release_sec * self.sample_rate)).exp();
+
+        // Peak hold: 5.0ms bridges zero crossings down to 100Hz without carrier ripple
+        self.hold_frames = ((0.0050 * self.sample_rate).round() as usize).max(1);
     }
 
     /// Process interleaved stereo f32 samples in-place.
@@ -208,25 +228,65 @@ impl TruePeakLimiter {
                 peak_true = peak_true.max(val_l.abs()).max(val_r.abs());
             }
 
-            // 3. Compute target gain (No-Intervention when peak_true <= target_ceiling)
-            let target_gain = if peak_true > self.target_ceiling {
-                self.target_ceiling / peak_true
+            // 3. Read true peak of the sample exiting the lookahead delay line NOW
+            let exiting_idx = (self.peak_write_pos + MAX_LOOKAHEAD_FRAMES - self.total_delay_frames)
+                % MAX_LOOKAHEAD_FRAMES;
+            let p_exiting = self.peak_buffer[exiting_idx];
+
+            // 4. Store current frame's true peak into circular peak buffer
+            self.peak_buffer[self.peak_write_pos] = peak_true;
+            self.peak_write_pos = (self.peak_write_pos + 1) % MAX_LOOKAHEAD_FRAMES;
+
+            // 5. Find maximum peak across all samples currently in the lookahead pipeline
+            let mut max_lookahead_peak = 0.0f32;
+            for i in 0..self.total_delay_frames {
+                let idx = (self.peak_write_pos + MAX_LOOKAHEAD_FRAMES - 1 - i) % MAX_LOOKAHEAD_FRAMES;
+                let p = self.peak_buffer[idx];
+                if p > max_lookahead_peak {
+                    max_lookahead_peak = p;
+                }
+            }
+
+            // 6. Peak-hold tracking: hold peak across waveform zero crossings
+            if max_lookahead_peak >= self.held_peak {
+                self.held_peak = max_lookahead_peak;
+                self.hold_timer = self.hold_frames;
+            } else if self.hold_timer > 0 {
+                self.hold_timer -= 1;
+            } else {
+                self.held_peak = max_lookahead_peak;
+            }
+
+            // 7. Compute target gain (No-Intervention when held_peak <= target_ceiling)
+            let target_gain = if self.held_peak > self.target_ceiling {
+                self.target_ceiling / self.held_peak
             } else {
                 1.0
             };
 
-            // 4. Smooth gain envelope with one-pole filter
+            // 8. Smooth gain envelope with attack and release
             let prev_gain = self.gain;
             if target_gain < self.gain {
+                // Attack phase: ramp down smoothly to target gain in advance of peak exit
                 self.gain =
                     self.attack_coeff * self.gain + (1.0 - self.attack_coeff) * target_gain;
-            } else {
+            } else if self.hold_timer == 0 {
+                // Release phase: smooth release after hold timer expires
                 self.gain =
                     self.release_coeff * self.gain + (1.0 - self.release_coeff) * target_gain;
             }
 
+            // Strict ceiling guarantee on the frame exiting right now:
+            // Ensures gain is unconditionally at or below what this exiting frame requires
+            if p_exiting > self.target_ceiling {
+                let exiting_max_gain = self.target_ceiling / p_exiting;
+                if self.gain > exiting_max_gain {
+                    self.gain = exiting_max_gain;
+                }
+            }
+
             // Snap cleanly to unity when target is unity and gain is practically 1.0
-            if self.gain > 0.99999 && target_gain >= 1.0 {
+            if self.gain > 0.99999 && target_gain >= 1.0 && self.held_peak <= self.target_ceiling {
                 self.gain = 1.0;
             }
 
@@ -239,18 +299,19 @@ impl TruePeakLimiter {
                 self.max_gain_reduction = red;
             }
 
-            // 5. Read DELAYED raw samples from circular buffer (INVARIANT: NEVER filtered by FIR)
+            // 9. Read DELAYED raw samples from circular buffer (INVARIANT: NEVER filtered by FIR)
             let read_pos = (self.write_pos + MAX_LOOKAHEAD_SAMPLES - delay_samples)
                 % MAX_LOOKAHEAD_SAMPLES;
             let delayed_l = self.delay_buffer[read_pos];
             let delayed_r = self.delay_buffer[read_pos + 1];
 
-            // 6. Store current raw input into circular delay buffer
+            // 10. Store current raw input into circular delay buffer
             self.delay_buffer[self.write_pos] = in_l;
             self.delay_buffer[self.write_pos + 1] = in_r;
             self.write_pos = (self.write_pos + 2) % MAX_LOOKAHEAD_SAMPLES;
 
-            // 7. Modulate delayed raw audio with smooth gain
+            // 11. Modulate delayed raw audio with smooth gain
+            // Bounded naturally <= target_ceiling (0.9885531); clamp is purely a DAC safety rail.
             chunk[0] = (delayed_l * self.gain).clamp(-1.0, 1.0);
             chunk[1] = (delayed_r * self.gain).clamp(-1.0, 1.0);
         }
@@ -265,6 +326,10 @@ impl TruePeakLimiter {
         self.detector_history_l = [0.0; POLYPHASE_TAPS];
         self.detector_history_r = [0.0; POLYPHASE_TAPS];
         self.detector_pos = 0;
+        self.peak_buffer = [0.0; MAX_LOOKAHEAD_FRAMES];
+        self.peak_write_pos = 0;
+        self.held_peak = 0.0;
+        self.hold_timer = 0;
         self.gain = 1.0;
         self.last_delta_gain = 0.0;
         self.max_gain_reduction = 0.0;

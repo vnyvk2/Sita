@@ -1,13 +1,21 @@
-//! 5ms Lookahead Peak Safety Limiter for the Nora Native Audio Engine.
+//! Legacy 5ms Lookahead Peak Safety Limiter for the Nora Native Audio Engine.
 //!
-//! Applies a circular lookahead delay line to detect incoming signal transients ahead of time,
-//! smoothly attenuating peaks to prevent digital inter-sample clipping while maintaining transparency.
+//! Note: This stage has been superseded in the production audio pipeline by `TruePeakLimiter`
+//! (ITU-R BS.1770-4 4x oversampled true-peak detection). It is retained solely for historical
+//! Milestone 3 test compatibility.
+
+#![allow(deprecated)]
 
 /// Maximum supported lookahead frames (supports up to 192kHz * 0.005s = 960 frames).
 const MAX_LOOKAHEAD_FRAMES: usize = 1024;
 const MAX_LOOKAHEAD_SAMPLES: usize = MAX_LOOKAHEAD_FRAMES * 2;
 
 /// Peak limiter with configurable lookahead duration and smooth attack/release envelopes.
+///
+/// Deprecated: Retained for historical test compatibility; production pipeline uses `TruePeakLimiter`.
+#[deprecated(
+    note = "Legacy M3 5ms peak limiter retained for historical test compatibility; production pipeline uses TruePeakLimiter"
+)]
 #[derive(Debug, Clone)]
 pub struct PeakLimiter {
     enabled: bool,

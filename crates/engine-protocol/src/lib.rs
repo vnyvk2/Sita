@@ -35,6 +35,15 @@ pub enum SoundProfile {
 }
 
 /// Transition lifecycle state for sound profile changes.
+///
+/// Note on semantics:
+/// - `Active`: Indicates the target profile is committed and authoritative. On synchronous
+///   `SoundProfileChanged` events emitted upon command receipt, `Active` confirms that the
+///   requested profile has been accepted and committed by the daemon control layer, while the
+///   audio thread executes a 30ms smooth cosine-squared ramp (`transition_ms: 30`).
+/// - `Transitioning`: Dynamically reported by `GetState` while the real-time audio thread is
+///   actively interpolating between curves across the 30ms transition window. Once the ramp
+///   completes, `GetState` returns to reporting `Active`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SoundProfileStatus {
