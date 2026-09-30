@@ -10,6 +10,7 @@ pub mod c4_soak_test;
 pub mod c5_seek_latency;
 pub mod protocol_mock;
 pub mod mock_backend;
+pub mod loudness;
 
 pub use generator::*;
 pub use wav_fixture::*;
@@ -20,3 +21,4 @@ pub use c4_soak_test::*;
 pub use c5_seek_latency::*;
 pub use protocol_mock::*;
 pub use mock_backend::*;
+pub use loudness::*;
