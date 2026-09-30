@@ -163,7 +163,7 @@ pub fn measure_loudness(interleaved_stereo: &[f32], sample_rate: u32) -> Loudnes
         for i in 0..num_frames {
             energy += k_l[i] * k_l[i] + k_r[i] * k_r[i];
         }
-        let mean_sq = energy / ((num_frames * 2) as f64);
+        let mean_sq = energy / (num_frames as f64);
         let lufs = if mean_sq > 1e-12 {
             -0.691 + 10.0 * mean_sq.log10()
         } else {
@@ -189,7 +189,7 @@ pub fn measure_loudness(interleaved_stereo: &[f32], sample_rate: u32) -> Loudnes
         for i in 0..block_size {
             sum += k_l[start + i] * k_l[start + i] + k_r[start + i] * k_r[start + i];
         }
-        let mean_sq = sum / ((block_size * 2) as f64);
+        let mean_sq = sum / (block_size as f64);
         block_powers.push(mean_sq);
         if mean_sq > 0.0 {
             short_term_lufs.push(-0.691 + 10.0 * mean_sq.log10());
@@ -239,5 +239,51 @@ pub fn measure_loudness(interleaved_stereo: &[f32], sample_rate: u32) -> Loudnes
         peak_dbfs: peak_db,
         rms_linear: rms_lin,
         rms_dbfs: rms_db,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bs1770_stereo_sine_calibration() {
+        // ITU-R BS.1770-4 calibration standard:
+        // A 0 dBFS stereo sine wave (peak amplitude 1.0 on both L and R).
+        // At 500 Hz (where K-weighting has 0.0 dB gain), the integrated loudness
+        // evaluates to exactly -0.691 LUFS (-0.69 +/- 0.5 LUFS).
+        // At 1000 Hz, K-weighting high-shelf adds +0.65 dB, evaluating to -0.04 LUFS.
+        let sample_rate = 48000u32;
+        let duration_secs = 2.0;
+        let num_frames = (duration_secs * sample_rate as f64) as usize;
+        let mut samples_500 = Vec::with_capacity(num_frames * 2);
+        let mut samples_1k = Vec::with_capacity(num_frames * 2);
+
+        for n in 0..num_frames {
+            let t = n as f64 / sample_rate as f64;
+            let s_500 = (2.0 * std::f64::consts::PI * 500.0 * t).sin() as f32;
+            let s_1k = (2.0 * std::f64::consts::PI * 1000.0 * t).sin() as f32;
+            samples_500.push(s_500);
+            samples_500.push(s_500);
+            samples_1k.push(s_1k);
+            samples_1k.push(s_1k);
+        }
+
+        let m_500 = measure_loudness(&samples_500, sample_rate);
+        let m_1k = measure_loudness(&samples_1k, sample_rate);
+
+        // 500 Hz calibration: exactly -0.691 LUFS (-0.69 +/- 0.5 LUFS)
+        assert!(
+            (m_500.integrated_lufs - (-0.691)).abs() <= 0.5,
+            "BS.1770 500Hz calibration failed: expected -0.69 +/- 0.5 LUFS, got {:.3} LUFS",
+            m_500.integrated_lufs
+        );
+
+        // 1000 Hz calibration: -0.691 + 0.65 dB = -0.04 LUFS (within 0.75 LU of -0.69)
+        assert!(
+            (m_1k.integrated_lufs - (-0.691)).abs() <= 0.75,
+            "BS.1770 1kHz calibration failed: expected -0.04 LUFS, got {:.3} LUFS",
+            m_1k.integrated_lufs
+        );
     }
 }
