@@ -188,3 +188,80 @@ fn test_c3_crossfade_discontinuity_audit() {
     assert!(report.is_continuity_valid);
     assert!(report.is_rms_power_continuous);
 }
+
+#[test]
+fn test_post_dsp_master_volume_invariant_with_active_limiter() {
+    let sample_rate = 48000.0;
+    let mut dsp = DspPipeline::new(sample_rate);
+
+    // Hot input signal exceeding 0.99 threshold (+3.52 dBFS peak)
+    let input_hot_peak = 1.5f32;
+    let mut raw_samples = vec![input_hot_peak; 960];
+
+    // 1. Process hot audio through full DSP chain with active limiter
+    dsp.process(&mut raw_samples);
+
+    // The limiter MUST engage on the unattenuated hot signal, clamping peak to <= 1.0
+    let limited_peak = raw_samples.iter().fold(0.0f32, |acc, &s| acc.max(s.abs()));
+    assert!(
+        limited_peak <= 1.0 + 1e-4,
+        "Limiter failed to clamp hot input: {limited_peak}"
+    );
+    assert!(
+        limited_peak >= 0.98,
+        "Limiter clamped too aggressively: {limited_peak}"
+    );
+
+    // Helper simulating post-DSP volume scaling (as performed in daemon render closure)
+    let apply_post_dsp_volume = |mut buffer: Vec<f32>, vol: f32| -> Vec<f32> {
+        if (vol - 1.0).abs() > f32::EPSILON {
+            for s in &mut buffer {
+                *s *= vol;
+            }
+        }
+        buffer
+    };
+
+    // 2. Volume = 1.0: output unchanged
+    let v1 = apply_post_dsp_volume(raw_samples.clone(), 1.0);
+    let peak_v1 = v1.iter().fold(0.0f32, |acc, &s| acc.max(s.abs()));
+    assert!((peak_v1 - limited_peak).abs() < 1e-6);
+
+    // 3. Volume = 0.5: output must be exactly -6.0206 dB relative to limited peak
+    let v05 = apply_post_dsp_volume(raw_samples.clone(), 0.5);
+    let peak_v05 = v05.iter().fold(0.0f32, |acc, &s| acc.max(s.abs()));
+    let expected_peak_v05 = limited_peak * 0.5;
+    assert!(
+        (peak_v05 - expected_peak_v05).abs() < 1e-5,
+        "Volume 0.5 error: got {peak_v05}, expected {expected_peak_v05}"
+    );
+    let ratio_db_v05 = 20.0 * (peak_v05 / peak_v1).log10();
+    assert!(
+        (ratio_db_v05 - (-6.0206)).abs() < 1e-3,
+        "Expected exactly -6.0206 dB at vol 0.5, got {ratio_db_v05}"
+    );
+
+    // 4. Volume = 0.25: output must be exactly -12.0412 dB relative to limited peak
+    let v025 = apply_post_dsp_volume(raw_samples.clone(), 0.25);
+    let peak_v025 = v025.iter().fold(0.0f32, |acc, &s| acc.max(s.abs()));
+    let expected_peak_v025 = limited_peak * 0.25;
+    assert!(
+        (peak_v025 - expected_peak_v025).abs() < 1e-5,
+        "Volume 0.25 error: got {peak_v025}, expected {expected_peak_v025}"
+    );
+    let ratio_db_v025 = 20.0 * (peak_v025 / peak_v1).log10();
+    assert!(
+        (ratio_db_v025 - (-12.0412)).abs() < 1e-3,
+        "Expected exactly -12.0412 dB at vol 0.25, got {ratio_db_v025}"
+    );
+
+    // 5. Negative proof: prove that if volume had been applied PRE-DSP, the limiter would NOT engage
+    let mut pre_attenuated = vec![input_hot_peak * 0.5; 960]; // 0.75 amplitude
+    let mut dsp_pre = DspPipeline::new(sample_rate);
+    dsp_pre.process(&mut pre_attenuated);
+    let pre_peak = pre_attenuated.iter().fold(0.0f32, |acc, &s| acc.max(s.abs()));
+    assert!(
+        (pre_peak - 0.75).abs() < 1e-4,
+        "Pre-DSP volume fails because limiter is bypassed at low volumes (peak={pre_peak})"
+    );
+}

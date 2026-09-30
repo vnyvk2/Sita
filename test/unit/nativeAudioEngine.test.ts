@@ -250,4 +250,22 @@ describe('Native Audio Backend - Anchored RAF Interpolation', () => {
 
     backend.destroy();
   });
+
+  it('forwards device_error push events to onError callback (Gate D)', () => {
+    const backend = new NativeAudioBackend(callbacks);
+
+    eventHandler!({
+      event: 'device_error',
+      message: 'Audio output device disconnected or failed'
+    });
+
+    expect(callbacks.onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'Audio output device disconnected or failed'
+      })
+    );
+
+    backend.destroy();
+  });
 });
+

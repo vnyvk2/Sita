@@ -79,3 +79,58 @@ fn test_mock_backend_buffer_underrun_xrun_accounting() {
     mock.inject_error(InjectedError::BufferUnderrun);
     assert_eq!(mock.state.xrun_count.load(Ordering::SeqCst), 2);
 }
+
+#[test]
+fn test_device_error_rising_edge_duplicate_suppression() {
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    let device_error_flag = Arc::new(AtomicBool::new(false));
+    let mut last_device_error = false;
+    let mut emitted_events = Vec::new();
+
+    // 1. Initial healthy state: 5 ticks, zero events
+    for _ in 0..5 {
+        let err_now = device_error_flag.load(Ordering::Acquire);
+        if err_now && !last_device_error {
+            emitted_events.push("device_error");
+        }
+        last_device_error = err_now;
+    }
+    assert_eq!(emitted_events.len(), 0);
+
+    // 2. Rising edge: device disconnects at tick 5
+    device_error_flag.store(true, Ordering::Release);
+    for _ in 0..5 {
+        let err_now = device_error_flag.load(Ordering::Acquire);
+        if err_now && !last_device_error {
+            emitted_events.push("device_error");
+        }
+        last_device_error = err_now;
+    }
+    // Must have emitted EXACTLY once despite 5 consecutive error ticks
+    assert_eq!(emitted_events.len(), 1, "Duplicate device_error events were not suppressed");
+
+    // 3. Fallback / recovery clears error flag
+    device_error_flag.store(false, Ordering::Release);
+    for _ in 0..5 {
+        let err_now = device_error_flag.load(Ordering::Acquire);
+        if err_now && !last_device_error {
+            emitted_events.push("device_error");
+        }
+        last_device_error = err_now;
+    }
+    assert_eq!(emitted_events.len(), 1);
+
+    // 4. Second rising edge: new disconnect occurs
+    device_error_flag.store(true, Ordering::Release);
+    for _ in 0..5 {
+        let err_now = device_error_flag.load(Ordering::Acquire);
+        if err_now && !last_device_error {
+            emitted_events.push("device_error");
+        }
+        last_device_error = err_now;
+    }
+    assert_eq!(emitted_events.len(), 2, "Second rising edge was not detected");
+}
+

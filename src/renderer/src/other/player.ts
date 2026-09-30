@@ -155,6 +155,12 @@ class AudioPlayer {
     this.audioB.preload = 'auto';
     this.audioB.defaultPlaybackRate = 1.0;
 
+    // Single volume authority: media-element volume is pinned to 1.0 so it
+    // never scales MediaElementSource output pre-graph (V^2 bug). Master
+    // level is applied once, post-graph, on gainNode (see set volume).
+    this.audioA.volume = 1.0;
+    this.audioB.volume = 1.0;
+
     this.queuesManager = queuesManager;
 
     this.currentContext = new window.AudioContext();
@@ -202,7 +208,8 @@ class AudioPlayer {
     this.karaokeNode = new KaraokeNode(this.currentContext);
     this.nightModeNode = new NightModeNode(this.currentContext);
 
-    this.currentVolume = this.audioA.volume;
+    this.currentVolume = 100;
+    this.gainNode.gain.value = 1.0;
 
     this.unsubscribeFunc = this.subscribeToStoreEvents();
     this.initializeAudioGraph();
@@ -487,7 +494,8 @@ class AudioPlayer {
     this.activeFadeGain.gain.value = 1.0;
     this.standbyFadeGain.gain.value = 0.0;
     this.gainNode.gain.value = this.volume;
-    this.audio.volume = this.volume;
+    this.audioA.volume = 1.0;
+    this.audioB.volume = 1.0;
     if (this.currentContext.state === 'suspended') {
       this.currentContext.resume().catch(() => {});
     }
@@ -2229,14 +2237,17 @@ class AudioPlayer {
     return this.currentVolume / 100;
   }
 
-  /** Sets the volume (0-1). */
+  /** Sets the volume (0-1). Single authority is gainNode (post-graph);
+   * media-element volume stays pinned at 1.0 so compressor drive is
+   * knob-invariant and output gain is V, never V^2. */
   set volume(volume: number) {
-    this.currentVolume = volume * 100;
-    this.audioA.volume = volume;
-    this.audioB.volume = volume;
-    this.gainNode.gain.value = volume;
+    const v = Math.max(0, Math.min(1, volume));
+    this.currentVolume = v * 100;
+    this.audioA.volume = 1.0;
+    this.audioB.volume = 1.0;
+    this.gainNode.gain.value = v;
     if (this.isNativeEngineActive && this.nativeBackend) {
-      this.nativeBackend.setVolume(volume).catch(() => {});
+      this.nativeBackend.setVolume(v).catch(() => {});
     }
   }
 
