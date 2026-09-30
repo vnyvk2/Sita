@@ -174,16 +174,28 @@ pub fn inspect_aac_audio_specific_config(extra_data: &[u8]) -> Result<(), Decode
     }
 
     // 5. Scan for hierarchical sync extension (0x2b7 = 11 bits: 0b01010110111)
-    while reader.remaining_bits() >= 16 {
+    while reader.remaining_bits() >= 17 {
         // Peek or test next 11 bits
         let saved_pos = reader.bit_pos;
         if let Some(sync) = reader.read_bits(11) {
             if sync == 0x2b7 {
                 if let Some(ext_aot) = reader.read_bits(5) {
-                    if ext_aot == 5 || ext_aot == 29 {
-                        return Err(DecodeError::UnsupportedProfile(
-                            "Hierarchical HE-AAC (SBR/PS sync extension 0x2b7) is unsupported by Symphonia AAC-LC decoder".to_string(),
-                        ));
+                    if ext_aot == 5 {
+                        if let Some(sbr_present) = reader.read_bits(1) {
+                            if sbr_present == 1 {
+                                return Err(DecodeError::UnsupportedProfile(
+                                    "Hierarchical HE-AAC (SBR sync extension 0x2b7 with sbrPresentFlag=1) is unsupported by Symphonia AAC-LC decoder".to_string(),
+                                ));
+                            }
+                        }
+                    } else if ext_aot == 29 {
+                        if let Some(ps_present) = reader.read_bits(1) {
+                            if ps_present == 1 {
+                                return Err(DecodeError::UnsupportedProfile(
+                                    "Hierarchical HE-AAC (PS sync extension 0x2b7 with psPresentFlag=1) is unsupported by Symphonia AAC-LC decoder".to_string(),
+                                ));
+                            }
+                        }
                     }
                 }
             }
