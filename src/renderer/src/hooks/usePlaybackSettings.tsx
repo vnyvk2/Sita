@@ -127,8 +127,21 @@ export function usePlaybackSettings(player: AudioPlayer | HTMLAudioElement) {
   const updateEqualizerOptions = useCallback(
     (options: Equalizer) => {
       saveEqualizerPreset(options);
+      // T2-1: push the held preset into both DSP chains immediately (no track
+      // reload, no DB round-trip race). Duck-typed like updateSongPosition
+      // above: the legacy HTMLAudioElement fallback has no EQ graph.
+      try {
+        if (
+          'applyEqualizerPreset' in player &&
+          typeof (player as AudioPlayer).applyEqualizerPreset === 'function'
+        ) {
+          (player as AudioPlayer).applyEqualizerPreset(options);
+        }
+      } catch {
+        // EQ live-push is best-effort; persisted preset still applies on load.
+      }
     },
-    [saveEqualizerPreset]
+    [saveEqualizerPreset, player]
   );
 
   return {

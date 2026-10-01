@@ -238,6 +238,11 @@ class AudioPlayer {
 
     this.unsubscribeFunc = this.subscribeToStoreEvents();
     this.initializeAudioGraph();
+    // T2-1: WebAudio EQ was built flat and never written. Apply the persisted
+    // preset instantly (legacy sync source), then upgrade both engines from
+    // the DB-authoritative source when it resolves. DSP-only, no generation.
+    this.applyEqualizerToWebAudio();
+    void this.refreshEqualizerFromDatabase().catch(() => {});
     this.setupQueueIntegration();
     this.setupAudioEventListeners();
     this.crossfadeScheduler = new CrossfadeScheduler(this.createCrossfadeDelegate());
@@ -372,32 +377,103 @@ class AudioPlayer {
     }
   }
 
+  /** Band order shared by the DB frequencyBands array and the WebAudio/native chains. */
+  private static readonly EQUALIZER_BAND_ORDER: EqualizerBandFilters[] = [
+    'thirtyTwoHertzFilter',
+    'sixtyFourHertzFilter',
+    'hundredTwentyFiveHertzFilter',
+    'twoHundredFiftyHertzFilter',
+    'fiveHundredHertzFilter',
+    'thousandHertzFilter',
+    'twoThousandHertzFilter',
+    'fourThousandHertzFilter',
+    'eightThousandHertzFilter',
+    'sixteenThousandHertzFilter'
+  ];
+
   /**
-   * Push the persisted 10-band EQ preset into the native DSP chain. Called on init + every native
-   * load so EQ presets are not silent no-ops.
+   * T2-1: write an EQ preset into the WebAudio 10-band chain (previously built
+   * flat and never written). DSP-only: never bumps playbackGeneration.
    */
-  public syncNativeEqualizer(): void {
-    if (!this.isNativeEngineActive || !this.nativeBackend) return;
+  public applyEqualizerToWebAudio(
+    preset?: Partial<Record<EqualizerBandFilters, number>>
+  ): void {
+    const source =
+      preset ?? (storage.equalizerPreset.getEqualizerPreset() as unknown as
+        | Partial<Record<EqualizerBandFilters, number>>
+        | undefined);
+    for (const key of AudioPlayer.EQUALIZER_BAND_ORDER) {
+      const band = this.equalizerBands.get(key);
+      if (!band) continue;
+      const db = Math.max(-12, Math.min(12, source?.[key] ?? 0));
+      if (typeof band.gain.setTargetAtTime === 'function') {
+        band.gain.setTargetAtTime(db, this.currentContext.currentTime, 0.05);
+      } else {
+        band.gain.value = db;
+      }
+    }
+  }
+
+  /**
+   * T2-1: apply a settings-UI preset directly to both DSP chains (live slider
+   * path — no DB round-trip, no track reload). Prefer this over
+   * refreshEqualizerFromDatabase when the caller already holds the preset,
+   * because the DB mutation may not have committed yet.
+   */
+  public applyEqualizerPreset(options: Equalizer): void {
+    this.applyEqualizerToWebAudio(options);
+    if (this.isNativeEngineActive && this.nativeBackend) {
+      const bands = AudioPlayer.EQUALIZER_BAND_ORDER.map((k) =>
+        Math.max(-12, Math.min(12, options?.[k] ?? 0))
+      ) as [number, number, number, number, number, number, number, number, number, number];
+      this.nativeBackend.setEqualizer(bands).catch(() => {});
+    }
+  }
+
+  /**
+   * T2-1: DB-authoritative EQ refresh for both engines. The settings UI writes
+   * frequencyBands to the DB (which the legacy localStorage root never sees),
+   * so read the DB first and fall back to legacy storage. Applies WebAudio
+   * gains immediately (no track reload needed) and pushes the native tuple
+   * when the native engine is active. Resolves the applied bands.
+   */
+  public async refreshEqualizerFromDatabase(): Promise<number[]> {
+    let bands: number[] | null = null;
     try {
-      const preset = storage.equalizerPreset.getEqualizerPreset() as unknown as
+      const res = await window?.api?.settingsHelpers?.getUserEqualizerPreset?.();
+      if (Array.isArray(res?.frequencyBands) && res.frequencyBands.length === 10) {
+        bands = res.frequencyBands.map((v) => Math.max(-12, Math.min(12, Number(v) || 0)));
+      }
+    } catch {
+      // Fall through to legacy storage below.
+    }
+    if (!bands) {
+      const legacy = storage.equalizerPreset.getEqualizerPreset() as unknown as
         | Partial<Record<EqualizerBandFilters, number>>
         | undefined;
-      const gains = [
-        preset?.thirtyTwoHertzFilter ?? 0,
-        preset?.sixtyFourHertzFilter ?? 0,
-        preset?.hundredTwentyFiveHertzFilter ?? 0,
-        preset?.twoHundredFiftyHertzFilter ?? 0,
-        preset?.fiveHundredHertzFilter ?? 0,
-        preset?.thousandHertzFilter ?? 0,
-        preset?.twoThousandHertzFilter ?? 0,
-        preset?.fourThousandHertzFilter ?? 0,
-        preset?.eightThousandHertzFilter ?? 0,
-        preset?.sixteenThousandHertzFilter ?? 0
-      ] as [number, number, number, number, number, number, number, number, number, number];
-      this.nativeBackend.setEqualizer(gains).catch(() => {});
-    } catch {
-      // EQ sync is best-effort; WebAudio path remains authoritative.
+      bands = AudioPlayer.EQUALIZER_BAND_ORDER.map((k) =>
+        Math.max(-12, Math.min(12, legacy?.[k] ?? 0))
+      );
     }
+    const preset = Object.fromEntries(
+      AudioPlayer.EQUALIZER_BAND_ORDER.map((k, i) => [k, bands[i]])
+    ) as Partial<Record<EqualizerBandFilters, number>>;
+    this.applyEqualizerToWebAudio(preset);
+    if (this.isNativeEngineActive && this.nativeBackend) {
+      this.nativeBackend
+        .setEqualizer(bands as [number, number, number, number, number, number, number, number, number, number])
+        .catch(() => {});
+    }
+    return bands;
+  }
+
+  /**
+   * Push the persisted 10-band EQ preset into the native DSP chain. Called on init + every native
+   * load so EQ presets are not silent no-ops. T2-1: DB-authoritative via
+   * refreshEqualizerFromDatabase (legacy storage is no longer written by settings).
+   */
+  public syncNativeEqualizer(): void {
+    void this.refreshEqualizerFromDatabase().catch(() => {});
   }
 
   /**
@@ -1039,6 +1115,9 @@ class AudioPlayer {
         }
 
         this.applyReplayGain();
+
+        // T2-1: keep WebAudio EQ audible without requiring a settings revisit.
+        this.applyEqualizerToWebAudio();
 
         // Ensure active slot is at full gain and standby is muted
         this.activeFadeGain.gain.value = 1.0;
