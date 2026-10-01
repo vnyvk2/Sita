@@ -49,6 +49,7 @@ export class NativeAudioBackend {
   private unsubscribeEvents?: () => void;
   private currentBootId = 0;
   private lastSeenSequenceId = 0;
+  private hasSeenReady = false;
 
   constructor(private callbacks: NativeAudioBackendCallbacks) {
     this.startRafLoop();
@@ -122,11 +123,27 @@ export class NativeAudioBackend {
         case 'ready':
           this.currentBootId = event.boot_id;
           this.lastSeenSequenceId = 0;
+          this.hasSeenReady = true;
           break;
 
         case 'sound_profile_changed':
+          // T2-5: reject zero-epoch and pre-handshake pushes (real boots are
+          // >= 1; see generate_boot_id().max(1)). Stale drops are debug-logged
+          // so rapid restarts stay diagnosable.
+          if (!this.hasSeenReady || !event.boot_id) {
+            console.debug('[nativeAudioBackend] dropping pre-ready profile event', {
+              boot_id: (event as { boot_id?: number }).boot_id ?? null
+            });
+            break;
+          }
           if (event.boot_id < this.currentBootId) {
             // Stale daemon instance: reject events from older boot epochs
+            console.debug('[nativeAudioBackend] dropping stale profile event', {
+              boot_id: event.boot_id,
+              sequence_id: event.sequence_id,
+              currentBootId: this.currentBootId,
+              lastSeenSequenceId: this.lastSeenSequenceId
+            });
             break;
           }
           if (
@@ -134,6 +151,11 @@ export class NativeAudioBackend {
             event.sequence_id <= this.lastSeenSequenceId
           ) {
             // Out-of-order or duplicate event within current boot epoch: reject
+            console.debug('[nativeAudioBackend] dropping duplicate profile event', {
+              boot_id: event.boot_id,
+              sequence_id: event.sequence_id,
+              lastSeenSequenceId: this.lastSeenSequenceId
+            });
             break;
           }
           this.currentBootId = event.boot_id;
@@ -285,30 +307,43 @@ export class NativeAudioBackend {
       }
       return data!;
     } catch (err: any) {
+      // T2-5: narrow timeout classification. The manager reports timeouts as
+      // 'timed out waiting for response ... (id, 5000ms)'; the previous
+      // substring 'time' also matched unrelated errors ('sometimes',
+      // 'lifetime', 'PrimeTime ...').
       const isTimeout =
-        typeof err?.message === 'string' &&
-        (err.message.toLowerCase().includes('time') ||
-          err.message.toLowerCase().includes('timed out'));
+        typeof err?.message === 'string' && /timed out|5000ms/i.test(err.message);
       if (isTimeout) {
         // Timeout as unknown outcome: query authoritative state from daemon
         try {
           const state = await this.getState();
           if (state?.sound_profile) {
+            const status = state.sound_profile_status ?? 'active';
             if (state.boot_id && state.boot_id > this.currentBootId) {
               this.currentBootId = state.boot_id;
-              this.lastSeenSequenceId = state.sequence_id ?? 0;
+              // T2-5: never regress the epoch when state omits sequence_id.
+              this.lastSeenSequenceId = state.sequence_id ?? this.lastSeenSequenceId;
+            } else if (
+              state.boot_id === this.currentBootId &&
+              (state.sequence_id ?? this.lastSeenSequenceId) > this.lastSeenSequenceId
+            ) {
+              this.lastSeenSequenceId = state.sequence_id as number;
             }
-            this.callbacks.onSoundProfileChange?.(
-              state.sound_profile,
-              state.sound_profile_status ?? 'active'
-            );
+            this.callbacks.onSoundProfileChange?.(state.sound_profile, status);
+            // Synthetic success reports the reconciled state honestly:
+            // transition_ms reflects the known 30ms ramp unless Active.
             return {
               profile: state.sound_profile,
-              transition_ms: 0,
+              transition_ms: status === 'active' ? 0 : 30,
               boot_id: this.currentBootId,
               sequence_id: this.lastSeenSequenceId
             };
           }
+          // T2-5: reachable state without a profile is still an unknown
+          // outcome — signal once instead of throwing silently.
+          this.callbacks.onError(
+            new Error('Sound profile command timed out and daemon state has no profile')
+          );
         } catch (reconcileErr) {
           this.callbacks.onError(
             new Error(
