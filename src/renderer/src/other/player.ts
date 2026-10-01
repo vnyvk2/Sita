@@ -605,6 +605,11 @@ class AudioPlayer {
     // Capture intent BEFORE flipping flags: paused routes natively while
     // active, so read it first. Never auto-start playback the user paused.
     const wasPlaying = !this.paused;
+    // Capture audible state before any dispatch below: persisting the latch
+    // notifies store subscribers synchronously (including our own volume
+    // sync), which must not alter the restored output.
+    const fallbackMuted = this.mutedState;
+    const fallbackVolume = this.volume;
     // T2-6: latch the persisted flag to WebAudio. Otherwise the store still
     // says native while the engine is WebAudio, and the next unrelated store
     // tick silently re-inits native (flap loop after every crash). Re-enable
@@ -630,9 +635,11 @@ class AudioPlayer {
 
     // Restore WebAudio gain graph and resume AudioContext if suspended.
     // T2-4: preserve mute across fallback (gainNode is the sole authority).
+    // Restores the pre-fallback capture, not live fields, so the synchronous
+    // subscriber side-effect of the latch persist above cannot change it.
     this.activeFadeGain.gain.value = 1.0;
     this.standbyFadeGain.gain.value = 0.0;
-    this.gainNode.gain.value = this.mutedState ? 0 : this.volume;
+    this.gainNode.gain.value = fallbackMuted ? 0 : fallbackVolume;
     this.audioA.volume = 1.0;
     this.audioB.volume = 1.0;
     if (this.currentContext.state === 'suspended') {

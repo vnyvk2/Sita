@@ -179,4 +179,22 @@ describe('T2-4 sole volume/mute authority', () => {
     expect(ramp).toHaveBeenCalledTimes(1);
     expect(ramp.mock.calls[0][0]).toBeCloseTo(0.001, 5);
   });
+
+  it('fallback preserves store-driven mute across the latch dispatch', async () => {
+    const { dispatch } = await import('@renderer/store/store');
+    dispatch({ type: 'UPDATE_VOLUME_VALUE', data: 50 } as any);
+    dispatch({ type: 'UPDATE_MUTED_STATE', data: true } as any);
+    expect(player.muted).toBe(true);
+    (player as any).currentSongData = {
+      songId: 1,
+      title: 'Song 1',
+      duration: 200,
+      path: 'nora://music/song_1.flac',
+      artists: [],
+      replayGain: {}
+    };
+    (player as any).fallbackToWebAudio();
+    expect(player.gainNode.gain.value).toBe(0);
+    expect(player.muted).toBe(true);
+  });
 });
