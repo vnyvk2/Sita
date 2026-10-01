@@ -605,8 +605,16 @@ class AudioPlayer {
     // Capture intent BEFORE flipping flags: paused routes natively while
     // active, so read it first. Never auto-start playback the user paused.
     const wasPlaying = !this.paused;
-    // Cancel logical fade + drop armed standby BEFORE restoring WebAudio so a
-    // frozen daemon fade cannot later commit into the restored graph.
+    // T2-6: latch the persisted flag to WebAudio. Otherwise the store still
+    // says native while the engine is WebAudio, and the next unrelated store
+    // tick silently re-inits native (flap loop after every crash). Re-enable
+    // stays an explicit user toggle. (Product decision: latch, not auto-retry;
+    // revert this line only if auto-return is specified.)
+    try {
+      storage.playback.setPlaybackOptions('useNativeAudioEngine', false);
+    } catch {
+      // Persistence is best-effort; in-memory flags below still hold.
+    }
     this.crossfadeScheduler.cancel();
     this.preloadedSongData = null;
     this.nativePreloadInFlight = false;
@@ -1666,14 +1674,34 @@ class AudioPlayer {
         const useNative = localStorage?.playback?.useNativeAudioEngine ?? false;
         if (useNative !== this.isNativeEngineActive) {
           if (useNative) {
+            // T2-6: explicit re-init supersedes anything the previous native
+            // instance was doing (e.g. a frozen mid-fade). Bump first so stale
+            // daemon completions arrive superseded.
+            const toggleGeneration = this.bumpPlaybackGeneration();
             const currentPos = this.currentTime;
             const shouldPlay = !this.paused;
             this.initNativeBackend();
+            // Reconcile inherited daemon state before re-priming: freeze any
+            // in-flight executor work (freeze, not cancel — see Tier-1). The
+            // load chain below commits only for the current generation.
+            void this.nativeBackend
+              ?.getState?.()
+              ?.then((state) => {
+                if (!this.isGenerationCurrent(toggleGeneration)) return;
+                if (state && state.state !== undefined && state.state !== 'stopped') {
+                  void window?.api?.audioEngine
+                    ?.send?.({ cmd: 'stop' })
+                    ?.catch?.(() => {});
+                }
+              })
+              ?.catch(() => {});
             if (this.currentSongData) {
               this.audio.pause();
               this.nativeBackend
                 ?.load(this.activeSlot, this.currentSongData.path)
                 .then(() => {
+                  // T2-6: stale re-init (superseded during awaits) commits nothing.
+                  if (!this.isGenerationCurrent(toggleGeneration)) return;
                   this.nativeLoadedSongId = this.currentSongData?.songId ?? null;
                   if (currentPos > 0) this.nativeBackend?.seek(currentPos);
                   if (shouldPlay) {
