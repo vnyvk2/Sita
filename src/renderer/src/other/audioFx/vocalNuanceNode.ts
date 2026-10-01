@@ -154,37 +154,13 @@ export class VocalNuanceNode {
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
-    // 2. Real-time ScriptProcessor or Compressor lane
-    if (typeof ctx.createScriptProcessor === 'function') {
-      try {
-        const proc = ctx.createScriptProcessor(1024, 2, 2);
-        proc.onaudioprocess = (e) => {
-          const inL = e.inputBuffer.getChannelData(0);
-          const inR = e.inputBuffer.getChannelData(1);
-          const outL = e.outputBuffer.getChannelData(0);
-          const outR = e.outputBuffer.getChannelData(1);
-          const alpha = this.enabled ? 1.0 : 0.0;
-
-          for (let i = 0; i < inL.length; i++) {
-            const [sL, sR] = this.shaper.processFrame(inL[i], inR[i], alpha);
-            outL[i] = sL;
-            outR[i] = sR;
-          }
-        };
-        this.input.connect(proc);
-        proc.connect(this.wetGain);
-        this.processorNode = proc;
-      } catch {
-        // Fallback to compressor lane if script processor creation fails
-        this.connectCompressorLane();
-      }
-    } else {
-      this.connectCompressorLane();
-    }
-
+    // 2. Wet shaped lane (Native Web Audio graph for real-time audio thread safety)
+    this.input.connect(this.compressor);
+    this.compressor.connect(this.makeupGain);
+    this.makeupGain.connect(this.wetGain);
     this.wetGain.connect(this.output);
 
-    // Configure compressor parameters for test/mock compatibility
+    // Configure compressor parameters matching locked Option B transition
     this.compressor.threshold.value = VOCAL_NUANCE_PARAMS.threshold;
     this.compressor.knee.value = VOCAL_NUANCE_PARAMS.knee;
     this.compressor.ratio.value = VOCAL_NUANCE_PARAMS.ratio;
@@ -195,12 +171,6 @@ export class VocalNuanceNode {
     // Default to Studio Reference (pure bypass, dry=1, wet=0)
     this.dryGain.gain.value = 1;
     this.wetGain.gain.value = 0;
-  }
-
-  private connectCompressorLane(): void {
-    this.input.connect(this.compressor);
-    this.compressor.connect(this.makeupGain);
-    this.makeupGain.connect(this.wetGain);
   }
 
   /**

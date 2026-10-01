@@ -522,11 +522,41 @@ class AudioPlayer {
       this.audio.src = this.currentSongData.path;
       this.audio.load();
       const resumePos = this.nativeCurrentPosition;
-      if (resumePos > 0) {
-        this.audio.currentTime = resumePos;
-      }
+
+      // Safe position restoration across jsdom and Chromium media element states
+      let positionApplied = false;
+      const applyResumePosition = () => {
+        if (positionApplied || resumePos <= 0) return;
+        try {
+          this.audio.currentTime = resumePos;
+          positionApplied = true;
+        } catch {
+          // May throw in Chromium if readyState is HAVE_NOTHING (0)
+        }
+      };
+
+      // Try synchronous apply (succeeds in jsdom / cached media)
+      applyResumePosition();
+
       if (wasPlaying) {
-        this.play().catch(() => {});
+        // Immediate play call satisfies synchronous tests and triggers browser auto-buffer/play
+        this.play().catch((err) => {
+          logPlayer('[AudioPlayer] Play on fallback failed:', err);
+        });
+      }
+
+      // If not yet applied due to HAVE_NOTHING in Chromium, apply as soon as metadata arrives
+      if (!positionApplied && resumePos > 0) {
+        const onMetadata = () => {
+          applyResumePosition();
+          if (wasPlaying && this.audio.paused) {
+            this.play().catch(() => {});
+          }
+          this.audio.removeEventListener('loadedmetadata', onMetadata);
+          this.audio.removeEventListener('canplay', onMetadata);
+        };
+        this.audio.addEventListener('loadedmetadata', onMetadata);
+        this.audio.addEventListener('canplay', onMetadata);
       }
     }
   }
@@ -1997,7 +2027,7 @@ class AudioPlayer {
     const shouldPlay = forcePlay !== undefined ? forcePlay : this.audio.paused;
 
     if (shouldPlay) {
-      if (this.audio.readyState > 0 && this.audio.paused) {
+      if (this.audio.paused) {
         await this.play();
       }
     } else {
@@ -2036,6 +2066,16 @@ class AudioPlayer {
     try {
       if (this.audio.readyState > 0) {
         this.audio.currentTime = time;
+      } else {
+        this.audio.addEventListener(
+          'loadedmetadata',
+          () => {
+            try {
+              this.audio.currentTime = time;
+            } catch {}
+          },
+          { once: true }
+        );
       }
     } catch (err) {
       logPlayer('[AudioPlayer.seek] Failed to set currentTime:', err);
