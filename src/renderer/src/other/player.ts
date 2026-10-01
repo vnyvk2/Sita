@@ -1644,11 +1644,24 @@ class AudioPlayer {
   }
 
   /**
+   * T2-7c: smoothed gain write shared by active and standby ReplayGain paths.
+   * Standby writes previously snapped (.value=) while the active path ramped,
+   * risking a click/zipper on crossfade-in.
+   */
+  private applyGainToNode(node: GainNode, linearGain: number): void {
+    const now = this.currentContext.currentTime;
+    if (typeof node.gain.setTargetAtTime === 'function') {
+      node.gain.setTargetAtTime(linearGain, now, 0.05);
+    } else {
+      node.gain.value = linearGain;
+    }
+  }
+
+  /**
    * Applies ReplayGain to this.replayGainNode using smooth exponential ramping. Master volume and
    * ducking remain entirely separate on this.gainNode.
    */
-  public applyReplayGain() {
-    const settings = storage.playback.getPlaybackOptions('replayGain') ?? {
+  public applyReplayGain() {    const settings = storage.playback.getPlaybackOptions('replayGain') ?? {
       mode: 'track',
       preampDb: 0,
       preventClipping: true
@@ -1664,13 +1677,8 @@ class AudioPlayer {
       albumPeak: this.currentSongData?.replayGain?.albumPeak
     });
 
-    const now = this.currentContext.currentTime;
     // Exponential smoothing with time constant 0.05s to prevent audio pops/zippering
-    if (typeof this.replayGainNode.gain.setTargetAtTime === 'function') {
-      this.replayGainNode.gain.setTargetAtTime(calculation.targetLinearGain, now, 0.05);
-    } else {
-      this.replayGainNode.gain.value = calculation.targetLinearGain;
-    }
+    this.applyGainToNode(this.replayGainNode, calculation.targetLinearGain);
 
     // Forward to the native DSP chain (previously dead: loadSong returned
     // before this ran and setDsp reset rg_db to 0 on every karaoke toggle).
@@ -1806,7 +1814,7 @@ class AudioPlayer {
           });
           const standbyReplayGainNode =
             this.activeSlot === 'A' ? this.replayGainB : this.replayGainA;
-          standbyReplayGainNode.gain.value = calculation.targetLinearGain;
+          this.applyGainToNode(standbyReplayGainNode, calculation.targetLinearGain);
 
           return true;
         } catch (err) {
@@ -1908,7 +1916,7 @@ class AudioPlayer {
           });
           const standbyReplayGainNode =
             this.activeSlot === 'A' ? this.replayGainB : this.replayGainA;
-          standbyReplayGainNode.gain.value = calculation.targetLinearGain;
+          this.applyGainToNode(standbyReplayGainNode, calculation.targetLinearGain);
         }
 
         // Ensure standby audio is ready and playing BEFORE curves start
