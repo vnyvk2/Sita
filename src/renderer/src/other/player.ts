@@ -116,6 +116,17 @@ class AudioPlayer {
   private pendingAutoPlay: boolean = false;
   private queueEventsUnsubscribe: (() => void)[] = [];
   private loadRequestId: number = 0;
+  /**
+   * Tier-1 unified playback generation (superseding-transaction epoch).
+   * Bumped by every playback op that supersedes the current transaction
+   * (load, seek, Next/Previous, fade start/cancel, fallback, destroy,
+   * queue-position commit). NOT bumped by standby preload start or by
+   * DSP-only changes (EQ/ReplayGain/profile/volume). All async continuations
+   * capture the value at start and commit only if still current.
+   * Separate from daemon boot_id/sequence_id (profile event lifecycle).
+   */
+  private playbackGeneration: number = 0;
+  private destroyed: boolean = false;
   private inFlightLoad: {
     songId: number;
     requestId: number;
@@ -288,6 +299,13 @@ class AudioPlayer {
         },
         onTransitionComplete: (activeSlot) => {
           if (!this.isNativeEngineActive) return;
+          // Tier-1: stale daemon completion (superseded by fallback/destroy/
+          // seek/Next or a newer fade) must cause zero playback mutations.
+          // The commit below is the exactly-once queue advance for the current
+          // generation; generation was bumped at fade ownership, so only a
+          // NEWER bump invalidates it — never the bump that started this fade.
+          const completionGeneration = this.playbackGeneration;
+          if (this.destroyed || !this.isGenerationCurrent(completionGeneration)) return;
           this.activeSlot = activeSlot;
           // Auto-splice adoption (gapless-at-0 path): the daemon already
           // switched to the preloaded standby. Adopt its metadata WITHOUT
@@ -331,7 +349,8 @@ class AudioPlayer {
       this.isNativeEngineActive = true;
       this.nativeIsPlaying = false;
       const vol = store.state.player?.volume?.value ?? this.currentVolume;
-      this.nativeBackend.setVolume(vol / 100).catch(() => {});
+      const isMuted = store.state.player?.volume?.isMuted ?? false;
+      this.nativeBackend.setVolume(isMuted ? 0 : vol / 100).catch(() => {});
       const isKaraoke = storage.playback.getPlaybackOptions('isKaraoke') ?? false;
       this.nativeBackend.setDsp({ rgDb: this.lastNativeRgDb, karaoke: isKaraoke }).catch(() => {});
       this.syncNativeEqualizer();
@@ -436,6 +455,10 @@ class AudioPlayer {
    * already-loaded fast path instead of re-priming (which would restart the track audibly).
    */
   private adoptPreloadedStandby(preloaded: AudioPlayerData): void {
+    // Tier-1: adopt is a queue-position commit; never run post-destroy.
+    // Callers (transition_complete) already validated generation; this guard
+    // covers direct calls. Queue advance below is the exactly-once commit.
+    if (this.destroyed) return;
     this.currentSongData = preloaded;
     this.nativeLoadedSongId = preloaded.songId;
     this.nativeCurrentPosition = 0;
@@ -492,9 +515,19 @@ class AudioPlayer {
   }
 
   private fallbackToWebAudio() {
+    // Tier-1 invalidation-first: bump BEFORE teardown/awaits so in-flight
+    // native completions (transition_complete, load, seek) arrive stale.
+    // Idempotent: repeated fallback calls bump again but restore same state.
+    const fallbackGeneration = this.bumpPlaybackGeneration();
     // Capture intent BEFORE flipping flags: paused routes natively while
     // active, so read it first. Never auto-start playback the user paused.
     const wasPlaying = !this.paused;
+    // Cancel logical fade + drop armed standby BEFORE restoring WebAudio so a
+    // frozen daemon fade cannot later commit into the restored graph.
+    this.crossfadeScheduler.cancel();
+    this.preloadedSongData = null;
+    this.nativePreloadInFlight = false;
+    this.isCrossfading = false;
     this.isNativeEngineActive = false;
     this.nativeIsPlaying = false;
     this.nativeLoadedSongId = null;
@@ -538,7 +571,7 @@ class AudioPlayer {
       // Try synchronous apply (succeeds in jsdom / cached media)
       applyResumePosition();
 
-      if (wasPlaying) {
+      if (wasPlaying && this.isGenerationCurrent(fallbackGeneration)) {
         // Immediate play call satisfies synchronous tests and triggers browser auto-buffer/play
         this.play().catch((err) => {
           logPlayer('[AudioPlayer] Play on fallback failed:', err);
@@ -548,6 +581,12 @@ class AudioPlayer {
       // If not yet applied due to HAVE_NOTHING in Chromium, apply as soon as metadata arrives
       if (!positionApplied && resumePos > 0) {
         const onMetadata = () => {
+          // Tier-1: stale fallback restoration must not resume superseded playback.
+          if (!this.isGenerationCurrent(fallbackGeneration)) {
+            this.audio.removeEventListener('loadedmetadata', onMetadata);
+            this.audio.removeEventListener('canplay', onMetadata);
+            return;
+          }
           applyResumePosition();
           if (wasPlaying && this.audio.paused) {
             this.play().catch(() => {});
@@ -586,6 +625,22 @@ class AudioPlayer {
   }
 
   /**
+   * Tier-1: bump the superseding-transaction epoch. Must be called BEFORE any
+   * teardown/await for ops that supersede active playback (load, seek,
+   * Next/Previous, fade start/cancel, fallback, destroy, queue commit).
+   * DSP-only changes and standby preload start must NOT call this.
+   */
+  private bumpPlaybackGeneration(): number {
+    this.playbackGeneration += 1;
+    return this.playbackGeneration;
+  }
+
+  /** Tier-1: true if the captured generation is still current. */
+  private isGenerationCurrent(captured: number): boolean {
+    return captured === this.playbackGeneration && !this.destroyed;
+  }
+
+  /**
    * Sets up integration between queue and player. Automatically loads songs when queue position
    * changes. Propagates queue events through player for convenience.
    */
@@ -620,6 +675,25 @@ class AudioPlayer {
       this.queueEventsUnsubscribe.push(
         queue.on('queueChange', (data) => {
           this.emit('queueChange', data);
+          // T2-7a: structural queue mutation invalidates armed standby only.
+          // No generation bump (active playback continues); cancel the
+          // scheduler standby when the true next diverges from the preloaded
+          // id, then refresh native standby toward the true next so the
+          // daemon cannot auto-splice a stale track at EOS. FADING is owned
+          // and excluded — only PRELOADING/READY arm standby.
+          const schedulerState = this.crossfadeScheduler.getState();
+          if (schedulerState === 'PRELOADING' || schedulerState === 'READY') {
+            const trueNext = this.peekNextTrackId();
+            if (trueNext !== this.crossfadeScheduler.getPreloadedTrackId()) {
+              this.crossfadeScheduler.cancel();
+              // Daemon standby overwrite toward the true next (no generation
+              // bump: preload start never supersedes active playback). When
+              // there is no current song there is nothing to refresh toward.
+              if (this.currentSongData) {
+                this.refreshNativeStandby(this.currentSongData.songId);
+              }
+            }
+          }
         })
       );
 
@@ -836,6 +910,8 @@ class AudioPlayer {
     }
 
     const currentRequestId = ++this.loadRequestId;
+    // Tier-1: manual load supersedes the active playback transaction.
+    const loadGeneration = this.bumpPlaybackGeneration();
     const tStart = performance.now();
 
     logPlayer('[AudioPerf] loadSong_start', {
@@ -844,9 +920,14 @@ class AudioPlayer {
       timestamp: tStart
     });
 
-    // Detach any pending canplay listener from prior in-flight track loads
+    // Detach any pending canplay listener from prior in-flight track loads.
+    // Tier-1: detach from BOTH elements — the handler may be attached to the
+    // element that is now standby after a slot swap (F2).
     if (this.pendingCanPlayHandler) {
-      this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.audioA.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.audioB.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.audioA.removeEventListener('error', this.pendingCanPlayHandler as EventListener);
+      this.audioB.removeEventListener('error', this.pendingCanPlayHandler as EventListener);
       this.pendingCanPlayHandler = null;
     }
 
@@ -867,8 +948,10 @@ class AudioPlayer {
 
         const tIpc = performance.now();
 
-        // Discard stale out-of-order resolution if user skipped again during in-flight fetch
-        if (currentRequestId !== this.loadRequestId) {
+        // Discard stale out-of-order resolution if user skipped again during in-flight fetch.
+        // Tier-1: a newer superseding transaction (seek/Next/fallback/destroy)
+        // bumps playbackGeneration independently of loadRequestId.
+        if (currentRequestId !== this.loadRequestId || !this.isGenerationCurrent(loadGeneration)) {
           logPlayer('[AudioPerf] loadSong_discarded_stale', {
             songId: songData.songId,
             currentRequestId,
@@ -910,6 +993,11 @@ class AudioPlayer {
               this.preloadedSongData = null;
             }
             await this.nativeBackend.load(this.activeSlot, songData.path);
+            // Tier-1: abort commit if superseded during native load await.
+            if (!this.isGenerationCurrent(loadGeneration)) {
+              logPlayer('[AudioPerf] loadSong_discarded_stale_native', { songId: songData.songId });
+              return null;
+            }
             this.nativeLoadedSongId = songData.songId;
             this.audio.src = songData.path;
             // Push fresh ReplayGain + EQ into the native chain for this track
@@ -918,6 +1006,10 @@ class AudioPlayer {
             this.syncNativeEqualizer();
             if (effectiveAutoPlay) {
               await this.nativeBackend.play();
+              // Tier-1: abort audible commit if superseded during play await.
+              if (!this.isGenerationCurrent(loadGeneration)) {
+                return null;
+              }
               this.nativeIsPlaying = true;
               this.emit('play');
             }
@@ -950,17 +1042,49 @@ class AudioPlayer {
         // 2. Load media pipeline
         this.audio.load();
 
-        // 3. Set up auto-play with generation guard and explicit listener tracking
-        if (effectiveAutoPlay) {
+        // 3. Set up auto-play with generation guard and explicit listener tracking.
+        // Tier-1: immediate-play gated on generation (F4); canplay handler
+        // captures its element so slot swap cannot orphan it (F2).
+        if (effectiveAutoPlay && this.isGenerationCurrent(loadGeneration)) {
           if (this.audio.readyState >= 3) {
             // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA - ready to play immediately
+            const playGeneration = loadGeneration;
             this.play().catch((err) =>
               console.error('[AudioPlayer] Immediate auto-play failed:', err)
             );
+            void playGeneration;
           } else {
-            // Wait for canplay event with generation guard
-            const autoPlayHandler = () => {
-              if (currentRequestId === this.loadRequestId) {
+            // T2-3: bounded autoplay wait with split canplay/error outcomes. All
+            // outcomes stay under generation + loadRequestId guards so an
+            // obsolete load can neither autoplay nor report loadError for the
+            // newer song. Error never calls play(). Single handler identity
+            // preserves the pending-handler detach contract (F2).
+            const targetElement = this.audio;
+            let autoPlayTimeoutId: ReturnType<typeof setTimeout> | null = null;
+            const cleanupAutoPlayWait = () => {
+              if (this.pendingCanPlayHandler === autoPlayHandler) {
+                this.pendingCanPlayHandler = null;
+              }
+              targetElement.removeEventListener('canplay', autoPlayHandler);
+              targetElement.removeEventListener('error', autoPlayHandler as EventListener);
+              if (autoPlayTimeoutId !== null) {
+                clearTimeout(autoPlayTimeoutId);
+                autoPlayTimeoutId = null;
+              }
+            };
+            const isCurrentLoad = () =>
+              currentRequestId === this.loadRequestId &&
+              this.isGenerationCurrent(loadGeneration);
+            const autoPlayHandler = (evt?: Event) => {
+              if (evt?.type === 'error') {
+                // Media error: never autoplay; report only for the current load.
+                if (isCurrentLoad()) {
+                  this.emit('loadError', { songId: songData.songId, error: new Error('Media error before canplay') });
+                }
+                cleanupAutoPlayWait();
+                return;
+              }
+              if (isCurrentLoad()) {
                 const tCanPlay = performance.now();
                 logPlayer('[AudioPerf] canplay_fired', {
                   songId: songData.songId,
@@ -972,14 +1096,23 @@ class AudioPlayer {
                   console.error('[AudioPlayer] Auto-play on canplay failed:', err)
                 );
               }
-              if (this.pendingCanPlayHandler === autoPlayHandler) {
-                this.pendingCanPlayHandler = null;
-              }
-              this.audio.removeEventListener('canplay', autoPlayHandler);
+              cleanupAutoPlayWait();
             };
+            autoPlayTimeoutId = setTimeout(
+              () => {
+                // Stalled media (neither canplay nor error): clear the wait so
+                // autoplay is not pending forever; report only if current.
+                if (isCurrentLoad()) {
+                  this.emit('loadError', { songId: songData.songId, error: new Error('Timed out waiting for canplay') });
+                }
+                cleanupAutoPlayWait();
+              },
+              8000
+            );
 
             this.pendingCanPlayHandler = autoPlayHandler;
-            this.audio.addEventListener('canplay', autoPlayHandler);
+            targetElement.addEventListener('canplay', autoPlayHandler);
+            targetElement.addEventListener('error', autoPlayHandler as EventListener);
           }
         }
 
@@ -1007,8 +1140,10 @@ class AudioPlayer {
 
         return songData;
       } catch (error) {
-        // Discard stale rejections / errors from superseded in-flight requests
-        if (currentRequestId !== this.loadRequestId) {
+        // Discard stale rejections / errors from superseded in-flight requests.
+        // Tier-1: generation covers supersede paths that loadRequestId cannot
+        // (seek/Next/fallback/destroy during native awaits).
+        if (currentRequestId !== this.loadRequestId || !this.isGenerationCurrent(loadGeneration)) {
           logPlayer('[AudioPerf] loadSong_discarded_stale_error', {
             songId,
             currentRequestId,
@@ -1044,7 +1179,13 @@ class AudioPlayer {
 
   /** Cleans up resources and event listeners. Should be called when player is no longer needed. */
   destroy() {
+    // Tier-1: idempotent + generation-bumped first so racing completions
+    // arrive stale. Repeated teardown (fallback/crash/HMR/unmount) is safe.
+    if (this.destroyed) return;
+    this.destroyed = true;
+    this.bumpPlaybackGeneration();
     this.clearAbLoop('DESTROY');
+    this.stopLoopWatchers();
     this.karaokeNode.destroy();
     this.nightModeNode.destroy();
     this.vocalNuanceNode.destroy();
@@ -1053,6 +1194,22 @@ class AudioPlayer {
     this.crossfadeScheduler.cancel();
     this.cancelActiveFade();
     this.inFlightLoad = null;
+    // Tier-1: drop armed standby/native state so post-destroy completions
+    // cannot adopt or resurrect playback.
+    this.preloadedSongData = null;
+    this.nativePreloadInFlight = false;
+    this.nativeLoadedSongId = null;
+    this.nativeCurrentPosition = 0;
+    this.isCrossfading = false;
+    // Tier-1 teardown audio guarantee: generation bump prevents stale STATE
+    // mutation, but the daemon keeps rendering until frozen. Freeze native
+    // output fire-and-forget (mixer pause freezes an in-flight crossfade;
+    // backend.destroy() intentionally does not stop the shared singleton).
+    // Fallback path already stops via audioEngine.stop(); direct destroy must
+    // also silence the executor. Never await here — destroy is synchronous.
+    if (this.nativeBackend && this.isNativeEngineActive) {
+      this.nativeBackend.pause().catch(() => {});
+    }
     if (this.nativeBackend) {
       this.nativeBackend.destroy();
       this.nativeBackend = null;
@@ -1061,7 +1218,8 @@ class AudioPlayer {
     this.nativeIsPlaying = false;
     if (this.unsubscribeFunc) this.unsubscribeFunc.unsubscribe();
     if (this.pendingCanPlayHandler) {
-      this.audio.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.audioA.removeEventListener('canplay', this.pendingCanPlayHandler);
+      this.audioB.removeEventListener('canplay', this.pendingCanPlayHandler);
       this.pendingCanPlayHandler = null;
     }
     this.queueEventsUnsubscribe.forEach((unsub) => typeof unsub === 'function' && unsub());
@@ -1410,10 +1568,10 @@ class AudioPlayer {
         const useNative = localStorage?.playback?.useNativeAudioEngine ?? false;
         if (useNative !== this.isNativeEngineActive) {
           if (useNative) {
+            const currentPos = this.currentTime;
+            const shouldPlay = !this.paused;
             this.initNativeBackend();
             if (this.currentSongData) {
-              const currentPos = this.currentTime;
-              const shouldPlay = !this.paused;
               this.audio.pause();
               this.nativeBackend
                 ?.load(this.activeSlot, this.currentSongData.path)
@@ -1683,8 +1841,20 @@ class AudioPlayer {
         }
 
         if (this.isNativeEngineActive && this.nativeBackend) {
+          // Tier-1: acquire logical FADING ownership BEFORE the daemon await so
+          // Next/pause/cancel during the await see FADING and invalidate via
+          // generation instead of racing an unowned transition.
+          const fadeGeneration = this.bumpPlaybackGeneration();
+          this.isCrossfading = true;
           try {
             await this.nativeBackend.crossfade(Math.round(clampedFadeDuration * 1000));
+            // Stale fade (superseded during await): cleanup only, no commit.
+            // The commit below advances queue exactly once, so the bump above
+            // must not invalidate this continuation — only a NEWER bump does.
+            if (!this.isGenerationCurrent(fadeGeneration)) {
+              this.isCrossfading = false;
+              return;
+            }
             this.activeSlot = this.activeSlot === 'A' ? 'B' : 'A';
             this.currentSongData = this.preloadedSongData;
             this.preloadedSongData = null;
@@ -1692,14 +1862,31 @@ class AudioPlayer {
             // lingers until the next heartbeat.
             this.nativeCurrentPosition = 0;
             this.nativeLoadedSongId = this.currentSongData?.songId ?? null;
+            // Tier-1: Player/Scheduler owns queue advancement (daemon is audio
+            // executor only). Advance exactly once under suppression, mirroring
+            // the WebAudio fade path, so the commit cannot double-advance.
+            this.suppressQueuePositionLoad = true;
+            try {
+              if (this.queue.hasNext) {
+                this.queue.moveToNext();
+              } else if (this.repeatMode === 'all' && this.queue.length > 0) {
+                this.queue.moveToStart();
+              }
+            } finally {
+              this.suppressQueuePositionLoad = false;
+            }
             if (this.currentSongData) {
               dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: this.currentSongData });
               storage.playback.setCurrentSongOptions('songId', this.currentSongData.songId);
               this.emit('songLoaded', this.currentSongData);
             }
+            // Keep isCrossfading=true until scheduler completion/cancel.
             return;
           } catch (err) {
+            console.error('[AudioPlayer.startFade] Native crossfade failed:', err);
             logPlayer('[AudioPlayer.startFade] Native crossfade failed:', err);
+            // Tier-1: release ownership before WebAudio fallthrough.
+            this.isCrossfading = false;
           }
         }
 
@@ -1956,9 +2143,17 @@ class AudioPlayer {
 
   /** Starts or resumes audio playback with fade-in effect. */
   async play() {
+    // Tier-1: capture superseding-transaction generation; stale continuations
+    // after awaits must not resurrect or ramp a superseded element (F4).
+    const playGeneration = this.playbackGeneration;
     if (this.isNativeEngineActive && this.nativeBackend) {
       try {
         await this.nativeBackend.play();
+        if (!this.isGenerationCurrent(playGeneration)) return;
+        // Tier-1: resume logical fade timer if resuming mid-native-fade.
+        if (this.isCrossfading) {
+          this.crossfadeScheduler.resumeFade();
+        }
         this.nativeIsPlaying = true;
         this.emit('play');
         return;
@@ -1972,12 +2167,14 @@ class AudioPlayer {
     if (this.currentContext.state === 'suspended') {
       await this.currentContext.resume();
     }
+    if (!this.isGenerationCurrent(playGeneration)) return;
     if (this.isCrossfading) {
       this.crossfadeScheduler.resumeFade();
       await Promise.all([this.audio.play(), this.standbyAudio.play()]);
       return;
     }
     await this.audio.play();
+    if (!this.isGenerationCurrent(playGeneration)) return;
     if (this.abLoopController.isActive()) {
       this.startLoopWatchers();
     }
@@ -1988,6 +2185,11 @@ class AudioPlayer {
   async pause() {
     this.stopLoopWatchers();
     if (this.isNativeEngineActive && this.nativeBackend) {
+      // Tier-1: native fade shares logical FADING ownership; freeze the
+      // scheduler timer alongside the daemon freeze (mixer pause).
+      if (this.isCrossfading) {
+        this.crossfadeScheduler.pauseFade();
+      }
       await this.nativeBackend.pause();
       this.nativeIsPlaying = false;
       this.emit('pause');
@@ -2043,6 +2245,9 @@ class AudioPlayer {
    * @param time - Time in seconds to seek to
    */
   seek(time: number) {
+    // Tier-1: seek supersedes the current playback transaction (even when the
+    // song identity is unchanged). Bump before teardown/awaits.
+    this.bumpPlaybackGeneration();
     this.crossfadeScheduler.cancel();
     if (this.abLoopController.isPositionOutside(time)) {
       this.clearAbLoop('SEEK_OUTSIDE');
@@ -2050,9 +2255,12 @@ class AudioPlayer {
     if (this.isNativeEngineActive && this.nativeBackend) {
       this.nativeCurrentPosition = time;
       this.emit('seeking', time);
+      const seekGeneration = this.playbackGeneration;
       this.nativeBackend
         .seek(time)
         .then(() => {
+          // Tier-1: stale seek completion must not mutate loop/emit state.
+          if (!this.isGenerationCurrent(seekGeneration)) return;
           // Mirrors the element 'seeked' listener contract (which early-outs
           // in native mode): releases pending loop jumps.
           this.loopJumpPending = false;
@@ -2060,6 +2268,12 @@ class AudioPlayer {
         })
         .catch((err) => {
           logPlayer('[AudioPlayer.seek] Native seek failed:', err);
+          // T2-7b: a rejected native seek must not wedge AB looping — release
+          // the pending jump, but only for the current transaction so a stale
+          // failure cannot clear a newer pending jump.
+          if (this.isGenerationCurrent(seekGeneration)) {
+            this.loopJumpPending = false;
+          }
         });
       return;
     }
@@ -2098,6 +2312,8 @@ class AudioPlayer {
       onError?: (error: unknown) => void;
     } = {}
   ): Promise<void> {
+    // Tier-1: user-initiated song change supersedes the active transaction.
+    this.bumpPlaybackGeneration();
     this.crossfadeScheduler.cancel();
     const { autoPlay = true, recordListening = true, onError } = options;
 
@@ -2133,6 +2349,8 @@ class AudioPlayer {
    * @param reason - Why the skip occurred ('USER_SKIP' or 'PLAYER_SKIP')
    */
   async skipForward(reason: SongSkipReason = 'USER_SKIP'): Promise<void> {
+    // Tier-1: skip supersedes active playback even when queue does not advance.
+    this.bumpPlaybackGeneration();
     this.crossfadeScheduler.cancel();
     logPlayer('[AudioPlayer.skipForward]', {
       reason,
@@ -2177,6 +2395,8 @@ class AudioPlayer {
    * restarts current song. Otherwise, moves to previous song in queue.
    */
   skipBackward(): void {
+    // Tier-1: skip/seek-restart supersedes active playback.
+    this.bumpPlaybackGeneration();
     this.crossfadeScheduler.cancel();
     // this.currentTime routes through the native playhead when the Rust
     // engine owns the sink (audio.currentTime stays 0 there).
@@ -2240,6 +2460,8 @@ class AudioPlayer {
    * @param position - The queue position (0-indexed)
    */
   playSongAtPosition(position: number) {
+    // Tier-1: position commit supersedes active playback.
+    this.bumpPlaybackGeneration();
     this.crossfadeScheduler.cancel();
     this.pendingAutoPlay = true; // Auto-play when manually selecting a position
     const moved = this.queue.moveToPosition(position);
