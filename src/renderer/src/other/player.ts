@@ -77,6 +77,13 @@ class AudioPlayer {
 
   queuesManager: QueuesManager;
   currentVolume: number;
+  /**
+   * T2-4: single volume/mute authority is the post-graph gainNode. Media
+   * elements stay pinned (volume 1.0, muted false) so mute never scales
+   * MediaElementSource output pre-graph. This field is the mute truth;
+   * the element-muted getter legacy is preserved via sync below.
+   */
+  private mutedState: boolean = false;
 
   currentContext: AudioContext;
   equalizerBands: Map<EqualizerBandFilters, BiquadFilterNode>;
@@ -537,10 +544,11 @@ class AudioPlayer {
     }
     window?.api?.audioEngine?.stop().catch(() => {});
 
-    // Restore WebAudio gain graph and resume AudioContext if suspended
+    // Restore WebAudio gain graph and resume AudioContext if suspended.
+    // T2-4: preserve mute across fallback (gainNode is the sole authority).
     this.activeFadeGain.gain.value = 1.0;
     this.standbyFadeGain.gain.value = 0.0;
-    this.gainNode.gain.value = this.volume;
+    this.gainNode.gain.value = this.mutedState ? 0 : this.volume;
     this.audioA.volume = 1.0;
     this.audioB.volume = 1.0;
     if (this.currentContext.state === 'suspended') {
@@ -1274,7 +1282,9 @@ class AudioPlayer {
     this.cancelActiveFade();
     return new Promise((resolve) => {
       const currentTime = this.currentContext.currentTime;
-      const targetVolume = Math.max(0.001, this.currentVolume / 100);
+      // T2-4: fade target respects mute — ramping while muted stays silent on
+      // the sole-authority gainNode instead of restoring audibility.
+      const targetVolume = this.mutedState ? 0.001 : Math.max(0.001, this.currentVolume / 100);
       const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
 
       this.gainNode.gain.setValueAtTime(Math.max(0.001, this.gainNode.gain.value), currentTime);
@@ -1537,12 +1547,21 @@ class AudioPlayer {
   }
 
   // ? PLAYER RELATED STORE UPDATES HANDLING
+  // T2-4: single volume/mute authority is the post-graph gainNode. Elements
+  // stay pinned (volume 1.0, muted false) so mute never scales
+  // MediaElementSource output pre-graph. One native forward per call.
   private updatePlayerVolume(volume: PlayerVolume) {
-    this.volume = volume.value / 100;
-    this.audioA.muted = volume.isMuted;
-    this.audioB.muted = volume.isMuted;
+    const v = Math.max(0, Math.min(1, volume.value / 100));
+    this.currentVolume = volume.value;
+    this.mutedState = volume.isMuted;
+    this.audioA.volume = 1.0;
+    this.audioB.volume = 1.0;
+    this.audioA.muted = false;
+    this.audioB.muted = false;
+    const effective = volume.isMuted ? 0 : v;
+    this.gainNode.gain.value = effective;
     if (this.isNativeEngineActive && this.nativeBackend) {
-      this.nativeBackend.setVolume(volume.isMuted ? 0 : volume.value / 100).catch(() => {});
+      this.nativeBackend.setVolume(effective).catch(() => {});
     }
   }
 
@@ -2545,27 +2564,33 @@ class AudioPlayer {
   /**
    * Sets the volume (0-1). Single authority is gainNode (post-graph); media-element volume stays
    * pinned at 1.0 so compressor drive is knob-invariant and output gain is V, never V^2.
+   * T2-4: respects mutedState — setting volume while muted updates the level
+   * without unmuting audibly.
    */
   set volume(volume: number) {
     const v = Math.max(0, Math.min(1, volume));
     this.currentVolume = v * 100;
     this.audioA.volume = 1.0;
     this.audioB.volume = 1.0;
-    this.gainNode.gain.value = v;
+    this.audioA.muted = false;
+    this.audioB.muted = false;
+    const effective = this.mutedState ? 0 : v;
+    this.gainNode.gain.value = effective;
     if (this.isNativeEngineActive && this.nativeBackend) {
-      this.nativeBackend.setVolume(v).catch(() => {});
+      this.nativeBackend.setVolume(effective).catch(() => {});
     }
   }
 
   /** Gets the muted state. */
   get muted(): boolean {
-    return this.audio.muted;
+    return this.mutedState;
   }
 
-  /** Sets the muted state. */
+  /** Sets the muted state. T2-4: gainNode-only authority; elements stay unmuted. */
   set muted(value: boolean) {
-    this.audioA.muted = value;
-    this.audioB.muted = value;
+    this.mutedState = value;
+    this.audioA.muted = false;
+    this.audioB.muted = false;
     this.gainNode.gain.value = value ? 0 : this.volume;
     if (this.isNativeEngineActive && this.nativeBackend) {
       this.nativeBackend.setVolume(value ? 0 : this.volume).catch(() => {});
