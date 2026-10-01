@@ -68,3 +68,7 @@ path = "tests/real_codec_tests.rs"
 [[test]]
 name = "phase3_listening_validation"
 path = "tests/phase3_listening_validation.rs"
+
+[[test]]
+name = "phase4_golden_fixture_parity"
+path = "tests/phase4_golden_fixture_parity.rs"

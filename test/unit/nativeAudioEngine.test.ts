@@ -134,6 +134,71 @@ describe('Native Audio Daemon Manager - Lifecycle & Supervision', () => {
     }
     await promise;
   });
+
+  it('guarantees sound profile restoration strictly precedes audio playback commands during startup', async () => {
+    const manager = new NativeAudioDaemonManager();
+    manager.setSoundProfilePreference('vocal_nuance_boost');
+
+    const writtenPayloads: any[] = [];
+    const fakeStdin = {
+      write: vi.fn((chunk: string, _encoding: any, cb?: any) => {
+        writtenPayloads.push(JSON.parse(chunk.trim()));
+        if (typeof cb === 'function') cb(null);
+      })
+    };
+
+    (manager as any).child = { stdin: fakeStdin, killed: false };
+
+    // Simulate daemon startup in flight
+    let resolveReady: () => void = () => {};
+    (manager as any).readyPromise = new Promise<void>((r) => {
+      resolveReady = r;
+    });
+    (manager as any).isStarting = true;
+    (manager as any).startPromise = (async () => {
+      await (manager as any).readyPromise;
+      await (manager as any).sendCommandInternal({
+        cmd: 'set_sound_profile',
+        profile: manager.getSoundProfilePreference()
+      });
+    })();
+
+    // While daemon is starting up, a playback command is issued (e.g. play)
+    const playPromise = manager.sendCommand({ cmd: 'play' });
+
+    // Verify nothing written yet while ready is pending
+    expect(writtenPayloads.length).toBe(0);
+
+    // Daemon emits ready handshake
+    resolveReady();
+    await new Promise((r) => setTimeout(r, 10));
+
+    // The FIRST command written MUST be set_sound_profile
+    expect(writtenPayloads.length).toBeGreaterThanOrEqual(1);
+    expect(writtenPayloads[0].cmd).toBe('set_sound_profile');
+    expect(writtenPayloads[0].profile).toBe('vocal_nuance_boost');
+
+    // Simulate daemon acknowledging set_sound_profile response
+    const pending = (manager as any).pendingRequests;
+    const restoreReq = pending.get(writtenPayloads[0].id);
+    if (restoreReq) {
+      clearTimeout(restoreReq.timer);
+      restoreReq.resolve({ id: writtenPayloads[0].id, status: 'ok' });
+    }
+
+    // Now the play command is permitted to execute
+    await new Promise((r) => setTimeout(r, 10));
+    expect(writtenPayloads.length).toBe(2);
+    expect(writtenPayloads[1].cmd).toBe('play');
+
+    const playReq = pending.get(writtenPayloads[1].id);
+    if (playReq) {
+      clearTimeout(playReq.timer);
+      playReq.resolve({ id: writtenPayloads[1].id, status: 'ok' });
+    }
+
+    await playPromise;
+  });
 });
 
 describe('Native Audio Backend - Anchored RAF Interpolation', () => {

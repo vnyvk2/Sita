@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import {
   VocalNuanceNode,
+  OptionBShaper,
   VOCAL_NUANCE_MAKEUP_DB,
   VOCAL_NUANCE_PARAMS,
   dBToLinear
@@ -113,5 +114,60 @@ describe('VocalNuanceNode - Web Audio Parity Implementation', () => {
     expect(node.makeupGain.disconnect).toHaveBeenCalled();
     expect(node.wetGain.disconnect).toHaveBeenCalled();
     expect(node.output.disconnect).toHaveBeenCalled();
+  });
+
+  describe('OptionBShaper - Exact Upward Nuance DSP Transfer Function', () => {
+    it('applies locked +1.5 dB lift to quiet signals (-30 dBFS)', () => {
+      const shaper = new OptionBShaper(48000);
+      const ampQuiet = Math.pow(10, -30.0 / 20.0);
+      const frames = 48000; // 1s
+      let lastGain = 1.0;
+
+      for (let i = 0; i < frames; i++) {
+        const t = i / 48000;
+        const s = ampQuiet * Math.sin(2 * Math.PI * 1000 * t);
+        shaper.processFrame(s, s, 1.0);
+        lastGain = shaper.nuanceGain;
+      }
+
+      const gainDb = 20 * Math.log10(lastGain);
+      expect(gainDb).toBeGreaterThanOrEqual(1.45);
+      expect(gainDb).toBeLessThanOrEqual(1.55);
+    });
+
+    it('preserves loud material at exact unity gain (0.0 dB / 1.000000) for signals >= -12 dBFS', () => {
+      const shaper = new OptionBShaper(48000);
+      const ampHot = Math.pow(10, -3.0 / 20.0); // -3 dBFS tone (loud passage)
+      const frames = 48000; // 1s
+      let lastGain = 1.0;
+
+      for (let i = 0; i < frames; i++) {
+        const t = i / 48000;
+        const s = ampHot * Math.sin(2 * Math.PI * 1000 * t);
+        shaper.processFrame(s, s, 1.0);
+        lastGain = shaper.nuanceGain;
+      }
+
+      const gainDb = 20 * Math.log10(lastGain);
+      // Product Invariant: Loud passages MUST remain at unity (0.0 dB), never downward compressed!
+      expect(Math.abs(gainDb)).toBeLessThan(0.01);
+      expect(lastGain).toBeCloseTo(1.0, 3);
+    });
+
+    it('interpolates smoothly along C^1 cubic Hermite spline at -18 dBFS mid-level', () => {
+      const shaper = new OptionBShaper(48000);
+      const ampMid = Math.pow(10, -18.0 / 20.0); // Exact midpoint of [-24, -12] dBFS
+      // Steady DC flat input at exact -18 dBFS midpoint (2s to allow 250ms release to settle)
+      const frames = 96000;
+      let lastGain = 1.0;
+      for (let i = 0; i < frames; i++) {
+        shaper.processFrame(ampMid, ampMid, 1.0);
+        lastGain = shaper.nuanceGain;
+      }
+
+      // Hermite spline at midpoint u=0.5: s(0.5) = 0.5 -> target lift = 1.5 * 0.5 = +0.750 dB
+      const gainDb = 20 * Math.log10(lastGain);
+      expect(gainDb).toBeCloseTo(0.75, 2);
+    });
   });
 });

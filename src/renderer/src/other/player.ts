@@ -2425,9 +2425,15 @@ class AudioPlayer {
   }
 
   /**
-   * Applies sound profile routing and crossfade to the WebAudio graph. In studio_reference: vocal
-   * nuance bypassed, limiter wet = 0, limiter dry = 1 (bit-exact null). In vocal_nuance_boost:
-   * vocal nuance active, limiter wet = 1, limiter dry = 0 (safety protection).
+   * Applies sound profile routing and crossfade to the WebAudio graph.
+   *
+   * Product Invariant (Web Audio Limiter Semantics):
+   *
+   * - In studio_reference: vocal nuance bypassed, limiter wet = 0, limiter dry = 1 (bit-exact null).
+   *   Prioritizes bit transparency and uncolored response; does NOT promise brickwall output
+   *   protection on the Web Audio fallback.
+   * - In vocal_nuance_boost: vocal nuance active, limiter wet = 1, limiter dry = 0. The Web Audio
+   *   safety limiter is engaged to guard against clipping on hot masters.
    */
   public applySoundProfileToWebAudio(profile: SoundProfile, immediate = false): void {
     this.currentSoundProfile = profile;

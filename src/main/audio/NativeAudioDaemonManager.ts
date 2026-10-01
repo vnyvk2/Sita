@@ -59,6 +59,7 @@ export class NativeAudioDaemonManager {
   private crashTimestamps: number[] = [];
   private exceededCrashLimit = false;
   private userSoundProfile: SoundProfile = 'studio_reference';
+  private startPromise: Promise<void> | null = null;
 
   public setSoundProfilePreference(profile: SoundProfile): void {
     this.userSoundProfile = profile;
@@ -114,17 +115,23 @@ export class NativeAudioDaemonManager {
   }
 
   public async start(): Promise<void> {
-    if (this.child && !this.child.killed) {
-      if (this.readyPromise) {
-        await this.readyPromise;
-      }
+    if (this.child && !this.child.killed && !this.isStarting) {
       return;
     }
 
-    if (this.isStarting && this.readyPromise) {
-      return this.readyPromise;
+    if (this.startPromise) {
+      return this.startPromise;
     }
 
+    this.startPromise = this.executeStartSequence();
+    try {
+      await this.startPromise;
+    } finally {
+      this.startPromise = null;
+    }
+  }
+
+  private async executeStartSequence(): Promise<void> {
     if (this.exceededCrashLimit) {
       throw new Error(
         'Native audio engine has exceeded maximum restart attempts (3 crashes within 10 seconds).'
@@ -201,7 +208,10 @@ export class NativeAudioDaemonManager {
       // Restore user's sound profile preference before returning so subsequent audio commands
       // execute with the restored profile already in effect.
       try {
-        await this.sendCommand({ cmd: 'set_sound_profile', profile: this.userSoundProfile });
+        await this.sendCommandInternal({
+          cmd: 'set_sound_profile',
+          profile: this.userSoundProfile
+        });
         logger.info('Restored user sound profile preference on daemon startup:', {
           profile: this.userSoundProfile
         });
@@ -306,16 +316,22 @@ export class NativeAudioDaemonManager {
   }
 
   public async sendCommand(command: DaemonCommand): Promise<DaemonResponse> {
-    if (!this.isRunning()) {
+    if (command.cmd === 'set_sound_profile') {
+      this.userSoundProfile = command.profile;
+    }
+
+    if (this.startPromise) {
+      await this.startPromise;
+    } else if (!this.isRunning()) {
       await this.start();
     }
 
+    return this.sendCommandInternal(command);
+  }
+
+  private sendCommandInternal(command: DaemonCommand): Promise<DaemonResponse> {
     if (!this.child || !this.child.stdin || this.child.killed) {
       throw new Error('Native audio daemon child process is not running or stdin is closed.');
-    }
-
-    if (command.cmd === 'set_sound_profile') {
-      this.userSoundProfile = command.profile;
     }
 
     // Translate audio path to local disk path if needed
@@ -328,11 +344,11 @@ export class NativeAudioDaemonManager {
           diskPath,
           originalPath: command.path
         });
-        return {
+        return Promise.resolve({
           id: this.nextRequestId++,
           status: 'error',
           message: `File not found on disk: ${diskPath}`
-        };
+        });
       }
       translatedCommand = {
         ...command,
