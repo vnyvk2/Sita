@@ -12,6 +12,9 @@ import {
 class MockAudioParam {
   value: number;
   cancelScheduledValues = vi.fn();
+  setValueAtTime = vi.fn((val: number) => {
+    this.value = val;
+  });
   setTargetAtTime = vi.fn((val: number) => {
     this.value = val;
   });

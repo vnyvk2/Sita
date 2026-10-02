@@ -10,12 +10,16 @@ import {
 
 interface MockAudioParam {
   value: number;
+  setValueAtTime: ReturnType<typeof vi.fn>;
   setTargetAtTime: ReturnType<typeof vi.fn>;
   cancelScheduledValues: ReturnType<typeof vi.fn>;
 }
 
 const createMockAudioParam = (initial: number): MockAudioParam => ({
   value: initial,
+  setValueAtTime: vi.fn(function (this: { value: number }, val: number) {
+    this.value = val;
+  }),
   setTargetAtTime: vi.fn(function (this: { value: number }, val: number) {
     this.value = val;
   }),

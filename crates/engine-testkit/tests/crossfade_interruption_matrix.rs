@@ -1,8 +1,9 @@
 //! Phase B: Deterministic DualSlotMixer Test Matrix for FADING × Interruption Scenarios.
 //!
-//! Investigates and captures the exact internal state transitions of DualSlotMixer
-//! when operations (seek, Next, Previous, pause, stop/load) occur during an active
-//! crossfade transition.
+//! [FLAW-DEMONSTRATOR / DIAGNOSTIC CHARACTERIZATION SUITE]
+//! This suite characterizes edge-case interruption behaviors during active crossfading
+//! (seek, Next, Previous, pause, stop/load). Tests serve as diagnostic evidence to detect
+//! and demonstrate subtle mixer transitions, early flips, and source-level edge cases.
 //!
 //! Captures:
 //! - active_slot

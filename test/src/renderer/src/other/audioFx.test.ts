@@ -24,17 +24,21 @@ class MockAudioContext {
   }
 
   createBiquadFilter() {
+    const makeParam = (val: number) => ({
+      value: val,
+      setValueAtTime: vi.fn(function (this: { value: number }, v: number) {
+        this.value = v;
+      }),
+      setTargetAtTime: vi.fn(function (this: { value: number }, v: number) {
+        this.value = v;
+      }),
+      cancelScheduledValues: vi.fn()
+    });
     return {
       type: 'peaking',
-      frequency: {
-        value: 1000,
-        setTargetAtTime: vi.fn()
-      },
-      gain: {
-        value: 0,
-        setTargetAtTime: vi.fn()
-      },
-      Q: { value: 1 },
+      frequency: makeParam(1000),
+      gain: makeParam(0),
+      Q: makeParam(1),
       connect: vi.fn(),
       disconnect: vi.fn()
     };

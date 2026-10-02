@@ -6,7 +6,7 @@ class MockAudioContext {
   state = 'running';
   destination = {};
   createGain() { return { gain: { value: 1, setValueAtTime: vi.fn(), setValueCurveAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() }; }
-  createBiquadFilter() { return { type: 'peaking', frequency: { value: 1000, setTargetAtTime: vi.fn() }, gain: { value: 0, setTargetAtTime: vi.fn() }, Q: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() }; }
+  createBiquadFilter() { return { type: 'peaking', frequency: { value: 1000, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, gain: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, Q: { value: 1, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, connect: vi.fn(), disconnect: vi.fn() }; }
   createMediaElementSource() { return { connect: vi.fn(), disconnect: vi.fn() }; }
   createConvolver() { return { buffer: null, connect: vi.fn(), disconnect: vi.fn() }; }
   createDynamicsCompressor() { return { threshold: { value: -6, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, knee: { value: 0, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, ratio: { value: 20, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, attack: { value: 0.003, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, release: { value: 0.15, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, reduction: 0, connect: vi.fn(), disconnect: vi.fn() }; }

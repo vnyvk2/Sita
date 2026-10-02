@@ -27,6 +27,20 @@ function mockW3CGain(v = 1) {
   return { gain, connect: vi.fn(), disconnect: vi.fn() };
 }
 
+class MockAudioParam {
+  value: number;
+  setValueAtTime = vi.fn((nv: number) => {
+    this.value = nv;
+  });
+  setTargetAtTime = vi.fn((nv: number) => {
+    this.value = nv;
+  });
+  cancelScheduledValues = vi.fn();
+  constructor(v = 0) {
+    this.value = v;
+  }
+}
+
 class MockAudioContext {
   currentTime = 10;
   state = 'running';
@@ -37,9 +51,9 @@ class MockAudioContext {
   createBiquadFilter() {
     return {
       type: 'peaking',
-      frequency: { value: 1000, setTargetAtTime: vi.fn() },
-      gain: { value: 0, setTargetAtTime: vi.fn() },
-      Q: { value: 1 },
+      frequency: new MockAudioParam(1000),
+      gain: new MockAudioParam(0),
+      Q: new MockAudioParam(1),
       connect: vi.fn(),
       disconnect: vi.fn()
     };

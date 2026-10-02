@@ -16,6 +16,9 @@ extraResources:
     to: bin
     filter:
       - '**/*'
+      - '!**/*.STALE*'
+      - '!**/*.bak'
+      - '!**/*.tmp'
 
 files:
   - '!**/.vscode/*'

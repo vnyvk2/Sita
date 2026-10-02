@@ -40,7 +40,7 @@ class MockAudioContext {
       type: 'peaking',
       frequency: new MockAudioParam(1000),
       gain: new MockAudioParam(0),
-      Q: { value: 1 },
+      Q: new MockAudioParam(1),
       connect: vi.fn(),
       disconnect: vi.fn()
     };
