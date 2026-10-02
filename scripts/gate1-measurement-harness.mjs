@@ -283,17 +283,24 @@ function computeMetrics(interleaved, sampleRate = 48000) {
   return { peak, peakDb, rms, rmsDb, truePeakDbtp, integratedLufs, lra, chL, chR, numFrames };
 }
 
-// Cross-correlation peak finding with 3-point parabolic sub-sample estimation
-function computeOptimalLag(sigA, sigB, maxLag = 256) {
+// Cross-correlation peak finding with 3-point parabolic sub-sample estimation.
+// Correlation window MUST cover high-energy (tonal) content: the fixture's
+// opening silence/dither segment decorrelates across engines (independent
+// dither generators), so a window starting at frame 0 yields a spurious lag
+// (observed: 42 instead of the true pipeline delay). Default window covers
+// 2.0s..8.0s at 48kHz. Pass THEORETICAL_PIPELINE_LAG_FRAMES separately for
+// the drift falsifier below — never derive acceptance from the optimum alone.
+const THEORETICAL_PIPELINE_LAG_FRAMES = 52; // true_peak lookahead 48 + FIR group delay 4 @48kHz
+function computeOptimalLag(sigA, sigB, maxLag = 256, startFrame = 2 * 48000, windowFrames = 6 * 48000) {
   let bestLag = 0;
   let maxCorr = -Infinity;
-  const n = Math.min(sigA.length, sigB.length, 48000);
+  const endFrame = Math.min(sigA.length, sigB.length, startFrame + windowFrames);
   const corrVals = new Float64Array(2 * maxLag + 1);
 
   for (let lag = -maxLag; lag <= maxLag; lag++) {
     let corr = 0;
     let count = 0;
-    for (let i = maxLag; i < n - maxLag; i++) {
+    for (let i = startFrame + maxLag; i < endFrame - maxLag; i++) {
       corr += sigA[i] * sigB[i + lag];
       count++;
     }
@@ -618,10 +625,15 @@ async function runGate1MeasurementHarness() {
     const mRust = computeMetrics(rustStudioSamples);
     const mWeb = computeMetrics(webRunA);
 
-    // Cross-correlation peak finding
+    // Cross-correlation peak finding over high-energy content (see note above).
     const lagReport = computeOptimalLag(mWeb.chL, mRust.chL, 256);
     console.log(`Cross-Correlation Optimal Lag: ${lagReport.integerLag} frames (${lagReport.lagMicros.toFixed(2)} µs)`);
     console.log(`Sub-sample parabolic fractional offset: ${lagReport.fractionalDelta.toFixed(4)} frames`);
+    // Pipeline-delay drift falsifier: the measured optimum must agree with the
+    // documented true-peak pipeline delay (48 lookahead + 4 FIR group delay).
+    // A drift here means the delay model changed, not that alignment improved.
+    const lagDrift = Math.abs(lagReport.integerLag - THEORETICAL_PIPELINE_LAG_FRAMES);
+    console.log(`Theoretical Pipeline Lag: ${THEORETICAL_PIPELINE_LAG_FRAMES} frames; drift: ${lagDrift} frames -> ${lagDrift <= 2 ? 'PASS' : 'FAIL (pipeline delay model changed)'}`);
 
     // Compute cancellation depth on aligned waveforms across segments
     // Exclude the 10.0s..12.0s overload region from the digital null test
@@ -632,9 +644,11 @@ async function runGate1MeasurementHarness() {
 
     const alignedCancellationDepth = computeCancellationDepth(webNullSlice, rustNullSlice, lagReport.integerLag);
     const unalignedCancellationDepth = computeCancellationDepth(webNullSlice, rustNullSlice, 0);
+    const theoreticalCancellationDepth = computeCancellationDepth(webNullSlice, rustNullSlice, THEORETICAL_PIPELINE_LAG_FRAMES);
 
-    console.log(`Unaligned Cancellation Depth:   ${unalignedCancellationDepth.toFixed(2)} dB`);
-    console.log(`Latency-Aligned Cancellation:   ${alignedCancellationDepth.toFixed(2)} dB`);
+    console.log(`Unaligned Cancellation Depth (lag 0):            ${unalignedCancellationDepth.toFixed(2)} dB`);
+    console.log(`Latency-Aligned Cancellation (optimal lag):       ${alignedCancellationDepth.toFixed(2)} dB`);
+    console.log(`Theoretical-Lag Cancellation (lag 52 documented): ${theoreticalCancellationDepth.toFixed(2)} dB`);
     console.log(`Self-Null Reference Floors:     [N_web = ${nWebCancellation.toFixed(2)} dB | N_rust = ${rustMetrics?.self_null?.cancellation_depth_db?.toFixed(2) ?? '240.00'} dB]`);
 
     function computeSegmentMetrics(webSamples, rustSamples, startSec, endSec, lagFrames, sampleRate = 48000) {
@@ -702,9 +716,12 @@ async function runGate1MeasurementHarness() {
     crossEngineReport = {
       measuredOptimalLagFrames: lagReport.integerLag,
       measuredOptimalLagMicros: lagReport.lagMicros,
+      theoreticalPipelineLagFrames: THEORETICAL_PIPELINE_LAG_FRAMES,
+      lagDriftFrames: Math.abs(lagReport.integerLag - THEORETICAL_PIPELINE_LAG_FRAMES),
       subSampleOffset: lagReport.fractionalDelta,
       alignedCancellationDepthDb: alignedCancellationDepth,
       unalignedCancellationDepthDb: unalignedCancellationDepth,
+      theoreticalLagCancellationDepthDb: theoreticalCancellationDepth,
       selfNullFloors: {
         chromiumWebAudioDb: nWebCancellation,
         rustNativeEngineDb: rustMetrics?.self_null?.cancellation_depth_db ?? 240.0
