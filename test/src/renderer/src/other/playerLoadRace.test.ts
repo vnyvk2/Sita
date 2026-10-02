@@ -1,33 +1,63 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-// Mock Web Audio API for jsdom environment
+class MockAudioParam {
+  value: number;
+  setValueAtTime = vi.fn();
+  setTargetAtTime = vi.fn((v: number) => {
+    this.value = v;
+  });
+  cancelScheduledValues = vi.fn();
+  exponentialRampToValueAtTime = vi.fn();
+  setValueCurveAtTime = vi.fn();
+  cancelAndHoldAtTime = vi.fn();
+  constructor(v: number) {
+    this.value = v;
+  }
+}
+
+function mockGainNode(v = 1) {
+  return {
+    gain: new MockAudioParam(v),
+    connect: vi.fn(),
+    disconnect: vi.fn()
+  };
+}
+
 class MockAudioContext {
   currentTime = 0;
+  state = 'running';
   destination = {};
   createGain() {
-    return {
-      gain: {
-        value: 1,
-        setValueAtTime: vi.fn(),
-        exponentialRampToValueAtTime: vi.fn(),
-        setTargetAtTime: vi.fn(),
-        cancelScheduledValues: vi.fn()
-      },
-      connect: vi.fn()
-    };
+    return mockGainNode(1);
   }
   createBiquadFilter() {
     return {
       type: 'peaking',
-      frequency: { value: 1000 },
-      gain: { value: 0 },
+      frequency: new MockAudioParam(1000),
+      gain: new MockAudioParam(0),
       Q: { value: 1 },
-      connect: vi.fn()
+      connect: vi.fn(),
+      disconnect: vi.fn()
     };
   }
   createMediaElementSource() {
-    return { connect: vi.fn() };
+    return { connect: vi.fn(), disconnect: vi.fn() };
+  }
+  createConvolver() {
+    return { buffer: null, connect: vi.fn(), disconnect: vi.fn() };
+  }
+  createDynamicsCompressor() {
+    return {
+      threshold: new MockAudioParam(-6),
+      knee: new MockAudioParam(0),
+      ratio: new MockAudioParam(20),
+      attack: new MockAudioParam(0.003),
+      release: new MockAudioParam(0.15),
+      reduction: 0,
+      connect: vi.fn(),
+      disconnect: vi.fn()
+    };
   }
   close() {
     return Promise.resolve();
@@ -210,7 +240,7 @@ describe('AudioPlayer Race & Lifecycle Deterministic Regression Tests', () => {
 
   it('P1: discards stale rejections when older in-flight request fails after newer request succeeded', async () => {
     let rejectGetSong1: (err: any) => void;
-    const getSong1Promise = new Promise((_, reject) => {
+    const getSong1Promise = new Promise((_resolve, reject) => {
       rejectGetSong1 = reject;
     });
 
@@ -312,5 +342,45 @@ describe('AudioPlayer Race & Lifecycle Deterministic Regression Tests', () => {
     expect(player.audio.src).toBe('nora://music/song_99.flac');
     expect(store.state.currentSongData?.songId).toBe(99);
     expect(store.state.currentSongData?.title).toBe('Song 99');
+  });
+
+  it('P1: queue positionChange immediately followed by playSongById for the same songId plays successfully', async () => {
+    let getSongCallCount = 0;
+    window.api = {
+      audioLibraryControls: {
+        getSong: vi.fn().mockImplementation((songId: number) => {
+          getSongCallCount++;
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                songId,
+                title: `Song ${songId}`,
+                duration: 210,
+                path: `nora://music/song_${songId}.flac`
+              });
+            }, 20);
+          });
+        })
+      }
+    } as any;
+
+    let songLoadedEmitted = false;
+    player.on('songLoaded', () => {
+      songLoadedEmitted = true;
+    });
+
+    // 1. Simulate queue position change triggering loadSong({ autoPlay: false })
+    (player as any).loadSong(100, { autoPlay: false });
+
+    // 2. Synchronously in the same tick, user click handler invokes playSongById(100, { autoPlay: true })
+    const playPromise = player.playSongById(100, { autoPlay: true });
+
+    await playPromise;
+
+    expect(getSongCallCount).toBe(1);
+    expect(songLoadedEmitted).toBe(true);
+    expect(player.audio.src).toBe('nora://music/song_100.flac');
+    expect(store.state.currentSongData?.songId).toBe(100);
+    expect(store.state.currentSongData?.title).toBe('Song 100');
   });
 });

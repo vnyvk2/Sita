@@ -78,10 +78,9 @@ class AudioPlayer {
   queuesManager: QueuesManager;
   currentVolume: number;
   /**
-   * T2-4: single volume/mute authority is the post-graph gainNode. Media
-   * elements stay pinned (volume 1.0, muted false) so mute never scales
-   * MediaElementSource output pre-graph. This field is the mute truth;
-   * the element-muted getter legacy is preserved via sync below.
+   * T2-4: single volume/mute authority is the post-graph gainNode. Media elements stay pinned
+   * (volume 1.0, muted false) so mute never scales MediaElementSource output pre-graph. This field
+   * is the mute truth; the element-muted getter legacy is preserved via sync below.
    */
   private mutedState: boolean = false;
 
@@ -124,13 +123,12 @@ class AudioPlayer {
   private queueEventsUnsubscribe: (() => void)[] = [];
   private loadRequestId: number = 0;
   /**
-   * Tier-1 unified playback generation (superseding-transaction epoch).
-   * Bumped by every playback op that supersedes the current transaction
-   * (load, seek, Next/Previous, fade start/cancel, fallback, destroy,
-   * queue-position commit). NOT bumped by standby preload start or by
-   * DSP-only changes (EQ/ReplayGain/profile/volume). All async continuations
-   * capture the value at start and commit only if still current.
-   * Separate from daemon boot_id/sequence_id (profile event lifecycle).
+   * Tier-1 unified playback generation (superseding-transaction epoch). Bumped by every playback op
+   * that supersedes the current transaction (load, seek, Next/Previous, fade start/cancel,
+   * fallback, destroy, queue-position commit). NOT bumped by standby preload start or by DSP-only
+   * changes (EQ/ReplayGain/profile/volume). All async continuations capture the value at start and
+   * commit only if still current. Separate from daemon boot_id/sequence_id (profile event
+   * lifecycle).
    */
   private playbackGeneration: number = 0;
   private destroyed: boolean = false;
@@ -392,14 +390,13 @@ class AudioPlayer {
   ];
 
   /**
-   * T2-1: write an EQ preset into the WebAudio 10-band chain (previously built
-   * flat and never written). DSP-only: never bumps playbackGeneration.
+   * T2-1: write an EQ preset into the WebAudio 10-band chain (previously built flat and never
+   * written). DSP-only: never bumps playbackGeneration.
    */
-  public applyEqualizerToWebAudio(
-    preset?: Partial<Record<EqualizerBandFilters, number>>
-  ): void {
+  public applyEqualizerToWebAudio(preset?: Partial<Record<EqualizerBandFilters, number>>): void {
     const source =
-      preset ?? (storage.equalizerPreset.getEqualizerPreset() as unknown as
+      preset ??
+      (storage.equalizerPreset.getEqualizerPreset() as unknown as
         | Partial<Record<EqualizerBandFilters, number>>
         | undefined);
     for (const key of AudioPlayer.EQUALIZER_BAND_ORDER) {
@@ -415,10 +412,9 @@ class AudioPlayer {
   }
 
   /**
-   * T2-1: apply a settings-UI preset directly to both DSP chains (live slider
-   * path — no DB round-trip, no track reload). Prefer this over
-   * refreshEqualizerFromDatabase when the caller already holds the preset,
-   * because the DB mutation may not have committed yet.
+   * T2-1: apply a settings-UI preset directly to both DSP chains (live slider path — no DB
+   * round-trip, no track reload). Prefer this over refreshEqualizerFromDatabase when the caller
+   * already holds the preset, because the DB mutation may not have committed yet.
    */
   public applyEqualizerPreset(options: Equalizer): void {
     this.applyEqualizerToWebAudio(options);
@@ -431,11 +427,10 @@ class AudioPlayer {
   }
 
   /**
-   * T2-1: DB-authoritative EQ refresh for both engines. The settings UI writes
-   * frequencyBands to the DB (which the legacy localStorage root never sees),
-   * so read the DB first and fall back to legacy storage. Applies WebAudio
-   * gains immediately (no track reload needed) and pushes the native tuple
-   * when the native engine is active. Resolves the applied bands.
+   * T2-1: DB-authoritative EQ refresh for both engines. The settings UI writes frequencyBands to
+   * the DB (which the legacy localStorage root never sees), so read the DB first and fall back to
+   * legacy storage. Applies WebAudio gains immediately (no track reload needed) and pushes the
+   * native tuple when the native engine is active. Resolves the applied bands.
    */
   public async refreshEqualizerFromDatabase(): Promise<number[]> {
     let bands: number[] | null = null;
@@ -461,7 +456,9 @@ class AudioPlayer {
     this.applyEqualizerToWebAudio(preset);
     if (this.isNativeEngineActive && this.nativeBackend) {
       this.nativeBackend
-        .setEqualizer(bands as [number, number, number, number, number, number, number, number, number, number])
+        .setEqualizer(
+          bands as [number, number, number, number, number, number, number, number, number, number]
+        )
         .catch(() => {});
     }
     return bands;
@@ -729,10 +726,9 @@ class AudioPlayer {
   }
 
   /**
-   * Tier-1: bump the superseding-transaction epoch. Must be called BEFORE any
-   * teardown/await for ops that supersede active playback (load, seek,
-   * Next/Previous, fade start/cancel, fallback, destroy, queue commit).
-   * DSP-only changes and standby preload start must NOT call this.
+   * Tier-1: bump the superseding-transaction epoch. Must be called BEFORE any teardown/await for
+   * ops that supersede active playback (load, seek, Next/Previous, fade start/cancel, fallback,
+   * destroy, queue commit). DSP-only changes and standby preload start must NOT call this.
    */
   private bumpPlaybackGeneration(): number {
     this.playbackGeneration += 1;
@@ -1181,13 +1177,15 @@ class AudioPlayer {
               }
             };
             const isCurrentLoad = () =>
-              currentRequestId === this.loadRequestId &&
-              this.isGenerationCurrent(loadGeneration);
+              currentRequestId === this.loadRequestId && this.isGenerationCurrent(loadGeneration);
             const autoPlayHandler = (evt?: Event) => {
               if (evt?.type === 'error') {
                 // Media error: never autoplay; report only for the current load.
                 if (isCurrentLoad()) {
-                  this.emit('loadError', { songId: songData.songId, error: new Error('Media error before canplay') });
+                  this.emit('loadError', {
+                    songId: songData.songId,
+                    error: new Error('Media error before canplay')
+                  });
                 }
                 cleanupAutoPlayWait();
                 return;
@@ -1206,17 +1204,17 @@ class AudioPlayer {
               }
               cleanupAutoPlayWait();
             };
-            autoPlayTimeoutId = setTimeout(
-              () => {
-                // Stalled media (neither canplay nor error): clear the wait so
-                // autoplay is not pending forever; report only if current.
-                if (isCurrentLoad()) {
-                  this.emit('loadError', { songId: songData.songId, error: new Error('Timed out waiting for canplay') });
-                }
-                cleanupAutoPlayWait();
-              },
-              8000
-            );
+            autoPlayTimeoutId = setTimeout(() => {
+              // Stalled media (neither canplay nor error): clear the wait so
+              // autoplay is not pending forever; report only if current.
+              if (isCurrentLoad()) {
+                this.emit('loadError', {
+                  songId: songData.songId,
+                  error: new Error('Timed out waiting for canplay')
+                });
+              }
+              cleanupAutoPlayWait();
+            }, 8000);
 
             this.pendingCanPlayHandler = autoPlayHandler;
             targetElement.addEventListener('canplay', autoPlayHandler);
@@ -1705,9 +1703,7 @@ class AudioPlayer {
               ?.then((state) => {
                 if (!this.isGenerationCurrent(toggleGeneration)) return;
                 if (state && state.state !== undefined && state.state !== 'stopped') {
-                  void window?.api?.audioEngine
-                    ?.send?.({ cmd: 'stop' })
-                    ?.catch?.(() => {});
+                  void window?.api?.audioEngine?.send?.({ cmd: 'stop' })?.catch?.(() => {});
                 }
               })
               ?.catch(() => {});
@@ -1786,9 +1782,9 @@ class AudioPlayer {
   }
 
   /**
-   * T2-7c: smoothed gain write shared by active and standby ReplayGain paths.
-   * Standby writes previously snapped (.value=) while the active path ramped,
-   * risking a click/zipper on crossfade-in.
+   * T2-7c: smoothed gain write shared by active and standby ReplayGain paths. Standby writes
+   * previously snapped (.value=) while the active path ramped, risking a click/zipper on
+   * crossfade-in.
    */
   private applyGainToNode(node: GainNode, linearGain: number): void {
     const now = this.currentContext.currentTime;
@@ -1803,7 +1799,8 @@ class AudioPlayer {
    * Applies ReplayGain to this.replayGainNode using smooth exponential ramping. Master volume and
    * ducking remain entirely separate on this.gainNode.
    */
-  public applyReplayGain() {    const settings = storage.playback.getPlaybackOptions('replayGain') ?? {
+  public applyReplayGain() {
+    const settings = storage.playback.getPlaybackOptions('replayGain') ?? {
       mode: 'track',
       preampDb: 0,
       preventClipping: true
@@ -2445,7 +2442,9 @@ class AudioPlayer {
           () => {
             try {
               this.audio.currentTime = time;
-            } catch {}
+            } catch {
+              // Ignore seek failures on unloaded media
+            }
           },
           { once: true }
         );
@@ -2472,7 +2471,13 @@ class AudioPlayer {
     } = {}
   ): Promise<void> {
     // Tier-1: user-initiated song change supersedes the active transaction.
-    this.bumpPlaybackGeneration();
+    // When an in-flight load is already fetching this exact songId (e.g. triggered
+    // synchronously by a queue positionChange / activeQueueChanged event in the same turn),
+    // do not bump generation here, as that would invalidate the in-flight load's generation
+    // and cause it to discard itself upon resolution.
+    if (!this.inFlightLoad || this.inFlightLoad.songId !== songId) {
+      this.bumpPlaybackGeneration();
+    }
     this.crossfadeScheduler.cancel();
     const { autoPlay = true, recordListening = true, onError } = options;
 
@@ -2695,9 +2700,8 @@ class AudioPlayer {
 
   /**
    * Sets the volume (0-1). Single authority is gainNode (post-graph); media-element volume stays
-   * pinned at 1.0 so compressor drive is knob-invariant and output gain is V, never V^2.
-   * T2-4: respects mutedState — setting volume while muted updates the level
-   * without unmuting audibly.
+   * pinned at 1.0 so compressor drive is knob-invariant and output gain is V, never V^2. T2-4:
+   * respects mutedState — setting volume while muted updates the level without unmuting audibly.
    */
   set volume(volume: number) {
     const v = Math.max(0, Math.min(1, volume));
