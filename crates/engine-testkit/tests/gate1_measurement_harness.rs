@@ -57,16 +57,13 @@ fn generate_test_signal_d6(sample_rate: u32) -> Vec<f32> {
 
     for frame in 0..total_frames {
         let t = frame as f64 / sr;
-        let mut sample_l = 0.0f64;
-        let mut sample_r = 0.0f64;
 
-        if t < 2.0 {
+        let (sample_l, sample_r) = if t < 2.0 {
             // Stage 1: Silence & -90 dBFS TPDF dither
             let dither_amp = 10.0f64.powf(-90.0 / 20.0);
             let d1 = (next_uniform() - next_uniform()) * dither_amp;
             let d2 = (next_uniform() - next_uniform()) * dither_amp;
-            sample_l = d1;
-            sample_r = d2;
+            (d1, d2)
         } else if t < 4.0 {
             // Stage 2: Low-Frequency EQ Bass Multitone (31.25/32 Hz, 62.5/64 Hz, 125 Hz at -18 dBFS)
             let f1 = 32.0;
@@ -77,8 +74,7 @@ fn generate_test_signal_d6(sample_rate: u32) -> Vec<f32> {
             let w2 = 2.0 * std::f64::consts::PI * f2 * t;
             let w3 = 2.0 * std::f64::consts::PI * f3 * t;
             let s = amp * (w1.sin() + w2.sin() + w3.sin());
-            sample_l = s;
-            sample_r = s;
+            (s, s)
         } else if t < 6.0 {
             // Stage 3: Mid/High Quiet Nuance Multitone (200 Hz, 1 kHz, 4 kHz at -36 dBFS)
             let f1 = 200.0;
@@ -89,8 +85,7 @@ fn generate_test_signal_d6(sample_rate: u32) -> Vec<f32> {
             let w2 = 2.0 * std::f64::consts::PI * f2 * t;
             let w3 = 2.0 * std::f64::consts::PI * f3 * t;
             let s = amp * (w1.sin() + w2.sin() + w3.sin());
-            sample_l = s;
-            sample_r = s;
+            (s, s)
         } else if t < 8.0 {
             // Stage 4: Dynamic Transition Shoulder (-30 dBFS -> -6 dBFS linear envelope ramp at 1 kHz)
             let progress = (t - 6.0) / 2.0; // 0.0 -> 1.0
@@ -98,8 +93,7 @@ fn generate_test_signal_d6(sample_rate: u32) -> Vec<f32> {
             let amp_end = 10.0f64.powf(-6.0 / 20.0);
             let env = amp_start + progress * (amp_end - amp_start);
             let s = env * (2.0 * std::f64::consts::PI * 1000.0 * t).sin();
-            sample_l = s;
-            sample_r = s;
+            (s, s)
         } else if t < 10.0 {
             // Stage 5: Full-Scale Master Audio (-1.0 dBFS dense multitone)
             let amp = 10.0f64.powf(-1.0 / 20.0) / 4.0;
@@ -109,8 +103,7 @@ fn generate_test_signal_d6(sample_rate: u32) -> Vec<f32> {
                     + (2.0 * std::f64::consts::PI * 1500.0 * t).sin()
                     + (2.0 * std::f64::consts::PI * 5000.0 * t).sin()
             );
-            sample_l = s;
-            sample_r = s;
+            (s, s)
         } else {
             // Stage 6: Intersample Peak Stress Transient (+3.0 dBFS overload; LIMITER CHARACTERIZATION ONLY)
             let overload_amp = 10.0f64.powf(3.0 / 20.0); // ~1.4125
@@ -119,9 +112,8 @@ fn generate_test_signal_d6(sample_rate: u32) -> Vec<f32> {
             } else {
                 -overload_amp * (2.0 * std::f64::consts::PI * 1000.0 * t).sin()
             };
-            sample_l = s;
-            sample_r = s;
-        }
+            (s, s)
+        };
 
         buffer[frame * 2] = sample_l as f32;
         buffer[frame * 2 + 1] = sample_r as f32;

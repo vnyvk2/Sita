@@ -232,7 +232,7 @@ fn test_phase4_vocal_nuance_boost_golden_fixture_parity() {
         attack_gain
     );
     assert!(
-        attack_gain >= 0.99 && attack_gain <= 1.02,
+        (0.99..=1.02).contains(&attack_gain),
         "Attack time constant (15ms) must settle gain within 2% of unity within 45ms (3*tau), got {:.4}",
         attack_gain
     );
@@ -264,7 +264,7 @@ fn test_phase4_vocal_nuance_boost_golden_fixture_parity() {
     // Two-pole smoothing (envelope tau=250ms + gain smoother tau=250ms):
     // After 233ms holdoff above -12 dBFS, gain gently begins upward climb without flutter.
     assert!(
-        recover_gain >= 1.01 && recover_gain <= 1.08,
+        (1.01..=1.08).contains(&recover_gain),
         "Upward nuance recovery: gain must smoothly begin upward climb without sudden jumps, got {:.4}",
         recover_gain
     );
