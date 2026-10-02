@@ -38,6 +38,38 @@ export function resolveToLocalDiskPath(inputPath: string): string {
   return cleanPath;
 }
 
+/**
+ * T3-1: pure identity formatter for daemon launch diagnostics. Correlates the
+ * spawned file with the handshake so a stale binary (e.g. pre-sound_profile)
+ * is a 30-second diagnosis instead of a mystery timeout. No I/O here; the
+ * caller supplies an optional mtime.
+ */
+export interface DaemonIdentityLog {
+  binaryPath: string | null;
+  engineVersion: string | null;
+  bootId: number | null;
+  protocolVersion: number | null;
+  /** Binary mtime (dev/diagnostic only); absent in packaged builds. */
+  binaryMtimeMs?: number;
+}
+
+export function formatDaemonIdentity(
+  binaryPath: string | null,
+  event: Extract<DaemonPushEvent, { event: 'ready' }> | null,
+  binaryMtimeMs?: number
+): DaemonIdentityLog {
+  const identity: DaemonIdentityLog = {
+    binaryPath,
+    engineVersion: event?.engine_version ?? null,
+    bootId: event?.boot_id ?? null,
+    protocolVersion: event?.protocol_version ?? null
+  };
+  if (typeof binaryMtimeMs === 'number') {
+    identity.binaryMtimeMs = binaryMtimeMs;
+  }
+  return identity;
+}
+
 export class NativeAudioDaemonManager {
   private child: ChildProcess | null = null;
   private isIntentionalStop = false;
@@ -54,6 +86,9 @@ export class NativeAudioDaemonManager {
       timer: NodeJS.Timeout;
     }
   >();
+
+  /** Binary selected by the most recent spawn; used to correlate the ready handshake with its file. */
+  private lastBinaryPath: string | null = null;
 
   private listeners = new Set<(event: DaemonPushEvent) => void>();
   private crashTimestamps: number[] = [];
@@ -172,6 +207,7 @@ export class NativeAudioDaemonManager {
 
     try {
       logger.info('Spawning native audio daemon:', { binaryPath });
+      this.lastBinaryPath = binaryPath;
       const child = spawn(binaryPath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true
@@ -237,6 +273,20 @@ export class NativeAudioDaemonManager {
         const event = parsed as unknown as DaemonPushEvent;
         if (event.event === 'ready') {
           logger.info('Native audio daemon ready handshake received:', event);
+          // T3-1: single identity line per boot — file vs handshake version
+          // correlation. mtime is dev/diagnostic only, never in packaged builds.
+          let binaryMtimeMs: number | undefined;
+          if (app?.isPackaged !== true && this.lastBinaryPath) {
+            try {
+              binaryMtimeMs = fs.statSync(this.lastBinaryPath).mtimeMs;
+            } catch {
+              // Binary vanished between spawn and handshake; path alone suffices.
+            }
+          }
+          logger.info(
+            'Native audio daemon identity:',
+            formatDaemonIdentity(this.lastBinaryPath, event, binaryMtimeMs)
+          );
           if (this.readyResolve) {
             this.readyResolve();
             this.readyResolve = null;

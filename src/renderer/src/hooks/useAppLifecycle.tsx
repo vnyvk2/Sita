@@ -53,20 +53,35 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
       console.log('local storage updated');
     };
 
+    // T3-1: startup restore outcome tracing. Two independent paths race below
+    // (persisted/unknown-source song vs canonical-queue head); each logs
+    // start/success/failure with its songId so the winner and any swallowed
+    // rejection are visible without changing restore behavior.
+    const logStartupRestore = (step: string, detail: unknown) => {
+      console.log(`[StartupRestore] ${step}`, detail ?? '');
+    };
     document.addEventListener('localStorage', syncLocalStorage);
 
     toggleShuffling(playback?.isShuffling);
     toggleRepeat(playback?.isRepeating);
 
+    logStartupRestore('pathA.start', 'checkForStartUpSongs');
     window.api.audioLibraryControls
       .checkForStartUpSongs()
       .then((startUpSongData) => {
         if (startUpSongData) {
+          logStartupRestore('pathA.unknown-source', {
+            songId: (startUpSongData as AudioPlayerData)?.songId ?? null
+          });
           playSongFromUnknownSource(startUpSongData, true);
         } else if (
           playback?.currentSong.songId &&
           typeof playback.currentSong.songId === 'number'
         ) {
+          logStartupRestore('pathA.persisted-song', {
+            songId: playback.currentSong.songId,
+            stoppedPosition: Number(playback.currentSong.stoppedPosition) || 0
+          });
           playSong(playback.currentSong.songId, false);
 
           const currSongPosition = Number(playback.currentSong.stoppedPosition);
@@ -75,12 +90,18 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
             type: 'UPDATE_SONG_POSITION',
             data: currSongPosition
           });
+        } else {
+          logStartupRestore('pathA.no-song', 'no unknown-source or persisted songId');
         }
         return undefined;
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        logStartupRestore('pathA.failed', err);
+        console.error(err);
+      });
 
     if (!queue || queue.queues.length === 0) {
+      logStartupRestore('pathB.start', 'canonical queue head');
       window.api.audioLibraryControls
         .getAllSongIds()
         .then((songIds) => {
@@ -89,12 +110,24 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
             // (docs/canonical-queue-architecture.md).
             const startupQueue = manager.getOrCreateCanonicalQueue({ songIds });
             if (startupQueue?.currentSongId) {
+              logStartupRestore('pathB.canonical-head', {
+                songId: startupQueue.currentSongId
+              });
               playSong(startupQueue.currentSongId, true);
+            } else {
+              logStartupRestore('pathB.empty-queue', 'canonical queue has no current song');
             }
+          } else {
+            logStartupRestore('pathB.no-songs', 'library returned no song ids');
           }
           return undefined;
         })
-        .catch((err) => console.error(err));
+        .catch((err) => {
+          logStartupRestore('pathB.failed', err);
+          console.error(err);
+        });
+    } else {
+      logStartupRestore('pathB.skipped', 'persisted queue present');
     }
 
     return () => {
