@@ -1357,7 +1357,9 @@ class AudioPlayer {
       const targetVolume = 0.001; // Very low but not zero to avoid clicks
       const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
 
-      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
+      // Anchor clamped: exponential ramps cannot start from 0 (W3C RangeError),
+      // reachable since T2-4 made gainNode 0 while muted. Mirrors fadeInAudio.
+      this.gainNode.gain.setValueAtTime(Math.max(0.001, this.gainNode.gain.value), currentTime);
       this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
 
       const timeoutId = setTimeout(() => {
