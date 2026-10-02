@@ -312,7 +312,7 @@ export class NativeAudioBackend {
       // substring 'time' also matched unrelated errors ('sometimes',
       // 'lifetime', 'PrimeTime ...').
       const isTimeout =
-        typeof err?.message === 'string' && /timed out|5000ms/i.test(err.message);
+        typeof err?.message === 'string' && /\b(timed out|timeout)\b|5000ms/i.test(err.message);
       if (isTimeout) {
         // Timeout as unknown outcome: query authoritative state from daemon
         try {

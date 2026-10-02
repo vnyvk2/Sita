@@ -240,3 +240,149 @@ fn eof_during_active_playback_exits_cleanly() {
     assert!(status.success(), "daemon exit status: {status}");
     // Drop's kill()+wait() on the already-reaped child are harmless no-ops.
 }
+
+#[test]
+fn daemon_stdio_crossfade_interrupted_by_seek_suppresses_transition_complete() {
+    let mut daemon = Daemon::spawn();
+    let ready: serde_json::Value =
+        serde_json::from_str(&daemon.next_line(Duration::from_secs(10))).unwrap();
+    assert_eq!(ready.get("event").and_then(|e| e.as_str()), Some("ready"));
+
+    let mut events = Vec::new();
+    let path_a = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+    let path_b = fixture("ref_440hz_3s_44100.wav").replace('\\', "\\\\");
+
+    // 1. Load Slot A and Slot B
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"a","path":"{path_a}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+    daemon.send(2, &format!(r#"{{"cmd":"load","slot":"b","path":"{path_b}"}}"#));
+    assert_ok(&daemon.wait_response(2, Duration::from_secs(10), &mut events));
+
+    // 2. Play Slot A
+    daemon.send(3, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(3, Duration::from_secs(5), &mut events));
+    let _ = daemon.wait_heartbeat(Duration::from_secs(5));
+
+    // 3. Initiate a long crossfade (5000ms)
+    daemon.send(4, r#"{"cmd":"crossfade","duration_ms":5000}"#);
+    assert_ok(&daemon.wait_response(4, Duration::from_secs(5), &mut events));
+
+    // Let it crossfade for ~300ms
+    std::thread::sleep(Duration::from_millis(300));
+
+    // 4. Seek on active Slot A while crossfading
+    daemon.send(5, r#"{"cmd":"seek","position_secs":0.5}"#);
+    assert_ok(&daemon.wait_response(5, Duration::from_secs(5), &mut events));
+
+    // 5. Read several heartbeats (covering over 1 second)
+    for _ in 0..5 {
+        let hb = daemon.wait_heartbeat(Duration::from_secs(5));
+        assert_eq!(
+            hb["active_slot"].as_str(),
+            Some("a"),
+            "Slot A must remain active after seek cancelled crossfade"
+        );
+    }
+
+    // 6. Verify that NO transition_complete event was collected among events
+    for ev in &events {
+        assert_ne!(
+            ev.get("event").and_then(|e| e.as_str()),
+            Some("transition_complete"),
+            "Cancelled crossfade must NOT emit transition_complete!"
+        );
+    }
+
+    daemon.send(6, r#"{"cmd":"stop"}"#);
+    assert_ok(&daemon.wait_response(6, Duration::from_secs(5), &mut events));
+}
+
+#[test]
+fn daemon_stdio_crossfade_interrupted_by_stop_aborts_cleanly() {
+    let mut daemon = Daemon::spawn();
+    let _ready = daemon.next_line(Duration::from_secs(10));
+
+    let mut events = Vec::new();
+    let path_a = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+    let path_b = fixture("ref_440hz_3s_44100.wav").replace('\\', "\\\\");
+
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"a","path":"{path_a}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+    daemon.send(2, &format!(r#"{{"cmd":"load","slot":"b","path":"{path_b}"}}"#));
+    assert_ok(&daemon.wait_response(2, Duration::from_secs(10), &mut events));
+
+    daemon.send(3, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(3, Duration::from_secs(5), &mut events));
+    let _ = daemon.wait_heartbeat(Duration::from_secs(5));
+
+    daemon.send(4, r#"{"cmd":"crossfade","duration_ms":5000}"#);
+    assert_ok(&daemon.wait_response(4, Duration::from_secs(5), &mut events));
+    std::thread::sleep(Duration::from_millis(200));
+
+    // Stop mid-crossfade
+    daemon.send(5, r#"{"cmd":"stop"}"#);
+    assert_ok(&daemon.wait_response(5, Duration::from_secs(5), &mut events));
+
+    // Verify stopped state in get_state
+    daemon.send(6, r#"{"cmd":"get_state"}"#);
+    let state = daemon.wait_response(6, Duration::from_secs(5), &mut events);
+    assert_ok(&state);
+
+    // Verify that NO transition_complete event was emitted
+    for ev in &events {
+        assert_ne!(
+            ev.get("event").and_then(|e| e.as_str()),
+            Some("transition_complete"),
+            "Stop mid-crossfade must NOT emit transition_complete!"
+        );
+    }
+}
+
+#[test]
+fn daemon_stdio_crossfade_interrupted_by_next_locks_incoming_slot_without_transition_complete() {
+    let mut daemon = Daemon::spawn();
+    let _ready = daemon.next_line(Duration::from_secs(10));
+
+    let mut events = Vec::new();
+    let path_a = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+    let path_b = fixture("ref_440hz_3s_44100.wav").replace('\\', "\\\\");
+
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"a","path":"{path_a}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+    daemon.send(2, &format!(r#"{{"cmd":"load","slot":"b","path":"{path_b}"}}"#));
+    assert_ok(&daemon.wait_response(2, Duration::from_secs(10), &mut events));
+
+    daemon.send(3, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(3, Duration::from_secs(5), &mut events));
+    let _ = daemon.wait_heartbeat(Duration::from_secs(5));
+
+    daemon.send(4, r#"{"cmd":"crossfade","duration_ms":5000}"#);
+    assert_ok(&daemon.wait_response(4, Duration::from_secs(5), &mut events));
+    std::thread::sleep(Duration::from_millis(200));
+
+    // Next track loaded into Slot B mid-crossfade
+    daemon.send(5, &format!(r#"{{"cmd":"load","slot":"b","path":"{path_b}"}}"#));
+    assert_ok(&daemon.wait_response(5, Duration::from_secs(10), &mut events));
+
+    // Heartbeats must now report Slot B
+    for _ in 0..4 {
+        let hb = daemon.wait_heartbeat(Duration::from_secs(5));
+        assert_eq!(
+            hb["active_slot"].as_str(),
+            Some("b"),
+            "Slot B must be authoritative active slot after Next"
+        );
+    }
+
+    // Verify that NO transition_complete event was emitted (since it was cancelled by Load, not natural finish)
+    for ev in &events {
+        assert_ne!(
+            ev.get("event").and_then(|e| e.as_str()),
+            Some("transition_complete"),
+            "Next mid-crossfade must NOT emit transition_complete!"
+        );
+    }
+
+    daemon.send(6, r#"{"cmd":"stop"}"#);
+    assert_ok(&daemon.wait_response(6, Duration::from_secs(5), &mut events));
+}

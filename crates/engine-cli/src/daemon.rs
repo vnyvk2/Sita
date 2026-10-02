@@ -270,6 +270,7 @@ impl EngineDaemon {
         );
 
         if let Ok(mut guard) = self.shared_engine.lock() {
+            guard.0.cancel_crossfade(lib_slot);
             guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
             // Keep the freshly primed slot playing if we were playing.
             if self.state == PlaybackState::Playing {
@@ -402,7 +403,12 @@ impl EngineDaemon {
                 // prime() signals any previous decoder on this slot to exit
                 // before dropping its consumer (no orphaned threads).
                 if let Ok(mut guard) = self.shared_engine.lock() {
+                    let was_crossfading = guard.0.crossfade.is_some();
+                    guard.0.cancel_crossfade(lib_slot);
                     guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
+                    if was_crossfading {
+                        self.active_slot.store(Self::slot_idx(slot) as u8, Ordering::Release);
+                    }
                 }
 
                 DaemonResult::Ok {
@@ -483,6 +489,8 @@ impl EngineDaemon {
                 self.state = PlaybackState::Stopped;
                 self.is_playing.store(false, Ordering::Release);
                 if let Ok(mut guard) = self.shared_engine.lock() {
+                    let active_slot = guard.0.active_slot;
+                    guard.0.cancel_crossfade(active_slot);
                     guard.0.pause();
                 }
                 let _ = self.backend.stop();
@@ -647,7 +655,6 @@ impl EngineDaemon {
 
         thread::spawn(move || {
             use std::io::Write;
-            let mut last_active: u8 = active_slot_hb.load(Ordering::Relaxed);
             let mut last_device_error = false;
             while running_hb.load(Ordering::Relaxed) {
                 thread::sleep(Duration::from_millis(250));
@@ -667,7 +674,7 @@ impl EngineDaemon {
                 // standby buffer check come from one snapshot, halving
                 // contention with the RT callback (the other reducer is the
                 // lock-free SetVolume path; see contention policy above).
-                let (position_secs, eos) = {
+                let (position_secs, eos, natural_transition) = {
                     let base = f64::from_bits(if slot_idx == 0 {
                         slot_base_hb.0.load(Ordering::Acquire)
                     } else {
@@ -677,7 +684,7 @@ impl EngineDaemon {
                     shared_hb
                         .lock()
                         .ok()
-                        .map(|g| {
+                        .map(|mut g| {
                             let id = if slot_idx == 0 { LibSlotId::A } else { LibSlotId::B };
                             let standby = if slot_idx == 0 { LibSlotId::B } else { LibSlotId::A };
                             let pos = base + g.0.slot(id).frames_consumed as f64 / rate;
@@ -689,18 +696,21 @@ impl EngineDaemon {
                             // buffered, the next render splices — wait for it.
                             let splice_imminent =
                                 is_eos && g.0.slot(standby).has_audio();
-                            (pos, is_eos && !splice_imminent)
+                            let transition = g.0.pending_transition_complete.take();
+                            (pos, is_eos && !splice_imminent, transition)
                         })
-                        .unwrap_or((base, false))
+                        .unwrap_or((base, false, None))
                 };
 
                 let mut events: Vec<DaemonEvent> = Vec::new();
-                // Crossfade completion: active slot index changed under us.
-                let active_now = active_slot_hb.load(Ordering::Relaxed);
-                if active_now != last_active {
-                    let new_slot = if active_now == 0 { SlotId::A } else { SlotId::B };
+                // Crossfade/splice completion: only emit when transition actually completed
+                // naturally on the audio thread (suppressed on cancellation).
+                if let Some(trans_slot) = natural_transition {
+                    let new_slot = match trans_slot {
+                        LibSlotId::A => SlotId::A,
+                        LibSlotId::B => SlotId::B,
+                    };
                     events.push(DaemonEvent::TransitionComplete { active_slot: new_slot });
-                    last_active = active_now;
                 }
 
                 events.push(DaemonEvent::Heartbeat {

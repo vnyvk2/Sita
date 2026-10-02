@@ -20,13 +20,16 @@ extraResources:
 files:
   - '!**/.vscode/*'
   - '!src/*'
+  - '!target/**/*'
+  - '!crates/**/*'
+  - '!scripts/**/*'
+  - '!{Cargo.toml,Cargo.lock}'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!**/resources/other/*'
   - '!**/resources/installer_assets/*'
-  - '!**/resources/other/*'
 
 asarUnpack:
   - resources/**

@@ -7,7 +7,8 @@ import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
 // but no longer disappear without a path tag.
 
 import { useAppLifecycle } from '@renderer/hooks/useAppLifecycle';
-import { dispatch } from '@renderer/store/store';
+import { dispatch, store } from '@renderer/store/store';
+import storage from '@renderer/utils/localStorage';
 
 function makeDeps(overrides: Record<string, any> = {}) {
   return {
@@ -120,5 +121,115 @@ describe('T3-1 startup restore tracing', () => {
     expect(steps).toContain('pathA.failed');
     expect(steps).toContain('pathB.failed');
     expect(errSpy).toHaveBeenCalled();
+  });
+
+  describe('Phase A: startup serialization and position restore', () => {
+    it('native ON + persisted position > 0: awaits playSong and restores currentTime and position', async () => {
+      dispatch({ type: 'UPDATE_QUEUE', data: { queues: [] } } as any);
+      storage.playback.setPlaybackOptions('useNativeAudioEngine', true);
+      storage.playback.setCurrentSongOptions('songId', 1614);
+      storage.playback.setCurrentSongOptions('stoppedPosition', 24.5);
+
+      let playSongResolved = false;
+      const deps = makeDeps({
+        playSong: vi.fn().mockImplementation(async (songId: number) => {
+          await new Promise((r) => setTimeout(r, 10));
+          dispatch({
+            type: 'CURRENT_SONG_DATA_CHANGE',
+            data: { songId, title: 'Test Song' }
+          } as any);
+          playSongResolved = true;
+        })
+      });
+
+      renderHook(() => useAppLifecycle(deps as any));
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 30));
+      });
+
+      expect(deps.playSong).toHaveBeenCalledWith(1614, false);
+      expect(playSongResolved).toBe(true);
+      expect(deps.audio.currentTime).toBe(24.5);
+      expect(store.state.player.songPosition).toBe(24.5);
+      expect(store.state.currentSongData?.songId).toBe(1614);
+      expect(loggedSteps()).toContain('pathA.persisted-song-restored');
+    });
+
+    it('native OFF + persisted position > 0: restores position correctly in WebAudio mode', async () => {
+      dispatch({ type: 'UPDATE_QUEUE', data: { queues: [] } } as any);
+      storage.playback.setPlaybackOptions('useNativeAudioEngine', false);
+      storage.playback.setCurrentSongOptions('songId', 1614);
+      storage.playback.setCurrentSongOptions('stoppedPosition', 12.0);
+
+      const deps = makeDeps({
+        playSong: vi.fn().mockImplementation(async (songId: number) => {
+          dispatch({
+            type: 'CURRENT_SONG_DATA_CHANGE',
+            data: { songId, title: 'WebAudio Track' }
+          } as any);
+        })
+      });
+
+      renderHook(() => useAppLifecycle(deps as any));
+      await act(async () => {});
+
+      expect(deps.playSong).toHaveBeenCalledWith(1614, false);
+      expect(deps.audio.currentTime).toBe(12.0);
+      expect(store.state.player.songPosition).toBe(12.0);
+      expect(store.state.currentSongData?.songId).toBe(1614);
+      expect(loggedSteps()).toContain('pathA.persisted-song-restored');
+    });
+
+    it('playSong failure: position restore does not create bogus state or seek', async () => {
+      dispatch({ type: 'UPDATE_QUEUE', data: { queues: [] } } as any);
+      dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: { songId: 100 } } as any);
+      dispatch({ type: 'UPDATE_SONG_POSITION', data: 0 } as any);
+      storage.playback.setCurrentSongOptions('songId', 9999);
+      storage.playback.setCurrentSongOptions('stoppedPosition', 45.0);
+
+      const deps = makeDeps({
+        audio: { currentTime: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() },
+        playSong: vi.fn().mockImplementation(async () => {
+          throw new Error('Unplayable file');
+        })
+      });
+
+      renderHook(() => useAppLifecycle(deps as any));
+      await act(async () => {});
+
+      expect(deps.playSong).toHaveBeenCalledWith(9999, false);
+      expect(deps.audio.currentTime).toBe(0);
+      expect(store.state.player.songPosition).toBe(0);
+      expect(loggedSteps()).not.toContain('pathA.persisted-song-restored');
+    });
+
+    it('StrictMode double invocation: unmounted first instance does not duplicate or corrupt restore', async () => {
+      dispatch({ type: 'UPDATE_QUEUE', data: { queues: [] } } as any);
+      storage.playback.setCurrentSongOptions('songId', 777);
+      storage.playback.setCurrentSongOptions('stoppedPosition', 18.0);
+
+      const deps = makeDeps({
+        playSong: vi.fn().mockImplementation(async (songId: number) => {
+          await new Promise((r) => setTimeout(r, 20));
+          dispatch({
+            type: 'CURRENT_SONG_DATA_CHANGE',
+            data: { songId, title: 'StrictMode Track' }
+          } as any);
+        })
+      });
+
+      const { unmount } = renderHook(() => useAppLifecycle(deps as any));
+      unmount();
+
+      renderHook(() => useAppLifecycle(deps as any));
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 50));
+      });
+
+      expect(deps.audio.currentTime).toBe(18.0);
+      expect(store.state.player.songPosition).toBe(18.0);
+      expect(store.state.currentSongData?.songId).toBe(777);
+    });
   });
 });

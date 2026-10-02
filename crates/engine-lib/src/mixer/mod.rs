@@ -20,6 +20,7 @@ pub struct DualSlotMixer {
     pub master_volume: f32,
     pub is_paused: bool,
     pub auto_splice: bool,
+    pub pending_transition_complete: Option<SlotId>,
 }
 
 impl Default for DualSlotMixer {
@@ -39,6 +40,7 @@ impl DualSlotMixer {
             master_volume: 1.0,
             is_paused: false,
             auto_splice: true,
+            pending_transition_complete: None,
         }
     }
 
@@ -87,6 +89,26 @@ impl DualSlotMixer {
         self.slot_mut(self.active_slot).state = SlotState::Crossfading;
         self.crossfade = Some(CrossfadeState::new(self.active_slot, standby, duration_frames));
         Ok(())
+    }
+
+    /// Cancel an in-flight crossfade, establishing `authoritative_slot` as the sole active slot.
+    ///
+    /// The authoritative slot's gain is restored to 1.0 and its state set to Playing.
+    /// The abandoned slot is fully cleared (gain 1.0, state Empty, decoder signaled to stop).
+    /// Suppresses any pending transition completion.
+    pub fn cancel_crossfade(&mut self, authoritative_slot: SlotId) {
+        if self.crossfade.take().is_some() {
+            let other_slot = authoritative_slot.opposite();
+            self.active_slot = authoritative_slot;
+            let auth = self.slot_mut(authoritative_slot);
+            auth.gain = 1.0;
+            if auth.state == SlotState::Crossfading {
+                auth.state = SlotState::Playing;
+            }
+            let abandoned = self.slot_mut(other_slot);
+            abandoned.clear();
+            self.pending_transition_complete = None;
+        }
     }
 
     /// Check if either slot has active audio playing or queued.
@@ -155,6 +177,7 @@ impl AudioSource for DualSlotMixer {
                 self.slot_mut(to_slot_id).state = SlotState::Playing;
                 self.active_slot = to_slot_id;
                 self.crossfade = None;
+                self.pending_transition_complete = Some(to_slot_id);
             } else {
                 self.crossfade = Some(xfade);
                 return written;
@@ -195,6 +218,7 @@ impl AudioSource for DualSlotMixer {
                     self.slot_mut(active_id).state = SlotState::Eos;
                     self.slot_mut(standby_id).state = SlotState::Playing;
                     self.active_slot = standby_id;
+                    self.pending_transition_complete = Some(standby_id);
                     // Loop will continue and fill the remaining output slice from newly active slot!
                 } else {
                     // Fill remaining output buffer with silence

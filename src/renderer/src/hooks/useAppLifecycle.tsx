@@ -45,6 +45,7 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
   const manager = getQueuesManager();
 
   useEffect(() => {
+    let isCancelled = false;
     const { playback, queue } = storage.getAllItems();
 
     const syncLocalStorage = () => {
@@ -68,7 +69,8 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
     logStartupRestore('pathA.start', 'checkForStartUpSongs');
     window.api.audioLibraryControls
       .checkForStartUpSongs()
-      .then((startUpSongData) => {
+      .then(async (startUpSongData) => {
+        if (isCancelled) return;
         if (startUpSongData) {
           logStartupRestore('pathA.unknown-source', {
             songId: (startUpSongData as AudioPlayerData)?.songId ?? null
@@ -78,24 +80,44 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
           playback?.currentSong.songId &&
           typeof playback.currentSong.songId === 'number'
         ) {
+          const targetSongId = playback.currentSong.songId;
+          const stoppedPos = Number(playback.currentSong.stoppedPosition) || 0;
           logStartupRestore('pathA.persisted-song', {
-            songId: playback.currentSong.songId,
-            stoppedPosition: Number(playback.currentSong.stoppedPosition) || 0
+            songId: targetSongId,
+            stoppedPosition: stoppedPos
           });
-          playSong(playback.currentSong.songId, false);
 
-          const currSongPosition = Number(playback.currentSong.stoppedPosition);
-          player.currentTime = currSongPosition;
-          dispatch({
-            type: 'UPDATE_SONG_POSITION',
-            data: currSongPosition
-          });
+          await playSong(targetSongId, false);
+
+          if (isCancelled) return;
+
+          // Verify that the target song is current / loaded before seeking and updating position
+          const currentLoadedId = store.state.currentSongData?.songId;
+          if (currentLoadedId === targetSongId) {
+            if (stoppedPos > 0) {
+              player.currentTime = stoppedPos;
+            }
+            dispatch({
+              type: 'UPDATE_SONG_POSITION',
+              data: stoppedPos
+            });
+            logStartupRestore('pathA.persisted-song-restored', {
+              songId: targetSongId,
+              restoredPosition: stoppedPos
+            });
+          } else {
+            logStartupRestore('pathA.persisted-song-aborted', {
+              expectedSongId: targetSongId,
+              actualSongId: currentLoadedId ?? null
+            });
+          }
         } else {
           logStartupRestore('pathA.no-song', 'no unknown-source or persisted songId');
         }
         return undefined;
       })
       .catch((err) => {
+        if (isCancelled) return;
         logStartupRestore('pathA.failed', err);
         console.error(err);
       });
@@ -105,6 +127,7 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
       window.api.audioLibraryControls
         .getAllSongIds()
         .then((songIds) => {
+          if (isCancelled) return;
           if (songIds && songIds.length > 0) {
             // Startup default queue is the canonical All Songs projection
             // (docs/canonical-queue-architecture.md).
@@ -123,6 +146,7 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
           return undefined;
         })
         .catch((err) => {
+          if (isCancelled) return;
           logStartupRestore('pathB.failed', err);
           console.error(err);
         });
@@ -131,6 +155,7 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
     }
 
     return () => {
+      isCancelled = true;
       document.removeEventListener('localStorage', syncLocalStorage);
     };
   }, []);

@@ -120,8 +120,8 @@ export class NightModeNode {
       this.dryGain.gain.value = dryTarget;
       this.wetGain.gain.value = wetTarget;
     } else {
-      this.dryGain.gain.setTargetAtTime(dryTarget, now, NightModeNode.FADE_TIME_CONSTANT);
-      this.wetGain.gain.setTargetAtTime(wetTarget, now, NightModeNode.FADE_TIME_CONSTANT);
+      this.dryGain.gain.setValueAtTime(this.dryGain.gain.value, now); this.dryGain.gain.setTargetAtTime(dryTarget, now, NightModeNode.FADE_TIME_CONSTANT);
+      this.wetGain.gain.setValueAtTime(this.wetGain.gain.value, now); this.wetGain.gain.setTargetAtTime(wetTarget, now, NightModeNode.FADE_TIME_CONSTANT);
     }
   }
 
@@ -180,7 +180,7 @@ export class NightModeNode {
       if (immediate || typeof param.setTargetAtTime !== 'function') {
         param.value = value;
       } else {
-        param.setTargetAtTime(value, now, NightModeNode.PARAM_TIME_CONSTANT);
+        param.setValueAtTime(param.value, now); param.setTargetAtTime(value, now, NightModeNode.PARAM_TIME_CONSTANT);
       }
     }
   }

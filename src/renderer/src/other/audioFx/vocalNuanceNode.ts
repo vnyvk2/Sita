@@ -198,8 +198,8 @@ export class VocalNuanceNode {
       this.dryGain.gain.value = dryTarget;
       this.wetGain.gain.value = wetTarget;
     } else {
-      this.dryGain.gain.setTargetAtTime(dryTarget, now, VocalNuanceNode.FADE_TIME_CONSTANT);
-      this.wetGain.gain.setTargetAtTime(wetTarget, now, VocalNuanceNode.FADE_TIME_CONSTANT);
+      this.dryGain.gain.setValueAtTime(this.dryGain.gain.value, now); this.dryGain.gain.setTargetAtTime(dryTarget, now, VocalNuanceNode.FADE_TIME_CONSTANT);
+      this.wetGain.gain.setValueAtTime(this.wetGain.gain.value, now); this.wetGain.gain.setTargetAtTime(wetTarget, now, VocalNuanceNode.FADE_TIME_CONSTANT);
     }
   }
 

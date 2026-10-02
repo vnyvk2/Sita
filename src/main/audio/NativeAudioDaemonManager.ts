@@ -107,16 +107,20 @@ export class NativeAudioDaemonManager {
   public findBinaryPath(): string | null {
     const binaryName = process.platform === 'win32' ? 'engine-cli.exe' : 'engine-cli';
 
-    const candidates = [
-      app?.isPackaged ? path.join(process.resourcesPath, 'bin', binaryName) : null,
-      path.join(process.cwd(), 'resources', 'bin', binaryName),
-      app?.getAppPath ? path.join(app.getAppPath(), 'target', 'release', binaryName) : null,
-      app?.getAppPath ? path.join(app.getAppPath(), 'target', 'debug', binaryName) : null,
-      path.join(process.cwd(), 'target', 'release', binaryName),
-      path.join(process.cwd(), 'target', 'debug', binaryName)
-    ].filter((p): p is string => Boolean(p));
+    const candidates = app?.isPackaged
+      ? [
+          path.join(process.resourcesPath, 'bin', binaryName),
+          path.join(process.cwd(), 'resources', 'bin', binaryName)
+        ]
+      : [
+          app?.getAppPath ? path.join(app.getAppPath(), 'target', 'release', binaryName) : null,
+          path.join(process.cwd(), 'target', 'release', binaryName),
+          app?.getAppPath ? path.join(app.getAppPath(), 'target', 'debug', binaryName) : null,
+          path.join(process.cwd(), 'target', 'debug', binaryName),
+          path.join(process.cwd(), 'resources', 'bin', binaryName)
+        ];
 
-    for (const candidate of candidates) {
+    for (const candidate of candidates.filter((p): p is string => Boolean(p))) {
       if (fs.existsSync(candidate)) {
         return candidate;
       }

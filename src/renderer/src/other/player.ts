@@ -149,6 +149,7 @@ class AudioPlayer {
   } | null = null;
   private crossfadeScheduler: CrossfadeScheduler;
   private preloadedSongData: AudioPlayerData | null = null;
+  private standbyPreloadGeneration: number = 0;
   private isCrossfading: boolean = false;
   private suppressQueuePositionLoad: boolean = false;
   private abLoopController: AbLoopController;
@@ -310,25 +311,24 @@ class AudioPlayer {
           // Informational only; track_end drives auto-advance.
         },
         onTransitionComplete: (activeSlot) => {
-          if (!this.isNativeEngineActive) return;
+          if (!this.isNativeEngineActive || this.destroyed) return;
           // Tier-1: stale daemon completion (superseded by fallback/destroy/
-          // seek/Next or a newer fade) must cause zero playback mutations.
-          // The commit below is the exactly-once queue advance for the current
-          // generation; generation was bumped at fade ownership, so only a
-          // NEWER bump invalidates it — never the bump that started this fade.
-          const completionGeneration = this.playbackGeneration;
-          if (this.destroyed || !this.isGenerationCurrent(completionGeneration)) return;
-          this.activeSlot = activeSlot;
+          // seek/Next or a newer transaction) must cause zero playback mutations.
           // Auto-splice adoption (gapless-at-0 path): the daemon already
           // switched to the preloaded standby. Adopt its metadata WITHOUT
           // reloading — a reload would restart the track audibly. TrackEnd
           // never fires for spliced transitions (daemon suppresses it while
           // the standby is buffered), so this is the only advance signal.
           const preloaded = this.preloadedSongData;
-          if (preloaded && preloaded.songId === this.peekNextTrackId()) {
+          if (
+            preloaded &&
+            this.isGenerationCurrent(this.standbyPreloadGeneration) &&
+            preloaded.songId === this.peekNextTrackId()
+          ) {
+            this.activeSlot = activeSlot;
             this.adoptPreloadedStandby(preloaded);
+            this.emit('songChange', this.currentSongData);
           }
-          this.emit('songChange', this.currentSongData);
         },
         onStateChange: (state) => {
           if (!this.isNativeEngineActive) return;
@@ -522,6 +522,7 @@ class AudioPlayer {
         return this.nativeBackend?.preload(songData.path).then(() => {
           if (this.isNativeEngineActive && this.currentSongData?.songId === mySong) {
             this.preloadedSongData = songData;
+            this.standbyPreloadGeneration = this.playbackGeneration;
           }
           return null;
         });
@@ -547,6 +548,7 @@ class AudioPlayer {
     this.nativeCurrentPosition = 0;
     this.nativeIsPlaying = true;
     this.preloadedSongData = null;
+    this.standbyPreloadGeneration = 0;
     this.clearAbLoop('TRACK_LOAD');
     dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: preloaded });
     storage.playback.setCurrentSongOptions('songId', preloaded.songId);
@@ -573,6 +575,7 @@ class AudioPlayer {
     const nextId = this.peekNextTrackId();
     if (nextId === null) {
       this.preloadedSongData = null;
+      this.standbyPreloadGeneration = 0;
       return;
     }
     if (this.preloadedSongData?.songId === nextId || this.nativePreloadInFlight) return;
@@ -587,6 +590,7 @@ class AudioPlayer {
         return this.nativeBackend?.preload(songData.path).then(() => {
           if (this.isNativeEngineActive && this.currentSongData?.songId === loadedSongId) {
             this.preloadedSongData = songData;
+            this.standbyPreloadGeneration = this.playbackGeneration;
           }
           return null;
         });
@@ -622,6 +626,7 @@ class AudioPlayer {
     }
     this.crossfadeScheduler.cancel();
     this.preloadedSongData = null;
+    this.standbyPreloadGeneration = 0;
     this.nativePreloadInFlight = false;
     this.isCrossfading = false;
     this.isNativeEngineActive = false;
@@ -1090,6 +1095,7 @@ class AudioPlayer {
             // upcoming track; refresh it toward the true next (async).
             if (this.preloadedSongData?.songId !== songData.songId) {
               this.preloadedSongData = null;
+              this.standbyPreloadGeneration = 0;
             }
             await this.nativeBackend.load(this.activeSlot, songData.path);
             // Tier-1: abort commit if superseded during native load await.
@@ -1299,6 +1305,7 @@ class AudioPlayer {
     // Tier-1: drop armed standby/native state so post-destroy completions
     // cannot adopt or resurrect playback.
     this.preloadedSongData = null;
+    this.standbyPreloadGeneration = 0;
     this.nativePreloadInFlight = false;
     this.nativeLoadedSongId = null;
     this.nativeCurrentPosition = 0;
@@ -1879,6 +1886,7 @@ class AudioPlayer {
             return false;
           }
           this.preloadedSongData = songData;
+          this.standbyPreloadGeneration = this.playbackGeneration;
 
           if (this.isNativeEngineActive && this.nativeBackend) {
             try {
@@ -1886,6 +1894,8 @@ class AudioPlayer {
               return true;
             } catch (err) {
               logPlayer('[AudioPlayer.crossfadePreload] Native preload failed', { trackId, err });
+              this.preloadedSongData = null;
+              this.standbyPreloadGeneration = 0;
               return false;
             }
           }
@@ -1929,6 +1939,7 @@ class AudioPlayer {
 
           if (!isReady || this.crossfadeScheduler.getSessionId() !== sessionId) {
             this.preloadedSongData = null;
+            this.standbyPreloadGeneration = 0;
             return false;
           }
 
@@ -2001,6 +2012,7 @@ class AudioPlayer {
             this.activeSlot = this.activeSlot === 'A' ? 'B' : 'A';
             this.currentSongData = this.preloadedSongData;
             this.preloadedSongData = null;
+            this.standbyPreloadGeneration = 0;
             // New track starts at 0; without this the old track's tail time
             // lingers until the next heartbeat.
             this.nativeCurrentPosition = 0;
@@ -2145,6 +2157,7 @@ class AudioPlayer {
           });
         }
         this.preloadedSongData = null;
+        this.standbyPreloadGeneration = 0;
       },
       onFadeCancel: (sessionId) => {
         logPlayer('[AudioPlayer.onFadeCancel]', { sessionId });
@@ -2177,6 +2190,7 @@ class AudioPlayer {
         this.standbyAudio.src = '';
         this.isCrossfading = false;
         this.preloadedSongData = null;
+        this.standbyPreloadGeneration = 0;
       }
     };
   }
@@ -2392,6 +2406,8 @@ class AudioPlayer {
     // song identity is unchanged). Bump before teardown/awaits.
     this.bumpPlaybackGeneration();
     this.crossfadeScheduler.cancel();
+    this.preloadedSongData = null;
+    this.standbyPreloadGeneration = 0;
     if (this.abLoopController.isPositionOutside(time)) {
       this.clearAbLoop('SEEK_OUTSIDE');
     }

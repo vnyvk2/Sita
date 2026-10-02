@@ -72,3 +72,11 @@ path = "tests/phase3_listening_validation.rs"
 [[test]]
 name = "phase4_golden_fixture_parity"
 path = "tests/phase4_golden_fixture_parity.rs"
+
+[[test]]
+name = "crossfade_interruption_matrix"
+path = "tests/crossfade_interruption_matrix.rs"
+
+[[test]]
+name = "crossfade_contract"
+path = "tests/crossfade_contract.rs"

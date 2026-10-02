@@ -97,7 +97,7 @@ if (typeof window !== 'undefined') {
   window.AudioContext = class {
     createGain() {
       return {
-        gain: { value: 1, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
+        gain: { value: 1, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn(), setValueAtTime: vi.fn() },
         connect: vi.fn(),
         disconnect: vi.fn()
       };
