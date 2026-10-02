@@ -1,3 +1,13 @@
+/**
+ * @deprecated [QUARANTINED FOR GATE 1 PARITY AUDIT]
+ * This test validates the standalone TypeScript helper class OptionBShaper in isolation against
+ * pre-generated Rust artifacts. It does NOT exercise the active Web Audio graph (which uses
+ * DynamicsCompressorNode + makeup gain in vocalNuanceNode.ts).
+ *
+ * CANONICAL HARNESS: Use `scripts/gate1-measurement-harness.mjs` executing in real headless
+ * Chromium (OfflineAudioContext) and `crates/engine-testkit/tests/gate1_measurement_harness.rs`.
+ */
+
 import fs from 'fs';
 import path from 'path';
 

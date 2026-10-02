@@ -12,7 +12,7 @@
 use engine_protocol::{SoundProfile, SoundProfileStatus};
 use serde::{Deserialize, Serialize};
 
-use crate::dsp::eq::EqualizerChain;
+use crate::dsp::eq::{EqProfile, EqualizerChain};
 use crate::dsp::karaoke::KaraokeProcessor;
 use crate::dsp::replaygain::ReplayGainProcessor;
 use crate::dsp::sound_profile::SoundProfileStage;
@@ -122,6 +122,30 @@ impl DspPipeline {
     #[inline]
     pub fn sound_profile(&self) -> SoundProfile {
         self.sound_profile.target_profile()
+    }
+
+    /// Set equalizer profile (defaults to EqProfile::LegacyWebAudio).
+    #[inline]
+    pub fn set_eq_profile(&mut self, profile: EqProfile) {
+        self.eq.set_profile(profile);
+    }
+
+    /// Current active equalizer profile.
+    #[inline]
+    pub fn eq_profile(&self) -> EqProfile {
+        self.eq.profile()
+    }
+
+    /// Access internal equalizer chain.
+    #[inline]
+    pub fn equalizer(&self) -> &EqualizerChain {
+        &self.eq
+    }
+
+    /// Mutable access to internal equalizer chain.
+    #[inline]
+    pub fn equalizer_mut(&mut self) -> &mut EqualizerChain {
+        &mut self.eq
     }
 
     /// High-level profile transition status (Active vs Transitioning).

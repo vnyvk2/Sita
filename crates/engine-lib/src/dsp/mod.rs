@@ -13,7 +13,10 @@ pub mod sound_profile;
 pub mod true_peak;
 
 pub use chain::{DspConfig, DspPipeline};
-pub use eq::{BiquadFilter, EqualizerChain, EQ_CENTER_FREQUENCIES, EQ_DEFAULT_Q};
+pub use eq::{
+    BiquadFilter, EqProfile, EqualizerChain, EQ_CENTER_FREQUENCIES, EQ_DEFAULT_Q,
+    EQ_ISO_FREQUENCIES, EQ_ISO_Q, EQ_LEGACY_FREQUENCIES, EQ_LEGACY_Q,
+};
 pub use karaoke::KaraokeProcessor;
 #[allow(deprecated)]
 pub use limiter::PeakLimiter;

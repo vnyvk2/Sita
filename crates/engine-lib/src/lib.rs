@@ -20,8 +20,9 @@ pub use buffer::{AudioConsumer, AudioProducer, BoundedAudioTransport, PlayheadTr
 pub use sink::{AudioSource, CpalBackend, NullSink, OutputBackend, WavSink};
 pub use mixer::{CrossfadeState, DualSlotMixer, SlotId, SlotState, VoiceSlot};
 pub use dsp::{
-    BiquadFilter, DspConfig, DspPipeline, EqualizerChain, KaraokeProcessor, ReplayGainProcessor,
-    SoundProfileStage, TruePeakLimiter, EQ_CENTER_FREQUENCIES,
+    BiquadFilter, DspConfig, DspPipeline, EqProfile, EqualizerChain, KaraokeProcessor,
+    ReplayGainProcessor, SoundProfileStage, TruePeakLimiter, EQ_CENTER_FREQUENCIES, EQ_DEFAULT_Q,
+    EQ_ISO_FREQUENCIES, EQ_ISO_Q, EQ_LEGACY_FREQUENCIES, EQ_LEGACY_Q,
 };
 #[allow(deprecated)]
 pub use dsp::PeakLimiter;

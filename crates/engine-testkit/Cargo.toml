@@ -80,3 +80,15 @@ path = "tests/crossfade_interruption_matrix.rs"
 [[test]]
 name = "crossfade_contract"
 path = "tests/crossfade_contract.rs"
+
+[[test]]
+name = "gate1_measurement_harness"
+path = "tests/gate1_measurement_harness.rs"
+
+[[test]]
+name = "rust_governance_gates"
+path = "tests/rust_governance_gates.rs"
+
+[[test]]
+name = "gate2_eq_parity"
+path = "tests/gate2_eq_parity.rs"

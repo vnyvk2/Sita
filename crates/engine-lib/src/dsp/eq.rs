@@ -1,12 +1,57 @@
 //! 10-Band Peaking Graphic Equalizer using Robert Bristow-Johnson (RBJ) biquad filters.
 
-/// Center frequencies for standard 10-band ISO octave equalizer.
-pub const EQ_CENTER_FREQUENCIES: [f32; 10] = [
+/// Center frequencies for Nora's Web Audio legacy equalizer (32 Hz to 16 kHz).
+pub const EQ_LEGACY_FREQUENCIES: [f32; 10] = [
+    32.0, 64.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
+];
+
+/// Quality factor (Q) for Web Audio legacy equalizer.
+pub const EQ_LEGACY_Q: f32 = 1.0;
+
+/// Center frequencies for standard 10-band ISO 266 octave equalizer (31.25 Hz to 16 kHz).
+pub const EQ_ISO_FREQUENCIES: [f32; 10] = [
     31.25, 62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0,
 ];
 
-/// Quality factor (Q) for 1-octave band filters.
-pub const EQ_DEFAULT_Q: f32 = std::f32::consts::SQRT_2;
+/// Quality factor (Q) for standard 1-octave band ISO equalizer.
+pub const EQ_ISO_Q: f32 = std::f32::consts::SQRT_2;
+
+/// Default center frequencies (defaults to LegacyWebAudio for backwards compatibility and WebAudio parity).
+pub const EQ_CENTER_FREQUENCIES: [f32; 10] = EQ_LEGACY_FREQUENCIES;
+
+/// Default quality factor (Q) (defaults to LegacyWebAudio for backwards compatibility and WebAudio parity).
+pub const EQ_DEFAULT_Q: f32 = EQ_LEGACY_Q;
+
+/// Profile determining the equalizer center frequencies and quality factor (Q).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EqProfile {
+    /// WebAudio legacy profile: Q=1.0, [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000] Hz.
+    /// Default mode for 100% acoustic and preset compatibility with Nora's Web Audio fallback.
+    #[default]
+    LegacyWebAudio,
+    /// Standard ISO 266 1-octave profile: Q=sqrt(2) ≈ 1.4142, [31.25, 62.5, 125, ...] Hz.
+    IsoOctave,
+}
+
+impl EqProfile {
+    /// Return the center frequencies associated with this EQ profile.
+    #[inline]
+    pub const fn center_frequencies(&self) -> &'static [f32; 10] {
+        match self {
+            Self::LegacyWebAudio => &EQ_LEGACY_FREQUENCIES,
+            Self::IsoOctave => &EQ_ISO_FREQUENCIES,
+        }
+    }
+
+    /// Return the filter quality factor (Q) associated with this EQ profile.
+    #[inline]
+    pub const fn q_factor(&self) -> f32 {
+        match self {
+            Self::LegacyWebAudio => EQ_LEGACY_Q,
+            Self::IsoOctave => EQ_ISO_Q,
+        }
+    }
+}
 
 /// Direct Form I biquad filter coefficients and channel delay state.
 #[derive(Debug, Clone, Copy)]
@@ -115,6 +160,18 @@ impl BiquadFilter {
     pub fn reset_state(&mut self) {
         self.state = [[0.0; 4]; 2];
     }
+
+    /// Normalized Direct Form I coefficients: (b0, b1, b2, a1, a2).
+    #[inline]
+    pub const fn coefficients(&self) -> (f32, f32, f32, f32, f32) {
+        (self.b0, self.b1, self.b2, self.a1, self.a2)
+    }
+
+    /// Whether this filter is currently in bit-transparent passthrough mode.
+    #[inline]
+    pub const fn is_passthrough(&self) -> bool {
+        self.is_passthrough
+    }
 }
 
 /// 10-Band Graphic Equalizer pipeline processing interleaved stereo audio.
@@ -122,6 +179,7 @@ impl BiquadFilter {
 pub struct EqualizerChain {
     sample_rate: f32,
     gains: [f32; 10],
+    profile: EqProfile,
     bands: [BiquadFilter; 10],
     is_active: bool,
 }
@@ -133,16 +191,66 @@ impl Default for EqualizerChain {
 }
 
 impl EqualizerChain {
-    /// Create a new 10-band equalizer initialized flat (0.0 dB all bands).
+    /// Create a new 10-band equalizer initialized flat (0.0 dB all bands) with default LegacyWebAudio profile.
     pub fn new(sample_rate: f32) -> Self {
+        Self::new_with_profile(sample_rate, EqProfile::LegacyWebAudio)
+    }
+
+    /// Create a new 10-band equalizer with a specific EQ profile.
+    pub fn new_with_profile(sample_rate: f32, profile: EqProfile) -> Self {
         let mut eq = Self {
             sample_rate: sample_rate.max(8000.0),
             gains: [0.0; 10],
+            profile,
             bands: [BiquadFilter::new(); 10],
             is_active: false,
         };
         eq.recalculate();
         eq
+    }
+
+    /// Get current EQ profile.
+    #[inline]
+    pub fn profile(&self) -> EqProfile {
+        self.profile
+    }
+
+    /// Update EQ profile and recalculate filter coefficients.
+    pub fn set_profile(&mut self, profile: EqProfile) {
+        if self.profile != profile {
+            self.profile = profile;
+            self.recalculate();
+        }
+    }
+
+    /// Get current center frequencies for the active profile.
+    #[inline]
+    pub fn center_frequencies(&self) -> &'static [f32; 10] {
+        self.profile.center_frequencies()
+    }
+
+    /// Get current Q factor for the active profile.
+    #[inline]
+    pub fn q_factor(&self) -> f32 {
+        self.profile.q_factor()
+    }
+
+    /// Get current gains across all 10 bands.
+    #[inline]
+    pub fn gains(&self) -> &[f32; 10] {
+        &self.gains
+    }
+
+    /// Check if EQ is currently actively modifying audio (any band |gain| > 0.01 dB).
+    #[inline]
+    pub fn is_active(&self) -> bool {
+        self.is_active
+    }
+
+    /// Access internal biquad filters across all 10 bands.
+    #[inline]
+    pub fn bands(&self) -> &[BiquadFilter; 10] {
+        &self.bands
     }
 
     /// Update sample rate and recalculate filter coefficients.
@@ -163,11 +271,13 @@ impl EqualizerChain {
     pub fn set_band_gain(&mut self, band_idx: usize, gain_db: f32) {
         if band_idx < 10 {
             self.gains[band_idx] = gain_db.clamp(-24.0, 24.0);
+            let freqs = self.profile.center_frequencies();
+            let q = self.profile.q_factor();
             self.bands[band_idx].update_peaking(
                 self.sample_rate,
-                EQ_CENTER_FREQUENCIES[band_idx],
+                freqs[band_idx],
                 self.gains[band_idx],
-                EQ_DEFAULT_Q,
+                q,
             );
             self.update_active_status();
         }
@@ -180,12 +290,14 @@ impl EqualizerChain {
     }
 
     fn recalculate(&mut self) {
+        let freqs = self.profile.center_frequencies();
+        let q = self.profile.q_factor();
         for (band, (&freq, &gain)) in self
             .bands
             .iter_mut()
-            .zip(EQ_CENTER_FREQUENCIES.iter().zip(self.gains.iter()))
+            .zip(freqs.iter().zip(self.gains.iter()))
         {
-            band.update_peaking(self.sample_rate, freq, gain, EQ_DEFAULT_Q);
+            band.update_peaking(self.sample_rate, freq, gain, q);
         }
         self.update_active_status();
     }
@@ -221,5 +333,66 @@ impl EqualizerChain {
         for band in &mut self.bands {
             band.reset_state();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_profile_is_legacy_web_audio() {
+        let eq = EqualizerChain::new(48000.0);
+        assert_eq!(eq.profile(), EqProfile::LegacyWebAudio);
+        assert_eq!(eq.q_factor(), 1.0);
+        assert_eq!(eq.center_frequencies(), &EQ_LEGACY_FREQUENCIES);
+        assert_eq!(eq.center_frequencies()[0], 32.0);
+        assert_eq!(eq.center_frequencies()[1], 64.0);
+        assert_eq!(eq.center_frequencies()[9], 16000.0);
+    }
+
+    #[test]
+    fn test_iso_octave_profile_constants() {
+        let eq = EqualizerChain::new_with_profile(48000.0, EqProfile::IsoOctave);
+        assert_eq!(eq.profile(), EqProfile::IsoOctave);
+        assert!((eq.q_factor() - std::f32::consts::SQRT_2).abs() < 1e-6);
+        assert_eq!(eq.center_frequencies(), &EQ_ISO_FREQUENCIES);
+        assert_eq!(eq.center_frequencies()[0], 31.25);
+        assert_eq!(eq.center_frequencies()[1], 62.5);
+        assert_eq!(eq.center_frequencies()[9], 16000.0);
+    }
+
+    #[test]
+    fn test_profile_switching_recalculates() {
+        let mut eq = EqualizerChain::new(48000.0);
+        eq.set_band_gain(0, 6.0); // +6dB at band 0
+        assert_eq!(eq.profile(), EqProfile::LegacyWebAudio);
+        let b0_legacy = eq.bands[0].b0;
+
+        eq.set_profile(EqProfile::IsoOctave);
+        assert_eq!(eq.profile(), EqProfile::IsoOctave);
+        let b0_iso = eq.bands[0].b0;
+
+        // Changing from 32Hz Q=1.0 to 31.25Hz Q=sqrt(2) must alter coefficients
+        assert!((b0_legacy - b0_iso).abs() > 1e-6);
+    }
+
+    #[test]
+    fn test_flat_bypass_identity() {
+        let mut eq = EqualizerChain::new(48000.0);
+        assert!(!eq.is_active());
+        let mut samples = vec![0.123f32, -0.456, 0.789, -0.012];
+        let original = samples.clone();
+        eq.process(&mut samples);
+        assert_eq!(samples, original);
+    }
+
+    #[test]
+    fn test_nyquist_guard_passthrough() {
+        let mut filter = BiquadFilter::new();
+        // 22 kHz @ 44.1 kHz is > 0.45 * fs (Nyquist guard)
+        filter.update_peaking(44100.0, 22000.0, 6.0, 1.0);
+        assert!(filter.is_passthrough);
+        assert_eq!(filter.process_sample(0, 0.5), 0.5);
     }
 }
