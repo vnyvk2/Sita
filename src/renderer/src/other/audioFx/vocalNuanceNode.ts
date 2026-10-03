@@ -1,14 +1,18 @@
 import type { SoundProfile } from '@common/audioEngineProtocol';
+import {
+  ensureOptionBWorkletLoaded,
+  OPTION_B_WORKLET_NAME,
+  OPTION_B_PARAMS
+} from './optionBShaperWorklet';
 
 /**
- * VocalNuanceNode — Web Audio Dynamic Nuance Shaper.
+ * VocalNuanceNode — Web Audio Dynamic Nuance Shaper (Gate 5 AudioWorklet Port).
  *
- * Implements the locked +1.5 dB upward nuance contour for Web Audio fallback, exactly matching the
- * Rust native audio engine's Option B transfer function.
+ * Implements the locked +1.5 dB upward nuance contour for Web Audio, matching the
+ * Rust native audio engine's Option B transfer function with real-time audio thread safety.
  *
  * Locked Option B Contour Specifications:
- *
- * - Upward nuance lift: +1.5 dB for quiet details (< -24 dBFS)
+ * - Upward nuance lift: +1.5 dB for quiet details (<= -24 dBFS)
  * - Smooth C^1 cubic Hermite transition across mid-levels (-24 dBFS to -12 dBFS)
  * - Exact unity gain (0.0 dB / 1.000000) for loud material (>= -12 dBFS)
  * - Attack time constant: 15 ms
@@ -17,10 +21,8 @@ import type { SoundProfile } from '@common/audioEngineProtocol';
  * - Crossfade transition time: 30 ms exponential time constant
  *
  * Product Invariant: Web Audio Limiter Semantics
- *
  * - StudioReference: Prioritizes bit transparency and uncolored response. The Web Audio safety
- *   limiter is bypassed (limiterDry = 1.0, limiterWet = 0.0) to preserve a pure digital null. It
- *   does NOT promise brickwall output protection on the Web Audio fallback.
+ *   limiter is bypassed (limiterDry = 1.0, limiterWet = 0.0) to preserve a pure digital null.
  * - VocalNuanceBoost: Upward nuance shaping applies +1.5 dB lift to quiet passages. The Web Audio
  *   safety limiter is engaged (limiterDry = 0.0, limiterWet = 1.0) to guard the output against
  *   potential digital clipping on hot masters.
@@ -29,18 +31,26 @@ import type { SoundProfile } from '@common/audioEngineProtocol';
 export const VOCAL_NUANCE_MAKEUP_DB = 1.5;
 
 export const VOCAL_NUANCE_PARAMS = {
-  threshold: -12, // dBFS
-  knee: 12, // dB
-  ratio: 1.25, // gentle upward slope ratio
-  attack: 0.015, // 15 ms reaction time
-  release: 0.25 // 250 ms anti-pumping release
+  maxLiftDb: OPTION_B_PARAMS.maxLiftDb,
+  lowThresholdDb: OPTION_B_PARAMS.lowThresholdDb,
+  highThresholdDb: OPTION_B_PARAMS.highThresholdDb,
+  noiseGateDb: OPTION_B_PARAMS.noiseGateDb,
+  noiseFloorDb: OPTION_B_PARAMS.noiseFloorDb,
+  attackSec: OPTION_B_PARAMS.attackSec,
+  releaseSec: OPTION_B_PARAMS.releaseSec,
+  // Legacy compatibility mappings
+  threshold: OPTION_B_PARAMS.highThresholdDb, // -12 dBFS (unity threshold)
+  knee: 12,
+  ratio: 1.0,
+  attack: OPTION_B_PARAMS.attackSec,
+  release: OPTION_B_PARAMS.releaseSec
 } as const;
 
 /** Linear amplitude conversion: A = 10^(dB / 20) */
 export const dBToLinear = (db: number): number => 10 ** (db / 20);
 
 /**
- * OptionBShaper — Exact mathematical port of the Rust Option B Upward Nuance Transfer Function.
+ * OptionBShaper — Exact mathematical reference port of the Rust Option B Upward Nuance Transfer Function.
  * Provides sample-by-sample and block-by-block processing with exact parity to
  * `SoundProfileStage`.
  */
@@ -122,24 +132,27 @@ export class OptionBShaper {
 export class VocalNuanceNode {
   readonly input: GainNode;
   readonly output: GainNode;
-
-  readonly compressor: DynamicsCompressorNode;
-  readonly makeupGain: GainNode;
   readonly dryGain: GainNode;
   readonly wetGain: GainNode;
 
   readonly shaper: OptionBShaper;
-  private processorNode: ScriptProcessorNode | null = null;
+  workletNode: AudioWorkletNode | null = null;
+  readonly ready: Promise<boolean>;
+
   private enabled = false;
+  private destroyed = false;
+  // Lifecycle: the wet lane has no input until the worklet (or fallback
+  // passthrough) is attached. setEnabled() calls arriving before settlement
+  // record intent here instead of ramping gains on a silent graph.
+  private workletSettled = false;
+  private pendingEnabled: { enabled: boolean; immediate: boolean } | null = null;
 
   /** 30 ms exponential time constant matching the Rust engine's 30 ms transition */
   private static readonly FADE_TIME_CONSTANT = 0.03;
 
-  constructor(private readonly ctx: AudioContext) {
+  constructor(private readonly ctx: BaseAudioContext) {
     this.input = ctx.createGain();
     this.output = ctx.createGain();
-    this.compressor = ctx.createDynamicsCompressor();
-    this.makeupGain = ctx.createGain();
     this.dryGain = ctx.createGain();
     this.wetGain = ctx.createGain();
 
@@ -150,27 +163,61 @@ export class VocalNuanceNode {
     this.input.channelCountMode = 'explicit';
     this.input.channelInterpretation = 'speakers';
 
-    // 1. Dry bypass lane
+    // 1. Dry bypass lane (StudioReference bit-transparent pass)
     this.input.connect(this.dryGain);
     this.dryGain.connect(this.output);
 
-    // 2. Wet shaped lane (Native Web Audio graph for real-time audio thread safety)
-    this.input.connect(this.compressor);
-    this.compressor.connect(this.makeupGain);
-    this.makeupGain.connect(this.wetGain);
+    // 2. Wet shaped lane: initialize to wetGain -> output
     this.wetGain.connect(this.output);
-
-    // Configure compressor parameters matching locked Option B transition
-    this.compressor.threshold.value = VOCAL_NUANCE_PARAMS.threshold;
-    this.compressor.knee.value = VOCAL_NUANCE_PARAMS.knee;
-    this.compressor.ratio.value = VOCAL_NUANCE_PARAMS.ratio;
-    this.compressor.attack.value = VOCAL_NUANCE_PARAMS.attack;
-    this.compressor.release.value = VOCAL_NUANCE_PARAMS.release;
-    this.makeupGain.gain.value = dBToLinear(VOCAL_NUANCE_MAKEUP_DB);
 
     // Default to Studio Reference (pure bypass, dry=1, wet=0)
     this.dryGain.gain.value = 1;
     this.wetGain.gain.value = 0;
+
+    // Asynchronously attach the AudioWorklet processor module
+    this.ready = this.initWorklet();
+  }
+
+  private async initWorklet(): Promise<boolean> {
+    try {
+      const loaded = await ensureOptionBWorkletLoaded(this.ctx);
+      if (loaded && !this.destroyed && typeof AudioWorkletNode !== 'undefined') {
+        const worklet = new AudioWorkletNode(this.ctx, OPTION_B_WORKLET_NAME, {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [2]
+        });
+        this.workletNode = worklet;
+        this.input.connect(worklet);
+        worklet.connect(this.wetGain);
+        this.workletSettled = true;
+        this.flushPendingEnabled();
+        return true;
+      }
+    } catch (err) {
+      console.warn('[VocalNuanceNode] AudioWorkletNode attachment failed, falling back:', err);
+    }
+
+    // Fallback path if AudioWorklet is not available (e.g. mock test environments)
+    if (!this.workletNode && !this.destroyed) {
+      try {
+        this.input.connect(this.wetGain);
+      } catch {
+        // Already connected or mock
+      }
+    }
+    this.workletSettled = true;
+    this.flushPendingEnabled();
+    return false;
+  }
+
+  /** Applies a previously deferred enable intent once the wet lane exists. */
+  private flushPendingEnabled(): void {
+    const pending = this.pendingEnabled;
+    this.pendingEnabled = null;
+    if (pending && !this.destroyed) {
+      this.applyEnabled(pending.enabled, pending.immediate);
+    }
   }
 
   /**
@@ -180,9 +227,21 @@ export class VocalNuanceNode {
    * @param immediate If true, snaps instantly (e.g. cold start restore)
    */
   setEnabled(enabled: boolean, immediate = false): void {
-    if (enabled === this.enabled) return;
+    if (enabled === this.enabled && this.workletSettled) return;
     this.enabled = enabled;
 
+    // Wet lane has no input until worklet/fallback attach completes: record
+    // intent and keep dry=1/wet=0 so output never goes silent. flushPendingEnabled
+    // applies the latest intent on settlement.
+    if (!this.workletSettled) {
+      this.pendingEnabled = { enabled, immediate };
+      return;
+    }
+    this.applyEnabled(enabled, immediate);
+  }
+
+  /** Ramps dry/wet gains toward the enabled state. Requires an attached wet lane. */
+  private applyEnabled(enabled: boolean, immediate = false): void {
     const now = this.ctx.currentTime;
     const dryTarget = enabled ? 0 : 1;
     const wetTarget = enabled ? 1 : 0;
@@ -198,8 +257,10 @@ export class VocalNuanceNode {
       this.dryGain.gain.value = dryTarget;
       this.wetGain.gain.value = wetTarget;
     } else {
-      this.dryGain.gain.setValueAtTime(this.dryGain.gain.value, now); this.dryGain.gain.setTargetAtTime(dryTarget, now, VocalNuanceNode.FADE_TIME_CONSTANT);
-      this.wetGain.gain.setValueAtTime(this.wetGain.gain.value, now); this.wetGain.gain.setTargetAtTime(wetTarget, now, VocalNuanceNode.FADE_TIME_CONSTANT);
+      this.dryGain.gain.setValueAtTime(this.dryGain.gain.value, now);
+      this.dryGain.gain.setTargetAtTime(dryTarget, now, VocalNuanceNode.FADE_TIME_CONSTANT);
+      this.wetGain.gain.setValueAtTime(this.wetGain.gain.value, now);
+      this.wetGain.gain.setTargetAtTime(wetTarget, now, VocalNuanceNode.FADE_TIME_CONSTANT);
     }
   }
 
@@ -220,20 +281,17 @@ export class VocalNuanceNode {
    * (e.g. +1.5 dB) when lifting quiet nuances.
    */
   getReduction(): number {
-    if (this.processorNode) {
-      return 20.0 * Math.log10(Math.max(1e-6, this.shaper.nuanceGain));
-    }
-    return this.compressor?.reduction ?? 0;
+    return 20.0 * Math.log10(Math.max(1e-6, this.shaper.nuanceGain));
   }
 
   destroy(): void {
+    this.destroyed = true;
+    this.pendingEnabled = null;
     this.input.disconnect();
     this.dryGain.disconnect();
-    this.compressor.disconnect();
-    this.makeupGain.disconnect();
-    if (this.processorNode) {
-      this.processorNode.disconnect();
-      this.processorNode.onaudioprocess = null;
+    if (this.workletNode) {
+      this.workletNode.disconnect();
+      this.workletNode = null;
     }
     this.wetGain.disconnect();
     this.output.disconnect();

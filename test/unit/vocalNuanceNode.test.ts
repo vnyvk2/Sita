@@ -63,17 +63,18 @@ describe('VocalNuanceNode - Web Audio Parity Implementation', () => {
     node = new VocalNuanceNode(ctx);
   });
 
-  it('initializes with locked production parameters and calibrated makeup gain', () => {
+  it('initializes with locked production parameters for Option B upward nuance', () => {
     expect(VOCAL_NUANCE_MAKEUP_DB).toBe(1.5);
-    expect(node.compressor.threshold.value).toBe(VOCAL_NUANCE_PARAMS.threshold); // -12 dBFS
-    expect(node.compressor.knee.value).toBe(VOCAL_NUANCE_PARAMS.knee); // 12 dB
-    expect(node.compressor.ratio.value).toBe(VOCAL_NUANCE_PARAMS.ratio); // 1.25 : 1
-    expect(node.compressor.attack.value).toBe(VOCAL_NUANCE_PARAMS.attack); // 15 ms
-    expect(node.compressor.release.value).toBe(VOCAL_NUANCE_PARAMS.release); // 250 ms
+    expect(node.shaper.maxLiftDb).toBe(1.5); // +1.5 dB quiet lift
+    expect(node.shaper.lowThresholdDb).toBe(-24.0); // -24 dBFS lower threshold
+    expect(node.shaper.highThresholdDb).toBe(-12.0); // -12 dBFS upper threshold (unity)
+    expect(node.shaper.noiseGateDb).toBe(-60.0); // -60 dBFS noise gate
+    expect(node.shaper.noiseFloorDb).toBe(-80.0); // -80 dBFS noise floor taper
 
     const expectedLinearMakeup = dBToLinear(1.5);
-    expect(node.makeupGain.gain.value).toBeCloseTo(expectedLinearMakeup, 4);
     expect(expectedLinearMakeup).toBeCloseTo(1.1885, 4);
+    // Legacy compressor is deleted from active graph
+    expect((node as any).compressor).toBeUndefined();
   });
 
   it('starts in StudioReference profile with bit-transparent dry bypass (dry=1, wet=0)', () => {
@@ -83,7 +84,8 @@ describe('VocalNuanceNode - Web Audio Parity Implementation', () => {
     expect(node.wetGain.gain.value).toBe(0);
   });
 
-  it('engages VocalNuanceBoost with wet lane active (dry=0, wet=1)', () => {
+  it('engages VocalNuanceBoost with wet lane active (dry=0, wet=1)', async () => {
+    await node.ready;
     node.setEnabled(true, true);
 
     expect(node.isEnabled()).toBe(true);
@@ -92,7 +94,8 @@ describe('VocalNuanceNode - Web Audio Parity Implementation', () => {
     expect(node.wetGain.gain.value).toBe(1);
   });
 
-  it('crossfades smoothly using 30ms time constant on dynamic toggle', () => {
+  it('crossfades smoothly using 30ms time constant on dynamic toggle', async () => {
+    await node.ready;
     node.setProfile('vocal_nuance_boost', false);
 
     expect(node.dryGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 10.0, 0.03);
@@ -103,18 +106,16 @@ describe('VocalNuanceNode - Web Audio Parity Implementation', () => {
     expect(node.wetGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 10.0, 0.03);
   });
 
-  it('reports live gain reduction correctly from compressor', () => {
+  it('reports live gain reduction correctly from nuance shaper', () => {
     expect(node.getReduction()).toBe(0);
-    (node.compressor as any).reduction = -2.4;
-    expect(node.getReduction()).toBe(-2.4);
+    node.shaper.nuanceGain = Math.pow(10, 1.5 / 20);
+    expect(node.getReduction()).toBeCloseTo(1.5, 2);
   });
 
   it('disconnects all internal nodes upon destroy()', () => {
     node.destroy();
     expect(node.input.disconnect).toHaveBeenCalled();
     expect(node.dryGain.disconnect).toHaveBeenCalled();
-    expect(node.compressor.disconnect).toHaveBeenCalled();
-    expect(node.makeupGain.disconnect).toHaveBeenCalled();
     expect(node.wetGain.disconnect).toHaveBeenCalled();
     expect(node.output.disconnect).toHaveBeenCalled();
   });
