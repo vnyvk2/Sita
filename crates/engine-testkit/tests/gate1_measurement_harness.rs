@@ -16,7 +16,7 @@ use engine_protocol::SoundProfile;
 use serde::{Deserialize, Serialize};
 
 const RENDERER_SOURCE_SHA: &str = "97e6b35547bd873997a191932bb9c6d47731ca63";
-const INTEGRATION_CHECKPOINT_SHA: &str = "53583d2e612f00bb01dd22646279f64bf63faab5";
+const INTEGRATION_CHECKPOINT_SHA: &str = "53583d2e345fa828132b42efd6007c4ed6648da6";
 const RUST_ENGINE_SHA: &str = "97e6b35547bd873997a191932bb9c6d47731ca63";
 
 fn find_artifacts_dir() -> PathBuf {

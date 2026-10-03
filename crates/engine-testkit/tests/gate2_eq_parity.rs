@@ -24,7 +24,7 @@ use engine_lib::types::AudioSpec;
 use serde::{Deserialize, Serialize};
 
 const RENDERER_SOURCE_SHA: &str = "97e6b35547bd873997a191932bb9c6d47731ca63";
-const INTEGRATION_CHECKPOINT_SHA: &str = "53583d2e612f00bb01dd22646279f64bf63faab5";
+const INTEGRATION_CHECKPOINT_SHA: &str = "53583d2e345fa828132b42efd6007c4ed6648da6";
 
 fn get_git_head_sha() -> String {
     if let Ok(output) = std::process::Command::new("git").args(["rev-parse", "HEAD"]).output() {
