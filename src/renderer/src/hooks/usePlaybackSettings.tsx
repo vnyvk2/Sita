@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import type AudioPlayer from '../other/player';
 import toggleSongIsFavorite from '../other/toggleSongIsFavorite';
@@ -35,6 +35,20 @@ import { useUserPreferences } from './useUserPreferences';
  */
 export function usePlaybackSettings(player: AudioPlayer | HTMLAudioElement) {
   const { saveEqualizerPreset } = useUserPreferences();
+
+  // T-UI-DEBOUNCE: trailing debounce for EQ preset DB persistence only.
+  // Slider drags fire per mousemove; the audible DSP path below stays live
+  // and unthrottled, while SQLite writes + query invalidations collapse.
+  const eqPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (eqPersistTimer.current) {
+        clearTimeout(eqPersistTimer.current);
+        eqPersistTimer.current = null;
+      }
+    },
+    []
+  );
 
   const toggleRepeat = useCallback((newState?: RepeatTypes) => {
     const repeatState =
@@ -126,10 +140,8 @@ export function usePlaybackSettings(player: AudioPlayer | HTMLAudioElement) {
 
   const updateEqualizerOptions = useCallback(
     (options: Equalizer) => {
-      saveEqualizerPreset(options);
-      // T2-1: push the held preset into both DSP chains immediately (no track
-      // reload, no DB round-trip race). Duck-typed like updateSongPosition
-      // above: the legacy HTMLAudioElement fallback has no EQ graph.
+      // Audible path: immediate live push to both DSP chains (no reload,
+      // no DB round-trip race). Never throttled.
       try {
         if (
           'applyEqualizerPreset' in player &&
@@ -140,6 +152,14 @@ export function usePlaybackSettings(player: AudioPlayer | HTMLAudioElement) {
       } catch {
         // EQ live-push is best-effort; persisted preset still applies on load.
       }
+      // Persist path: trailing debounce collapses drag bursts into one write.
+      if (eqPersistTimer.current) {
+        clearTimeout(eqPersistTimer.current);
+      }
+      eqPersistTimer.current = setTimeout(() => {
+        eqPersistTimer.current = null;
+        saveEqualizerPreset(options);
+      }, 200);
     },
     [saveEqualizerPreset, player]
   );
