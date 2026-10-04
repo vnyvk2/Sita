@@ -251,12 +251,12 @@ fn compute_true_peak(samples: &[f32]) -> (f32, f64) {
         hist_r[0] = in_r;
 
         // Evaluate 4 polyphase phases
-        for phase in 0..4 {
+        for coeffs in &POLYPHASE_COEFFS {
             let mut interp_l = 0.0f32;
             let mut interp_r = 0.0f32;
             for tap in 0..POLYPHASE_TAPS {
-                interp_l += POLYPHASE_COEFFS[phase][tap] * hist_l[tap];
-                interp_r += POLYPHASE_COEFFS[phase][tap] * hist_r[tap];
+                interp_l += coeffs[tap] * hist_l[tap];
+                interp_r += coeffs[tap] * hist_r[tap];
             }
             max_tp = max_tp.max(interp_l.abs()).max(interp_r.abs());
         }
@@ -900,7 +900,7 @@ fn true_peak_independent(stereo_interleaved: &[f32]) -> f32 {
     // Prototype lowpass at cutoff just below input Nyquist (pi/L output-rate
     // radians), total-sum normalized so the full-rate response has DC gain L.
     let mut h = vec![0.0f64; TAPS];
-    for n in 0..TAPS {
+    for (n, hn) in h.iter_mut().enumerate() {
         let x = n as f64 - M as f64;
         let s = if x == 0.0 {
             1.0
@@ -910,7 +910,7 @@ fn true_peak_independent(stereo_interleaved: &[f32]) -> f32 {
         let w = 0.35875 - 0.48829 * (2.0 * pi * n as f64 / (TAPS - 1) as f64)
             + 0.14128 * (4.0 * pi * n as f64 / (TAPS - 1) as f64)
             - 0.01168 * (6.0 * pi * n as f64 / (TAPS - 1) as f64);
-        h[n] = L as f64 * s * w;
+        *hn = L as f64 * s * w;
     }
     let sum: f64 = h.iter().sum();
     for v in h.iter_mut() {

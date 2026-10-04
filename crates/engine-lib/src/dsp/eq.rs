@@ -87,7 +87,7 @@ impl BiquadFilter {
 
     /// Recompute peaking EQ biquad filter coefficients according to RBJ Audio EQ Cookbook.
     pub fn update_peaking(&mut self, sample_rate: f32, freq_hz: f32, gain_db: f32, q: f32) {
-        if gain_db.abs() < 0.01 || sample_rate <= 0.0 {
+        if sample_rate <= 0.0 {
             self.b0 = 1.0;
             self.b1 = 0.0;
             self.b2 = 0.0;
@@ -106,6 +106,17 @@ impl BiquadFilter {
             self.a1 = 0.0;
             self.a2 = 0.0;
             self.is_passthrough = true;
+            return;
+        }
+
+        // If the filter is already in bit-transparent passthrough and gain is flat,
+        // remain in passthrough (zero CPU overhead for untouched bands).
+        if gain_db.abs() < 0.01 && self.is_passthrough {
+            self.b0 = 1.0;
+            self.b1 = 0.0;
+            self.b2 = 0.0;
+            self.a1 = 0.0;
+            self.a2 = 0.0;
             return;
         }
 
@@ -179,10 +190,18 @@ impl BiquadFilter {
 pub struct EqualizerChain {
     sample_rate: f32,
     gains: [f32; 10],
+    /// Live per-band gains actually driving coefficients. `gains` holds the
+    /// requested targets; `current` chases them at RAMP_SECONDS full-scale
+    /// speed so preset jumps never step the output (T-EQ-SMOOTH).
+    current: [f32; 10],
     profile: EqProfile,
     bands: [BiquadFilter; 10],
     is_active: bool,
+    settle_frames: usize,
 }
+
+/// Full-scale (48 dB span) traverse time for smoothed gain changes.
+const EQ_RAMP_SECONDS: f32 = 0.025;
 
 impl Default for EqualizerChain {
     fn default() -> Self {
@@ -201,9 +220,11 @@ impl EqualizerChain {
         let mut eq = Self {
             sample_rate: sample_rate.max(8000.0),
             gains: [0.0; 10],
+            current: [0.0; 10],
             profile,
             bands: [BiquadFilter::new(); 10],
             is_active: false,
+            settle_frames: 0,
         };
         eq.recalculate();
         eq
@@ -215,10 +236,12 @@ impl EqualizerChain {
         self.profile
     }
 
-    /// Update EQ profile and recalculate filter coefficients.
+    /// Update EQ profile and recalculate filter coefficients. Structural change:
+    /// snaps live gains to targets first so no stale ramp survives the retune.
     pub fn set_profile(&mut self, profile: EqProfile) {
         if self.profile != profile {
             self.profile = profile;
+            self.current = self.gains;
             self.recalculate();
         }
     }
@@ -235,10 +258,17 @@ impl EqualizerChain {
         self.profile.q_factor()
     }
 
-    /// Get current gains across all 10 bands.
+    /// Get requested gains across all 10 bands (targets; live values may lag
+    /// during smoothing — see `current_gains`).
     #[inline]
     pub fn gains(&self) -> &[f32; 10] {
         &self.gains
+    }
+
+    /// Get live per-band gains currently driving filter coefficients.
+    #[inline]
+    pub fn current_gains(&self) -> &[f32; 10] {
+        &self.current
     }
 
     /// Check if EQ is currently actively modifying audio (any band |gain| > 0.01 dB).
@@ -259,18 +289,45 @@ impl EqualizerChain {
         self.recalculate();
     }
 
-    /// Set gain for all 10 bands (-24.0 dB to +24.0 dB).
+    /// Set gain for all 10 bands (-24.0 dB to +24.0 dB), applied immediately.
+    /// Deterministic path for tests, init, and offline harnesses. Live daemon
+    /// updates must use `set_target_gains` to avoid output steps.
     pub fn set_gains(&mut self, gains: [f32; 10]) {
         for (i, &g) in gains.iter().enumerate() {
-            self.gains[i] = g.clamp(-24.0, 24.0);
+            let clamped = g.clamp(-24.0, 24.0);
+            self.gains[i] = clamped;
+            self.current[i] = clamped;
+        }
+        let any_active = self.gains.iter().any(|g| g.abs() > 0.01);
+        if any_active {
+            self.settle_frames = ((0.030 * self.sample_rate).round() as usize).max(64);
+        } else {
+            self.settle_frames = 0;
+            for band in &mut self.bands {
+                band.is_passthrough = true;
+                band.reset_state();
+            }
         }
         self.recalculate();
     }
 
-    /// Set a single band's gain by index.
+    /// Set gain targets for all 10 bands; live gains chase them at
+    /// EQ_RAMP_SECONDS full-scale speed during `process` (T-EQ-SMOOTH).
+    /// Real-time safe: plain array writes, no allocation.
+    pub fn set_target_gains(&mut self, gains: [f32; 10]) {
+        for (i, &g) in gains.iter().enumerate() {
+            self.gains[i] = g.clamp(-24.0, 24.0);
+        }
+        self.settle_frames = ((0.030 * self.sample_rate).round() as usize).max(64);
+        self.update_active_status();
+    }
+
+    /// Set a single band's gain by index, applied immediately.
     pub fn set_band_gain(&mut self, band_idx: usize, gain_db: f32) {
         if band_idx < 10 {
-            self.gains[band_idx] = gain_db.clamp(-24.0, 24.0);
+            let clamped = gain_db.clamp(-24.0, 24.0);
+            self.gains[band_idx] = clamped;
+            self.current[band_idx] = clamped;
             let freqs = self.profile.center_frequencies();
             let q = self.profile.q_factor();
             self.bands[band_idx].update_peaking(
@@ -283,19 +340,28 @@ impl EqualizerChain {
         }
     }
 
-    /// Reset all 10 bands to flat response (0 dB).
+    /// Reset all 10 bands to flat response (0 dB), applied immediately.
     pub fn reset_flat(&mut self) {
         self.gains = [0.0; 10];
+        self.current = [0.0; 10];
+        self.settle_frames = 0;
+        for band in &mut self.bands {
+            band.is_passthrough = true;
+            band.reset_state();
+        }
         self.recalculate();
     }
 
+    /// Recompute coefficients from LIVE gains. Targets in `gains` only take
+    /// effect via the per-sample ramp in `process` (smooth path) or via the
+    /// instant setters above, which copy targets into `current` first.
     fn recalculate(&mut self) {
         let freqs = self.profile.center_frequencies();
         let q = self.profile.q_factor();
         for (band, (&freq, &gain)) in self
             .bands
             .iter_mut()
-            .zip(freqs.iter().zip(self.gains.iter()))
+            .zip(freqs.iter().zip(self.current.iter()))
         {
             band.update_peaking(self.sample_rate, freq, gain, q);
         }
@@ -303,18 +369,70 @@ impl EqualizerChain {
     }
 
     fn update_active_status(&mut self) {
-        self.is_active = self.gains.iter().any(|g| g.abs() > 0.01);
+        // Active while any requested OR live gain is non-trivial, or while
+        // settle decay frames remain, so a ramp toward flat keeps processing
+        // (decaying state through near-unity filters) until fully settled
+        // instead of hard-bypassing mid-ramp.
+        self.is_active = self.settle_frames > 0
+            || self
+                .gains
+                .iter()
+                .chain(self.current.iter())
+                .any(|g| g.abs() > 0.01);
     }
 
     /// Process a buffer of interleaved stereo f32 samples in-place.
     /// Real-time safe: Zero allocations, zero syscalls, zero mutexes, never panics.
+    /// Live gain targets chase at EQ_RAMP_SECONDS full-scale speed per sample;
+    /// coefficients are recomputed only while a ramp is moving (bounded to the
+    /// transition window; settled processing is just the filter loop below).
     #[inline]
     pub fn process(&mut self, samples: &mut [f32]) {
         if !self.is_active || samples.is_empty() {
             return;
         }
 
+        // Full-scale excess per sample for a 48 dB span traversed in EQ_RAMP_SECONDS.
+        let max_step = 48.0 / (EQ_RAMP_SECONDS * self.sample_rate);
+
         for chunk in samples.chunks_exact_mut(2) {
+            // Advance live gains toward targets (plain-float math, no allocation).
+            // Exact-arrival rule: when the remaining distance fits in one step,
+            // jump exactly to the target. This guarantees finite-step convergence
+            // with no dead zone between the activity threshold (0.01 dB, which
+            // gates is_active) and any epsilon snap: every residual is either
+            // stepped by max_step or snapped exactly, so ramps always terminate
+            // precisely on their targets.
+            let mut moved = false;
+            for i in 0..10 {
+                let diff = self.gains[i] - self.current[i];
+                if diff.abs() > f32::EPSILON {
+                    if diff.abs() <= max_step {
+                        self.current[i] = self.gains[i];
+                    } else {
+                        self.current[i] += diff.signum() * max_step;
+                    }
+                    moved = true;
+                }
+            }
+            if moved {
+                self.settle_frames = ((0.030 * self.sample_rate).round() as usize).max(64);
+                self.recalculate();
+            } else if self.settle_frames > 0 {
+                let all_flat = self.gains.iter().all(|g| g.abs() <= 0.01)
+                    && self.current.iter().all(|g| g.abs() <= 0.01);
+                if all_flat {
+                    self.settle_frames -= 1;
+                    if self.settle_frames == 0 {
+                        for band in &mut self.bands {
+                            band.is_passthrough = true;
+                            band.reset_state();
+                        }
+                        self.update_active_status();
+                    }
+                }
+            }
+
             let mut left = chunk[0];
             let mut right = chunk[1];
 
@@ -339,6 +457,51 @@ impl EqualizerChain {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Render a sine through `eq`, returning (max adjacent output step, last
+    /// output sample, end phase). `seed_prev` seeds the first delta and
+    /// `start_phase_rad` continues oscillator phase so callers can chain
+    /// warmup and measurement renders with unbroken phase and history.
+    /// Phase is ACCUMULATED incrementally: computing it from absolute frame
+    /// indices in f32 loses all precision past ~t=20000 (argument magnitude
+    /// ~1.6e7 exceeds the 24-bit mantissa), turning the stimulus itself into
+    /// staircase noise. Do not "simplify" this back to absolute phase.
+    fn render_sine_block(
+        eq: &mut EqualizerChain,
+        freq_hz: f32,
+        amp: f32,
+        start_phase_rad: f32,
+        frames: usize,
+        seed_prev: f32,
+    ) -> (f32, f32, f32) {
+        let sr = 48000.0;
+        let increment = 2.0 * std::f32::consts::PI * freq_hz / sr;
+        let mut peak_step = 0.0f32;
+        let mut prev = seed_prev;
+        let mut phase = start_phase_rad;
+        let mut n = 0;
+        // Process in small blocks to resemble callback cadence.
+        while n < frames {
+            let block = (frames - n).min(256);
+            let mut buf = vec![0.0f32; block * 2];
+            for i in 0..block {
+                let s = amp * phase.sin();
+                buf[2 * i] = s;
+                buf[2 * i + 1] = s;
+                phase += increment;
+            }
+            eq.process(&mut buf);
+            for i in (0..block * 2).step_by(2) {
+                let d = (buf[i] - prev).abs();
+                if d > peak_step {
+                    peak_step = d;
+                }
+                prev = buf[i];
+            }
+            n += block;
+        }
+        (peak_step, prev, phase)
+    }
 
     #[test]
     fn test_default_profile_is_legacy_web_audio() {
@@ -394,5 +557,78 @@ mod tests {
         filter.update_peaking(44100.0, 22000.0, 6.0, 1.0);
         assert!(filter.is_passthrough);
         assert_eq!(filter.process_sample(0, 0.5), 0.5);
+    }
+
+    #[test]
+    fn test_smooth_ramp_converges_to_targets() {
+        let mut eq = EqualizerChain::new(48000.0);
+        eq.set_target_gains([6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        // Targets visible immediately; live values lag until processed.
+        assert_eq!(eq.gains()[0], 6.0);
+        assert_eq!(eq.current_gains()[0], 0.0);
+        // 50 ms of processing settles a 25 ms full-scale ramp.
+        let (_, _, _) = render_sine_block(&mut eq, 55.0, 1.0, 0.0, 2400, 0.0);
+        assert_eq!(eq.current_gains()[0], 6.0);
+        // Coefficients now match the instant path exactly.
+        let mut reference = EqualizerChain::new(48000.0);
+        reference.set_gains([6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        assert_eq!(eq.bands()[0].coefficients(), reference.bands()[0].coefficients());
+    }
+
+    #[test]
+    fn test_preset_jump_has_no_output_step() {
+        // Warm up steady state on +12 dB low bands (full-scale 55 Hz sine).
+        // 48218 frames lands the switch at a sine peak (worst case for step
+        // size): 48218 * 55 / 48000 ~= 55.25 cycles.
+        let mut eq = EqualizerChain::new(48000.0);
+        eq.set_gains([12.0, 12.0, 12.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let (_, last, phase) = render_sine_block(&mut eq, 55.0, 1.0, 0.0, 48218, 0.0);
+        // Retarget flat mid-stream (the T-EQ-SMOOTH path): must glide, not step.
+        eq.set_target_gains([0.0; 10]);
+        let (smooth_peak, _, _) = render_sine_block(&mut eq, 55.0, 1.0, phase, 24000, last);
+        assert!(
+            smooth_peak < 0.2,
+            "smoothed preset jump stepped by {}",
+            smooth_peak
+        );
+
+        // Sensitivity control: the legacy instant snap on the same switch.
+        let mut instant = EqualizerChain::new(48000.0);
+        instant.set_gains([12.0, 12.0, 12.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        let (_, last_instant, phase_instant) =
+            render_sine_block(&mut instant, 55.0, 1.0, 0.0, 48218, 0.0);
+        instant.set_gains([0.0; 10]);
+        let (instant_peak, _, _) =
+            render_sine_block(&mut instant, 55.0, 1.0, phase_instant, 24000, last_instant);
+        assert!(
+            instant_peak > 1.0,
+            "instant-switch baseline unexpectedly smooth: {}",
+            instant_peak
+        );
+    }
+
+    #[test]
+    fn test_ramp_to_flat_settles_into_passthrough() {
+        let mut eq = EqualizerChain::new(48000.0);
+        eq.set_gains([6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        assert!(eq.is_active());
+        eq.set_target_gains([0.0; 10]);
+        // Active throughout the ramp (state decays through near-unity filters).
+        assert!(eq.is_active());
+        let (_, _, _) = render_sine_block(&mut eq, 440.0, 0.5, 0.0, 4800, 0.0);
+        // Settled: inactive, passthrough bands, live gains at zero.
+        assert!(!eq.is_active());
+        assert!(eq.current_gains().iter().all(|&g| g == 0.0));
+        assert!(eq.bands()[0].is_passthrough());
+    }
+
+    #[test]
+    fn test_target_gains_clamp_and_expose_targets() {
+        let mut eq = EqualizerChain::new(48000.0);
+        eq.set_target_gains([30.0, -30.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+        assert_eq!(eq.gains()[0], 24.0);
+        assert_eq!(eq.gains()[1], -24.0);
+        // Live values untouched until processing runs.
+        assert_eq!(eq.current_gains()[0], 0.0);
     }
 }

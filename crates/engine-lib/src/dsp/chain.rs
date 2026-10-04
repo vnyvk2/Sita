@@ -101,6 +101,17 @@ impl DspPipeline {
         self.config = config;
     }
 
+    /// Apply EQ gains from a live context: persists them into config but ramps
+    /// coefficients smoothly (T-EQ-SMOOTH) instead of stepping. Real-time safe.
+    pub fn set_eq_gains_smooth(&mut self, gains: [f32; 10]) {
+        let mut clamped = [0.0f32; 10];
+        for (i, &g) in gains.iter().enumerate() {
+            clamped[i] = g.clamp(-24.0, 24.0);
+        }
+        self.config.eq_gains = clamped;
+        self.eq.set_target_gains(clamped);
+    }
+
     /// Set bypass mode state.
     pub fn set_bypass(&mut self, bypass: bool) {
         if self.config.bypass != bypass {

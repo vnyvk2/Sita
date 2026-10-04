@@ -528,9 +528,9 @@ impl EngineDaemon {
             }
             DaemonCommand::SetEq { gains } => {
                 if let Ok(mut guard) = self.shared_engine.lock() {
-                    let mut dsp_config = guard.1.config().clone();
-                    dsp_config.eq_gains = gains;
-                    guard.1.update_config(dsp_config);
+                    // T-EQ-SMOOTH: route live EQ updates through the smoothed
+                    // path so preset jumps ramp instead of stepping the output.
+                    guard.1.set_eq_gains_smooth(gains);
                 }
                 DaemonResult::Ok { data: None }
             }
