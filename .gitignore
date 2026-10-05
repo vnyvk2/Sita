@@ -6,6 +6,7 @@ out
 .env
 thunder-tests
 coverage/
+test-results/
 *.m3u
 .npmrc
 .github/plans/
@@ -62,6 +63,7 @@ resources/bin/
 # Local planning, experiment logs, memory benchmarks & scratchpads (kept in local workspace only)
 sqlite-migration-progress.md
 PHASE_13_METADATA_PLATFORM.md
+AUDIT_RECONNAISSANCE.md
 HANDOFF.md
 PERFORMANCE_OPTIMIZATIONS_WALKTHROUGH.md
 walkthrough.md
