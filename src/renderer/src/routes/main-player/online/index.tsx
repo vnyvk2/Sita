@@ -4,7 +4,7 @@ import TitleContainer from '@renderer/components/TitleContainer';
 import { downloadsQuery } from '@renderer/queries/downloads';
 import { settingsQuery } from '@renderer/queries/settings';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -114,9 +114,10 @@ interface TrackRowProps {
   playlist?: { id: string; name: string };
   /** Latest job state for this track's videoId, from the single page-level subscription. */
   jobState?: DownloadJobState;
+  onEnsureFolder?: () => Promise<boolean>;
 }
 
-function TrackRow({ track, playlist, jobState }: TrackRowProps) {
+function TrackRow({ track, playlist, jobState, onEnsureFolder }: TrackRowProps) {
   const [error, setError] = useState<string | null>(null);
 
   const thumbnail = track.thumbnails.at(-1);
@@ -124,6 +125,11 @@ function TrackRow({ track, playlist, jobState }: TrackRowProps) {
   const download = async () => {
     setError(null);
     try {
+      if (onEnsureFolder) {
+        const folderReady = await onEnsureFolder();
+        if (!folderReady) return;
+      }
+
       if (playlist) {
         await window.api.downloads.enqueueMany([toEnqueueInput(track)], playlist.id, playlist.name);
       } else {
@@ -200,6 +206,8 @@ function JobStatusChip({ job, onDownload }: { job?: DownloadJobState; onDownload
 
 function OnlinePage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [mode, setMode] = useState<PageMode>('SEARCH');
   const [searchText, setSearchText] = useState('');
   const [playlistUrl, setPlaylistUrl] = useState('');
@@ -214,6 +222,22 @@ function OnlinePage() {
 
   const { data: userSettings } = useQuery(settingsQuery.all);
   const hasFolder = Boolean(userSettings?.onlineDownloadsFolder);
+
+  const ensureDownloadFolder = async (): Promise<boolean> => {
+    if (hasFolder) return true;
+    try {
+      const folderPath = await window.api.settingsHelpers.getFolderLocation();
+      if (!folderPath) return false;
+
+      await window.api.settings.updateOnlineDownloadsFolder(folderPath);
+      await window.api.downloads.ensureFolderRegistered();
+      await queryClient.invalidateQueries(settingsQuery.all);
+      return true;
+    } catch (err) {
+      console.warn('Failed to configure online downloads folder:', err);
+      return false;
+    }
+  };
 
   const searchMutation = useMutation({
     mutationFn: (query: string) => window.api.downloads.search(query),
@@ -241,11 +265,19 @@ function OnlinePage() {
   const downloadEntirePlaylist = async () => {
     const info = playlistMutation.data;
     if (!info) return;
-    await window.api.downloads.enqueueMany(
-      info.entries.map(toEnqueueInput),
-      info.playlistId,
-      info.title
-    );
+
+    const folderReady = await ensureDownloadFolder();
+    if (!folderReady) return;
+
+    try {
+      await window.api.downloads.enqueueMany(
+        info.entries.map(toEnqueueInput),
+        info.playlistId,
+        info.title
+      );
+    } catch (err) {
+      console.warn('Failed to enqueue playlist downloads:', err);
+    }
   };
 
   const results = searchMutation.data ?? [];
@@ -264,9 +296,37 @@ function OnlinePage() {
       </div>
 
       {!hasFolder && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-orange-400/50 bg-orange-400/10 p-3 text-xs">
-          <span className="material-icons-round">warning</span>
-          {t('onlinePage.configureFolderWarning')}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-orange-400/50 bg-orange-400/10 p-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="material-icons-round text-base text-orange-400">warning</span>
+            <span>
+              {t(
+                'onlinePage.configureFolderWarning',
+                'Set a download folder before downloading songs.'
+              )}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              label={t('onlinePage.chooseFolder', 'Choose download folder')}
+              iconName="folder_open"
+              iconClassName="material-icons-round-outlined text-sm"
+              clickHandler={() => void ensureDownloadFolder()}
+              className="border-orange-400/30 bg-orange-500/20 py-1 text-xs text-orange-950 hover:bg-orange-500/30 dark:text-orange-200"
+            />
+            <button
+              type="button"
+              onClick={() =>
+                navigate({
+                  to: '/main-player/settings',
+                  search: { section: 'downloads', highlight: 'setting-downloads-folder' }
+                })
+              }
+              className="text-font-color-dimmed hover:text-font-color-highlight dark:text-dark-font-color-dimmed dark:hover:text-dark-font-color-highlight cursor-pointer underline underline-offset-2 transition-colors"
+            >
+              {t('onlinePage.openSettings', 'Open in Settings')}
+            </button>
+          </div>
         </div>
       )}
 
@@ -315,6 +375,7 @@ function OnlinePage() {
                 key={track.videoId}
                 track={track}
                 jobState={jobsByVideoId.get(track.videoId)}
+                onEnsureFolder={ensureDownloadFolder}
               />
             ))}
           </ul>
@@ -371,6 +432,7 @@ function OnlinePage() {
                     track={track}
                     playlist={{ id: playlist.playlistId, name: playlist.title }}
                     jobState={jobsByVideoId.get(track.videoId)}
+                    onEnsureFolder={ensureDownloadFolder}
                   />
                 ))}
               </ul>

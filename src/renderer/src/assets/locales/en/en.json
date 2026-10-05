@@ -1453,8 +1453,9 @@
     "activeDownloads": "Active downloads",
     "noActiveDownloads": "No downloads yet.",
     "cancelDownload": "Cancel",
-    "clearFinished": "Hide finished",
-    "configureFolderWarning": "Set a download folder in Settings before downloading.",
+    "configureFolderWarning": "Set a download folder before downloading songs.",
+    "chooseFolder": "Choose download folder",
+    "openSettings": "Open in Settings",
     "binaryMissingError": "The download backend is not installed. Run \"npm run fetch:binaries\" and restart the app."
   },
 
