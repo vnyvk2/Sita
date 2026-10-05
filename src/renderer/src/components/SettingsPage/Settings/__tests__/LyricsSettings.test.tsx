@@ -1,10 +1,14 @@
-﻿// @vitest-environment jsdom
+// @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LyricsSettings from '../LyricsSettings';
+
+const { setPreferencesSpy } = vi.hoisted(() => ({
+  setPreferencesSpy: vi.fn()
+}));
 
 // Mock storage
 vi.mock('../../../../utils/localStorage', async (importOriginal) => {
@@ -16,7 +20,7 @@ vi.mock('../../../../utils/localStorage', async (importOriginal) => {
       preferences: {
         ...actual.default?.preferences,
         getPreferences: vi.fn().mockReturnValue(false),
-        setPreferences: vi.fn()
+        setPreferences: setPreferencesSpy
       }
     }
   };
@@ -68,6 +72,7 @@ describe('LyricsSettings collapsible behavior', () => {
 
     // Inner options should not be in the DOM when collapsed
     expect(container.querySelector('.lyrics-appearance-section')).toBeNull();
+    expect(container.querySelector('.lyrics-scroll-section')).toBeNull();
     expect(container.querySelector('.save-lyrics-automatically')).toBeNull();
     expect(container.querySelector('.always-save-lrc-files')).toBeNull();
     expect(container.querySelector('.lrc-files-custom-save-location')).toBeNull();
@@ -87,6 +92,7 @@ describe('LyricsSettings collapsible behavior', () => {
 
     expect(headerButton.getAttribute('aria-expanded')).toBe('true');
     expect(container.querySelector('.lyrics-appearance-section')).not.toBeNull();
+    expect(container.querySelector('.lyrics-scroll-section')).not.toBeNull();
     expect(container.querySelector('.save-lyrics-automatically')).not.toBeNull();
     expect(container.querySelector('.always-save-lrc-files')).not.toBeNull();
     expect(container.querySelector('.lrc-files-custom-save-location')).not.toBeNull();
@@ -103,9 +109,35 @@ describe('LyricsSettings collapsible behavior', () => {
     fireEvent.click(headerButton);
     expect(headerButton.getAttribute('aria-expanded')).toBe('true');
     expect(container.querySelector('.lyrics-appearance-section')).not.toBeNull();
+    expect(container.querySelector('.lyrics-scroll-section')).not.toBeNull();
 
     fireEvent.click(headerButton);
     expect(headerButton.getAttribute('aria-expanded')).toBe('false');
     expect(container.querySelector('.lyrics-appearance-section')).toBeNull();
+    expect(container.querySelector('.lyrics-scroll-section')).toBeNull();
+  });
+
+  it('renders the scroll mode dropdown and saves preference on change', () => {
+    const { container } = renderWithQueryClient(<LyricsSettings />);
+
+    const headerButton = container.querySelector(
+      'button[aria-expanded="false"]'
+    ) as HTMLButtonElement;
+    fireEvent.click(headerButton);
+
+    const scrollModeItem = container.querySelector('#setting-lyrics-scroll-mode');
+    expect(scrollModeItem).not.toBeNull();
+
+    const triggerButton = scrollModeItem?.querySelector(
+      'button[aria-haspopup="menu"]'
+    ) as HTMLButtonElement;
+    expect(triggerButton).not.toBeNull();
+
+    fireEvent.click(triggerButton);
+
+    const manualOption = screen.getByText('Manual');
+    fireEvent.click(manualOption);
+
+    expect(setPreferencesSpy).toHaveBeenCalledWith('lyricsScrollMode', 'manual');
   });
 });
