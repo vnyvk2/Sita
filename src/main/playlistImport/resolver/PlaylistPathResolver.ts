@@ -1,4 +1,4 @@
-import { dirname, isAbsolute, normalize, resolve } from 'path';
+import { dirname, isAbsolute, normalize, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 
 import type { ImportedPlaylist } from '../models/ImportedPlaylist';
@@ -38,6 +38,23 @@ export class PlaylistPathResolver {
 
   resolvePath(originalReference: string, baseDir: string): PathResolutionResult {
     let candidatePath = originalReference.trim();
+
+    if (candidatePath.includes('\0')) {
+      return {
+        originalReference,
+        resolutionStatus: 'INVALID_URI',
+        verificationStatus: 'UNVERIFIED',
+        diagnostics: ['Null byte in track reference']
+      };
+    }
+    if (candidatePath.length > 4096) {
+      return {
+        originalReference,
+        resolutionStatus: 'INVALID_URI',
+        verificationStatus: 'UNVERIFIED',
+        diagnostics: ['Track reference exceeds maximum length']
+      };
+    }
 
     // Check if it's a Windows drive letter (e.g. C:\ or D:/)
     const isWindowsDrive = /^[a-zA-Z]:[\\/]/.test(candidatePath);
@@ -83,12 +100,16 @@ export class PlaylistPathResolver {
     const resolvedTarget = isAbsolute(candidatePath)
       ? normalize(candidatePath)
       : normalize(resolve(baseDir, candidatePath));
+    const rel = relative(normalize(baseDir), resolvedTarget);
+    const escapesBase =
+      !isAbsolute(candidatePath) && (rel === '..' || rel.startsWith(`..${sep}`));
 
     return {
       originalReference,
       resolvedPath: resolvedTarget,
       resolutionStatus: 'RESOLVED',
-      verificationStatus: 'UNVERIFIED'
+      verificationStatus: 'UNVERIFIED',
+      ...(escapesBase ? { diagnostics: ['Reference resolves outside playlist directory'] } : {})
     };
   }
 }

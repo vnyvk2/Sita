@@ -18,7 +18,7 @@ export interface ButtonProps {
   className?: string;
   iconClassName?: string;
   pendingClassName?: string;
-  clickHandler: (
+  clickHandler?: (
     e: ReactMouseEvent<HTMLButtonElement, MouseEvent> | KeyboardEvent<HTMLButtonElement>,
     setIsDisabled: (state: boolean) => void,
     setIsPending: (state: boolean) => void
@@ -36,7 +36,7 @@ export interface ButtonProps {
   children?: string;
 }
 
-const Button = memo((props: ButtonProps) => {
+const Button = memo((props: ButtonProps & Record<`data-${string}`, unknown>) => {
   const {
     id,
     className,
@@ -56,7 +56,8 @@ const Button = memo((props: ButtonProps) => {
     isVisible = true,
     style,
     removeFocusOnClick = true,
-    ariaPressed
+    ariaPressed,
+    ...dataAttrs
   } = props;
 
   const [isButtonDisabled, setIsButtonDisabled] = useState(isDisabled);
@@ -102,7 +103,7 @@ const Button = memo((props: ButtonProps) => {
       onClick={(e) => {
         if (!isButtonDisabled) {
           if (removeFocusOnClick) e.currentTarget.blur();
-          clickHandler(e, updateIsDisabled, updateIsPending);
+          clickHandler?.(e, updateIsDisabled, updateIsPending);
         }
       }}
       title={tooltipLabel || label}
@@ -113,6 +114,7 @@ const Button = memo((props: ButtonProps) => {
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       style={style}
+      {...dataAttrs}
     >
       {isStatusPending && isButtonDisabled ? (
         <span

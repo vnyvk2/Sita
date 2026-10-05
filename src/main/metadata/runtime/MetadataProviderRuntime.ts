@@ -164,8 +164,10 @@ export class MetadataProviderRuntime {
 
   public isAvailable(): boolean {
     if (!this.config.enabled || this.providers.size === 0) return false;
-    for (const status of this.providerStatuses.values()) {
-      if (status.state === ProviderState.Healthy || status.state === ProviderState.Degraded) {
+    for (const [id, status] of this.providerStatuses.entries()) {
+      this.recoverIfDue(id, status);
+      const current = this.providerStatuses.get(id) ?? status;
+      if (current.state === ProviderState.Healthy || current.state === ProviderState.Degraded) {
         return true;
       }
     }
@@ -237,7 +239,9 @@ export class MetadataProviderRuntime {
       const explicitAdapter = this.providers.get(sourceOverride.toLowerCase());
       if (!explicitAdapter) return [];
       const status = this.getProviderStatus(sourceOverride);
-      if (status && status.state === ProviderState.Offline) return [];
+      if (status) this.recoverIfDue(sourceOverride.toLowerCase(), status);
+      const current = this.getProviderStatus(sourceOverride);
+      if (current && current.state === ProviderState.Offline) return [];
       targetAdapters = [explicitAdapter];
       providerPriority = [sourceOverride];
     } else {
@@ -387,12 +391,22 @@ export class MetadataProviderRuntime {
     if (!providerReleaseId) return null;
 
     const targetProviderId = providerId?.toLowerCase() ?? 'musicbrainz';
+    const status = this.providerStatuses.get(targetProviderId);
+    if (status) this.recoverIfDue(targetProviderId, status);
     const adapter = this.providers.get(targetProviderId) ?? this.getSortedAdapters()[0];
 
     if (adapter && typeof adapter.resolveRelease === 'function') {
       const startTime = Date.now();
       try {
-        const resolved = await adapter.resolveRelease(providerReleaseId);
+        const resolved = (await Promise.race([
+          adapter.resolveRelease(providerReleaseId),
+          new Promise<never>((_resolve, reject) =>
+            setTimeout(
+              () => reject(new Error(`resolveRelease timeout (${SEARCH_RACE_TIMEOUT_MS}ms)`)),
+              SEARCH_RACE_TIMEOUT_MS
+            )
+          )
+        ])) as ResolvedAlbumRelease | null;
         if (resolved) {
           this.recordSuccess(targetProviderId, Date.now() - startTime);
           return resolved;
@@ -463,5 +477,21 @@ export class MetadataProviderRuntime {
     return Array.from(this.providers.values()).sort(
       (a, b) => (b.priority ?? 100) - (a.priority ?? 100)
     );
+  }
+
+  private recoverIfDue(key: string, status: ProviderStatus): void {
+    if (status.state !== ProviderState.Offline) return;
+    const timeoutMs = this.options.healthRecoveryTimeoutMs ?? 60000;
+    const lastCheck = status.lastHealthCheck ?? 0;
+    if (Date.now() - lastCheck < timeoutMs) return;
+    this.providerStatuses.set(key, {
+      state: ProviderState.Degraded,
+      consecutiveFailures: Math.max(
+        0,
+        (this.options.failureThresholdBeforeDegraded ?? 3) - 1
+      ),
+      lastHealthCheck: Date.now(),
+      lastErrorMessage: status.lastErrorMessage
+    });
   }
 }

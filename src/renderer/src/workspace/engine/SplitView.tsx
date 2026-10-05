@@ -42,9 +42,6 @@ export const SplitView: FC<SplitViewProps> = memo(({ node }) => {
       const weightB = initialWeights[dividerIndex + 1] ?? 1 / node.children.length;
       const pairWeight = weightA + weightB;
 
-      dividerEl.setPointerCapture(e.pointerId);
-      containerEl.setAttribute('data-resizing', 'true');
-
       const startCoord = isHorizontal ? e.clientX : e.clientY;
       const rectA = slotA.getBoundingClientRect();
       const rectB = slotB.getBoundingClientRect();
@@ -54,6 +51,9 @@ export const SplitView: FC<SplitViewProps> = memo(({ node }) => {
       const minSlotSize = 80; // Minimum slot pixel size guard
 
       if (totalPairSize <= 0 || pairWeight <= 0) return;
+
+      dividerEl.setPointerCapture(e.pointerId);
+      containerEl.setAttribute('data-resizing', 'true');
 
       const effectiveMin = Math.min(minSlotSize, totalPairSize / 2);
 

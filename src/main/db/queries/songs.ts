@@ -15,7 +15,7 @@ import { isTransactionContext, rawAll } from '@db/sqlite/raw';
 import { parseSongArtworks } from '@main/fs/resolveFilePaths';
 import logger from '@main/logger';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-import { and, asc, desc, eq, inArray, like, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
 
 import { titleToBucket } from '../../../common/titleToBucket';
 
@@ -1378,8 +1378,9 @@ export const updateSongByPath = async (
 };
 
 export const searchSongs = async (keyword: string, trx: DB | DBTransaction = db) => {
+  const escaped = keyword.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
   const data = await trx.query.songs.findMany({
-    where: or(like(songs.title, `%${keyword}%`)),
+    where: or(sql`${songs.title} LIKE ${`%${escaped}%`} ESCAPE '\\'`),
     with: {
       artists: {
         with: {

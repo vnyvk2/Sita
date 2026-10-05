@@ -59,6 +59,7 @@ if (!useMemoryDb && !isDatabaseStubbed) {
 }
 
 let engine: SqliteEngine | null = null;
+let closePromise: Promise<void> | null = null;
 let sqliteFileExisted = false;
 
 if (isDatabaseStubbed) {
@@ -110,9 +111,20 @@ export const closeDatabaseInstance = async () => {
   ShutdownLogger.logShutdownTransition(ShutdownState.ClosingDatabase, 'closeDatabaseInstance');
   if (isDatabaseStubbed) return logger.debug('Database instance stubbed; nothing to close.');
   if (!engine) return logger.debug('Database instance already closed.');
+  if (closePromise) return closePromise;
 
-  await engine.close();
-  engine = null;
+  closePromise = (async () => {
+    try {
+      await engine?.close();
+    } finally {
+      engine = null;
+    }
+  })();
+  try {
+    await closePromise;
+  } finally {
+    closePromise = null;
+  }
   logger.debug('Database instance closed.');
   ShutdownLogger.logShutdownTransition(ShutdownState.DatabaseClosed, 'closeDatabaseInstance');
 };
@@ -121,7 +133,7 @@ export const nukeDatabase = async () => {
   try {
     logger.debug('Performing complete database reset...');
     if (!engine) throw new Error('[Nora] Database is stubbed; nuke unavailable.');
-    await engine.close();
+    await closeDatabaseInstance();
     deleteSqliteFiles(DB_PATH);
     engine = openSqliteEngine(DB_PATH);
     await seedDatabase();

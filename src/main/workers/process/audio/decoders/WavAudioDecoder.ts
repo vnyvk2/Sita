@@ -232,9 +232,20 @@ export class WavAudioDecoder implements AudioDecoder {
       const chunkDataOffset = fileOffset + 8;
 
       if (chunkId === 'fmt ') {
+        if (chunkSize > 64) {
+          throw new Error(`Invalid fmt chunk size (${chunkSize} > 64 bytes).`);
+        }
         const fmtSize = Math.max(16, chunkSize);
         const fmtBuf = Buffer.alloc(fmtSize);
-        await handle.read(fmtBuf, 0, fmtSize, chunkDataOffset);
+        const { bytesRead: fmtBytesRead } = await handle.read(
+          fmtBuf,
+          0,
+          fmtSize,
+          chunkDataOffset
+        );
+        if (fmtBytesRead < fmtSize) {
+          throw new Error(`Truncated fmt chunk (expected ${fmtSize}, got ${fmtBytesRead}).`);
+        }
 
         audioFormat = fmtBuf.readUInt16LE(0);
         channels = fmtBuf.readUInt16LE(2);

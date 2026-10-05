@@ -722,7 +722,8 @@ class AudioPlayer {
       const targetVolume = 0.001; // Very low but not zero to avoid clicks
       const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
 
-      this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, currentTime);
+      // Fix TEAM06-001: Prevent RangeError by ensuring starting value is > 0
+      this.gainNode.gain.setValueAtTime(Math.max(0.001, this.gainNode.gain.value), currentTime);
       this.gainNode.gain.exponentialRampToValueAtTime(targetVolume, currentTime + fadeDuration);
 
       const timeoutId = setTimeout(() => {
@@ -741,7 +742,7 @@ class AudioPlayer {
     this.cancelActiveFade();
     return new Promise((resolve) => {
       const currentTime = this.currentContext.currentTime;
-      const targetVolume = Math.max(0.001, this.currentVolume / 100);
+      const targetVolume = this.muted ? 0.001 : Math.max(0.001, this.currentVolume / 100);
       const fadeDuration = AUDIO_FADE_DURATION / 1000; // Convert to seconds
 
       this.gainNode.gain.setValueAtTime(Math.max(0.001, this.gainNode.gain.value), currentTime);
@@ -990,9 +991,9 @@ class AudioPlayer {
 
   // ? PLAYER RELATED STORE UPDATES HANDLING
   private updatePlayerVolume(volume: PlayerVolume) {
+    if (!volume || typeof volume.value !== 'number') return;
     this.volume = volume.value / 100;
-    this.audioA.muted = volume.isMuted;
-    this.audioB.muted = volume.isMuted;
+    this.muted = volume.isMuted ?? false;
   }
 
   private updatePlaybackRate(playbackRate: number) {
@@ -1762,20 +1763,26 @@ class AudioPlayer {
    * media-element volume stays pinned at 1.0 so compressor drive is
    * knob-invariant and output gain is V, never V^2. */
   set volume(volume: number) {
-    const v = Math.max(0, Math.min(1, volume));
-    this.currentVolume = v * 100;
+    const v = Number(volume);
+    if (!Number.isFinite(v)) return;
+    const clamped = Math.max(0, Math.min(1, v));
+    this.currentVolume = clamped * 100;
     this.audioA.volume = 1.0;
     this.audioB.volume = 1.0;
-    this.gainNode.gain.value = v;
+    if (!this.muted) {
+      this.gainNode.gain.value = clamped;
+    }
   }
 
   /** Gets the muted state. */
   get muted(): boolean {
-    return this.audio.muted;
+    return this.audioA.muted || this.audioB.muted;
   }
 
   /** Sets the muted state. */
   set muted(value: boolean) {
+    // Single authority: mute via gainNode to prevent clicking/graph silencing
+    // but keep media element sync for browser media session/hardware keys
     this.audioA.muted = value;
     this.audioB.muted = value;
     this.gainNode.gain.value = value ? 0 : this.volume;

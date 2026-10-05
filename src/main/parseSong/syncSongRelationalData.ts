@@ -14,6 +14,7 @@ import {
   linkSongToArtist,
   unlinkSongFromArtist,
   getArtistSongIds,
+  getArtistAlbumIds,
   deleteArtist
 } from '@main/db/queries/artists';
 import { saveArtworks, syncSongArtworks, syncAlbumArtworks } from '@main/db/queries/artworks';
@@ -127,7 +128,10 @@ export const syncSongRelationalData = async ({
       // - artistsArtworks entries
       const artistSongIds = await getArtistSongIds(artistId, trx);
       if (artistSongIds.length === 0) {
-        await deleteArtist(artistId, trx);
+        const artistAlbumIds = await getArtistAlbumIds(artistId, trx);
+        if (artistAlbumIds.length === 0) {
+          await deleteArtist(artistId, trx);
+        }
       }
     }
   }

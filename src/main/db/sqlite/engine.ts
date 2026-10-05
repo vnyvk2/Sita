@@ -202,8 +202,21 @@ function buildDrizzle(db: DatabaseSync) {
   });
 
   const clearCaches = () => {
-    arrayCache.clear();
-    objectCache.clear();
+    for (const cache of [arrayCache, objectCache]) {
+      for (const stmt of cache.values()) {
+        try {
+          (stmt as unknown as { close?: () => void }).close?.();
+        } catch {
+          /* best-effort finalize */
+        }
+        try {
+          (stmt as unknown as { finalize?: () => void }).finalize?.();
+        } catch {
+          /* best-effort finalize */
+        }
+      }
+      cache.clear();
+    }
   };
 
   return { orm, preparedObj, withTxLock, clearCaches, getActiveTxLock: () => txLock };
@@ -391,6 +404,7 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
     close: async () => {
       const t = performance.now();
       const activeLock = getActiveTxLock();
+      let timedOut = false;
       if (activeLock) {
         try {
           await Promise.race([
@@ -400,7 +414,15 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
             )
           ]);
         } catch (error) {
+          timedOut = true;
           logger.warn('[db] active transaction did not complete before close timeout', { error });
+        }
+      }
+      if (timedOut) {
+        try {
+          db.exec('ROLLBACK;');
+        } catch {
+          /* no open transaction or already rolled back */
         }
       }
       clearCaches();
