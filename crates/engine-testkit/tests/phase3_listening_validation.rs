@@ -416,18 +416,21 @@ fn analyze_temporal_transitions(
             if pre_quiet {
                 // Crossing event detected!
                 let end_frame = (i + post_window_frames).min(total_frames);
-                let mut window_max_gain_linear = 1.0f32;
+                let mut ref_win_max = 0.0f32;
+                let mut nua_win_max = 0.0f32;
 
                 for k in i..end_frame {
                     for ch in 0..2 {
-                        let s_ref = out_ref[k * 2 + ch].abs();
-                        let s_nua = out_nuance[k * 2 + ch].abs();
-                        if s_ref > noise_thresh_linear {
-                            let gain = s_nua / s_ref;
-                            window_max_gain_linear = window_max_gain_linear.max(gain);
-                        }
+                        ref_win_max = ref_win_max.max(out_ref[k * 2 + ch].abs());
+                        nua_win_max = nua_win_max.max(out_nuance[k * 2 + ch].abs());
                     }
                 }
+
+                let window_max_gain_linear = if ref_win_max > noise_thresh_linear {
+                    nua_win_max / ref_win_max
+                } else {
+                    1.0
+                };
 
                 let max_15ms_gain_db = 20.0 * window_max_gain_linear.log10();
                 overall_max_gain_linear = overall_max_gain_linear.max(window_max_gain_linear);
@@ -528,20 +531,21 @@ fn evaluate_track(
     let delta_lra = (nuance_loudness.lra_lu - ref_loudness.lra_lu) as f32;
     let attack_edge_delta = nuance_loudness.peak_dbfs - ref_loudness.peak_dbfs;
 
-    // Measure dynamic gains across output vs reference (samples are time-aligned after 52-sample TruePeakLimiter latency):
+    // Measure dynamic gains across output vs reference using short analysis windows (5ms) to prevent filter phase-shift zero-crossing division anomalies:
+    let win_samples = (0.005 * sample_rate as f32).round() as usize * 2;
     let mut max_gain_linear = 1.0f32;
     let mut max_loud_linear = 0.0f32;
     let mut found_loud_sample = false;
     let loud_thresh_linear = 10.0f32.powf(-12.0 / 20.0); // 0.25118864 (-12 dBFS)
     let noise_thresh_linear = 10.0f32.powf(-60.0 / 20.0); // 0.001 (-60 dBFS)
 
-    for (s_ref, s_nua) in out_ref.iter().zip(out_nuance.iter()) {
-        let abs_ref = s_ref.abs();
-        let abs_nua = s_nua.abs();
-        if abs_ref > noise_thresh_linear {
-            let gain = abs_nua / abs_ref;
+    for (c_ref, c_nua) in out_ref.chunks(win_samples).zip(out_nuance.chunks(win_samples)) {
+        let p_ref = c_ref.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
+        let p_nua = c_nua.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
+        if p_ref > noise_thresh_linear {
+            let gain = p_nua / p_ref;
             max_gain_linear = max_gain_linear.max(gain);
-            if abs_ref >= loud_thresh_linear {
+            if p_ref >= loud_thresh_linear {
                 found_loud_sample = true;
                 max_loud_linear = max_loud_linear.max(gain);
             }

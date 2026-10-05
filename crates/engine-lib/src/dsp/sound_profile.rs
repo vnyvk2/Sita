@@ -17,6 +17,7 @@
 //! - Lock-free and real-time safe: Zero heap allocations, zero syscalls, zero mutex locks.
 
 use engine_protocol::{SoundProfile, SoundProfileStatus};
+use crate::dsp::eq::BiquadFilter;
 
 /// Transition state machine lifecycle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,6 +47,8 @@ pub struct SoundProfileStage {
     high_threshold_db: f32,
     noise_gate_db: f32,
     noise_floor_db: f32,
+    // Static spectral presence boost centered around vocal presence region (4 kHz)
+    presence_filter: BiquadFilter,
 }
 
 impl Default for SoundProfileStage {
@@ -73,6 +76,7 @@ impl SoundProfileStage {
             high_threshold_db: -12.0,
             noise_gate_db: -60.0,
             noise_floor_db: -80.0,
+            presence_filter: BiquadFilter::new(),
         };
         stage.recalculate();
         stage
@@ -144,6 +148,20 @@ impl SoundProfileStage {
         let release_sec = 0.250f32;
         self.attack_coeff = (-1.0 / (attack_sec * self.sample_rate)).exp();
         self.release_coeff = (-1.0 / (release_sec * self.sample_rate)).exp();
+
+        // Vocal presence EQ: +0.6 dB bell at 4 kHz (Q=1.2) for distinct vocal presence
+        self.presence_filter.update_peaking(self.sample_rate, 4000.0, 0.6, 1.2);
+    }
+
+    /// Configure static presence EQ parameters for VocalNuanceBoost.
+    pub fn set_presence_params(&mut self, freq_hz: f32, gain_db: f32, q: f32) {
+        self.presence_filter.update_peaking(self.sample_rate, freq_hz, gain_db, q);
+    }
+
+    /// Access the internal presence filter.
+    #[inline]
+    pub fn presence_filter(&self) -> &BiquadFilter {
+        &self.presence_filter
     }
 
     /// Configure Upward Nuance Shaping parameters.
@@ -307,6 +325,7 @@ impl SoundProfileStage {
                     if self.transition_frame >= self.transition_frames {
                         self.state = TransitionState::StudioReference;
                         self.current_alpha = 0.0;
+                        self.presence_filter.reset_state();
                     }
                 }
             }
@@ -362,12 +381,16 @@ impl SoundProfileStage {
                     self.release_coeff * self.nuance_gain + (1.0 - self.release_coeff) * target_g;
             }
 
-            // 4. Modulate composite gain: G[n] = (1 - alpha) * 1.000000 + alpha * nuance_gain
-            let composite_gain = (1.0 - self.current_alpha) + self.current_alpha * self.nuance_gain;
+            // 4. Modulate composite signal with presence EQ and upward nuance gain:
+            let filt_l = self.presence_filter.process_sample(0, in_l);
+            let filt_r = self.presence_filter.process_sample(1, in_r);
 
-            // 5. Apply time-aligned modulation (zero latency, zero delay comb)
-            chunk[0] = in_l * composite_gain;
-            chunk[1] = in_r * composite_gain;
+            let nuance_out_l = filt_l * self.nuance_gain;
+            let nuance_out_r = filt_r * self.nuance_gain;
+
+            // 5. Apply time-aligned modulation (zero latency, smooth transition)
+            chunk[0] = (1.0 - self.current_alpha) * in_l + self.current_alpha * nuance_out_l;
+            chunk[1] = (1.0 - self.current_alpha) * in_r + self.current_alpha * nuance_out_r;
         }
     }
 
@@ -384,6 +407,7 @@ impl SoundProfileStage {
         };
         self.nuance_envelope = 0.0;
         self.nuance_gain = 1.0;
+        self.presence_filter.reset_state();
     }
 }
 
