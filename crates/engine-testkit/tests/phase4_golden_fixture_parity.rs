@@ -14,7 +14,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use engine_lib::dsp::SoundProfileStage;
+use engine_lib::dsp::{DspConfig, DspPipeline, SoundProfileStage};
 use engine_protocol::SoundProfile;
 use serde::Serialize;
 
@@ -305,4 +305,100 @@ fn test_phase4_vocal_nuance_boost_golden_fixture_parity() {
     let json_path = artifacts_dir.join("golden_fixture_reference.json");
     fs::write(&json_path, json).expect("Failed to write golden metrics JSON");
     println!("Saved golden reference metrics to {:?}", json_path);
+}
+
+#[test]
+fn test_tier_b_band_limited_presence_audibility_and_limiter_headroom() {
+    // 1. Tier B: Band-limited presence region (2 kHz - 8 kHz, centered at 4 kHz)
+    // Generates a 4.0 kHz tone at loud material level (-6.0 dBFS)
+    let frames = (1.0 * SAMPLE_RATE) as usize;
+    let amp_loud = 10.0f32.powf(-6.0 / 20.0);
+    let mut presence_input = Vec::with_capacity(frames * 2);
+    for frame in 0..frames {
+        let t = frame as f32 / SAMPLE_RATE;
+        let s = amp_loud * (2.0 * std::f32::consts::PI * 4000.0 * t).sin();
+        presence_input.push(s);
+        presence_input.push(s);
+    }
+
+    let mut presence_output = presence_input.clone();
+    let mut stage = SoundProfileStage::new(SAMPLE_RATE);
+    stage.set_target_profile(SoundProfile::VocalNuanceBoost);
+    // Warm up transition so VocalNuanceBoost is fully active
+    let mut warmup = vec![0.0f32; stage.transition_frames() * 2];
+    stage.process(&mut warmup);
+    stage.process(&mut presence_output);
+
+    // Measure settled presence band gain (evaluated after envelope settled, last 0.5s)
+    let eval_slice_in = &presence_input[(frames / 2 * 2)..];
+    let eval_slice_out = &presence_output[(frames / 2 * 2)..];
+    let in_peak_4k = compute_peak_dbfs(eval_slice_in);
+    let out_peak_4k = compute_peak_dbfs(eval_slice_out);
+    let presence_band_gain_db = out_peak_4k - in_peak_4k;
+
+    println!(
+        "Tier B Presence Band (4.0 kHz @ -6 dBFS) Gain: +{:.3} dB",
+        presence_band_gain_db
+    );
+    assert!(
+        presence_band_gain_db >= 0.50,
+        "Tier B Requirement: Presence band (2-8 kHz) must receive >= +0.5 dB boost (got +{:.3} dB)",
+        presence_band_gain_db
+    );
+
+    // 2. Off-band / broadband loud body (e.g. 500 Hz tone at -6.0 dBFS)
+    let mut offband_input = Vec::with_capacity(frames * 2);
+    for frame in 0..frames {
+        let t = frame as f32 / SAMPLE_RATE;
+        let s = amp_loud * (2.0 * std::f32::consts::PI * 500.0 * t).sin();
+        offband_input.push(s);
+        offband_input.push(s);
+    }
+    let mut offband_output = offband_input.clone();
+    let mut stage_off = SoundProfileStage::new(SAMPLE_RATE);
+    stage_off.set_target_profile(SoundProfile::VocalNuanceBoost);
+    let mut warmup_off = vec![0.0f32; stage_off.transition_frames() * 2];
+    stage_off.process(&mut warmup_off);
+    stage_off.process(&mut offband_output);
+
+    let eval_off_in = &offband_input[(frames / 2 * 2)..];
+    let eval_off_out = &offband_output[(frames / 2 * 2)..];
+    let offband_gain_db = compute_peak_dbfs(eval_off_out) - compute_peak_dbfs(eval_off_in);
+    println!(
+        "Tier B Broadband / Off-band (500 Hz @ -6 dBFS) Gain: {:.4} dB",
+        offband_gain_db
+    );
+    assert!(
+        offband_gain_db.abs() <= 0.40,
+        "Tier B Requirement: Broadband / off-band loud body must remain <= 0.4 dB (got {:.4} dB)",
+        offband_gain_db
+    );
+
+    // 3. Limiter Gain Reduction Bound in full DspPipeline
+    // On a high-level test signal through the full pipeline with limiter enabled:
+    let mut pipeline = DspPipeline::new(SAMPLE_RATE);
+    pipeline.update_config(DspConfig {
+        bypass: false,
+        replaygain_db: 0.0,
+        eq_gains: [0.0; 10],
+        karaoke: false,
+        limiter: true,
+        sound_profile: SoundProfile::VocalNuanceBoost,
+    });
+    let mut pipeline_output = presence_input.clone();
+    pipeline.process(&mut pipeline_output);
+
+    // Limiter true-peak ceiling is -0.1 dBTP. With input at -6.0 dBFS + 0.6 dB presence = -5.4 dBFS,
+    // the limiter should have zero gain reduction (<= 0.3 dB GR bound).
+    let out_peak_pipe = compute_peak_dbfs(&pipeline_output[(frames / 2 * 2)..]);
+    let pipe_gain_delta = (out_peak_pipe - out_peak_4k).abs();
+    println!(
+        "Tier B Full Pipeline Limiter GR Delta: {:.4} dB",
+        pipe_gain_delta
+    );
+    assert!(
+        pipe_gain_delta <= 0.30,
+        "Tier B Requirement: Limiter gain reduction on sub-ceiling material must be <= 0.3 dB (got {:.3} dB)",
+        pipe_gain_delta
+    );
 }

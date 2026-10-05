@@ -407,12 +407,14 @@ fn daemon_stdio_sound_profile_toggle_during_playback_is_lock_free() {
     let resp = daemon.wait_response(3, Duration::from_secs(5), &mut events);
     assert_ok(&resp);
 
-    // Verify GetState reports updated profile without blocking
+    // Verify GetState reports updated profile without blocking and with 0 contention
     daemon.send(4, r#"{"cmd":"get_state"}"#);
     let state_resp = daemon.wait_response(4, Duration::from_secs(5), &mut events);
     assert_ok(&state_resp);
     let data = state_resp["data"].as_object().unwrap();
     assert_eq!(data["sound_profile"].as_str(), Some("vocal_nuance_boost"));
+    assert_eq!(data["cb_contention"].as_u64(), Some(0));
+    assert!(data["position_secs"].as_f64().unwrap() >= 0.0);
 
     // Toggle back to studio_reference
     daemon.send(5, r#"{"cmd":"set_sound_profile","profile":"studio_reference"}"#);
@@ -423,6 +425,8 @@ fn daemon_stdio_sound_profile_toggle_during_playback_is_lock_free() {
     assert_ok(&state_resp2);
     let data2 = state_resp2["data"].as_object().unwrap();
     assert_eq!(data2["sound_profile"].as_str(), Some("studio_reference"));
+    assert_eq!(data2["cb_contention"].as_u64(), Some(0));
+    assert!(data2["position_secs"].as_f64().unwrap() >= 0.0);
 
     daemon.send(7, r#"{"cmd":"stop"}"#);
     assert_ok(&daemon.wait_response(7, Duration::from_secs(5), &mut events));

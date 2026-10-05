@@ -40,6 +40,34 @@ class OptionBShaperProcessor extends AudioWorkletProcessor {
     this.highThresholdDb = -12.0;
     this.noiseGateDb = -60.0;
     this.noiseFloorDb = -80.0;
+
+    // Presence bell filter: +0.6 dB @ 4 kHz (Q=1.2) for vocal clarity
+    const A = Math.pow(10, 0.6 / 40.0);
+    const w0 = 2.0 * Math.PI * (4000.0 / this.sampleRate);
+    const alpha = Math.sin(w0) / (2.0 * 1.2);
+    const b0 = 1.0 + alpha * A;
+    const b1 = -2.0 * Math.cos(w0);
+    const b2 = 1.0 - alpha * A;
+    const a0 = 1.0 + alpha / A;
+    const a1 = -2.0 * Math.cos(w0);
+    const a2 = 1.0 - alpha / A;
+
+    this.b0 = b0 / a0;
+    this.b1 = b1 / a0;
+    this.b2 = b2 / a0;
+    this.a1 = a1 / a0;
+    this.a2 = a2 / a0;
+    this.filterStateL = [0.0, 0.0, 0.0, 0.0];
+    this.filterStateR = [0.0, 0.0, 0.0, 0.0];
+  }
+
+  filterSample(state, x) {
+    const y = this.b0 * x + this.b1 * state[0] + this.b2 * state[1] - this.a1 * state[2] - this.a2 * state[3];
+    state[1] = state[0];
+    state[0] = x;
+    state[3] = state[2];
+    state[2] = y;
+    return y;
   }
 
   process(inputs, outputs) {
@@ -95,10 +123,14 @@ class OptionBShaperProcessor extends AudioWorkletProcessor {
         this.nuanceGain = this.releaseCoeff * this.nuanceGain + (1.0 - this.releaseCoeff) * targetG;
       }
 
-      // 4. In-place modulation
-      outL[i] = sL * this.nuanceGain;
+      // 4. Presence bell filter (+0.6 dB @ 4 kHz)
+      const filtL = this.filterSample(this.filterStateL, sL);
+      const filtR = this.filterSample(this.filterStateR, sR);
+
+      // 5. In-place modulation
+      outL[i] = filtL * this.nuanceGain;
       if (output.length > 1) {
-        outR[i] = sR * this.nuanceGain;
+        outR[i] = filtR * this.nuanceGain;
       }
       if (outputs.length > 1 && outputs[1] && outputs[1][0]) {
         outputs[1][0][i] = this.nuanceGain;

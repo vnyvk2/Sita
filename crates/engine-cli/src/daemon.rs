@@ -222,8 +222,8 @@ impl EngineDaemon {
     fn current_position_secs(&self) -> f64 {
         let idx = self.active_slot.load(Ordering::Relaxed) as usize;
         let base = self.base_secs(idx);
-        let frames = if let Ok(guard) = self.shared_engine.try_lock() {
-            let id = if idx == 0 { LibSlotId::A } else { LibSlotId::B };
+        let id = if idx == 0 { LibSlotId::A } else { LibSlotId::B };
+        let frames = if let Ok(guard) = self.shared_engine.lock() {
             guard.0.slot(id).frames_consumed
         } else {
             0

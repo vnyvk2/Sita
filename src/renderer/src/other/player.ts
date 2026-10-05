@@ -1723,9 +1723,11 @@ class AudioPlayer {
     const isFxEngaged = clampedWet > 0 || clampedTreble !== 0 || clampedCutoff < 20000;
 
     const fxHeadroom = isFxEngaged ? 0.8414 : 1.0;
+    const presenceBoostDb = this.currentSoundProfile === 'vocal_nuance_boost' ? 0.6 : 0.0;
+    const effectiveBoostDb = this.currentCompositeEqGainDb + presenceBoostDb;
     const eqHeadroom =
-      this.currentCompositeEqGainDb > 0.001
-        ? Math.pow(10, -this.currentCompositeEqGainDb / 20)
+      effectiveBoostDb > 0.001
+        ? Math.pow(10, -effectiveBoostDb / 20)
         : 1.0;
 
     const targetHeadroom = Math.min(fxHeadroom, eqHeadroom);
@@ -3044,6 +3046,7 @@ class AudioPlayer {
         this.limiterWetGainNode.gain.setTargetAtTime(wetTarget, now, 0.03);
       }
     }
+    this.updateHeadroomGain(immediate);
   }
 
   // ========== A-B LOOP PUBLIC CONTROLS ==========

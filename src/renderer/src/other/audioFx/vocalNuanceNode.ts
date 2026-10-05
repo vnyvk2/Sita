@@ -49,6 +49,53 @@ export const VOCAL_NUANCE_PARAMS = {
 /** Linear amplitude conversion: A = 10^(dB / 20) */
 export const dBToLinear = (db: number): number => 10 ** (db / 20);
 
+export class BiquadPeakingFilter {
+  b0: number = 1.0;
+  b1: number = 0.0;
+  b2: number = 0.0;
+  a1: number = 0.0;
+  a2: number = 0.0;
+  stateL: [number, number, number, number] = [0, 0, 0, 0];
+  stateR: [number, number, number, number] = [0, 0, 0, 0];
+
+  constructor(sampleRate: number, freqHz = 4000.0, gainDb = 0.6, q = 1.2) {
+    this.update(sampleRate, freqHz, gainDb, q);
+  }
+
+  update(sampleRate: number, freqHz: number, gainDb: number, q: number) {
+    const sr = Math.max(8000, sampleRate);
+    const A = Math.pow(10, gainDb / 40.0);
+    const w0 = 2.0 * Math.PI * (freqHz / sr);
+    const alpha = Math.sin(w0) / (2.0 * Math.max(0.1, q));
+    const b0 = 1.0 + alpha * A;
+    const b1 = -2.0 * Math.cos(w0);
+    const b2 = 1.0 - alpha * A;
+    const a0 = 1.0 + alpha / A;
+    const a1 = -2.0 * Math.cos(w0);
+    const a2 = 1.0 - alpha / A;
+
+    this.b0 = b0 / a0;
+    this.b1 = b1 / a0;
+    this.b2 = b2 / a0;
+    this.a1 = a1 / a0;
+    this.a2 = a2 / a0;
+  }
+
+  processSample(state: [number, number, number, number], x: number): number {
+    const y = this.b0 * x + this.b1 * state[0] + this.b2 * state[1] - this.a1 * state[2] - this.a2 * state[3];
+    state[1] = state[0];
+    state[0] = x;
+    state[3] = state[2];
+    state[2] = y;
+    return y;
+  }
+
+  reset() {
+    this.stateL = [0, 0, 0, 0];
+    this.stateR = [0, 0, 0, 0];
+  }
+}
+
 /**
  * OptionBShaper — Exact mathematical reference port of the Rust Option B Upward Nuance Transfer Function.
  * Provides sample-by-sample and block-by-block processing with exact parity to
@@ -65,11 +112,13 @@ export class OptionBShaper {
   readonly highThresholdDb: number = -12.0;
   readonly noiseGateDb: number = -60.0;
   readonly noiseFloorDb: number = -80.0;
+  readonly presenceFilter: BiquadPeakingFilter;
 
   constructor(sampleRate = 48000) {
     this.sampleRate = Math.max(8000, sampleRate);
     this.attackCoeff = Math.exp(-1.0 / (0.015 * this.sampleRate));
     this.releaseCoeff = Math.exp(-1.0 / (0.25 * this.sampleRate));
+    this.presenceFilter = new BiquadPeakingFilter(this.sampleRate, 4000.0, 0.6, 1.2);
   }
 
   processFrame(left: number, right: number, alpha: number): [number, number] {
@@ -114,10 +163,17 @@ export class OptionBShaper {
       this.nuanceGain = this.releaseCoeff * this.nuanceGain + (1.0 - this.releaseCoeff) * targetG;
     }
 
-    // 4. Modulation: g_eff = (1 - alpha) * 1.0 + alpha * nuance_gain
-    const gEff = (1.0 - alpha) * 1.0 + alpha * this.nuanceGain;
+    // 4. Modulate composite signal with presence EQ and upward nuance gain:
+    const filtL = this.presenceFilter.processSample(this.presenceFilter.stateL, left);
+    const filtR = this.presenceFilter.processSample(this.presenceFilter.stateR, right);
 
-    return [left * gEff, right * gEff];
+    const nuanceOutL = filtL * this.nuanceGain;
+    const nuanceOutR = filtR * this.nuanceGain;
+
+    const outL = (1.0 - alpha) * left + alpha * nuanceOutL;
+    const outR = (1.0 - alpha) * right + alpha * nuanceOutR;
+
+    return [outL, outR];
   }
 
   processInterleaved(samples: Float32Array, alpha: number): void {
