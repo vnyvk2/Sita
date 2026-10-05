@@ -40,6 +40,7 @@ pub struct EngineDaemon {
     start_time: Instant,
     slot_durations: Arc<(AtomicU64, AtomicU64)>, // f64 duration in bits
     slot_base_secs: Arc<(AtomicU64, AtomicU64)>, // per-slot playhead base in f64 bits
+    slot_frames_consumed: Arc<(AtomicU64, AtomicU64)>, // lock-free frames consumed mirror
     slot_paths: Arc<Mutex<[Option<String>; 2]>>, // last loaded path per slot for seek respawn
     eos_notified: Arc<(AtomicBool, AtomicBool)>, // TrackEnd already emitted per slot
     output_rate: Arc<AtomicU32>, // device render rate in Hz; single source of truth
@@ -69,6 +70,7 @@ impl EngineDaemon {
             start_time: Instant::now(),
             slot_durations: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
             slot_base_secs: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
+            slot_frames_consumed: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
             slot_paths: Arc::new(Mutex::new([None, None])),
             eos_notified: Arc::new((AtomicBool::new(false), AtomicBool::new(false))),
             output_rate: Arc::new(AtomicU32::new(48000)),
@@ -126,6 +128,7 @@ impl EngineDaemon {
         let contention_cb = Arc::clone(&self.cb_contention);
         let volume_cb = Arc::clone(&self.volume);
         let sound_profile_cb = Arc::clone(&self.sound_profile);
+        let frames_consumed_cb = Arc::clone(&self.slot_frames_consumed);
 
         let render_fn = move |data: &mut [f32]| -> usize {
             if !is_playing_cb.load(Ordering::Relaxed) {
@@ -167,6 +170,8 @@ impl EngineDaemon {
                     LibSlotId::B => 1,
                 };
                 active_slot_cb.store(slot_idx, Ordering::Relaxed);
+                frames_consumed_cb.0.store(mixer.slot_a.frames_consumed, Ordering::Relaxed);
+                frames_consumed_cb.1.store(mixer.slot_b.frames_consumed, Ordering::Relaxed);
                 written
             } else {
                 // Contention policy (documented, deliberate): the callback
@@ -218,15 +223,14 @@ impl EngineDaemon {
 
     /// Per-slot playhead: base offset + frames consumed by that slot's ring
     /// buffer. Never uses cumulative backend totals, so track changes and
-    /// seeks cannot leak the previous song's time.
+    /// seeks cannot leak the previous song's time. Completely lock-free.
     fn current_position_secs(&self) -> f64 {
         let idx = self.active_slot.load(Ordering::Relaxed) as usize;
         let base = self.base_secs(idx);
-        let id = if idx == 0 { LibSlotId::A } else { LibSlotId::B };
-        let frames = if let Ok(guard) = self.shared_engine.lock() {
-            guard.0.slot(id).frames_consumed
+        let frames = if idx == 0 {
+            self.slot_frames_consumed.0.load(Ordering::Relaxed)
         } else {
-            0
+            self.slot_frames_consumed.1.load(Ordering::Relaxed)
         };
         base + frames as f64 / self.output_rate_hz() as f64
     }
@@ -280,8 +284,10 @@ impl EngineDaemon {
         }
         self.set_base_secs(idx, clamped);
         if idx == 0 {
+            self.slot_frames_consumed.0.store(0, Ordering::Release);
             self.eos_notified.0.store(false, Ordering::Release);
         } else {
+            self.slot_frames_consumed.1.store(0, Ordering::Release);
             self.eos_notified.1.store(false, Ordering::Release);
         }
         Ok(())
@@ -358,70 +364,88 @@ impl EngineDaemon {
         });
     }
 
+    fn load_slot(&mut self, slot: SlotId, path: String, is_preload: bool) -> DaemonResult {
+        let lib_slot = match slot {
+            SlotId::A => LibSlotId::A,
+            SlotId::B => LibSlotId::B,
+        };
+
+        let probed = match engine_lib::decoder::probe_file(&path) {
+            Ok(p) => p,
+            Err(e) => return DaemonResult::Error { message: format!("Probe failed: {}", e) },
+        };
+
+        let duration_secs = probed.estimated_duration.map(|d| d.as_secs_f64()).unwrap_or(0.0);
+        let sample_rate = probed.spec.sample_rate;
+        let channels = probed.spec.channels;
+        let codec = probed.codec.clone();
+
+        match slot {
+            SlotId::A => self.slot_durations.0.store(duration_secs.to_bits(), Ordering::Release),
+            SlotId::B => self.slot_durations.1.store(duration_secs.to_bits(), Ordering::Release),
+        }
+        // Fresh per-slot playhead: base 0, no stale TrackEnd.
+        self.set_base_secs(Self::slot_idx(slot), 0.0);
+        if Self::slot_idx(slot) == 0 {
+            self.eos_notified.0.store(false, Ordering::Release);
+        } else {
+            self.eos_notified.1.store(false, Ordering::Release);
+        }
+        if let Ok(mut paths) = self.slot_paths.lock() {
+            paths[Self::slot_idx(slot)] = Some(path.clone());
+        }
+
+        let target_rate = self.output_rate_hz();
+        let spec = AudioSpec::new_f32_stereo(target_rate);
+        let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
+        let stop_signal = Arc::new(AtomicBool::new(false));
+
+        // Spawn background decoder thread with sinc resampling
+        Self::spawn_decoder_thread(path.clone(), 0.0, producer, Arc::clone(&stop_signal), target_rate);
+
+        // prime() signals any previous decoder on this slot to exit
+        // before dropping its consumer (no orphaned threads).
+        if let Ok(mut guard) = self.shared_engine.lock() {
+            let was_crossfading = guard.0.crossfade.is_some();
+            let current_active_idx = self.active_slot.load(Ordering::Relaxed) as usize;
+            let current_active_lib = if current_active_idx == 0 { LibSlotId::A } else { LibSlotId::B };
+            let current_active_empty = guard.0.slot(current_active_lib).state == engine_lib::mixer::SlotState::Empty;
+            let current_active_eos = guard.0.slot(current_active_lib).state == engine_lib::mixer::SlotState::Eos;
+            let target_is_active = current_active_lib == lib_slot;
+
+            let should_activate = !is_preload && (was_crossfading || current_active_empty || current_active_eos || target_is_active);
+
+            if should_activate {
+                guard.0.set_active_slot(lib_slot);
+                self.active_slot.store(Self::slot_idx(slot) as u8, Ordering::Release);
+            }
+            guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
+        }
+
+        if lib_slot == LibSlotId::A {
+            self.slot_frames_consumed.0.store(0, Ordering::Release);
+        } else {
+            self.slot_frames_consumed.1.store(0, Ordering::Release);
+        }
+
+        DaemonResult::Ok {
+            data: Some(serde_json::json!({
+                "slot": slot,
+                "path": path,
+                "cued": true,
+                "duration_secs": duration_secs,
+                "sample_rate": sample_rate,
+                "channels": channels,
+                "codec": codec,
+            })),
+        }
+    }
+
     /// Execute command and return synchronous result.
     pub fn handle_command(&mut self, cmd: DaemonCommand) -> DaemonResult {
         match cmd {
             DaemonCommand::Load { slot, path } => {
-                let lib_slot = match slot {
-                    SlotId::A => LibSlotId::A,
-                    SlotId::B => LibSlotId::B,
-                };
-
-                let probed = match engine_lib::decoder::probe_file(&path) {
-                    Ok(p) => p,
-                    Err(e) => return DaemonResult::Error { message: format!("Probe failed: {}", e) },
-                };
-
-                let duration_secs = probed.estimated_duration.map(|d| d.as_secs_f64()).unwrap_or(0.0);
-                let sample_rate = probed.spec.sample_rate;
-                let channels = probed.spec.channels;
-                let codec = probed.codec.clone();
-
-                match slot {
-                    SlotId::A => self.slot_durations.0.store(duration_secs.to_bits(), Ordering::Release),
-                    SlotId::B => self.slot_durations.1.store(duration_secs.to_bits(), Ordering::Release),
-                }
-                // Fresh per-slot playhead: base 0, no stale TrackEnd.
-                self.set_base_secs(Self::slot_idx(slot), 0.0);
-                if Self::slot_idx(slot) == 0 {
-                    self.eos_notified.0.store(false, Ordering::Release);
-                } else {
-                    self.eos_notified.1.store(false, Ordering::Release);
-                }
-                if let Ok(mut paths) = self.slot_paths.lock() {
-                    paths[Self::slot_idx(slot)] = Some(path.clone());
-                }
-
-                let target_rate = self.output_rate_hz();
-                let spec = AudioSpec::new_f32_stereo(target_rate);
-                let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
-                let stop_signal = Arc::new(AtomicBool::new(false));
-
-                // Spawn background decoder thread with sinc resampling
-                Self::spawn_decoder_thread(path.clone(), 0.0, producer, Arc::clone(&stop_signal), target_rate);
-
-                // prime() signals any previous decoder on this slot to exit
-                // before dropping its consumer (no orphaned threads).
-                if let Ok(mut guard) = self.shared_engine.lock() {
-                    let was_crossfading = guard.0.crossfade.is_some();
-                    guard.0.cancel_crossfade(lib_slot);
-                    guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
-                    if was_crossfading {
-                        self.active_slot.store(Self::slot_idx(slot) as u8, Ordering::Release);
-                    }
-                }
-
-                DaemonResult::Ok {
-                    data: Some(serde_json::json!({
-                        "slot": slot,
-                        "path": path,
-                        "cued": true,
-                        "duration_secs": duration_secs,
-                        "sample_rate": sample_rate,
-                        "channels": channels,
-                        "codec": codec,
-                    })),
-                }
+                self.load_slot(slot, path, false)
             }
             DaemonCommand::Preload { path } => {
                 let standby = if self.active_slot.load(Ordering::Relaxed) == 0 {
@@ -429,20 +453,28 @@ impl EngineDaemon {
                 } else {
                     SlotId::A
                 };
-                self.handle_command(DaemonCommand::Load { slot: standby, path })
+                self.load_slot(standby, path, true)
             }
             DaemonCommand::Play => {
-                let active_id = if self.active_slot.load(Ordering::Relaxed) == 0 {
+                let mut active_id = if self.active_slot.load(Ordering::Relaxed) == 0 {
                     LibSlotId::A
                 } else {
                     LibSlotId::B
                 };
 
-                if let Ok(guard) = self.shared_engine.lock() {
+                if let Ok(mut guard) = self.shared_engine.lock() {
                     if guard.0.slot(active_id).state == engine_lib::mixer::SlotState::Empty {
-                        return DaemonResult::Error {
-                            message: "No track loaded in active slot".to_string(),
-                        };
+                        let opposite = active_id.opposite();
+                        if guard.0.slot(opposite).state != engine_lib::mixer::SlotState::Empty {
+                            active_id = opposite;
+                            guard.0.set_active_slot(opposite);
+                            let opp_idx = if opposite == LibSlotId::A { 0 } else { 1 };
+                            self.active_slot.store(opp_idx, Ordering::Release);
+                        } else {
+                            return DaemonResult::Error {
+                                message: "No track loaded in active slot".to_string(),
+                            };
+                        }
                     }
                 }
                 // Replay after natural end: slot.play() cannot leave Eos, so
@@ -642,6 +674,7 @@ impl EngineDaemon {
         let active_slot_hb = Arc::clone(&self.active_slot);
         let slot_durations_hb = Arc::clone(&self.slot_durations);
         let slot_base_hb = Arc::clone(&self.slot_base_secs);
+        let slot_frames_hb = Arc::clone(&self.slot_frames_consumed);
         let output_rate_hb = Arc::clone(&self.output_rate);
         let eos_notified_hb = Arc::clone(&self.eos_notified);
         let device_error_hb = self.backend.device_error_flag();
@@ -666,10 +699,9 @@ impl EngineDaemon {
                 } else {
                     slot_durations_hb.1.load(Ordering::Relaxed)
                 });
-                // Single mixer lock per beat: position, EOS state, and the
-                // standby buffer check come from one snapshot, halving
-                // contention with the RT callback (the other reducer is the
-                // lock-free SetVolume path; see contention policy above).
+                // Single mixer try_lock per beat: position is lock-free from atomics,
+                // EOS state and standby buffer check use try_lock so the heartbeat
+                // NEVER blocks or contends with the real-time audio callback.
                 let (position_secs, eos, natural_transition) = {
                     let base = f64::from_bits(if slot_idx == 0 {
                         slot_base_hb.0.load(Ordering::Acquire)
@@ -677,13 +709,18 @@ impl EngineDaemon {
                         slot_base_hb.1.load(Ordering::Acquire)
                     });
                     let rate = output_rate_hb.load(Ordering::Acquire).max(8000) as f64;
+                    let frames = if slot_idx == 0 {
+                        slot_frames_hb.0.load(Ordering::Relaxed)
+                    } else {
+                        slot_frames_hb.1.load(Ordering::Relaxed)
+                    };
+                    let pos = base + frames as f64 / rate;
                     shared_hb
-                        .lock()
+                        .try_lock()
                         .ok()
                         .map(|mut g| {
                             let id = if slot_idx == 0 { LibSlotId::A } else { LibSlotId::B };
                             let standby = if slot_idx == 0 { LibSlotId::B } else { LibSlotId::A };
-                            let pos = base + g.0.slot(id).frames_consumed as f64 / rate;
                             let is_eos =
                                 g.0.slot(id).state == engine_lib::mixer::SlotState::Eos;
                             // A beat landing between drain and splice would
@@ -695,7 +732,7 @@ impl EngineDaemon {
                             let transition = g.0.pending_transition_complete.take();
                             (pos, is_eos && !splice_imminent, transition)
                         })
-                        .unwrap_or((base, false, None))
+                        .unwrap_or((pos, false, None))
                 };
 
                 let mut events: Vec<DaemonEvent> = Vec::new();

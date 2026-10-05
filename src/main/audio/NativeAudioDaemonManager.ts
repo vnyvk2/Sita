@@ -39,10 +39,9 @@ export function resolveToLocalDiskPath(inputPath: string): string {
 }
 
 /**
- * T3-1: pure identity formatter for daemon launch diagnostics. Correlates the
- * spawned file with the handshake so a stale binary (e.g. pre-sound_profile)
- * is a 30-second diagnosis instead of a mystery timeout. No I/O here; the
- * caller supplies an optional mtime.
+ * T3-1: pure identity formatter for daemon launch diagnostics. Correlates the spawned file with the
+ * handshake so a stale binary (e.g. pre-sound_profile) is a 30-second diagnosis instead of a
+ * mystery timeout. No I/O here; the caller supplies an optional mtime.
  */
 export interface DaemonIdentityLog {
   binaryPath: string | null;
@@ -120,12 +119,26 @@ export class NativeAudioDaemonManager {
           path.join(process.cwd(), 'resources', 'bin', binaryName)
         ];
 
-    for (const candidate of candidates.filter((p): p is string => Boolean(p))) {
-      if (fs.existsSync(candidate)) {
-        return candidate;
-      }
+    const existing = candidates
+      .filter((p): p is string => Boolean(p))
+      .filter((p) => fs.existsSync(p));
+
+    if (existing.length === 0) {
+      return null;
     }
-    return null;
+
+    if (app?.isPackaged) {
+      return existing[0];
+    }
+
+    // In dev mode, pick the freshest binary by mtime so tests/builds aren't trapped on stale binaries
+    return existing.sort((a, b) => {
+      try {
+        return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs;
+      } catch {
+        return 0;
+      }
+    })[0];
   }
 
   public isAvailable(): boolean {

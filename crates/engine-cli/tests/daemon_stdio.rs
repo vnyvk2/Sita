@@ -479,3 +479,28 @@ fn daemon_stdio_song_shift_with_preloaded_standby_plays_intended_track() {
     assert_ok(&daemon.wait_response(6, Duration::from_secs(5), &mut events));
 }
 
+#[test]
+fn daemon_stdio_cold_load_slot_b_plays_cleanly() {
+    let mut daemon = Daemon::spawn();
+    let mut events = Vec::new();
+    let path_track = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+
+    // 1. Cold startup: load directly into Slot B (without touching Slot A)
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"b","path":"{path_track}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+
+    // 2. Play must succeed and activate Slot B (not error with "No track loaded in active slot")
+    daemon.send(2, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(2, Duration::from_secs(5), &mut events));
+
+    // 3. Heartbeats must show active_slot: "b" and is_playing: true
+    for _ in 0..4 {
+        let hb = daemon.wait_heartbeat(Duration::from_secs(5));
+        assert_eq!(hb["active_slot"].as_str(), Some("b"));
+        assert_eq!(hb["is_playing"].as_bool(), Some(true));
+    }
+
+    daemon.send(3, r#"{"cmd":"stop"}"#);
+    assert_ok(&daemon.wait_response(3, Duration::from_secs(5), &mut events));
+}
+

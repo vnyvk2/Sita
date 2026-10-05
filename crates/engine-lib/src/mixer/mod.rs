@@ -111,6 +111,23 @@ impl DualSlotMixer {
         }
     }
 
+    /// Explicitly set the active slot, cancelling any in-flight crossfade and resetting gain.
+    pub fn set_active_slot(&mut self, slot: SlotId) {
+        if self.crossfade.take().is_some() {
+            let other_slot = slot.opposite();
+            let abandoned = self.slot_mut(other_slot);
+            abandoned.clear();
+            self.pending_transition_complete = None;
+        } else if self.active_slot != slot {
+            let other_slot = slot.opposite();
+            if self.slot(other_slot).state == SlotState::Playing {
+                self.slot_mut(other_slot).state = SlotState::Paused;
+            }
+        }
+        self.active_slot = slot;
+        self.slot_mut(slot).gain = 1.0;
+    }
+
     /// Check if either slot has active audio playing or queued.
     pub fn is_active(&self) -> bool {
         self.slot_a.state == SlotState::Playing
