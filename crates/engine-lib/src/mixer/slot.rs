@@ -109,7 +109,7 @@ impl VoiceSlot {
         let channels = self.spec.map_or(2, |s| s.channels as usize);
         self.frames_consumed += (read / channels.max(1)) as u64;
 
-        if read == 0 && consumer.available_samples() == 0 {
+        if consumer.available_samples() == 0 {
             // Check if producer signaled EOF
             if let Some(stop) = &self.stop_signal {
                 if stop.load(Ordering::Relaxed) {

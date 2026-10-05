@@ -205,10 +205,10 @@ impl AudioSource for DualSlotMixer {
                 }
                 written += chunk_read;
             } else {
-                // Active slot produced 0 samples (EOS or empty)
+                // Active slot produced 0 samples. Auto-splice only if active slot is genuinely at Eos.
                 let standby_id = self.active_slot.opposite();
 
-                if self.auto_splice && self.slot(standby_id).has_audio() {
+                if self.auto_splice && self.slot(active_id).state == SlotState::Eos && self.slot(standby_id).has_audio() {
                     // Seamless Gapless Splice: mark the exhausted slot Eos
                     // (NOT cleared — clearing would free the ring buffer on
                     // the real-time thread, and Eos is the TrackEnd signal;
@@ -230,5 +230,59 @@ impl AudioSource for DualSlotMixer {
         }
 
         written
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::buffer::transport::BoundedAudioTransport;
+    use crate::AudioSpec;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    #[test]
+    fn test_auto_splice_does_not_hijack_buffering_active_slot() {
+        let spec = AudioSpec::new_f32_stereo(44100);
+        let mut mixer = DualSlotMixer::new();
+
+        // 1. Prime Slot A (active) with empty transport and decoder NOT at EOF (stop_signal = false).
+        // This simulates a track that has just been loaded/primed while its decoder thread is spinning up.
+        let (mut prod_a, cons_a) = BoundedAudioTransport::create(&spec, 1.0);
+        let stop_a = Arc::new(AtomicBool::new(false));
+        mixer.slot_mut(SlotId::A).prime(cons_a, spec, Arc::clone(&stop_a));
+        mixer.play();
+
+        // 2. Prime Slot B (standby) with preloaded audio ready to go.
+        let (mut prod_b, cons_b) = BoundedAudioTransport::create(&spec, 1.0);
+        let stop_b = Arc::new(AtomicBool::new(false));
+        prod_b.try_push(&[0.5, 0.5, 0.5, 0.5]);
+        mixer.slot_mut(SlotId::B).prime(cons_b, spec, stop_b);
+
+        // 3. Render audio while Slot A is still buffering (available samples == 0).
+        let mut out = [999.0f32; 4];
+        let written = mixer.render(&mut out);
+
+        // Assert: Slot A must NOT have been abandoned or marked Eos!
+        assert_eq!(mixer.active_slot, SlotId::A, "Active slot must stay Slot A while buffering");
+        assert_eq!(mixer.slot(SlotId::A).state, SlotState::Playing, "Slot A must remain Playing");
+        assert_eq!(out, [0.0, 0.0, 0.0, 0.0], "Output must be silence while buffering");
+        assert_eq!(written, 4);
+
+        // 4. Now Slot A decoder delivers audio frames
+        prod_a.try_push(&[0.25, 0.25, 0.25, 0.25]);
+        let mut out2 = [0.0f32; 4];
+        mixer.render(&mut out2);
+        assert_eq!(out2, [0.25, 0.25, 0.25, 0.25], "Slot A audio must play");
+        assert_eq!(mixer.active_slot, SlotId::A);
+
+        // 5. Now Slot A reaches natural EOF
+        stop_a.store(true, Ordering::Release);
+        // Next render drains Slot A to EOS and auto-splices seamlessly into Slot B
+        let mut out3 = [0.0f32; 4];
+        mixer.render(&mut out3);
+        assert_eq!(mixer.active_slot, SlotId::B, "Auto-splice must trigger when Slot A reaches genuine EOS");
+        assert_eq!(out3, [0.5, 0.5, 0.5, 0.5], "Slot B audio must play seamlessly upon EOS");
+        assert_eq!(mixer.pending_transition_complete, Some(SlotId::B));
     }
 }

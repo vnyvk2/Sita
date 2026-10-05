@@ -383,13 +383,13 @@ class AudioPlayer {
           // reloading — a reload would restart the track audibly. TrackEnd
           // never fires for spliced transitions (daemon suppresses it while
           // the standby is buffered), so this is the only advance signal.
+          this.activeSlot = activeSlot;
           const preloaded = this.preloadedSongData;
           if (
             preloaded &&
             this.isGenerationCurrent(this.standbyPreloadGeneration) &&
             preloaded.songId === this.peekNextTrackId()
           ) {
-            this.activeSlot = activeSlot;
             this.adoptPreloadedStandby(preloaded);
             this.emit('songChange', this.currentSongData);
           }
@@ -424,6 +424,7 @@ class AudioPlayer {
       });
       this.isNativeEngineActive = true;
       this.nativeIsPlaying = false;
+      this.activeSlot = 'A';
       const vol = store.state.player?.volume?.value ?? this.currentVolume;
       const isMuted = store.state.player?.volume?.isMuted ?? false;
       this.nativeBackend.setVolume(isMuted ? 0 : vol / 100).catch(() => {});
@@ -1168,12 +1169,10 @@ class AudioPlayer {
             // currentTime immediately — retaining the previous track's time
             // painted e.g. 2m30s onto the new track's seekbar.
             this.nativeCurrentPosition = 0;
-            // A manual load invalidates any standby preloaded for a different
-            // upcoming track; refresh it toward the true next (async).
-            if (this.preloadedSongData?.songId !== songData.songId) {
-              this.preloadedSongData = null;
-              this.standbyPreloadGeneration = 0;
-            }
+            // A manual load invalidates any standby preloaded previously;
+            // refresh it toward the true next track (async).
+            this.preloadedSongData = null;
+            this.standbyPreloadGeneration = 0;
             await this.nativeBackend.load(this.activeSlot, songData.path);
             // Tier-1: abort commit if superseded during native load await.
             if (!this.isGenerationCurrent(loadGeneration)) {
@@ -1849,41 +1848,35 @@ class AudioPlayer {
             const currentPos = this.currentTime;
             const shouldPlay = !this.paused;
             this.initNativeBackend();
-            // Reconcile inherited daemon state before re-priming: freeze any
-            // in-flight executor work (freeze, not cancel — see Tier-1). The
-            // load chain below commits only for the current generation.
-            void this.nativeBackend
-              ?.getState?.()
-              ?.then((state) => {
-                if (!this.isGenerationCurrent(toggleGeneration)) return;
-                if (state && state.state !== undefined && state.state !== 'stopped') {
-                  void window?.api?.audioEngine?.send?.({ cmd: 'stop' })?.catch?.(() => {});
-                }
-              })
-              ?.catch(() => {});
             if (this.currentSongData) {
               this.audio.pause();
-              this.nativeBackend
-                ?.load(this.activeSlot, this.currentSongData.path)
-                .then(() => {
-                  // T2-6: stale re-init (superseded during awaits) commits nothing.
+              void (async () => {
+                try {
+                  // Stop any legacy in-flight stream in the daemon before priming
+                  await window?.api?.audioEngine?.send?.({ cmd: 'stop' });
                   if (!this.isGenerationCurrent(toggleGeneration)) return;
-                  this.nativeLoadedSongId = this.currentSongData?.songId ?? null;
-                  if (currentPos > 0) this.nativeBackend?.seek(currentPos);
-                  if (shouldPlay) {
-                    this.nativeBackend
-                      ?.play()
-                      .then(() => {
-                        this.nativeIsPlaying = true;
-                        this.emit('play');
-                      })
-                      .catch(() => {});
+                  await this.nativeBackend?.load(this.activeSlot, this.currentSongData!.path);
+                  if (!this.isGenerationCurrent(toggleGeneration)) return;
+                  this.nativeLoadedSongId = this.currentSongData!.songId;
+                  this.preloadedSongData = null;
+                  this.standbyPreloadGeneration = 0;
+                  this.applyReplayGain();
+                  this.syncNativeEqualizer();
+                  if (currentPos > 0) {
+                    await this.nativeBackend?.seek(currentPos);
                   }
-                })
-                .catch((err) => {
+                  if (shouldPlay) {
+                    await this.nativeBackend?.play();
+                    if (!this.isGenerationCurrent(toggleGeneration)) return;
+                    this.nativeIsPlaying = true;
+                    this.emit('play');
+                  }
+                  this.refreshNativeStandby(this.currentSongData!.songId);
+                } catch (err) {
                   console.warn('[AudioPlayer] Failed to load song on native toggle:', err);
                   this.fallbackToWebAudio();
-                });
+                }
+              })();
             }
           } else {
             this.fallbackToWebAudio();

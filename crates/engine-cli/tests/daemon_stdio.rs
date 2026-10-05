@@ -432,3 +432,50 @@ fn daemon_stdio_sound_profile_toggle_during_playback_is_lock_free() {
     assert_ok(&daemon.wait_response(7, Duration::from_secs(5), &mut events));
 }
 
+#[test]
+fn daemon_stdio_song_shift_with_preloaded_standby_plays_intended_track() {
+    let mut daemon = Daemon::spawn();
+    let mut events = Vec::new();
+    let path_track1 = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+    let path_track2 = fixture("ref_440hz_3s_44100.wav").replace('\\', "\\\\");
+    let path_track3 = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+
+    // 1. Load Track 1 into Slot A and play
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"a","path":"{path_track1}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+    daemon.send(2, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(2, Duration::from_secs(5), &mut events));
+    let _ = daemon.wait_heartbeat(Duration::from_secs(5));
+
+    // 2. Preload Track 2 into standby (Slot B)
+    daemon.send(3, &format!(r#"{{"cmd":"preload","path":"{path_track2}"}}"#));
+    assert_ok(&daemon.wait_response(3, Duration::from_secs(10), &mut events));
+
+    // Let it play for 200ms
+    std::thread::sleep(Duration::from_millis(200));
+
+    // 3. User manually shifts songs to Track 3 (loads into active Slot A, plays)
+    daemon.send(4, &format!(r#"{{"cmd":"load","slot":"a","path":"{path_track3}"}}"#));
+    assert_ok(&daemon.wait_response(4, Duration::from_secs(10), &mut events));
+    daemon.send(5, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(5, Duration::from_secs(5), &mut events));
+
+    // 4. Assert: Slot A must remain the active playing slot! It must NOT have auto-spliced to preloaded Track 2 in Slot B!
+    for _ in 0..4 {
+        let hb = daemon.wait_heartbeat(Duration::from_secs(5));
+        assert_eq!(
+            hb["active_slot"].as_str(),
+            Some("a"),
+            "Slot A must remain active and playing the intended track, not hijacked by Slot B"
+        );
+        assert_eq!(
+            hb["is_playing"].as_bool(),
+            Some(true),
+            "Slot A must be actively playing"
+        );
+    }
+
+    daemon.send(6, r#"{"cmd":"stop"}"#);
+    assert_ok(&daemon.wait_response(6, Duration::from_secs(5), &mut events));
+}
+
