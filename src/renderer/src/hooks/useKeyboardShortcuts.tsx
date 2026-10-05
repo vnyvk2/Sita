@@ -373,15 +373,47 @@ export function useKeyboardShortcuts(dependencies: KeyboardShortcutDependencies)
             ]);
             break;
           }
-          case 'appShortcutsPrompt.goToSearch':
+          case 'appShortcutsPrompt.goToSearch': {
             // In mini mode the main-player router is unmounted; route to the
             // mini player's own search surface instead.
             if (store.state.playerType === 'mini') {
               void window.api.miniPlayer.toggleMiniPlayerSearch(true);
-            } else {
-              navigate({ to: '/main-player/search' });
+              break;
             }
+
+            // Contextual search: a visible tab-local or settings search takes
+            // precedence over navigating to global search. Tab-local handlers on
+            // MainContainer only fire when focus is already inside the container,
+            // so a fresh tab switch (focus on sidebar/body) would otherwise
+            // navigate away. This lives inside the matched-shortcut case (not a
+            // raw key check) so user-rebound Go-to-Search keys and Ctrl+F
+            // rebound to other actions keep working as configured.
+            // NOTE: INPUT/TEXTAREA already bailed above, so this never steals
+            // keystrokes while typing. Settings Cmd+F + `/` stay handled by
+            // SettingsSearchInput's own listener (shortcut engine is Ctrl-only).
+            const settingsInput =
+              document.querySelector<HTMLInputElement>('input[role="combobox"]');
+            if (settingsInput && document.contains(settingsInput) && !settingsInput.disabled) {
+              settingsInput.focus();
+              settingsInput.select();
+              break;
+            }
+
+            const pageSearchInput =
+              document.querySelector<HTMLInputElement>('input.search-input[type="search"]') ??
+              document.querySelector<HTMLInputElement>('input#searchBar[type="search"]');
+            if (
+              pageSearchInput &&
+              document.contains(pageSearchInput) &&
+              !pageSearchInput.disabled
+            ) {
+              pageSearchInput.focus();
+              break;
+            }
+
+            navigate({ to: '/main-player/search' });
             break;
+          }
           case 'appShortcutsPrompt.goToLyrics':
             if (router.state.location.pathname.startsWith('/main-player/lyrics')) {
               history.back();
