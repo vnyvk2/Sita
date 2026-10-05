@@ -1,5 +1,6 @@
 import type { PlaylistDto } from '@common/collections/dtos';
 import { SpecialPlaylists } from '@common/playlists.enum';
+import { titleToBucket } from '@common/titleToBucket';
 import {
   DragDropContext,
   Droppable,
@@ -10,6 +11,8 @@ import {
 } from '@hello-pangea/dnd';
 import { CollectionClient } from '@renderer/api/CollectionClient';
 import { collectionKeys } from '@renderer/api/collectionKeys';
+import AlphabetScrubber from '@renderer/components/AlphabetScrubber/AlphabetScrubber';
+import { getAlphabetScrubberContextMenuItem } from '@renderer/components/AlphabetScrubber/getAlphabetScrubberContextMenu';
 import Button from '@renderer/components/Button';
 import { type DropdownOption } from '@renderer/components/Dropdown';
 import MainContainer from '@renderer/components/MainContainer';
@@ -205,10 +208,6 @@ function PlaylistInfoPage() {
   const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
   const preToggleAnchorIndexRef = useRef<number | null>(null);
 
-  const handleListRangeChange = useCallback((range: ListRange) => {
-    latestVisibleRangeRef.current = range;
-  }, []);
-
   const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue, playSong } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
@@ -396,6 +395,89 @@ function PlaylistInfoPage() {
   }, [playlistSongs, keyword, language]);
 
   const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
+
+  const alphabetScrubberPosition = preferences?.alphabetScrubberPosition ?? 'off';
+
+  const { alphabetMap, letterCounts } = useMemo(() => {
+    if (sortingOrder !== 'aToZ' && sortingOrder !== 'zToA') {
+      return { alphabetMap: undefined, letterCounts: undefined };
+    }
+    const map: Record<string, number> = {};
+    const counts: Record<string, number> = {};
+
+    for (let index = 0; index < filteredSongs.length; index++) {
+      const bucket = titleToBucket(filteredSongs[index].title);
+      if (map[bucket] === undefined) {
+        map[bucket] = index;
+      }
+      counts[bucket] = (counts[bucket] || 0) + 1;
+    }
+
+    return { alphabetMap: map, letterCounts: counts };
+  }, [filteredSongs, sortingOrder]);
+
+  const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
+  const activeLetterRef = useRef<string | undefined>(undefined);
+  activeLetterRef.current = activeLetter;
+
+  const alphabetEntries = useMemo(() => {
+    if (!alphabetMap) return [];
+    return Object.entries(alphabetMap).sort(([, a], [, b]) => a - b);
+  }, [alphabetMap]);
+
+  const handleListRangeChange = useCallback(
+    (range: ListRange) => {
+      latestVisibleRangeRef.current = range;
+      if (alphabetEntries.length === 0) return;
+
+      const startIndex = range.startIndex;
+      let currentLetter = alphabetEntries[0][0];
+      for (let i = 0; i < alphabetEntries.length; i++) {
+        if (alphabetEntries[i][1] <= startIndex) {
+          currentLetter = alphabetEntries[i][0];
+        } else {
+          break;
+        }
+      }
+
+      if (currentLetter !== activeLetterRef.current) {
+        setActiveLetter(currentLetter);
+      }
+    },
+    [alphabetEntries]
+  );
+
+  const handleSelectLetter = useCallback(
+    (_letter: string, targetIndex: number) => {
+      virtuosoRef.current?.scrollToIndex({
+        index: Math.min(targetIndex, filteredSongs.length - 1),
+        align: 'start',
+        behavior: 'auto'
+      });
+    },
+    [filteredSongs.length]
+  );
+
+  const getMoreOptionsMenuItems = useCallback(
+    (): ContextMenuItem[] => [
+      getAlphabetScrubberContextMenuItem({
+        t,
+        currentPosition: alphabetScrubberPosition,
+        currentSortOrder: sortingOrder,
+        onAutoSwitchSort: (order) => {
+          navigate({ search: (prev) => ({ ...prev, sortingOrder: order }) });
+        }
+      })
+    ],
+    [alphabetScrubberPosition, navigate, sortingOrder, t]
+  );
+
+  const normalizedKeyword = keyword?.trim();
+  const shouldShowScrubber =
+    alphabetScrubberPosition !== 'off' &&
+    !normalizedKeyword &&
+    (sortingOrder === 'aToZ' || sortingOrder === 'zToA') &&
+    Boolean(alphabetMap && Object.keys(alphabetMap).length > 0);
 
   const virtuosoContext = useMemo<PlaylistVirtuosoContext>(
     () => ({
@@ -871,6 +953,22 @@ function PlaylistInfoPage() {
               playlistData.id !== SpecialPlaylists.Favorites
           },
           {
+            className:
+              'more-options-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0',
+            iconName: 'more_horiz',
+            tooltipLabel: t('common.moreOptions'),
+            clickHandler: (e) => {
+              e.stopPropagation();
+              const button = e.currentTarget;
+              const { x, y } = button.getBoundingClientRect();
+              updateContextMenuData(true, getMoreOptionsMenuItems(), x + 10, y + 50);
+            },
+            onContextMenu: (e) => {
+              e.preventDefault();
+              updateContextMenuData(true, getMoreOptionsMenuItems(), e.pageX, e.pageY);
+            }
+          },
+          {
             tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
             clickHandler: playAllSongs,
@@ -907,6 +1005,9 @@ function PlaylistInfoPage() {
             options: playlistSortOptions,
             onChange: (e) => {
               const order = e.currentTarget.value as SongSortTypes;
+              if (alphabetScrubberPosition !== 'off' && order !== 'aToZ' && order !== 'zToA') {
+                storage.preferences.setPreferences('alphabetScrubberPosition', 'off');
+              }
               navigate({ search: (prev) => ({ ...prev, sortingOrder: order }) });
             },
             isDisabled: !(playlistData.itemCount > 0)
@@ -940,52 +1041,117 @@ function PlaylistInfoPage() {
           isLibraryEmpty={playlistSongs.length === 0}
         />
       </div>
-      {filteredSongs.length > 0 &&
-        (reorderEnabled ? (
-          <DragDropContext
-            onDragStart={handleDragStart}
-            onDragUpdate={handleDragUpdate}
-            onDragEnd={handleDragEnd}
-            autoScrollerOptions={{
-              startFromPercentage: 0.15,
-              maxScrollAtPercentage: 0.05
-            }}
-          >
-            <Droppable
-              droppableId="playlist-droppable"
-              mode="virtual"
-              ignoreContainerClipping={true}
-              renderClone={(provided, renderCloneSnapshot, rubric) => {
-                const entryId = Number(rubric.draggableId);
-                const item =
-                  filteredSongs.find((s) => s.entryId === entryId) ??
-                  filteredSongs[rubric.source.index];
-                if (!item) return null;
-                return (
-                  <PlaylistRow
-                    item={item}
-                    index={rubric.source.index}
-                    isIndexingSongs={preferences.isSongIndexingEnabled}
-                    onPlayClick={handleSongPlayBtnClick}
-                    selectAllHandler={selectAllHandler}
-                    provided={provided}
-                    isDragging={renderCloneSnapshot.isDragging}
-                    buildContextMenuItems={getContextMenuItems}
-                    isCompact={isCompactSongView}
-                  />
-                );
-              }}
-            >
-              {(droppableProvided) => (
+      {filteredSongs.length > 0 && (
+        <div className="playlist-songs-container appear-from-bottom flex min-h-0 flex-1 flex-col delay-100">
+          {shouldShowScrubber && alphabetScrubberPosition === 'top-horizontal' && (
+            <AlphabetScrubber
+              alphabetMap={alphabetMap}
+              letterCounts={letterCounts}
+              position="top-horizontal"
+              sortOrder={sortingOrder as 'aToZ' | 'zToA'}
+              activeLetter={activeLetter}
+              onSelectLetter={handleSelectLetter}
+              className="mr-4"
+            />
+          )}
+          <div className="flex min-h-0 w-full flex-1">
+            {shouldShowScrubber && alphabetScrubberPosition === 'left-vertical' && (
+              <AlphabetScrubber
+                alphabetMap={alphabetMap}
+                letterCounts={letterCounts}
+                position="left-vertical"
+                sortOrder={sortingOrder as 'aToZ' | 'zToA'}
+                activeLetter={activeLetter}
+                onSelectLetter={handleSelectLetter}
+              />
+            )}
+            <div className="flex h-full min-w-0 flex-1 flex-col">
+              {reorderEnabled ? (
+                <DragDropContext
+                  onDragStart={handleDragStart}
+                  onDragUpdate={handleDragUpdate}
+                  onDragEnd={handleDragEnd}
+                  autoScrollerOptions={{
+                    startFromPercentage: 0.15,
+                    maxScrollAtPercentage: 0.05
+                  }}
+                >
+                  <Droppable
+                    droppableId="playlist-droppable"
+                    mode="virtual"
+                    ignoreContainerClipping={true}
+                    renderClone={(provided, renderCloneSnapshot, rubric) => {
+                      const entryId = Number(rubric.draggableId);
+                      const item =
+                        filteredSongs.find((s) => s.entryId === entryId) ??
+                        filteredSongs[rubric.source.index];
+                      if (!item) return null;
+                      return (
+                        <PlaylistRow
+                          item={item}
+                          index={rubric.source.index}
+                          isIndexingSongs={preferences.isSongIndexingEnabled}
+                          onPlayClick={handleSongPlayBtnClick}
+                          selectAllHandler={selectAllHandler}
+                          provided={provided}
+                          isDragging={renderCloneSnapshot.isDragging}
+                          buildContextMenuItems={getContextMenuItems}
+                          isCompact={isCompactSongView}
+                        />
+                      );
+                    }}
+                  >
+                    {(droppableProvided) => (
+                      <VirtualizedList
+                        key={isCompactSongView ? 'compact' : 'standard'}
+                        ref={virtuosoRef}
+                        data={filteredSongs}
+                        fixedItemHeight={isCompactSongView ? 38 : 60}
+                        scrollerRef={droppableProvided.innerRef}
+                        scrollKey={scrollKey}
+                        scrollSeekConfiguration={false}
+                        increaseViewportBy={{ top: 800, bottom: 800 }}
+                        context={virtuosoContext}
+                        components={virtuosoComponents}
+                        onChange={handleListRangeChange}
+                        computeItemKey={(index, item) =>
+                          item?.entryId ? `entry-${item.entryId}` : `row-${index}`
+                        }
+                        itemContent={(index, item) => (
+                          <Draggable
+                            key={item.entryId || item.songId}
+                            draggableId={String(item.entryId || item.songId)}
+                            index={index}
+                          >
+                            {(draggableProvided, draggableSnapshot) => (
+                              <PlaylistRow
+                                key={item.entryId || item.songId}
+                                item={item}
+                                index={index}
+                                isIndexingSongs={preferences.isSongIndexingEnabled}
+                                onPlayClick={handleSongPlayBtnClick}
+                                selectAllHandler={selectAllHandler}
+                                provided={draggableProvided}
+                                isDragging={
+                                  draggableSnapshot.isDragging && !draggableSnapshot.isDropAnimating
+                                }
+                                buildContextMenuItems={getContextMenuItems}
+                                isCompact={isCompactSongView}
+                              />
+                            )}
+                          </Draggable>
+                        )}
+                      />
+                    )}
+                  </Droppable>
+                </DragDropContext>
+              ) : (
                 <VirtualizedList
                   key={isCompactSongView ? 'compact' : 'standard'}
                   ref={virtuosoRef}
                   data={filteredSongs}
                   fixedItemHeight={isCompactSongView ? 38 : 60}
-                  scrollerRef={droppableProvided.innerRef}
                   scrollKey={scrollKey}
-                  scrollSeekConfiguration={false}
-                  increaseViewportBy={{ top: 800, bottom: 800 }}
                   context={virtuosoContext}
                   components={virtuosoComponents}
                   onChange={handleListRangeChange}
@@ -993,60 +1159,23 @@ function PlaylistInfoPage() {
                     item?.entryId ? `entry-${item.entryId}` : `row-${index}`
                   }
                   itemContent={(index, item) => (
-                    <Draggable
-                      key={item.entryId || item.songId}
-                      draggableId={String(item.entryId || item.songId)}
+                    <PlaylistRow
+                      key={item.entryId || index}
+                      item={item}
                       index={index}
-                    >
-                      {(draggableProvided, draggableSnapshot) => (
-                        <PlaylistRow
-                          key={item.entryId || item.songId}
-                          item={item}
-                          index={index}
-                          isIndexingSongs={preferences.isSongIndexingEnabled}
-                          onPlayClick={handleSongPlayBtnClick}
-                          selectAllHandler={selectAllHandler}
-                          provided={draggableProvided}
-                          isDragging={
-                            draggableSnapshot.isDragging && !draggableSnapshot.isDropAnimating
-                          }
-                          buildContextMenuItems={getContextMenuItems}
-                          isCompact={isCompactSongView}
-                        />
-                      )}
-                    </Draggable>
+                      isIndexingSongs={preferences.isSongIndexingEnabled}
+                      onPlayClick={handleSongPlayBtnClick}
+                      selectAllHandler={selectAllHandler}
+                      buildContextMenuItems={getContextMenuItems}
+                      isCompact={isCompactSongView}
+                    />
                   )}
                 />
               )}
-            </Droppable>
-          </DragDropContext>
-        ) : (
-          <VirtualizedList
-            key={isCompactSongView ? 'compact' : 'standard'}
-            ref={virtuosoRef}
-            data={filteredSongs}
-            fixedItemHeight={isCompactSongView ? 38 : 60}
-            scrollKey={scrollKey}
-            context={virtuosoContext}
-            components={virtuosoComponents}
-            onChange={handleListRangeChange}
-            computeItemKey={(index, item) =>
-              item?.entryId ? `entry-${item.entryId}` : `row-${index}`
-            }
-            itemContent={(index, item) => (
-              <PlaylistRow
-                key={item.entryId || index}
-                item={item}
-                index={index}
-                isIndexingSongs={preferences.isSongIndexingEnabled}
-                onPlayClick={handleSongPlayBtnClick}
-                selectAllHandler={selectAllHandler}
-                buildContextMenuItems={getContextMenuItems}
-                isCompact={isCompactSongView}
-              />
-            )}
-          />
-        ))}
+            </div>
+          </div>
+        </div>
+      )}
       {playlistSongs.length > 0 && filteredSongs.length === 0 && (
         <div className="flex h-full grow flex-col">
           <PlaylistInfoAndImgContainer

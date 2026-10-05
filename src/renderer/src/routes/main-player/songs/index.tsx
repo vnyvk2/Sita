@@ -2,6 +2,7 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import NoSongsImage from '@assets/images/svg/Empty Inbox _Monochromatic.svg';
 import AlphabetScrubber from '@renderer/components/AlphabetScrubber/AlphabetScrubber';
+import { getAlphabetScrubberContextMenuItem } from '@renderer/components/AlphabetScrubber/getAlphabetScrubberContextMenu';
 import Button from '@renderer/components/Button';
 import Dropdown, { type DropdownOption } from '@renderer/components/Dropdown';
 import DuplicateSongsCleanupPrompt from '@renderer/components/DuplicateSongsCleanupPrompt';
@@ -22,12 +23,6 @@ import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getLibraryVersion } from '@renderer/other/libraryVersion';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import {
-  getSongRowHeight,
-  resolveSongViewMode,
-  setSongViewMode,
-  type SongViewMode
-} from '@renderer/utils/songViewMode';
-import {
   SONG_WINDOW_SIZE,
   SONG_WINDOW_STALE_TIME,
   getSongListIdentity,
@@ -40,6 +35,12 @@ import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { scrollRegistry } from '@renderer/utils/scrollStore';
+import {
+  getSongRowHeight,
+  resolveSongViewMode,
+  setSongViewMode,
+  type SongViewMode
+} from '@renderer/utils/songViewMode';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -454,14 +455,12 @@ function SongsPage() {
     rowHeight: fixedItemHeight
   });
 
-  const {
-    handleContextMenu: handleContainerContextMenu,
-    handleClick: handleContainerClick
-  } = useSongListContextMenuDelegation({
-    getItem,
-    isCompact: isCompactSongView,
-    onPlayClick: handleSongPlayBtnClick
-  });
+  const { handleContextMenu: handleContainerContextMenu, handleClick: handleContainerClick } =
+    useSongListContextMenuDelegation({
+      getItem,
+      isCompact: isCompactSongView,
+      onPlayClick: handleSongPlayBtnClick
+    });
 
   const renderSong = useCallback(
     (index: number) => {
@@ -542,6 +541,35 @@ function SongsPage() {
       });
     },
     [filteredSongIds.length]
+  );
+
+  const getMoreOptionsMenuItems = useCallback(
+    (): ContextMenuItem[] => [
+      {
+        label: t('settingsPage.resyncLibrary'),
+        iconName: 'sync',
+        handlerFunction: () => window.api.audioLibraryControls.resyncSongsLibrary()
+      },
+      {
+        isContextMenuItemSeperator: true,
+        label: '',
+        handlerFunction: null
+      },
+      getAlphabetScrubberContextMenuItem({
+        t,
+        currentPosition: alphabetScrubberPosition,
+        currentSortOrder: sortingOrder,
+        onAutoSwitchSort: (order) => {
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              sortingOrder: order
+            })
+          });
+        }
+      })
+    ],
+    [alphabetScrubberPosition, navigate, sortingOrder, t]
   );
 
   const normalizedKeyword = keyword?.trim();
@@ -651,34 +679,12 @@ function SongsPage() {
               e.stopPropagation();
               const button = e.currentTarget;
               const { x, y } = button.getBoundingClientRect();
-              updateContextMenuData(
-                true,
-                [
-                  {
-                    label: t('settingsPage.resyncLibrary'),
-                    iconName: 'sync',
-                    handlerFunction: () => window.api.audioLibraryControls.resyncSongsLibrary()
-                  }
-                ],
-                x + 10,
-                y + 50
-              );
+              updateContextMenuData(true, getMoreOptionsMenuItems(), x + 10, y + 50);
             }}
             tooltipLabel={t('common.moreOptions')}
             onContextMenu={(e) => {
               e.preventDefault();
-              updateContextMenuData(
-                true,
-                [
-                  {
-                    label: t('settingsPage.resyncLibrary'),
-                    iconName: 'sync',
-                    handlerFunction: () => window.api.audioLibraryControls.resyncSongsLibrary()
-                  }
-                ],
-                e.pageX,
-                e.pageY
-              );
+              updateContextMenuData(true, getMoreOptionsMenuItems(), e.pageX, e.pageY);
             }}
           />
           {isMultipleSelectionEnabled && (
@@ -758,10 +764,18 @@ function SongsPage() {
             value={sortingOrder}
             options={songSortOptions}
             onChange={(e) => {
+              const newOrder = e.currentTarget.value as SongSortTypes;
+              if (
+                alphabetScrubberPosition !== 'off' &&
+                newOrder !== 'aToZ' &&
+                newOrder !== 'zToA'
+              ) {
+                storage.preferences.setPreferences('alphabetScrubberPosition', 'off');
+              }
               navigate({
                 search: (prev) => ({
                   ...prev,
-                  sortingOrder: e.currentTarget.value as SongSortTypes
+                  sortingOrder: newOrder
                 })
               });
             }}
