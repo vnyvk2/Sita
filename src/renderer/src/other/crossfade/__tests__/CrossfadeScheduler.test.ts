@@ -268,4 +268,62 @@ describe('CrossfadeScheduler', () => {
     vi.advanceTimersByTime(10000);
     expect(delegate.onFadeComplete).not.toHaveBeenCalled();
   });
+
+  it('should not finalize in-flight fade if audio clock has not elapsed', async () => {
+    let mockAudioTime = 10.0;
+    delegate.getAudioCurrentTime = vi.fn(() => mockAudioTime);
+    await scheduler.onTimeUpdate(89);
+    await scheduler.onTimeUpdate(94);
+    expect(scheduler.getState()).toBe('FADING');
+
+    // Advance audio clock by only 2s (fade duration is 6s)
+    mockAudioTime = 12.0;
+    scheduler.maybeFinalize();
+    expect(scheduler.getState()).toBe('FADING');
+    expect(delegate.onFadeComplete).not.toHaveBeenCalled();
+  });
+
+  it('should finalize in-flight fade when audio clock has elapsed and be idempotent with setTimeout', async () => {
+    let mockAudioTime = 10.0;
+    delegate.getAudioCurrentTime = vi.fn(() => mockAudioTime);
+    await scheduler.onTimeUpdate(89);
+    await scheduler.onTimeUpdate(94);
+    expect(scheduler.getState()).toBe('FADING');
+
+    // Advance audio clock past 6s fade duration (e.g. 10.0 + 6.1s = 16.1s)
+    mockAudioTime = 16.1;
+    scheduler.maybeFinalize();
+    expect(delegate.onFadeComplete).toHaveBeenCalledWith(expect.any(Number), 42);
+    expect(scheduler.getState()).toBe('IDLE');
+
+    // Verify setTimeout does not double-call onFadeComplete
+    (delegate.onFadeComplete as unknown as ReturnType<typeof vi.fn>).mockClear();
+    vi.advanceTimersByTime(10000);
+    expect(delegate.onFadeComplete).not.toHaveBeenCalled();
+  });
+
+  it('should fallback to wall clock when getAudioCurrentTime is not provided', async () => {
+    delete delegate.getAudioCurrentTime;
+    await scheduler.onTimeUpdate(89);
+    await scheduler.onTimeUpdate(94);
+    expect(scheduler.getState()).toBe('FADING');
+
+    // Before duration: no-op
+    scheduler.maybeFinalize();
+    expect(scheduler.getState()).toBe('FADING');
+    expect(delegate.onFadeComplete).not.toHaveBeenCalled();
+
+    // Advance wall clock past 6000ms
+    vi.advanceTimersByTime(6001);
+    // Timeout handler triggers maybeFinalize, completing the fade
+    expect(delegate.onFadeComplete).toHaveBeenCalledWith(expect.any(Number), 42);
+    expect(scheduler.getState()).toBe('IDLE');
+  });
+
+  it('should be a no-op if maybeFinalize is called when not in FADING state', () => {
+    expect(scheduler.getState()).toBe('IDLE');
+    scheduler.maybeFinalize();
+    expect(delegate.onFadeComplete).not.toHaveBeenCalled();
+    expect(scheduler.getState()).toBe('IDLE');
+  });
 });

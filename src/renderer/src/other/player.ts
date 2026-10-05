@@ -163,6 +163,19 @@ class AudioPlayer {
   private nativeLoadedSongId: number | null = null;
   private lastNativeRgDb: number = 0;
   private nativePreloadInFlight: boolean = false;
+  private registeredAudioElements: HTMLAudioElement[] = [];
+  private webAudioWatchdogId: ReturnType<typeof setInterval> | null = null;
+
+  private handleVisibilityChange = (): void => {
+    if (typeof document === 'undefined') return;
+    if (this.isNativeEngineActive) {
+      if (document.hidden) {
+        this.quiesceWebAudio();
+      }
+    } else if (this.crossfadeScheduler.getState() === 'FADING') {
+      this.crossfadeScheduler.maybeFinalize();
+    }
+  };
 
   constructor(queuesManager: QueuesManager) {
     this.listeners = new Map();
@@ -176,6 +189,12 @@ class AudioPlayer {
     this.audioB.crossOrigin = 'anonymous';
     this.audioB.preload = 'auto';
     this.audioB.defaultPlaybackRate = 1.0;
+
+    this.registeredAudioElements = [this.audioA, this.audioB];
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+    this.startWebAudioWatchdog();
 
     // Single volume authority: media-element volume is pinned to 1.0 so it
     // never scales MediaElementSource output pre-graph (V^2 bug). Master
@@ -260,7 +279,52 @@ class AudioPlayer {
     }
   }
 
+  /**
+   * Centralized Web Audio Quiescence Invariant:
+   * Spec-safe teardown of all registered HTMLAudioElements and timer hygiene.
+   * Enforces: isNativeEngineActive === true => no HTML media element is loaded or playing.
+   * Safe across all readyState transitions (no currentTime traps on unloaded media).
+   */
+  public quiesceWebAudio(): void {
+    this.crossfadeScheduler.cancel();
+    for (const el of this.registeredAudioElements) {
+      try {
+        el.pause();
+        el.removeAttribute('src');
+        el.load();
+      } catch {
+        // Safe regardless of readyState
+      }
+    }
+  }
+
+  private startWebAudioWatchdog(): void {
+    if (typeof window === 'undefined' || this.webAudioWatchdogId !== null) return;
+    this.webAudioWatchdogId = setInterval(() => {
+      if (this.destroyed || !this.isNativeEngineActive) return;
+      for (const el of this.registeredAudioElements) {
+        if (!el.paused) {
+          console.warn(
+            '[AudioPlayer.Watchdog] Leaked active HTMLAudioElement detected while native engine is active! Quiescing WebAudio immediately:',
+            el
+          );
+          this.quiesceWebAudio();
+          break;
+        }
+      }
+      if (typeof document !== 'undefined') {
+        const unowned = [...document.querySelectorAll('audio')].filter(
+          (el) => !el.paused && !this.registeredAudioElements.includes(el)
+        );
+        if (unowned.length > 0) {
+          console.warn('[AudioPlayer.Watchdog] Unowned playing audio:', unowned);
+        }
+      }
+    }, 2000);
+  }
+
   private initNativeBackend() {
+    this.quiesceWebAudio();
     // Guard against double-init leaking the previous rAF + IPC subscription.
     if (this.nativeBackend) {
       this.nativeBackend.destroy();
@@ -1006,12 +1070,11 @@ class AudioPlayer {
       return this.inFlightLoad.promise;
     }
 
-    // 2. Fast-path: if exact song is already loaded, audio src is set, and no load is in-flight
+    // 2. Fast-path: if exact song is already loaded, audio src is set (in web mode), and no load is in-flight
     if (
       this.currentSongData?.songId === songId &&
-      this.audio.src &&
-      !this.inFlightLoad &&
-      (!this.isNativeEngineActive || this.nativeLoadedSongId === songId)
+      (!this.isNativeEngineActive ? !!this.audio.src : this.nativeLoadedSongId === songId) &&
+      !this.inFlightLoad
     ) {
       logPlayer('[AudioPerf] loadSong_already_loaded', {
         songId,
@@ -1349,8 +1412,14 @@ class AudioPlayer {
     }
     this.queueEventsUnsubscribe.forEach((unsub) => typeof unsub === 'function' && unsub());
     this.removeAllListeners();
-    this.audio.pause();
-    this.audio.src = '';
+    if (this.webAudioWatchdogId !== null) {
+      clearInterval(this.webAudioWatchdogId);
+      this.webAudioWatchdogId = null;
+    }
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    }
+    this.quiesceWebAudio();
     this.currentContext.close();
   }
 
@@ -1948,6 +2017,7 @@ class AudioPlayer {
         playbackRate: this.audio.playbackRate || 1.0,
         repeatMode: this.repeatMode
       }),
+      getAudioCurrentTime: () => this.currentContext.currentTime,
       getNextTrackId: () => {
         if (this.repeatMode === 'one') return null;
         if (this.queue.hasNext) {
@@ -2164,8 +2234,8 @@ class AudioPlayer {
           this.crossfadeScheduler.getState() !== 'FADING'
         ) {
           this.standbyAudio.pause();
-          this.standbyAudio.currentTime = 0;
-          this.standbyAudio.src = '';
+          this.standbyAudio.removeAttribute('src');
+          this.standbyAudio.load();
           return;
         }
 
@@ -2225,8 +2295,8 @@ class AudioPlayer {
         const standbyFade = this.standbyFadeGain;
         standbyFade.gain.value = 0.0;
         this.standbyAudio.pause();
-        this.standbyAudio.currentTime = 0;
-        this.standbyAudio.src = '';
+        this.standbyAudio.removeAttribute('src');
+        this.standbyAudio.load();
         this.activeFadeGain.gain.value = 1.0;
         this.isCrossfading = false;
         this.clearAbLoop('CROSSFADE_COMPLETE');
@@ -2266,8 +2336,8 @@ class AudioPlayer {
         this.standbyFadeGain.gain.setValueAtTime(0.0, now);
 
         this.standbyAudio.pause();
-        this.standbyAudio.currentTime = 0;
-        this.standbyAudio.src = '';
+        this.standbyAudio.removeAttribute('src');
+        this.standbyAudio.load();
         this.isCrossfading = false;
         this.preloadedSongData = null;
         this.standbyPreloadGeneration = 0;
