@@ -19,7 +19,7 @@ class MockAudioContext {
         setTargetAtTime: vi.fn(),
         cancelScheduledValues: vi.fn()
       },
-      connect: vi.fn()
+      connect: vi.fn(), disconnect: vi.fn()
     };
   }
   createBiquadFilter() {
@@ -28,11 +28,13 @@ class MockAudioContext {
       frequency: { value: 1000 },
       gain: { value: 0 },
       Q: { value: 1 },
-      connect: vi.fn()
+      connect: vi.fn(), disconnect: vi.fn()
     };
   }
+  createConvolver() { return { buffer: null, connect: vi.fn(), disconnect: vi.fn() }; }
+  createDynamicsCompressor() { return { threshold: { value: -6, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, knee: { value: 0, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, ratio: { value: 20, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, attack: { value: 0.003, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, release: { value: 0.15, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() }, reduction: 0, connect: vi.fn(), disconnect: vi.fn() }; }
   createMediaElementSource() {
-    return { connect: vi.fn() };
+    return { connect: vi.fn(), disconnect: vi.fn() };
   }
   close() {
     return Promise.resolve();

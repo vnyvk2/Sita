@@ -22,9 +22,9 @@ class MockAudioContext {
   createBiquadFilter() {
     return {
       type: 'peaking',
-      frequency: { value: 1000, setTargetAtTime: vi.fn() },
-      gain: { value: 0, setTargetAtTime: vi.fn() },
-      Q: { value: 1 },
+      frequency: { value: 1000, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
+      gain: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
+      Q: { value: 1, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
       connect: vi.fn(),
       disconnect: vi.fn()
     };

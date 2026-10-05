@@ -1,0 +1,37 @@
+{
+  "_note": "Canonical wire examples for the engine-protocol schema. Rust asserts exact match (engine-protocol tag-lock test); TypeScript asserts each example parses under its union (test/unit/audioEngineWireParity.test.ts). A shape drift on either side fails loudly instead of desyncing silently.",
+  "commands": [
+    { "id": 1, "cmd": "load", "slot": "a", "path": "C:/Music/track.flac" },
+    { "id": 2, "cmd": "preload", "path": "C:/Music/next.mp3" },
+    { "id": 3, "cmd": "play" },
+    { "id": 4, "cmd": "pause" },
+    { "id": 5, "cmd": "stop" },
+    { "id": 6, "cmd": "seek", "position_secs": 90.5 },
+    { "id": 7, "cmd": "crossfade", "duration_ms": 3000 },
+    { "id": 8, "cmd": "set_volume", "volume": 0.75 },
+    { "id": 9, "cmd": "set_eq", "gains": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0] },
+    { "id": 10, "cmd": "set_dsp", "bypass": false, "rg_db": -3.0, "karaoke": false, "limiter": true },
+    { "id": 11, "cmd": "set_sound_profile", "profile": "studio_reference" },
+    { "id": 12, "cmd": "list_devices" },
+    { "id": 13, "cmd": "set_device", "device_id": "Speakers" },
+    { "id": 14, "cmd": "get_state" }
+  ],
+  "events": [
+    { "event": "ready", "protocol_version": 1, "engine_version": "0.1.0", "boot_id": 9876543210 },
+    { "event": "state_changed", "state": "playing" },
+    { "event": "state_changed", "state": "paused", "position_secs": 12.5 },
+    { "event": "slot_end", "slot": "a" },
+    { "event": "track_end", "slot": "a" },
+    { "event": "transition_complete", "active_slot": "b" },
+    { "event": "xrun", "count": 3 },
+    { "event": "device_error", "message": "disconnected" },
+    { "event": "sound_profile_changed", "profile": "vocal_nuance_boost", "status": "active", "boot_id": 9876543210, "sequence_id": 1 },
+    { "event": "heartbeat", "active_slot": "a", "position_secs": 12.5, "duration_secs": 240.0, "wallclock_ms": 12345, "is_playing": true }
+  ],
+  "responses": [
+    { "id": 1, "status": "ok", "data": { "slot": "a", "path": "C:/Music/track.flac", "cued": true, "duration_secs": 240.0, "sample_rate": 44100, "channels": 2, "codec": "FLAC" } },
+    { "id": 2, "status": "ok", "data": { "state": "playing", "active_slot": "a", "volume": 0.75, "xrun_count": 0, "low_water_mark": 1024, "position_secs": 12.5, "cb_contention": 0, "sound_profile": "studio_reference", "sound_profile_status": "active" } },
+    { "id": 3, "status": "error", "message": "No track loaded in active slot" },
+    { "id": 4, "status": "ok", "data": { "profile": "vocal_nuance_boost", "transition_ms": 30, "boot_id": 9876543210, "sequence_id": 1 } }
+  ]
+}

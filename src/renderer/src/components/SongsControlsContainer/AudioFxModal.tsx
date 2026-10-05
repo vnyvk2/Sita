@@ -1,6 +1,7 @@
+import type { SoundProfile } from '@common/audioEngineProtocol';
+import { useStore } from '@tanstack/react-store';
 import { type CSSProperties, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useStore } from '@tanstack/react-store';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
@@ -37,7 +38,7 @@ function NightModeReductionMeter({ player }: { player: AudioPlayer }) {
 
   return (
     <div className="flex items-center gap-2 pt-0.5">
-      <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-[10px] font-medium shrink-0">
+      <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed shrink-0 text-[10px] font-medium">
         {t('audioFx.nightModeReduction', 'Gain Reduction')}:
       </span>
       <div className="bg-background-color-2/80 dark:bg-dark-background-color-2/80 relative h-2 flex-1 overflow-hidden rounded-full">
@@ -49,7 +50,7 @@ function NightModeReductionMeter({ player }: { player: AudioPlayer }) {
       </div>
       <span
         ref={readoutRef}
-        className="text-font-color-dimmed dark:text-dark-font-color-dimmed w-14 font-mono text-[10px] text-right"
+        className="text-font-color-dimmed dark:text-dark-font-color-dimmed w-14 text-right font-mono text-[10px]"
       >
         0.0 dB
       </span>
@@ -63,10 +64,7 @@ const AudioFxModal = () => {
   const { changePromptMenuData } = useContext(AppUpdateContext);
 
   const [currentFx, setCurrentFx] = useState<AudioFxOptions>(() => player.getAudioFx());
-  const isKaraoke = useStore(
-    store,
-    (state) => state.localStorage?.playback?.isKaraoke ?? false
-  );
+  const isKaraoke = useStore(store, (state) => state.localStorage?.playback?.isKaraoke ?? false);
   const karaokeLevel = useStore(
     store,
     (state) => state.localStorage?.playback?.karaokeLevel ?? 100
@@ -79,6 +77,14 @@ const AudioFxModal = () => {
     store,
     (state) => state.localStorage?.playback?.nightModePreset ?? 'standard'
   );
+  const soundProfile = useStore(
+    store,
+    (state) => (state.localStorage?.playback?.soundProfile as SoundProfile) ?? 'studio_reference'
+  );
+
+  const selectSoundProfile = (profile: SoundProfile) => {
+    player.setSoundProfile(profile);
+  };
 
   useEffect(() => {
     const onFxChange = (updatedFx: unknown) => {
@@ -150,6 +156,84 @@ const AudioFxModal = () => {
               'Transform playback with live acoustic reverb, pitch & speed modulation'
             )}
           </p>
+        </div>
+      </div>
+
+      {/* Sound Profile Selector */}
+      <div className="border-background-color-2/80 bg-background-color-2/30 dark:border-dark-background-color-2/80 dark:bg-dark-background-color-2/30 flex flex-col gap-2 rounded-xl border p-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-base">
+              tune
+            </span>
+            <span className="text-font-color-black dark:text-font-color-white text-xs font-bold tracking-wider uppercase">
+              {t('audioFx.soundProfile.title', 'Sound Profile')}
+            </span>
+          </div>
+          <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed font-mono text-[10px]">
+            {soundProfile === 'vocal_nuance_boost'
+              ? '+1.5 dB Upward Contour'
+              : 'Bit-Exact Passthrough'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => selectSoundProfile('studio_reference')}
+            className={`flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5 text-left transition-all ${
+              soundProfile === 'studio_reference'
+                ? 'border-font-color-highlight bg-font-color-highlight/10 text-font-color-highlight ring-font-color-highlight/30 dark:border-dark-font-color-highlight dark:bg-dark-font-color-highlight/15 dark:text-dark-font-color-highlight dark:ring-dark-font-color-highlight/30 ring-1'
+                : 'border-background-color-2/80 bg-background-color-2/40 text-font-color-black hover:bg-background-color-2 dark:border-dark-background-color-2/80 dark:bg-dark-background-color-2/40 dark:text-font-color-white dark:hover:bg-dark-background-color-2/70'
+            }`}
+          >
+            <span className="material-icons-round text-lg">album</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold">
+                  {t('audioFx.soundProfile.studioReference', 'Studio Reference')}
+                </span>
+                {soundProfile === 'studio_reference' && (
+                  <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                    check_circle
+                  </span>
+                )}
+              </div>
+              <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-[10px] opacity-80">
+                {t('audioFx.soundProfile.studioRefDesc', 'Pure digital null, uncolored response')}
+              </div>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => selectSoundProfile('vocal_nuance_boost')}
+            className={`flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5 text-left transition-all ${
+              soundProfile === 'vocal_nuance_boost'
+                ? 'border-font-color-highlight bg-font-color-highlight/10 text-font-color-highlight ring-font-color-highlight/30 dark:border-dark-font-color-highlight dark:bg-dark-font-color-highlight/15 dark:text-dark-font-color-highlight dark:ring-dark-font-color-highlight/30 ring-1'
+                : 'border-background-color-2/80 bg-background-color-2/40 text-font-color-black hover:bg-background-color-2 dark:border-dark-background-color-2/80 dark:bg-dark-background-color-2/40 dark:text-font-color-white dark:hover:bg-dark-background-color-2/70'
+            }`}
+          >
+            <span className="material-icons-round text-lg">record_voice_over</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold">
+                  {t('audioFx.soundProfile.vocalNuance', 'Vocal Nuance Boost')}
+                </span>
+                {soundProfile === 'vocal_nuance_boost' && (
+                  <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-sm">
+                    check_circle
+                  </span>
+                )}
+              </div>
+              <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-[10px] opacity-80">
+                {t(
+                  'audioFx.soundProfile.vocalNuanceDesc',
+                  '+1.5 dB upward contour, protected ceiling'
+                )}
+              </div>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -270,7 +354,10 @@ const AudioFxModal = () => {
               id="audiofx-night-mode"
               isChecked={isNightMode}
               checkedStateUpdateFunction={() => dispatch({ type: 'TOGGLE_NIGHT_MODE' })}
-              labelContent={t('audioFx.nightModeTitle', 'Night Listening Mode (Dynamic Normalizer)')}
+              labelContent={t(
+                'audioFx.nightModeTitle',
+                'Night Listening Mode (Dynamic Normalizer)'
+              )}
             />
             <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 pl-7 text-[10px]">
               {t(

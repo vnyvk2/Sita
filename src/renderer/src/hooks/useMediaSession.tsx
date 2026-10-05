@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { store } from '../store/store';
+import type AudioPlayer from '../other/player';
 
 /** Dependencies required by the useMediaSession hook. */
 export interface MediaSessionDependencies {
@@ -40,10 +41,15 @@ export interface MediaSessionDependencies {
  *   }
  *   ```;
  *
- * @param player - The HTML audio player element
+ * @param player - The AudioPlayer instance or HTML audio element.
+ *   AudioPlayer routes currentTime/duration/paused/playbackRate through the
+ *   native engine when it owns the sink.
  * @param dependencies - Object containing required callback functions
  */
-export function useMediaSession(player: HTMLAudioElement, dependencies: MediaSessionDependencies) {
+export function useMediaSession(
+  player: AudioPlayer | HTMLAudioElement,
+  dependencies: MediaSessionDependencies
+) {
   const { t } = useTranslation();
   const {
     toggleSongPlayback,
@@ -213,11 +219,19 @@ export function useMediaSession(player: HTMLAudioElement, dependencies: MediaSes
     // a play/pause round-trip first.
     updateMediaSessionMetaData();
 
-    // Listen to player events
+    // Listen to player events. Both DOM (lowercase) and AudioPlayer
+    // (camelCase) names are subscribed: each object fires only its own, and
+    // subscribing to a never-fired name is a harmless no-op. This keeps the
+    // hook working whether WebAudio or the native engine owns the sink.
+    // 'loadedmetadata' covers WebAudio; 'songLoaded'/'durationChange' cover
+    // native (AudioPlayer never emits 'loadedmetadata').
     player.addEventListener('play', updateMediaSessionMetaData);
     player.addEventListener('pause', updateMediaSessionMetaData);
     player.addEventListener('loadedmetadata', updateMediaSessionMetaData);
+    player.addEventListener('songLoaded', updateMediaSessionMetaData);
+    player.addEventListener('durationChange', updateMediaSessionMetaData);
     player.addEventListener('timeupdate', safeSetPositionState);
+    player.addEventListener('timeUpdate', safeSetPositionState);
 
     // Cleanup
     return () => {
@@ -245,7 +259,10 @@ export function useMediaSession(player: HTMLAudioElement, dependencies: MediaSes
       player.removeEventListener('play', updateMediaSessionMetaData);
       player.removeEventListener('pause', updateMediaSessionMetaData);
       player.removeEventListener('loadedmetadata', updateMediaSessionMetaData);
+      player.removeEventListener('songLoaded', updateMediaSessionMetaData);
+      player.removeEventListener('durationChange', updateMediaSessionMetaData);
       player.removeEventListener('timeupdate', safeSetPositionState);
+      player.removeEventListener('timeUpdate', safeSetPositionState);
 
       storeSubscription.unsubscribe();
     };

@@ -178,15 +178,21 @@ const setItem = <
   type: Type,
   data: Data
 ) => {
-  const storage = { ...getAllItems() };
+  const current = getAllItems();
+  const parent = current[itemType] ?? LOCAL_STORAGE_DEFAULT_TEMPLATE[itemType];
+  const storage: LocalStorage = {
+    ...current,
+    [itemType]: {
+      ...(typeof parent === 'object' && parent !== null ? parent : {}),
+      [type]: data
+    }
+  };
   try {
     if (
-      (itemType in storage && type in storage[itemType]) ||
+      (itemType in current && type in (current[itemType] as object)) ||
       (itemType in LOCAL_STORAGE_DEFAULT_TEMPLATE &&
-        type in LOCAL_STORAGE_DEFAULT_TEMPLATE[itemType])
+        type in (LOCAL_STORAGE_DEFAULT_TEMPLATE[itemType] as object))
     ) {
-      storage[itemType][type] = data;
-
       setAllItems(storage);
     } else {
       throw new Error(`option ${String(type)} doesn't exist on localStorage.`);

@@ -1,9 +1,11 @@
-import { dispatch, store } from '@renderer/store/store';
+import type { SoundProfile } from '@common/audioEngineProtocol';
+import { dispatch, flushPendingLocalStorage, store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 import { lazy, useContext, useEffect, useState, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
+import { useAudioPlayer } from '../../../hooks/useAudioPlayer';
 import i18n from '../../../i18n';
 import storage from '../../../utils/localStorage';
 import Button from '../../Button';
@@ -37,6 +39,20 @@ const AudioPlaybackSettings = () => {
     store,
     (state) => state.localStorage?.playback?.audioFx?.preset ?? 'normal'
   );
+  const useNativeEngine = useStore(
+    store,
+    (state) => state.localStorage?.playback?.useNativeAudioEngine ?? false
+  );
+  const soundProfile = useStore(
+    store,
+    (state) => (state.localStorage?.playback?.soundProfile as SoundProfile) ?? 'studio_reference'
+  );
+
+  const player = useAudioPlayer();
+
+  const selectSoundProfile = (profile: SoundProfile) => {
+    player.setSoundProfile(profile);
+  };
 
   const { t } = useTranslation();
   const { changePromptMenuData } = useContext(AppUpdateContext);
@@ -69,10 +85,15 @@ const AudioPlaybackSettings = () => {
     }
   }, []);
 
+  const updateUseNativeEngine = (enabled: boolean) => {
+    storage.playback.setPlaybackOptions('useNativeAudioEngine', enabled);
+    flushPendingLocalStorage();
+  };
+
   const updateCrossfade = (duration: number) => {
     setCrossfadeDuration(duration);
     storage.playback.setPlaybackOptions('crossfade', { duration });
-    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: storage.getLocalStorage() });
+    flushPendingLocalStorage();
   };
 
   const updateReplayGain = (
@@ -89,7 +110,7 @@ const AudioPlaybackSettings = () => {
     };
     const next = { ...current, ...updated };
     storage.playback.setPlaybackOptions('replayGain', next);
-    dispatch({ type: 'UPDATE_LOCAL_STORAGE', data: storage.getLocalStorage() });
+    flushPendingLocalStorage();
   };
 
   const playbackRateSeekBarCssProperties: CSSProperties = {};
@@ -358,6 +379,95 @@ const AudioPlaybackSettings = () => {
                 )
               }
             />
+          </div>
+        </li>
+
+        <li className="native-audio-engine-settings mb-6" id="nativeAudioEngineSettings">
+          <div className="title text-font-color-highlight dark:text-dark-font-color-highlight mb-1 flex items-center gap-2 text-lg font-medium">
+            <span>Experimental Rust Audio Engine</span>
+            <span className="bg-font-color-highlight/20 text-font-color-highlight rounded px-2 py-0.5 text-xs font-semibold uppercase">
+              Experimental
+            </span>
+          </div>
+          <div className="description mb-3 text-sm opacity-80">
+            Enables high-performance native Rust playback daemon (`engine-cli`) with bit-accurate
+            decoding, sample-accurate gapless transitions, and ultra-low latency.
+          </div>
+          <div className="flex items-center gap-4">
+            <Checkbox
+              id="useNativeAudioEngineCheckbox"
+              isChecked={useNativeEngine}
+              checkedStateUpdateFunction={(state) => updateUseNativeEngine(state)}
+              labelContent="Enable Native Rust Audio Engine (Default: Off)"
+            />
+          </div>
+        </li>
+
+        <li className="sound-profile-settings mb-6" id="soundProfileSettings">
+          <div className="title text-font-color-highlight dark:text-dark-font-color-highlight mb-1 flex items-center justify-between text-lg font-medium">
+            <div className="flex items-center gap-2">
+              <span className="material-icons-round text-base">tune</span>
+              <span>Sound Profile</span>
+            </div>
+            <span className="bg-font-color-highlight/20 text-font-color-highlight rounded px-2 py-0.5 text-xs font-semibold uppercase">
+              {useNativeEngine ? 'Rust Native Active' : 'Web Audio Fallback Active'}
+            </span>
+          </div>
+          <div className="description mb-3 text-sm opacity-80">
+            Select mastering profile for playback. Applied with sample accuracy across both the
+            native Rust daemon and Web Audio engine.
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => selectSoundProfile('studio_reference')}
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 text-left transition-all ${
+                soundProfile === 'studio_reference'
+                  ? 'border-font-color-highlight bg-font-color-highlight/10 text-font-color-highlight ring-font-color-highlight/30 dark:border-dark-font-color-highlight dark:bg-dark-font-color-highlight/15 dark:text-dark-font-color-highlight dark:ring-dark-font-color-highlight/30 ring-1'
+                  : 'border-background-color-2/80 bg-background-color-2/40 text-font-color-black hover:bg-background-color-2 dark:border-dark-background-color-2/80 dark:bg-dark-background-color-2/40 dark:text-font-color-white dark:hover:bg-dark-background-color-2/70'
+              }`}
+            >
+              <span className="material-icons-round mt-0.5 text-2xl">album</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Studio Reference</span>
+                  {soundProfile === 'studio_reference' && (
+                    <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-base">
+                      check_circle
+                    </span>
+                  )}
+                </div>
+                <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 text-xs opacity-80">
+                  Pure digital null, uncolored response. Bit-exact passthrough with zero coloration.
+                </div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => selectSoundProfile('vocal_nuance_boost')}
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3.5 text-left transition-all ${
+                soundProfile === 'vocal_nuance_boost'
+                  ? 'border-font-color-highlight bg-font-color-highlight/10 text-font-color-highlight ring-font-color-highlight/30 dark:border-dark-font-color-highlight dark:bg-dark-font-color-highlight/15 dark:text-dark-font-color-highlight dark:ring-dark-font-color-highlight/30 ring-1'
+                  : 'border-background-color-2/80 bg-background-color-2/40 text-font-color-black hover:bg-background-color-2 dark:border-dark-background-color-2/80 dark:bg-dark-background-color-2/40 dark:text-font-color-white dark:hover:bg-dark-background-color-2/70'
+              }`}
+            >
+              <span className="material-icons-round mt-0.5 text-2xl">record_voice_over</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Vocal Nuance Boost</span>
+                  {soundProfile === 'vocal_nuance_boost' && (
+                    <span className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight text-base">
+                      check_circle
+                    </span>
+                  )}
+                </div>
+                <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 text-xs opacity-80">
+                  Upward nuance lift (+1.5 dB quiet contour) with locked true-peak brickwall
+                  protection.
+                </div>
+              </div>
+            </button>
           </div>
         </li>
       </ul>

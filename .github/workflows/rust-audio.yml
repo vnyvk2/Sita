@@ -1,0 +1,49 @@
+name: Rust Audio Engine
+
+on:
+  push:
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'scripts/generate-audio-fixtures.mjs'
+      - '.github/workflows/rust-audio.yml'
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'scripts/generate-audio-fixtures.mjs'
+      - '.github/workflows/rust-audio.yml'
+  workflow_dispatch:
+
+jobs:
+  clippy:
+    name: Clippy (deny warnings)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install ALSA headers (cpal)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  test:
+    name: Cargo test (gated on fixtures)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install ALSA headers (cpal)
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: FedericoCarboni/setup-ffmpeg@v3
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+      # Fixtures are git-ignored and generated locally; without this step the
+      # real-codec gate and the real-binary stdio test cannot run.
+      - name: Generate audio fixtures
+        run: node scripts/generate-audio-fixtures.mjs
+      - run: cargo test --workspace

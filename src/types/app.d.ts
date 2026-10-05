@@ -687,6 +687,8 @@ declare global {
     karaokeLevel?: number;
     isNightMode?: boolean;
     nightModePreset?: 'gentle' | 'standard' | 'strong';
+    useNativeAudioEngine?: boolean;
+    soundProfile?: 'studio_reference' | 'vocal_nuance_boost';
   }
 
   type EqualizerBandFilters =
@@ -1184,7 +1186,6 @@ declare global {
     | 'PLAYLIST_IMPORT_BATCH_FAILED'
     | 'PLAYLIST_IMPORT_BATCH_ALREADY_IN_PROGRESS'
     | 'PLAYLIST_RENAME_SUCCESS'
-
     | 'PLAYLIST_RENAME_FAILED'
     | 'PLAYLIST_IMPORT_TO_EXISTING_PLAYLIST'
     | 'SONG_REPARSE_SUCCESS'
@@ -1537,10 +1538,8 @@ declare global {
     isrc?: string;
     path?: string;
     /**
-     * Language edit signal:
-     *   undefined = field not edited (skip entirely)
-     *   ''        = explicit clear (delete override, null column, clear tag)
-     *   non-empty = set value
+     * Language edit signal: undefined = field not edited (skip entirely) '' = explicit clear
+     * (delete override, null column, clear tag) non-empty = set value
      */
     language?: string;
   }

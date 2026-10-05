@@ -42,6 +42,13 @@ jobs:
           npm ci --no-fund --no-audit --include=optional
           npm rebuild rollup
 
+      - name: Install Rust toolchain (native audio engine)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install ALSA headers for cpal (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
       # - name: Install correct Sharp Dependencies
       #   run: |
       #     npm remove sharp

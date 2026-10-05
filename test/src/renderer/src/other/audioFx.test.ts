@@ -24,17 +24,21 @@ class MockAudioContext {
   }
 
   createBiquadFilter() {
+    const makeParam = (val: number) => ({
+      value: val,
+      setValueAtTime: vi.fn(function (this: { value: number }, v: number) {
+        this.value = v;
+      }),
+      setTargetAtTime: vi.fn(function (this: { value: number }, v: number) {
+        this.value = v;
+      }),
+      cancelScheduledValues: vi.fn()
+    });
     return {
       type: 'peaking',
-      frequency: {
-        value: 1000,
-        setTargetAtTime: vi.fn()
-      },
-      gain: {
-        value: 0,
-        setTargetAtTime: vi.fn()
-      },
-      Q: { value: 1 },
+      frequency: makeParam(1000),
+      gain: makeParam(0),
+      Q: makeParam(1),
       connect: vi.fn(),
       disconnect: vi.fn()
     };
@@ -106,8 +110,8 @@ class MockAudioContext {
 
 window.AudioContext = MockAudioContext as any;
 
-import AudioPlayer from '@renderer/other/player';
 import { AUDIO_FX_PRESETS } from '@renderer/other/audioFx/types';
+import AudioPlayer from '@renderer/other/player';
 
 describe('AudioPlayer Audio FX & Dual Source Graph', () => {
   let player: AudioPlayer;
@@ -154,6 +158,9 @@ describe('AudioPlayer Audio FX & Dual Source Graph', () => {
     expect(player.wetGainNode).toBeDefined();
     expect(player.convolverNode).toBeDefined();
     expect(player.safetyLimiterNode).toBeDefined();
+    expect(player.limiterDryGainNode).toBeDefined();
+    expect(player.limiterWetGainNode).toBeDefined();
+    expect(player.vocalNuanceNode).toBeDefined();
     expect(player.nightcoreTrebleBoostNode).toBeDefined();
 
     // audio getter returns the active slot (A by default)
@@ -218,5 +225,25 @@ describe('AudioPlayer Audio FX & Dual Source Graph', () => {
 
     player.setAudioFxPreset('slowed');
     expect(fxListener).toHaveBeenCalledWith(expect.objectContaining({ preset: 'slowed' }));
+  });
+
+  it('updates WebAudio routing and emits event when soundProfile is toggled', () => {
+    const profileListener = vi.fn();
+    player.on('soundProfileChange', profileListener);
+
+    expect(player.getSoundProfile()).toBe('studio_reference');
+    expect(player.vocalNuanceNode.isEnabled()).toBe(false);
+
+    // Toggle to vocal nuance boost
+    player.setSoundProfile('vocal_nuance_boost', true);
+    expect(player.getSoundProfile()).toBe('vocal_nuance_boost');
+    expect(player.vocalNuanceNode.isEnabled()).toBe(true);
+    expect(profileListener).toHaveBeenCalledWith('vocal_nuance_boost');
+
+    // Toggle back to studio reference
+    player.setSoundProfile('studio_reference', true);
+    expect(player.getSoundProfile()).toBe('studio_reference');
+    expect(player.vocalNuanceNode.isEnabled()).toBe(false);
+    expect(profileListener).toHaveBeenCalledWith('studio_reference');
   });
 });

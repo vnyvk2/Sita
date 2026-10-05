@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi, afterEach } from 'vitest';
 
 // Mock Electron app globally for all tests
 vi.mock('electron', () => ({
@@ -73,6 +73,119 @@ vi.mock('electron-updater', () => {
   };
 });
 
+export class SetupMockAudioParam {
+  value: number;
+  setValueAtTime = vi.fn(function (this: any, val: number) {
+    this.value = val;
+    return this;
+  });
+  setTargetAtTime = vi.fn(function (this: any, val: number) {
+    this.value = val;
+    return this;
+  });
+  linearRampToValueAtTime = vi.fn(function (this: any, val: number) {
+    this.value = val;
+    return this;
+  });
+  exponentialRampToValueAtTime = vi.fn(function (this: any, val: number) {
+    this.value = val;
+    return this;
+  });
+  setValueCurveAtTime = vi.fn(function (this: any) {
+    return this;
+  });
+  cancelScheduledValues = vi.fn(function (this: any) {
+    return this;
+  });
+  cancelAndHoldAtTime = vi.fn(function (this: any) {
+    return this;
+  });
+
+  constructor(initial = 0) {
+    this.value = initial;
+  }
+}
+
+export class SetupMockAudioContext {
+  currentTime = 0;
+  state = 'running';
+  destination = { channelCount: 2 };
+
+  createGain() {
+    return {
+      gain: new SetupMockAudioParam(1),
+      channelCount: 2,
+      channelCountMode: 'max',
+      channelInterpretation: 'speakers',
+      connect: vi.fn().mockReturnThis(),
+      disconnect: vi.fn()
+    };
+  }
+
+  createChannelSplitter() {
+    return { connect: vi.fn().mockReturnThis(), disconnect: vi.fn() };
+  }
+
+  createChannelMerger() {
+    return { connect: vi.fn().mockReturnThis(), disconnect: vi.fn() };
+  }
+
+  createBiquadFilter() {
+    return {
+      frequency: new SetupMockAudioParam(1000),
+      Q: new SetupMockAudioParam(1),
+      gain: new SetupMockAudioParam(0),
+      type: 'peaking',
+      connect: vi.fn().mockReturnThis(),
+      disconnect: vi.fn()
+    };
+  }
+
+  createDynamicsCompressor() {
+    return {
+      threshold: new SetupMockAudioParam(-24),
+      knee: new SetupMockAudioParam(30),
+      ratio: new SetupMockAudioParam(12),
+      attack: new SetupMockAudioParam(0.003),
+      release: new SetupMockAudioParam(0.25),
+      reduction: 0,
+      connect: vi.fn().mockReturnThis(),
+      disconnect: vi.fn()
+    };
+  }
+
+  createMediaElementSource() {
+    return { connect: vi.fn().mockReturnThis(), disconnect: vi.fn() };
+  }
+
+  createConvolver() {
+    return { buffer: null, connect: vi.fn().mockReturnThis(), disconnect: vi.fn() };
+  }
+
+  createBuffer(channels: number, length: number, sampleRate: number) {
+    return {
+      numberOfChannels: channels,
+      length,
+      sampleRate,
+      getChannelData: vi.fn(() => new Float32Array(length))
+    };
+  }
+
+  resume() {
+    this.state = 'running';
+    return Promise.resolve();
+  }
+
+  suspend() {
+    this.state = 'suspended';
+    return Promise.resolve();
+  }
+
+  close() {
+    return Promise.resolve();
+  }
+}
+
 if (typeof window !== 'undefined') {
   (window as unknown as { api?: unknown }).api = {
     log: {
@@ -94,40 +207,15 @@ if (typeof window !== 'undefined') {
     }
   };
 
-  window.AudioContext = class {
-    createGain() {
-      return {
-        gain: { value: 1, setTargetAtTime: vi.fn(), cancelScheduledValues: vi.fn() },
-        connect: vi.fn(),
-        disconnect: vi.fn()
-      };
-    }
-    createChannelSplitter() { return { connect: vi.fn(), disconnect: vi.fn() }; }
-    createChannelMerger() { return { connect: vi.fn(), disconnect: vi.fn() }; }
-    createBiquadFilter() {
-      return {
-        frequency: { value: 0 },
-        Q: { value: 0 },
-        gain: { value: 0 },
-        type: 'lowpass',
-        connect: vi.fn(),
-        disconnect: vi.fn()
-      };
-    }
-    createDynamicsCompressor() {
-      return {
-        threshold: { value: 0 },
-        knee: { value: 0 },
-        ratio: { value: 1 },
-        attack: { value: 0 },
-        release: { value: 0 },
-        reduction: 0,
-        connect: vi.fn(),
-        disconnect: vi.fn()
-      };
-    }
-    createMediaElementSource() { return { connect: vi.fn(), disconnect: vi.fn() }; }
-    createConvolver() { return { connect: vi.fn(), disconnect: vi.fn(), buffer: null }; }
-    close() { return Promise.resolve(); }
-  } as any;
+  window.AudioContext = SetupMockAudioContext as any;
+  (window as any).webkitAudioContext = SetupMockAudioContext as any;
 }
+
+const defaultAudioContext = typeof window !== 'undefined' ? window.AudioContext : undefined;
+
+afterEach(() => {
+  if (typeof window !== 'undefined' && defaultAudioContext) {
+    window.AudioContext = defaultAudioContext;
+    (window as any).webkitAudioContext = defaultAudioContext;
+  }
+});

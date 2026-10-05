@@ -1,3 +1,4 @@
+import type { SoundProfile } from '@common/audioEngineProtocol';
 import { type ReactNode } from 'react';
 
 import type { AbLoopState } from './abLoopController';
@@ -58,6 +59,7 @@ export type AppReducerStateActions =
   | { type: 'UPDATE_KARAOKE_LEVEL'; data: number }
   | { type: 'TOGGLE_NIGHT_MODE'; data?: boolean }
   | { type: 'SET_NIGHT_MODE_PRESET'; data: NightModePreset }
+  | { type: 'SET_SOUND_PROFILE'; data: SoundProfile }
   | { type: 'SET_AB_LOOP_STATE'; data: AbLoopState }
   | { type: 'UPDATE_VOLUME_VALUE'; data: number }
   | { type: 'UPDATE_QUEUE'; data: QueuesState }
@@ -350,6 +352,18 @@ export const reducer = (state: AppReducer, action: AppReducerStateActions): AppR
         }
       };
     }
+    case 'SET_SOUND_PROFILE': {
+      return {
+        ...state,
+        localStorage: {
+          ...state.localStorage,
+          playback: {
+            ...state.localStorage.playback,
+            soundProfile: action.data
+          }
+        }
+      };
+    }
     case 'SET_AB_LOOP_STATE': {
       return {
         ...state,
@@ -567,7 +581,9 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     isKaraoke: false,
     karaokeLevel: 100,
     isNightMode: false,
-    nightModePreset: 'standard'
+    nightModePreset: 'standard',
+    useNativeAudioEngine: false,
+    soundProfile: 'studio_reference'
   },
   queue: {
     queues: [{ id: 'default-queue', position: 0, songIds: [] }],

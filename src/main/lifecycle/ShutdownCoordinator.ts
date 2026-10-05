@@ -9,6 +9,7 @@ import { savePendingMetadataUpdates } from '@main/updateSong/updateSongId3Tags';
 import { adaptivePolicyEngine } from '@main/workers/adaptivePolicyEngine';
 import { libraryScheduler } from '@main/workers/jobScheduler';
 import { mediaWorkerBridge } from '@main/workers/process/MediaWorkerBridge';
+import { nativeAudioDaemonManager } from '@main/audio/NativeAudioDaemonManager';
 import { type BrowserWindow, ipcMain } from 'electron';
 
 import { ShutdownLogger } from './ShutdownLogger';
@@ -96,6 +97,9 @@ export class ShutdownCoordinator {
     }
 
     // 3. Renderer Notification & State Flush with ACK
+    // The renderer persists stoppedPosition/shuffle/repeat from memory to
+    // disk; without the ACK wait the debounced write never lands before
+    // process exit. Daemon stop happens AFTER so currentTime stays readable.
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents?.isDestroyed()) {
       try {
         const flushPromise = new Promise<void>((resolve) => {
@@ -130,6 +134,15 @@ export class ShutdownCoordinator {
       } catch (error) {
         logger.warn('Could not complete app/beforeQuitEvent flush:', { error });
       }
+    }
+
+    // 3b. Stop the native daemon AFTER the renderer flush so the playhead is
+    // still queryable, releasing WASAPI before DB teardown.
+    try {
+      await nativeAudioDaemonManager.stop();
+    } catch (error) {
+      hasPartialFailures = true;
+      logger.error('Error stopping native audio daemon during shutdown:', { error });
     }
 
     // DB Write Barrier: If the scheduler had surviving job promises that did not

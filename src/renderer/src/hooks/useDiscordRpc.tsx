@@ -2,16 +2,19 @@ import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { store } from '../store/store';
+import type AudioPlayer from '../other/player';
 
 /**
- * Synchronizes Discord Rich Presence with the provided audio element's current song.
+ * Synchronizes Discord Rich Presence with the provided audio player's current song.
  *
  * Registers listeners on the audio player to update Discord activity (song title, artists, artwork,
  * action button) and to set playback timestamps while the player is actively playing.
  *
- * @param player - The HTMLAudioElement whose playback state and metadata drive the presence updates
+ * @param player - The AudioPlayer instance or HTMLAudioElement whose playback state and metadata
+ *   drive the presence updates. AudioPlayer routes paused/currentTime/duration through the
+ *   native engine when it owns the sink, and emits play/pause/seeked in both modes.
  */
-export function useDiscordRpc(player: HTMLAudioElement) {
+export function useDiscordRpc(player: AudioPlayer | HTMLAudioElement) {
   const { t } = useTranslation();
 
   const setDiscordRpcActivity = useCallback(() => {

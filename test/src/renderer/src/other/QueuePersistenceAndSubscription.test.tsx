@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import PlayerQueue from '@renderer/other/playerQueue';
 import { QueuesManager } from '@renderer/other/queuesManager';
-import { store } from '@renderer/store/store';
+import { flushPendingLocalStorage, store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { render } from '@testing-library/react';
 import React from 'react';
@@ -235,13 +235,18 @@ describe('Phase 2: Queue State, Persistence & Subscription Invariants', () => {
     });
 
     it('only invokes storage.setLocalStorage exactly once per store state transition', () => {
+      // Drain any pending debounced write from earlier tests so the count is exact.
+      flushPendingLocalStorage();
       const setLocalStorageSpy = vi.spyOn(storage, 'setLocalStorage');
       setLocalStorageSpy.mockClear();
 
-      // Trigger a state change via storage helper
+      // Trigger a state change via storage helper (debounced 250ms by design).
       storage.sortingStates.setSortingStates('songsPage', 'aToZ');
 
-      // Assert setLocalStorage was called exactly once from the store subscriber
+      // Flush the debounce deterministically instead of relying on timers.
+      flushPendingLocalStorage();
+
+      // Assert setLocalStorage was called exactly once from the store subscriber.
       expect(setLocalStorageSpy).toHaveBeenCalledTimes(1);
       setLocalStorageSpy.mockRestore();
     });

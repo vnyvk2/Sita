@@ -40,14 +40,12 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
     windowManagement
   } = dependencies;
 
-  const player =
-    playerInstance instanceof HTMLAudioElement
-      ? playerInstance
-      : (playerInstance as AudioPlayer).audio;
+  const player = playerInstance as unknown as (AudioPlayer & HTMLAudioElement);
 
   const manager = getQueuesManager();
 
   useEffect(() => {
+    let isCancelled = false;
     const { playback, queue } = storage.getAllItems();
 
     const syncLocalStorage = () => {
@@ -56,51 +54,108 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
       console.log('local storage updated');
     };
 
+    // T3-1: startup restore outcome tracing. Two independent paths race below
+    // (persisted/unknown-source song vs canonical-queue head); each logs
+    // start/success/failure with its songId so the winner and any swallowed
+    // rejection are visible without changing restore behavior.
+    const logStartupRestore = (step: string, detail: unknown) => {
+      console.log(`[StartupRestore] ${step}`, detail ?? '');
+    };
     document.addEventListener('localStorage', syncLocalStorage);
 
     toggleShuffling(playback?.isShuffling);
     toggleRepeat(playback?.isRepeating);
 
+    logStartupRestore('pathA.start', 'checkForStartUpSongs');
     window.api.audioLibraryControls
       .checkForStartUpSongs()
-      .then((startUpSongData) => {
+      .then(async (startUpSongData) => {
+        if (isCancelled) return;
         if (startUpSongData) {
+          logStartupRestore('pathA.unknown-source', {
+            songId: (startUpSongData as AudioPlayerData)?.songId ?? null
+          });
           playSongFromUnknownSource(startUpSongData, true);
         } else if (
           playback?.currentSong.songId &&
           typeof playback.currentSong.songId === 'number'
         ) {
-          playSong(playback.currentSong.songId, false);
-
-          const currSongPosition = Number(playback.currentSong.stoppedPosition);
-          player.currentTime = currSongPosition;
-          dispatch({
-            type: 'UPDATE_SONG_POSITION',
-            data: currSongPosition
+          const targetSongId = playback.currentSong.songId;
+          const stoppedPos = Number(playback.currentSong.stoppedPosition) || 0;
+          logStartupRestore('pathA.persisted-song', {
+            songId: targetSongId,
+            stoppedPosition: stoppedPos
           });
+
+          await playSong(targetSongId, false);
+
+          if (isCancelled) return;
+
+          // Verify that the target song is current / loaded before seeking and updating position
+          const currentLoadedId = store.state.currentSongData?.songId;
+          if (currentLoadedId === targetSongId) {
+            if (stoppedPos > 0) {
+              player.currentTime = stoppedPos;
+            }
+            dispatch({
+              type: 'UPDATE_SONG_POSITION',
+              data: stoppedPos
+            });
+            logStartupRestore('pathA.persisted-song-restored', {
+              songId: targetSongId,
+              restoredPosition: stoppedPos
+            });
+          } else {
+            logStartupRestore('pathA.persisted-song-aborted', {
+              expectedSongId: targetSongId,
+              actualSongId: currentLoadedId ?? null
+            });
+          }
+        } else {
+          logStartupRestore('pathA.no-song', 'no unknown-source or persisted songId');
         }
         return undefined;
       })
-      .catch((err) => console.error(err));
+      .catch((err) => {
+        if (isCancelled) return;
+        logStartupRestore('pathA.failed', err);
+        console.error(err);
+      });
 
     if (!queue || queue.queues.length === 0) {
+      logStartupRestore('pathB.start', 'canonical queue head');
       window.api.audioLibraryControls
         .getAllSongIds()
         .then((songIds) => {
+          if (isCancelled) return;
           if (songIds && songIds.length > 0) {
             // Startup default queue is the canonical All Songs projection
             // (docs/canonical-queue-architecture.md).
             const startupQueue = manager.getOrCreateCanonicalQueue({ songIds });
             if (startupQueue?.currentSongId) {
+              logStartupRestore('pathB.canonical-head', {
+                songId: startupQueue.currentSongId
+              });
               playSong(startupQueue.currentSongId, true);
+            } else {
+              logStartupRestore('pathB.empty-queue', 'canonical queue has no current song');
             }
+          } else {
+            logStartupRestore('pathB.no-songs', 'library returned no song ids');
           }
           return undefined;
         })
-        .catch((err) => console.error(err));
+        .catch((err) => {
+          if (isCancelled) return;
+          logStartupRestore('pathB.failed', err);
+          console.error(err);
+        });
+    } else {
+      logStartupRestore('pathB.skipped', 'persisted queue present');
     }
 
     return () => {
+      isCancelled = true;
       document.removeEventListener('localStorage', syncLocalStorage);
     };
   }, []);
@@ -162,6 +217,8 @@ export function useAppLifecycle(dependencies: AppLifecycleDependencies): void {
     };
     const handleBeforeQuitEvent = async () => {
       try {
+        // player.currentTime resolves through the native getter when the Rust
+        // engine is active, so stoppedPosition stays exact in both backends.
         storage.playback.setCurrentSongOptions('stoppedPosition', player.currentTime);
         storage.playback.setPlaybackOptions('isRepeating', store.state.player.isRepeating);
         storage.playback.setPlaybackOptions('isShuffling', store.state.player.isShuffling);

@@ -25,6 +25,7 @@ export interface CrossfadeDelegate {
   }): Promise<void>;
   onFadeComplete(sessionId: number, incomingTrackId: number): void;
   onFadeCancel(sessionId: number): void;
+  getAudioCurrentTime?: () => number;
 }
 
 export class CrossfadeScheduler {
@@ -33,6 +34,8 @@ export class CrossfadeScheduler {
   private preloadedTrackId: number | null = null;
   private fadeTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private fadeStartTimeWallClock: number = 0;
+  private fadeStartAudioTime: number = 0;
+  private fadeDurationSecs: number = 0;
   private remainingFadeDurationMs: number = 0;
   private fadingSessionId: number | null = null;
   private fadingTrackId: number | null = null;
@@ -152,6 +155,8 @@ export class CrossfadeScheduler {
         this.fadingSessionId = sessionId;
         this.fadingTrackId = incomingId;
         this.fadeStartTimeWallClock = Date.now();
+        this.fadeStartAudioTime = this.delegate.getAudioCurrentTime?.() ?? 0;
+        this.fadeDurationSecs = trigger.clampedFadeDuration;
         this.remainingFadeDurationMs = trigger.clampedFadeDuration * 1000;
 
         this.scheduleFadeCompletion(this.remainingFadeDurationMs);
@@ -163,21 +168,9 @@ export class CrossfadeScheduler {
     if (this.fadeTimeoutId) {
       clearTimeout(this.fadeTimeoutId);
     }
-    const sessionId = this.fadingSessionId;
-    const incomingId = this.fadingTrackId;
 
     this.fadeTimeoutId = setTimeout(() => {
-      if (this.currentSessionId === sessionId && this.state === 'FADING') {
-        this.state = 'IDLE';
-        this.preloadedTrackId = null;
-        this.fadeTimeoutId = null;
-        this.fadingSessionId = null;
-        this.fadingTrackId = null;
-        this.remainingFadeDurationMs = 0;
-        if (incomingId !== null) {
-          this.delegate.onFadeComplete(sessionId, incomingId);
-        }
-      }
+      this.maybeFinalize();
     }, delayMs);
   }
 
@@ -204,6 +197,46 @@ export class CrossfadeScheduler {
   }
 
   /**
+   * Clock-derived, idempotent, bookkeeping-only finalization.
+   * Can be safely called from setTimeout, visibilitychange (both directions), or watchdog tick.
+   * Throttling merely delays bookkeeping — never diverges from the audio clock.
+   */
+  public maybeFinalize(): void {
+    if (this.state !== 'FADING') {
+      return;
+    }
+
+    let isComplete = false;
+    const currentAudioTime = this.delegate.getAudioCurrentTime?.();
+    if (typeof currentAudioTime === 'number' && this.fadeDurationSecs > 0) {
+      isComplete = currentAudioTime - this.fadeStartAudioTime >= this.fadeDurationSecs;
+    } else {
+      isComplete = Date.now() - this.fadeStartTimeWallClock >= this.remainingFadeDurationMs;
+    }
+
+    if (isComplete) {
+      if (this.fadeTimeoutId) {
+        clearTimeout(this.fadeTimeoutId);
+        this.fadeTimeoutId = null;
+      }
+      const sessionId = this.fadingSessionId;
+      const incomingId = this.fadingTrackId;
+      if (sessionId !== null && this.currentSessionId === sessionId) {
+        this.state = 'IDLE';
+        this.preloadedTrackId = null;
+        this.fadingSessionId = null;
+        this.fadingTrackId = null;
+        this.remainingFadeDurationMs = 0;
+        this.fadeStartAudioTime = 0;
+        this.fadeDurationSecs = 0;
+        if (incomingId !== null) {
+          this.delegate.onFadeComplete(sessionId, incomingId);
+        }
+      }
+    }
+  }
+
+  /**
    * Immediately aborts any in-flight preload, preparation, or crossfade transition.
    */
   public cancel(): void {
@@ -215,6 +248,8 @@ export class CrossfadeScheduler {
     this.currentSessionId++; // Invalidate pending callbacks
     this.state = 'IDLE';
     this.preloadedTrackId = null;
+    this.fadeStartAudioTime = 0;
+    this.fadeDurationSecs = 0;
 
     if (this.fadeTimeoutId) {
       clearTimeout(this.fadeTimeoutId);
