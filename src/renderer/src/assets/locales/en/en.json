@@ -1468,6 +1468,10 @@
       "nightcore": "Nightcore",
       "custom": "Custom"
     },
+    "tabs": {
+      "effects": "Studio Effects & DSP",
+      "equalizer": "10-Band Equalizer"
+    },
     "speed": "Playback Speed",
     "preservePitch": "Preserve Original Pitch",
     "reverbWet": "Reverb Intensity",

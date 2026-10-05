@@ -125,7 +125,7 @@ const OtherSongControlsContainer = () => {
             changePromptMenuData(
               true,
               <AudioFxModal />,
-              'audio-fx-modal-dialog w-[860px] max-w-[94vw]'
+              'audio-fx-modal-dialog w-[860px] max-w-[94vw] max-h-[90vh]!'
             )
         });
       }
@@ -338,7 +338,7 @@ const OtherSongControlsContainer = () => {
             changePromptMenuData(
               true,
               <AudioFxModal />,
-              'audio-fx-modal-dialog w-[860px] max-w-[94vw]'
+              'audio-fx-modal-dialog w-[860px] max-w-[94vw] max-h-[90vh]!'
             )
           }
         />

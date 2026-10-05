@@ -136,7 +136,10 @@ const AudioPlaybackSettings = () => {
       className="audio-playback-settings-container"
     >
       <ul className="marker:bg-font-color-highlight dark:marker:bg-dark-font-color-highlight list-disc pl-6">
-        <li id="setting-audio-waveform-seekbar" className="secondary-container enable-waveform-seekbar mb-4">
+        <li
+          id="setting-audio-waveform-seekbar"
+          className="secondary-container enable-waveform-seekbar mb-4"
+        >
           <div className="description">{t('settingsPage.enableWaveformSeekbarDescription')}</div>
           <Checkbox
             id="toggleEnableWaveformSeekbar"
@@ -149,7 +152,10 @@ const AudioPlaybackSettings = () => {
           />
         </li>
 
-        <li id="setting-audio-remaining-duration" className="secondary-container show-remaining-song-duration mb-4">
+        <li
+          id="setting-audio-remaining-duration"
+          className="secondary-container show-remaining-song-duration mb-4"
+        >
           <div className="description">
             {t('settingsPage.showRemainingSongDurationDescription')}
           </div>
@@ -269,7 +275,10 @@ const AudioPlaybackSettings = () => {
             />
           </div>
 
-          <div className="preamp-container flex w-1/2 min-w-[200px] flex-col" id="setting-audio-preamp">
+          <div
+            className="preamp-container flex w-1/2 min-w-[200px] flex-col"
+            id="setting-audio-preamp"
+          >
             <span className="mb-1 text-sm font-medium">
               Pre-amp Adjustment: {preampDb > 0 ? `+${preampDb}` : preampDb} dB
             </span>
@@ -375,7 +384,7 @@ const AudioPlaybackSettings = () => {
                 changePromptMenuData(
                   true,
                   <AudioFxModal />,
-                  'audio-fx-modal-dialog w-[860px] max-w-[94vw]'
+                  'audio-fx-modal-dialog w-[860px] max-w-[94vw] max-h-[90vh]!'
                 )
               }
             />

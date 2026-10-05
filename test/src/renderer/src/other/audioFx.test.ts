@@ -246,4 +246,42 @@ describe('AudioPlayer Audio FX & Dual Source Graph', () => {
     expect(player.vocalNuanceNode.isEnabled()).toBe(false);
     expect(profileListener).toHaveBeenCalledWith('studio_reference');
   });
+
+  it('guarantees FX preset mutations and reset to normal never mutate or reset 10-band equalizer', () => {
+    // 1. Set custom equalizer gains on the audio graph
+    const customEq: Equalizer = {
+      thirtyTwoHertzFilter: 4.5,
+      sixtyFourHertzFilter: 3.0,
+      hundredTwentyFiveHertzFilter: 1.5,
+      twoHundredFiftyHertzFilter: 0,
+      fiveHundredHertzFilter: -1.0,
+      thousandHertzFilter: -2.0,
+      twoThousandHertzFilter: 1.0,
+      fourThousandHertzFilter: 2.5,
+      eightThousandHertzFilter: 5.0,
+      sixteenThousandHertzFilter: 6.0
+    };
+    player.applyEqualizerPreset(customEq);
+
+    // Verify the custom EQ bands are active on the WebAudio peaking filters
+    expect(player.equalizerBands.get('thirtyTwoHertzFilter')?.gain.value).toBe(4.5);
+    expect(player.equalizerBands.get('eightThousandHertzFilter')?.gain.value).toBe(5.0);
+
+    // 2. Change FX preset to slowed, nightcore, and reset back to normal
+    player.setAudioFxPreset('slowed');
+    player.setAudioFxPreset('nightcore');
+    player.setAudioFxPreset('normal');
+
+    // 3. Assert all 10 EQ bands remained strictly intact and untouched
+    expect(player.equalizerBands.get('thirtyTwoHertzFilter')?.gain.value).toBe(4.5);
+    expect(player.equalizerBands.get('sixtyFourHertzFilter')?.gain.value).toBe(3.0);
+    expect(player.equalizerBands.get('hundredTwentyFiveHertzFilter')?.gain.value).toBe(1.5);
+    expect(player.equalizerBands.get('twoHundredFiftyHertzFilter')?.gain.value).toBe(0);
+    expect(player.equalizerBands.get('fiveHundredHertzFilter')?.gain.value).toBe(-1.0);
+    expect(player.equalizerBands.get('thousandHertzFilter')?.gain.value).toBe(-2.0);
+    expect(player.equalizerBands.get('twoThousandHertzFilter')?.gain.value).toBe(1.0);
+    expect(player.equalizerBands.get('fourThousandHertzFilter')?.gain.value).toBe(2.5);
+    expect(player.equalizerBands.get('eightThousandHertzFilter')?.gain.value).toBe(5.0);
+    expect(player.equalizerBands.get('sixteenThousandHertzFilter')?.gain.value).toBe(6.0);
+  });
 });
