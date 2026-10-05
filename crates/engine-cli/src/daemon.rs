@@ -222,7 +222,7 @@ impl EngineDaemon {
     fn current_position_secs(&self) -> f64 {
         let idx = self.active_slot.load(Ordering::Relaxed) as usize;
         let base = self.base_secs(idx);
-        let frames = if let Ok(guard) = self.shared_engine.lock() {
+        let frames = if let Ok(guard) = self.shared_engine.try_lock() {
             let id = if idx == 0 { LibSlotId::A } else { LibSlotId::B };
             guard.0.slot(id).frames_consumed
         } else {
@@ -556,9 +556,6 @@ impl EngineDaemon {
                     SoundProfile::VocalNuanceBoost => 1,
                 };
                 self.sound_profile.store(profile_val, Ordering::Release);
-                if let Ok(mut guard) = self.shared_engine.lock() {
-                    guard.1.set_sound_profile(profile);
-                }
                 // transition_ms: 30 informs the client of the smooth DSP cross-modulation
                 // ramp duration applied asynchronously on the audio callback thread.
                 DaemonResult::Ok {
@@ -590,15 +587,14 @@ impl EngineDaemon {
                 } else {
                     SlotId::B
                 };
-                let (profile, status) = if let Ok(guard) = self.shared_engine.lock() {
-                    (guard.1.sound_profile(), guard.1.sound_profile_status())
+                let profile = match self.sound_profile.load(Ordering::Acquire) {
+                    0 => SoundProfile::StudioReference,
+                    _ => SoundProfile::VocalNuanceBoost,
+                };
+                let status = if let Ok(guard) = self.shared_engine.try_lock() {
+                    guard.1.sound_profile_status()
                 } else {
-                    let p = if self.sound_profile.load(Ordering::Relaxed) == 0 {
-                        SoundProfile::StudioReference
-                    } else {
-                        SoundProfile::VocalNuanceBoost
-                    };
-                    (p, SoundProfileStatus::Active)
+                    SoundProfileStatus::Active
                 };
                 DaemonResult::Ok {
                     data: Some(serde_json::json!({

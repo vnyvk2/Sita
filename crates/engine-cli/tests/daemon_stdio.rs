@@ -386,3 +386,45 @@ fn daemon_stdio_crossfade_interrupted_by_next_locks_incoming_slot_without_transi
     daemon.send(6, r#"{"cmd":"stop"}"#);
     assert_ok(&daemon.wait_response(6, Duration::from_secs(5), &mut events));
 }
+
+#[test]
+fn daemon_stdio_sound_profile_toggle_during_playback_is_lock_free() {
+    let mut daemon = Daemon::spawn();
+    let _ready = daemon.next_line(Duration::from_secs(10));
+
+    let mut events = Vec::new();
+    let path = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"a","path":"{path}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+
+    daemon.send(2, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(2, Duration::from_secs(5), &mut events));
+    let _ = daemon.wait_heartbeat(Duration::from_secs(5));
+
+    // Toggle sound profile rapidly during active playback
+    daemon.send(3, r#"{"cmd":"set_sound_profile","profile":"vocal_nuance_boost"}"#);
+    let resp = daemon.wait_response(3, Duration::from_secs(5), &mut events);
+    assert_ok(&resp);
+
+    // Verify GetState reports updated profile without blocking
+    daemon.send(4, r#"{"cmd":"get_state"}"#);
+    let state_resp = daemon.wait_response(4, Duration::from_secs(5), &mut events);
+    assert_ok(&state_resp);
+    let data = state_resp["data"].as_object().unwrap();
+    assert_eq!(data["sound_profile"].as_str(), Some("vocal_nuance_boost"));
+
+    // Toggle back to studio_reference
+    daemon.send(5, r#"{"cmd":"set_sound_profile","profile":"studio_reference"}"#);
+    assert_ok(&daemon.wait_response(5, Duration::from_secs(5), &mut events));
+
+    daemon.send(6, r#"{"cmd":"get_state"}"#);
+    let state_resp2 = daemon.wait_response(6, Duration::from_secs(5), &mut events);
+    assert_ok(&state_resp2);
+    let data2 = state_resp2["data"].as_object().unwrap();
+    assert_eq!(data2["sound_profile"].as_str(), Some("studio_reference"));
+
+    daemon.send(7, r#"{"cmd":"stop"}"#);
+    assert_ok(&daemon.wait_response(7, Duration::from_secs(5), &mut events));
+}
+
