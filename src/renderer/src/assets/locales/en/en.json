@@ -393,17 +393,40 @@
     "resultsCount_other": "{{count}} settings found",
     "aliasMatch": "Keyword match: {{keyword}}",
     "searchAliases": {
-      "setting-appearance-theme-mode": ["dark", "light", "colors", "style", "palette", "day", "night"],
+      "setting-appearance-theme-mode": [
+        "dark",
+        "light",
+        "colors",
+        "style",
+        "palette",
+        "day",
+        "night"
+      ],
       "setting-appearance-theme-preset": ["accent", "tint", "custom theme", "scheme"],
       "setting-preferences-song-indexing": ["track count", "numbers", "order", "index"],
-      "setting-preferences-alphabet-scrubber": ["a-z", "letters", "scrub", "jump to song", "fast scroll"],
-      "setting-preferences-song-row-density": ["compact view", "row size", "compact rows", "density"],
+      "setting-preferences-alphabet-scrubber": [
+        "a-z",
+        "letters",
+        "scrub",
+        "jump to song",
+        "fast scroll"
+      ],
+      "setting-preferences-song-row-density": [
+        "compact view",
+        "row size",
+        "compact rows",
+        "density"
+      ],
       "setting-audio-crossfade": ["smooth transition", "overlap songs", "gapless"],
       "setting-audio-replaygain": ["volume leveling", "loudness", "normalize sound"],
       "setting-accounts-discord-rpc": ["discord", "rich presence", "rpc status"],
       "setting-accounts-lastfm": ["scrobble", "last fm", "audioscrobbler"],
       "setting-accounts-listenbrainz": ["open source scrobbler", "metabrainz"],
-      "setting-accessibility-reduced-motion": ["stop animations", "disable transitions", "less motion"],
+      "setting-accessibility-reduced-motion": [
+        "stop animations",
+        "disable transitions",
+        "less motion"
+      ],
       "setting-audio-waveform-seekbar": ["sound wave", "visualizer", "audio graph"]
     },
 
@@ -566,6 +589,8 @@
     "shuffleArtworkFromSongCovers": "Enable shuffling the artwork made from song covers. (The artworks shuffle each time a page refresh happens.)",
     "sidebarNavigation": "Sidebar Navigation",
     "sidebarNavigationDescription": "Select which side tabs to display in the navigation bar.",
+    "showSidebarPlaylistsSection": "Show playlists in sidebar when viewing a playlist",
+    "showSidebarPlaylistsSectionDescription": "Display all playlists and a resizable split view in the sidebar when a playlist is open. Disable this if you prefer a static sidebar or use a dedicated Playlists panel in modular layouts.",
 
     "accessibility": "Accessibility",
     "reducedMotionDescription": "Removes animation that appears in the app. This will also reduce the smoothness of the app.",

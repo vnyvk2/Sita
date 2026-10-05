@@ -1,10 +1,10 @@
 import { store } from '@renderer/store/store';
+import { dndStore, workspaceActions } from '@renderer/workspace/store';
 import { linkOptions, useLocation } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { dndStore, workspaceActions } from '@renderer/workspace/store';
 import ErrorBoundary from '../ErrorBoundary';
 import LibraryDiagnosticsPanel from './LibraryDiagnosticsPanel';
 import LibrarySchedulerStatus from './LibrarySchedulerStatus';
@@ -23,6 +23,10 @@ const Sidebar = memo(() => {
     (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
   );
   const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
+  const showSidebarPlaylistsSection = useStore(
+    store,
+    (state) => state.localStorage.preferences?.showSidebarPlaylistsSection ?? true
+  );
 
   const { t } = useTranslation();
   const isPlaylistOpened = useLocation({
@@ -200,14 +204,14 @@ const Sidebar = memo(() => {
     ? sidebarMode === 'hidden'
       ? `side-bar relative z-20 order-first flex !h-full w-0 min-w-0 max-w-0 shrink-0 grow-0 opacity-0 pointer-events-none overflow-hidden p-0 m-0 border-0 transition-all duration-300 ${bgClass}`
       : sidebarMode === 'compact'
-      ? `side-bar relative z-20 order-first flex !h-full w-14 min-w-[3.5rem] max-w-[3.5rem] shrink-0 grow-0 flex-col overflow-hidden rounded-tr-2xl transition-all duration-300 ${bgClass}`
-      : `side-bar relative z-20 order-first flex !h-full w-60 min-w-[15rem] max-w-[18rem] shrink-0 grow-0 flex-col rounded-tr-2xl transition-all duration-300 ${bgClass}`
+        ? `side-bar relative z-20 order-first flex !h-full w-14 min-w-[3.5rem] max-w-[3.5rem] shrink-0 grow-0 flex-col overflow-hidden rounded-tr-2xl transition-all duration-300 ${bgClass}`
+        : `side-bar relative z-20 order-first flex !h-full w-60 min-w-[15rem] max-w-[18rem] shrink-0 grow-0 flex-col rounded-tr-2xl transition-all duration-300 ${bgClass}`
     : `side-bar relative z-20 order-1 flex !h-full w-[30%] !max-w-[18rem] grow flex-col rounded-tr-2xl transition-[width] ${bgClass} delay-200 md:hover:w-60 lg:absolute lg:w-14 lg:hover:w-[30%] lg:hover:shadow-2xl`;
 
   return (
     <nav className={navClassName}>
       <ErrorBoundary>
-        {isPlaylistOpened && sidebarMode !== 'compact' ? (
+        {isPlaylistOpened && showSidebarPlaylistsSection && sidebarMode !== 'compact' ? (
           <div
             ref={navContainerRef}
             className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -247,12 +251,8 @@ const Sidebar = memo(() => {
             <button
               type="button"
               onClick={() => workspaceActions.cycleSidebarMode()}
-              title={
-                sidebarMode === 'expanded'
-                  ? 'Collapse to icon rail'
-                  : 'Hide sidebar'
-              }
-              className="text-font-color-dimmed hover:bg-stone-200/50 hover:text-font-color-black dark:hover:bg-stone-800/50 dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors"
+              title={sidebarMode === 'expanded' ? 'Collapse to icon rail' : 'Hide sidebar'}
+              className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-stone-200/50 dark:hover:bg-stone-800/50"
             >
               <span className="material-symbols-rounded text-lg">
                 {sidebarMode === 'expanded' ? 'chevron_left' : 'dock_to_left'}

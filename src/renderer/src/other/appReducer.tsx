@@ -547,6 +547,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     },
     isCompactSongView: false,
     songViewMode: 'normal' as const,
+    showSidebarPlaylistsSection: true,
     pinnedSubFilterTools: ['compactView', 'language', 'genre']
   },
   playback: {

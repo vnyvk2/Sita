@@ -5,7 +5,7 @@ export interface SettingCatalogEntry {
   id: string;
   /** Section key indicating which collapsible section owns this setting */
   sectionKey: SettingsSectionKey;
-  /** i18n key for the title */
+  /** I18n key for the title */
   titleKey: string;
   /** Default English title if translation is missing */
   defaultTitle: string;
@@ -31,12 +31,18 @@ export const SECTION_METADATA: Record<SettingsSectionKey, SectionMeta> = {
   equalizer: { titleKey: 'settingsPage.equalizer', defaultTitle: 'Equalizer' },
   defaultPage: { titleKey: 'settingsPage.defaultPage', defaultTitle: 'Default Page' },
   preferences: { titleKey: 'settingsPage.preferences', defaultTitle: 'Preferences' },
-  metadata: { titleKey: 'settingsPage.metadataSources', defaultTitle: 'Metadata & AutoTag Sources' },
+  metadata: {
+    titleKey: 'settingsPage.metadataSources',
+    defaultTitle: 'Metadata & AutoTag Sources'
+  },
   accessibility: { titleKey: 'settingsPage.accessibility', defaultTitle: 'Accessibility' },
   performance: { titleKey: 'settingsPage.performance', defaultTitle: 'Performance' },
   downloads: { titleKey: 'settingsPage.downloads.title', defaultTitle: 'Online downloads' },
   library: { titleKey: 'settingsPage.libraryScanning', defaultTitle: 'Library & Folders' },
-  startup: { titleKey: 'settingsPage.startupAndWindowCustomization', defaultTitle: 'Startup & Window' },
+  startup: {
+    titleKey: 'settingsPage.startupAndWindowCustomization',
+    defaultTitle: 'Startup & Window'
+  },
   storage: { titleKey: 'settingsPage.storage', defaultTitle: 'Storage' },
   advanced: { titleKey: 'settingsPage.advanced', defaultTitle: 'Advanced' },
   about: { titleKey: 'settingsPage.about', defaultTitle: 'About' }
@@ -100,8 +106,7 @@ export const settingsCatalog: SettingCatalogEntry[] = [
     titleKey: 'settingsPage.enableSongCardDynamicArtworkBackground',
     defaultTitle: 'Enable dynamic song card background',
     descriptionKey: 'settingsPage.enableSongCardDynamicArtworkBackgroundDescription',
-    defaultDescription:
-      'Apply dynamic colored backgrounds to song cards matching album artwork.',
+    defaultDescription: 'Apply dynamic colored backgrounds to song cards matching album artwork.',
     keywords: ['song card', 'card background', 'artwork background']
   },
   {
@@ -122,7 +127,16 @@ export const settingsCatalog: SettingCatalogEntry[] = [
     defaultTitle: 'App language',
     descriptionKey: 'settingsPage.languageDescription',
     defaultDescription: 'Change the language of the user interface.',
-    keywords: ['language', 'locale', 'translate', 'english', 'turkish', 'french', 'portuguese', 'vietnamese']
+    keywords: [
+      'language',
+      'locale',
+      'translate',
+      'english',
+      'turkish',
+      'french',
+      'portuguese',
+      'vietnamese'
+    ]
   },
 
   // --- AUDIO PLAYBACK ---
@@ -399,6 +413,22 @@ export const settingsCatalog: SettingCatalogEntry[] = [
     descriptionKey: 'settingsPage.playlistArtworksDescription',
     defaultDescription: 'Automatically build collage covers for playlists from contained songs.',
     keywords: ['playlist cover', 'collage', 'playlist artwork', 'grid cover']
+  },
+  {
+    id: 'setting-preferences-sidebar-playlists-section',
+    sectionKey: 'preferences',
+    titleKey: 'settingsPage.showSidebarPlaylistsSection',
+    defaultTitle: 'Show playlists in sidebar when viewing a playlist',
+    descriptionKey: 'settingsPage.showSidebarPlaylistsSectionDescription',
+    defaultDescription:
+      'Display all playlists and a resizable split view in the sidebar when a playlist is open.',
+    keywords: [
+      'sidebar playlists',
+      'playlist sidebar',
+      'split sidebar',
+      'playlists panel',
+      'hide playlists in sidebar'
+    ]
   },
   {
     id: 'setting-preferences-sidebar-tabs',

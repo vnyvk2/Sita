@@ -25,14 +25,24 @@ vi.mock('../../NavLink', () => ({
   )
 }));
 
+let currentPathname = '/main-player/home';
+
 // Mock @tanstack/react-router
 vi.mock('@tanstack/react-router', () => ({
   useLocation: (opts?: { select?: (loc: any) => any }) => {
-    const loc = { pathname: '/main-player/home', href: 'http://localhost/main-player/home' };
+    const loc = { pathname: currentPathname, href: `http://localhost${currentPathname}` };
     return opts?.select ? opts.select(loc) : loc;
   },
   linkOptions: <T,>(opts: T): T => opts,
-  Link: ({ children, to, ...props }: { children?: React.ReactNode; to?: string; [key: string]: unknown }) => (
+  Link: ({
+    children,
+    to,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    to?: string;
+    [key: string]: unknown;
+  }) => (
     <a href={to} {...props}>
       {children}
     </a>
@@ -73,8 +83,17 @@ vi.mock('../LibraryDiagnosticsPanel', () => ({
   default: () => <div data-testid="diagnostics-panel" />
 }));
 
+vi.mock('../SidebarPlaylistsSection', () => ({
+  default: () => <div data-testid="sidebar-playlists-section" />
+}));
+
+vi.mock('../SidebarResizer', () => ({
+  default: () => <div data-testid="sidebar-resizer" />
+}));
+
 describe('Sidebar Navigation & visibleSideTabs Filtering', () => {
   beforeEach(() => {
+    currentPathname = '/main-player/home';
     store.setState((prev) => ({
       ...prev,
       bodyBackgroundImage: '',
@@ -220,5 +239,71 @@ describe('Sidebar Navigation & visibleSideTabs Filtering', () => {
     expect(screen.queryByText('Artists')).toBeNull();
     expect(screen.queryByText('Albums')).toBeNull();
     expect(screen.getByText('Insights')).toBeDefined();
+  });
+});
+
+describe('SidebarPlaylistsSection Gating', () => {
+  beforeEach(() => {
+    currentPathname = '/main-player/home';
+  });
+
+  it('renders SidebarPlaylistsSection and SidebarResizer when playlist detail is open and showSidebarPlaylistsSection is true', () => {
+    currentPathname = '/main-player/playlists/42';
+    store.setState((prev) => ({
+      ...prev,
+      localStorage: {
+        ...prev.localStorage,
+        preferences: {
+          ...prev.localStorage.preferences,
+          showSidebarPlaylistsSection: true
+        }
+      }
+    }));
+
+    render(<Sidebar />);
+
+    expect(screen.getByTestId('sidebar-playlists-section')).toBeDefined();
+    expect(screen.getByTestId('sidebar-resizer')).toBeDefined();
+  });
+
+  it('renders SidebarPlaylistsSection by default when showSidebarPlaylistsSection is undefined (backward compatibility)', () => {
+    currentPathname = '/main-player/playlists/42';
+    store.setState((prev) => ({
+      ...prev,
+      localStorage: {
+        ...prev.localStorage,
+        preferences: {
+          ...prev.localStorage.preferences,
+          showSidebarPlaylistsSection: undefined
+        }
+      }
+    }));
+
+    render(<Sidebar />);
+
+    expect(screen.getByTestId('sidebar-playlists-section')).toBeDefined();
+    expect(screen.getByTestId('sidebar-resizer')).toBeDefined();
+  });
+
+  it('does NOT render SidebarPlaylistsSection or SidebarResizer when showSidebarPlaylistsSection is false', () => {
+    currentPathname = '/main-player/playlists/42';
+    store.setState((prev) => ({
+      ...prev,
+      localStorage: {
+        ...prev.localStorage,
+        preferences: {
+          ...prev.localStorage.preferences,
+          showSidebarPlaylistsSection: false
+        }
+      }
+    }));
+
+    render(<Sidebar />);
+
+    expect(screen.queryByTestId('sidebar-playlists-section')).toBeNull();
+    expect(screen.queryByTestId('sidebar-resizer')).toBeNull();
+    // Primary navigation links are still rendered
+    expect(screen.getByText('Home')).toBeDefined();
+    expect(screen.getByText('Playlists')).toBeDefined();
   });
 });

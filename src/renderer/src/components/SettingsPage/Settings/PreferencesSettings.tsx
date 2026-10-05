@@ -68,7 +68,10 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li id="setting-preferences-alphabet-scrubber" className="alphabet-scrubber-settings-container mb-4">
+        <li
+          id="setting-preferences-alphabet-scrubber"
+          className="alphabet-scrubber-settings-container mb-4"
+        >
           <div className="secondary-container toggle-alphabet-scrubber mb-4">
             <div className="description">
               {t(
@@ -93,7 +96,10 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
-        <li id="setting-preferences-song-row-density" className="song-view-mode-settings-container mb-4">
+        <li
+          id="setting-preferences-song-row-density"
+          className="song-view-mode-settings-container mb-4"
+        >
           <div className="secondary-container toggle-song-view-mode mb-4">
             <div className="description">
               {t(
@@ -203,6 +209,28 @@ const PreferencesSettings = () => {
                 storage.preferences.setPreferences('shuffleArtworkFromSongCovers', state)
               }
               labelContent={t('settingsPage.shuffleArtworkFromSongCovers')}
+            />
+          </div>
+        </li>
+
+        <li id="setting-preferences-sidebar-playlists-section" className="checkbox-container">
+          <div className="secondary-container show-sidebar-playlists mb-4">
+            <div className="description">
+              {t(
+                'settingsPage.showSidebarPlaylistsSectionDescription',
+                'Display all playlists and a resizable split view in the sidebar when a playlist is open. Disable this if you prefer a static sidebar or use a dedicated Playlists panel in modular layouts.'
+              )}
+            </div>
+            <Checkbox
+              id="toggleSidebarPlaylistsSection"
+              isChecked={preferences?.showSidebarPlaylistsSection ?? true}
+              checkedStateUpdateFunction={(state) =>
+                storage.preferences.setPreferences('showSidebarPlaylistsSection', state)
+              }
+              labelContent={t(
+                'settingsPage.showSidebarPlaylistsSection',
+                'Show playlists in sidebar when viewing a playlist'
+              )}
             />
           </div>
         </li>

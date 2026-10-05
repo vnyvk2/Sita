@@ -637,6 +637,7 @@ declare global {
     playerBarControlsIn3Dots?: PlayerBarControlsIn3Dots;
     isCompactSongView?: boolean;
     songViewMode?: 'compact' | 'small' | 'normal';
+    showSidebarPlaylistsSection?: boolean;
     pinnedSubFilterTools?: string[];
   }
 

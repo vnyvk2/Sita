@@ -17,6 +17,10 @@ export const NavigationPanel: FC<PanelProps> = memo(() => {
     store,
     (state: AppReducer) => state.localStorage.preferences?.visibleSideTabs
   );
+  const showSidebarPlaylistsSection = useStore(
+    store,
+    (state: AppReducer) => state.localStorage.preferences?.showSidebarPlaylistsSection ?? true
+  );
 
   const { t } = useTranslation();
   const isPlaylistOpened = useLocation({
@@ -173,7 +177,7 @@ export const NavigationPanel: FC<PanelProps> = memo(() => {
 
   return (
     <nav className="navigation-panel bg-side-bar-background dark:bg-dark-background-color-2 flex h-full w-full flex-col overflow-hidden">
-      {isPlaylistOpened ? (
+      {isPlaylistOpened && showSidebarPlaylistsSection ? (
         <div
           ref={navContainerRef}
           className="relative flex min-h-0 flex-1 flex-col overflow-hidden"

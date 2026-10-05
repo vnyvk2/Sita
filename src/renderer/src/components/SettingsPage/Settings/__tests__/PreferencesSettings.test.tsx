@@ -127,4 +127,29 @@ describe('PreferencesSettings Sidebar Tabs Navigation', () => {
       online: true
     });
   });
+
+  it('renders sidebar playlists section toggle with default checked state true', () => {
+    const { container } = render(<PreferencesSettings />);
+    const playlistsSectionCheckbox = container.querySelector(
+      '#toggleSidebarPlaylistsSection'
+    ) as HTMLInputElement;
+
+    expect(playlistsSectionCheckbox).not.toBeNull();
+    expect(playlistsSectionCheckbox.checked).toBe(true);
+  });
+
+  it('toggling sidebar playlists section calls setPreferences with showSidebarPlaylistsSection: false', () => {
+    const { container } = render(<PreferencesSettings />);
+    const playlistsSectionCheckbox = container.querySelector(
+      '#toggleSidebarPlaylistsSection'
+    ) as HTMLInputElement;
+
+    expect(playlistsSectionCheckbox).not.toBeNull();
+    fireEvent.click(playlistsSectionCheckbox);
+
+    expect(storage.preferences.setPreferences).toHaveBeenCalledWith(
+      'showSidebarPlaylistsSection',
+      false
+    );
+  });
 });
