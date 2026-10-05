@@ -92,3 +92,13 @@ path = "tests/rust_governance_gates.rs"
 [[test]]
 name = "gate2_eq_parity"
 path = "tests/gate2_eq_parity.rs"
+
+[[test]]
+name = "gate3_headroom_limiter"
+path = "tests/gate3_headroom_limiter.rs"
+
+[[test]]
+name = "gate4_acoustic_ablation"
+path = "tests/gate4_acoustic_ablation.rs"
+
+

@@ -182,7 +182,7 @@ describe('Golden Audio-Fixture Parity Verification (Rust vs Web Audio)', () => {
     const shoulderOut = output.subarray(72000 * 2, 96000 * 2);
     const shoulderIn = input.subarray(72000 * 2, 96000 * 2);
     const shoulderGainDb = computePeakDb(shoulderOut) - computePeakDb(shoulderIn);
-    // Envelope settles at -18.9 dBFS due to 250ms inter-crest ripple, Hermite spline gives +0.908 dB
+    // Envelope settles at -18.85 dBFS due to finite attack/release tracking bias on 1kHz sine, Hermite spline gives +0.908 dB
     expect(shoulderGainDb).toBeCloseTo(0.908, 2);
 
     // 3. Stage 3 (Loud region, t in [2.5, 3.0]s = frames 120000..144000)

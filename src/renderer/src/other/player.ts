@@ -10,7 +10,7 @@ import { getOrCreateReverbBuffer } from './audioFx/reverbImpulse';
 import { AUDIO_FX_PRESETS, type AudioFxOptions, type AudioFxPresetType } from './audioFx/types';
 import { VocalNuanceNode } from './audioFx/vocalNuanceNode';
 import { CrossfadeScheduler, type CrossfadeDelegate } from './crossfade/CrossfadeScheduler';
-import { equalizerBandHertzData } from './equalizerData';
+import { computeCompositeEqPeak, equalizerBandHertzData } from './equalizerData';
 import { NativeAudioBackend } from './nativeAudioBackend';
 import PlayerQueue from './playerQueue';
 import type { QueuesManager } from './queuesManager';
@@ -110,6 +110,8 @@ class AudioPlayer {
   private currentSoundProfile: SoundProfile = 'studio_reference';
   private isConvolverConnected = false;
   private currentAudioFx: AudioFxOptions = AUDIO_FX_PRESETS.normal;
+  private currentCompositeEqGainDb = 0.0;
+  private currentHeadroomGain = 1.0;
 
   unsubscribeFunc: Subscription;
 
@@ -399,12 +401,28 @@ class AudioPlayer {
       (storage.equalizerPreset.getEqualizerPreset() as unknown as
         | Partial<Record<EqualizerBandFilters, number>>
         | undefined);
+    const gains: number[] = [];
     for (const key of AudioPlayer.EQUALIZER_BAND_ORDER) {
+      const db = Math.max(-12, Math.min(12, source?.[key] ?? 0));
+      gains.push(db);
+    }
+
+    // Gate 3.2: Reconcile headroom attenuation BEFORE (or simultaneously with) biquad gain ramp
+    // so there is zero transition interval where new EQ gain exceeds effective headroom
+    this.currentCompositeEqGainDb = computeCompositeEqPeak(
+      gains,
+      this.currentContext?.sampleRate ?? 48000
+    );
+    this.updateHeadroomGain();
+
+    const now = this.currentContext?.currentTime ?? 0;
+    for (let i = 0; i < AudioPlayer.EQUALIZER_BAND_ORDER.length; i++) {
+      const key = AudioPlayer.EQUALIZER_BAND_ORDER[i];
       const band = this.equalizerBands.get(key);
       if (!band) continue;
-      const db = Math.max(-12, Math.min(12, source?.[key] ?? 0));
+      const db = gains[i];
       if (typeof band.gain.setTargetAtTime === 'function') {
-        band.gain.setTargetAtTime(db, this.currentContext.currentTime, 0.05);
+        band.gain.setTargetAtTime(db, now, 0.05);
       } else {
         band.gain.value = db;
       }
@@ -1609,16 +1627,81 @@ class AudioPlayer {
       this.nightcoreTrebleBoostNode.gain.value = clampedTreble;
     }
 
-    // 5. Headroom gain staging: 1.0 (0 dB) when no FX engaged; 0.8414 (-1.5 dB) when FX active
-    const isFxEngaged = clampedWet > 0 || clampedTreble !== 0 || clampedCutoff < 20000;
-    const targetHeadroom = isFxEngaged ? 0.8414 : 1.0;
-    if (typeof this.headroomGainNode.gain.setTargetAtTime === 'function') {
-      this.headroomGainNode.gain.setTargetAtTime(targetHeadroom, now, 0.05);
-    } else {
-      this.headroomGainNode.gain.value = targetHeadroom;
-    }
+    // 5. Gate 3.2: Reconciled dynamic headroom gain staging (FX + composite EQ)
+    this.updateHeadroomGain();
 
     this.emit('audioFxChange', this.currentAudioFx);
+  }
+
+  /**
+   * Gate 3.2: Dynamic Headroom Gain Staging (Option A).
+   *
+   * Reconciles FX headroom (-1.5 dB when reverb/treble/lowpass active) with composite EQ
+   * peak accumulation G_composite = max_w |prod H_k(e^jw)|.
+   *
+   * Staging rules:
+   * 1. If audio FX (reverb, nightcore treble, lowpass) are engaged, fxHeadroom = 0.8414 (-1.5 dB).
+   * 2. If composite EQ gain G_composite > 0 dB, eqHeadroom = 10^(-G_composite / 20).
+   * 3. targetHeadroom = min(fxHeadroom, eqHeadroom).
+   * 4. When no FX and no EQ boost (flat or cutting only), targetHeadroom = 1.0 (0 dB, bit-transparent).
+   */
+  public updateHeadroomGain(immediate = false): void {
+    if (!this.headroomGainNode || !this.currentContext) return;
+    const { reverbWet, trebleBoostGain, lowPassCutoff } = this.currentAudioFx;
+    const clampedWet = Math.max(0, Math.min(1, reverbWet));
+    const clampedTreble = Math.max(-12, Math.min(12, trebleBoostGain));
+    const clampedCutoff = Math.max(20, Math.min(20000, lowPassCutoff));
+    const isFxEngaged = clampedWet > 0 || clampedTreble !== 0 || clampedCutoff < 20000;
+
+    const fxHeadroom = isFxEngaged ? 0.8414 : 1.0;
+    const eqHeadroom =
+      this.currentCompositeEqGainDb > 0.001
+        ? Math.pow(10, -this.currentCompositeEqGainDb / 20)
+        : 1.0;
+
+    const targetHeadroom = Math.min(fxHeadroom, eqHeadroom);
+    const now = this.currentContext.currentTime;
+    const currentHeadroom = this.currentHeadroomGain;
+
+    // Asymmetric transition behavior (Gate 3.2):
+    // 1. Increased attenuation (targetHeadroom < currentHeadroom):
+    //    Apply IMMEDIATELY at time `now` via setValueAtTime to guarantee zero transient
+    //    exposure window where new EQ boost could clip before headroom engages.
+    // 2. Reduced attenuation / recovery toward unity (targetHeadroom >= currentHeadroom):
+    //    Smooth upward recovery over 50ms via setTargetAtTime to prevent audible pops/clicks.
+    const isIncreasingAttenuation = targetHeadroom < currentHeadroom - 1e-4;
+
+    if (
+      immediate ||
+      isIncreasingAttenuation ||
+      typeof this.headroomGainNode.gain.setTargetAtTime !== 'function'
+    ) {
+      if (typeof this.headroomGainNode.gain.cancelScheduledValues === 'function') {
+        this.headroomGainNode.gain.cancelScheduledValues(now);
+      }
+      if (typeof this.headroomGainNode.gain.setValueAtTime === 'function') {
+        this.headroomGainNode.gain.setValueAtTime(targetHeadroom, now);
+      } else {
+        this.headroomGainNode.gain.value = targetHeadroom;
+      }
+      this.currentHeadroomGain = targetHeadroom;
+    } else {
+      if (typeof this.headroomGainNode.gain.cancelScheduledValues === 'function') {
+        this.headroomGainNode.gain.cancelScheduledValues(now);
+      }
+      this.headroomGainNode.gain.setTargetAtTime(targetHeadroom, now, 0.05);
+      this.currentHeadroomGain = targetHeadroom;
+    }
+  }
+
+  /** Return the currently calculated composite EQ peak gain in dB. */
+  public getCompositeEqGainDb(): number {
+    return this.currentCompositeEqGainDb;
+  }
+
+  /** Return the current effective gain value of the headroom gain node. */
+  public getHeadroomGain(): number {
+    return this.headroomGainNode?.gain?.value ?? this.currentHeadroomGain;
   }
 
   public getAudioFx(): AudioFxOptions {

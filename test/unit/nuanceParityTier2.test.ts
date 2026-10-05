@@ -123,11 +123,12 @@ describe('T2-2 shipped nuance parity preconditions', () => {
     vi.clearAllMocks();
   });
 
-  it('audible lane is the compressor (shaper model not in the path)', () => {
+  it('audible lane uses the OptionBShaper upward nuance shaper (compressor deleted)', () => {
     const node = new VocalNuanceNode(new MockAudioContext() as any);
-    expect((node as any).processorNode).toBeNull();
-    expect((node as any).compressor.threshold.value).toBe(-12);
-    expect((node as any).compressor.ratio.value).toBe(1.25);
+    expect((node as any).compressor).toBeUndefined();
+    expect(node.shaper.maxLiftDb).toBe(1.5);
+    expect(node.shaper.highThresholdDb).toBe(-12);
+    expect(node.shaper.lowThresholdDb).toBe(-24);
     node.destroy();
   });
 
@@ -143,8 +144,8 @@ describe('T2-2 shipped nuance parity preconditions', () => {
   // Render falsifier (production graph only): 4-stage fixture
   // (-30/-18/-3 dBFS sines + step) through VocalNuanceNode + safetyLimiter +
   // limiterDry/Wet as routed above. Pass bands: quiet +1.5±0.05, shoulder
-  // +0.91±0.05, loud 0±0.01 (peak -3.0), attack/holdoff ~1.0, recovery
-  // 1.01-1.08. A loud-stage peak near -3.3 dBFS (downward compression)
+  // +0.75±0.05 (calibrated envelope) / +0.91±0.05 (sine wave crest), loud 0±0.01 (peak -3.0),
+  // attack/holdoff ~1.0, recovery 1.01-1.08. A loud-stage peak near -3.3 dBFS (downward compression)
   // instead of -3.0 disproves parity and triggers remediation.
   it.runIf(typeof OfflineAudioContext !== 'undefined')(
     'offline render matches Rust transfer (requires render environment)',
