@@ -14,6 +14,7 @@ import { useLyricsScrollSync } from '../../LyricsPage/useLyricsScrollSync';
 type Props = {
   isLyricsVisible: boolean;
   setIsLyricsAvailable: (state: boolean) => void;
+  className?: string;
 };
 
 const LyricsContainer = (props: Props) => {
@@ -21,7 +22,7 @@ const LyricsContainer = (props: Props) => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const abLoop = useStore(store, (state) => state.player.abLoop);
 
-  const { isLyricsVisible, setIsLyricsAvailable } = props;
+  const { isLyricsVisible, setIsLyricsAvailable, className } = props;
   const { t } = useTranslation();
 
   const { data: lyrics } = useLyricsQuery({ enabled: isLyricsVisible });
@@ -49,9 +50,14 @@ const LyricsContainer = (props: Props) => {
   });
 
   useEffect(() => {
-    if (isLyricsVisible && lyrics) {
+    if (isLyricsVisible && lyrics?.lyrics) {
       setIsLyricsAvailable(true);
+    } else {
+      setIsLyricsAvailable(false);
     }
+    return () => {
+      setIsLyricsAvailable(false);
+    };
   }, [isLyricsVisible, lyrics, setIsLyricsAvailable]);
 
   const lyricsComponents = useMemo(() => {
@@ -82,14 +88,14 @@ const LyricsContainer = (props: Props) => {
     return undefined;
   }, [lyrics]);
 
+  const containerClasses =
+    className ||
+    `mini-player-lyrics-container appear-from-bottom absolute top-0 flex h-full max-h-screen! w-full max-w-full! flex-col items-start overflow-auto pt-20 pr-[20%] pb-[25%] pl-20 transition-[filter] delay-200 select-none ${
+      !isCurrentSongPlaying ? 'blur-xs brightness-50' : ''
+    }`;
+
   return (
-    <div
-      ref={scrollContainerRef}
-      className={`mini-player-lyrics-container appear-from-bottom w-ful absolute top-0 flex h-full max-h-screen! w-full max-w-full! flex-col items-start overflow-auto pt-20 pr-[20%] pb-[25%] pl-20 transition-[filter] delay-200 select-none group-focus-within:brightness-50 group-focus-within/fullScreenPlayer:blur-xs group-hover/fullScreenPlayer:blur-xs group-hover/fullScreenPlayer:brightness-50 ${
-        !isCurrentSongPlaying ? 'blur-xs brightness-50' : ''
-      }`}
-      id="miniPlayerLyricsContainer"
-    >
+    <div ref={scrollContainerRef} className={containerClasses} id="miniPlayerLyricsContainer">
       {isLyricsVisible && lyrics?.lyrics?.isSynced && (
         <button
           type="button"
