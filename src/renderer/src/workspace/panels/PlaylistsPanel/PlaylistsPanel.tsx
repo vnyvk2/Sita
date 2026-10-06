@@ -53,9 +53,9 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
         onClick={openNewPlaylistPrompt}
         title={t('playlistsPage.createPlaylist', 'Create Playlist')}
         aria-label={t('playlistsPage.createPlaylist', 'Create Playlist')}
-        className="hover:bg-background-color-2 text-font-color-dimmed hover:text-font-color-black dark:hover:bg-dark-background-color-2 dark:hover:text-font-color-white flex h-5 w-5 cursor-pointer items-center justify-center rounded transition-colors"
+        className="hover:bg-background-color-2 text-font-color-dimmed/70 hover:text-font-color-black dark:hover:bg-dark-background-color-2 dark:hover:text-font-color-white flex h-4.5 w-4.5 cursor-pointer items-center justify-center rounded transition-colors"
       >
-        <span className="material-symbols-rounded text-sm">add</span>
+        <span className="material-symbols-rounded-outlined text-[12px] leading-none">add</span>
       </button>
     ),
     [openNewPlaylistPrompt, t]

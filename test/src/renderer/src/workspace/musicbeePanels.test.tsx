@@ -124,7 +124,7 @@ describe('MusicBee Widgets: QueuePanel and LyricsPanel', () => {
           <LyricsPanel instance={mockInstance} api={mockApi} />
         </PanelFrame>
       );
-      expect(screen.getByTitle('Expand to full page')).toBeDefined();
+      expect(screen.getByText('No track selected')).toBeDefined();
       expect(document.querySelectorAll('header.panel-header')).toHaveLength(1);
     });
   });

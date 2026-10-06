@@ -168,9 +168,11 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
                 onClick={openHeaderMenu}
                 aria-haspopup="menu"
                 title="Panel options"
-                className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-stone-200 dark:hover:bg-stone-700"
+                className="text-font-color-dimmed/70 hover:text-font-color-black dark:hover:text-font-color-white flex h-4.5 w-4.5 cursor-pointer items-center justify-center rounded hover:bg-stone-200/60 dark:hover:bg-stone-700/60 transition-colors"
               >
-                <span className="material-symbols-rounded text-[14px]">expand_more</span>
+                <span className="material-symbols-rounded text-[13px] leading-none opacity-80">
+                  expand_more
+                </span>
               </button>
             </div>
 
@@ -180,17 +182,20 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
             </div>
 
             {/* Right: Panel actions + Frame controls */}
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-0.5">
               {fragment?.actions}
+              {fragment?.actions && (
+                <div className="mx-0.5 h-3 w-px bg-stone-300/60 dark:bg-stone-700/60" />
+              )}
               <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                 <button
                   type="button"
                   onClick={handleMaximizeClick}
                   title={isMaximized ? 'Restore Panel (Ctrl+Alt+M)' : 'Maximize Panel (Ctrl+Alt+M)'}
                   aria-label={isMaximized ? 'Restore Panel' : 'Maximize Panel'}
-                  className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-stone-200 dark:hover:bg-stone-700"
+                  className="text-font-color-dimmed/60 hover:text-font-color-black dark:hover:text-font-color-white flex h-4 w-4 cursor-pointer items-center justify-center rounded hover:bg-stone-200/60 dark:hover:bg-stone-700/60 transition-colors"
                 >
-                  <span className="material-symbols-rounded text-[12px]">
+                  <span className="material-symbols-rounded-outlined text-[10px] leading-none">
                     {isMaximized ? 'close_fullscreen' : 'open_in_full'}
                   </span>
                 </button>
@@ -203,9 +208,9 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
                     }}
                     title="Close Panel"
                     aria-label="Close Panel"
-                    className="text-font-color-dimmed flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-900/40 dark:hover:text-rose-400"
+                    className="text-font-color-dimmed/60 hover:text-rose-600 dark:hover:text-rose-400 flex h-4 w-4 cursor-pointer items-center justify-center rounded hover:bg-rose-100/70 dark:hover:bg-rose-900/40 transition-colors"
                   >
-                    <span className="material-symbols-rounded text-[12px]">close</span>
+                    <span className="material-symbols-rounded text-[9.5px] leading-none">close</span>
                   </button>
                 )}
               </div>

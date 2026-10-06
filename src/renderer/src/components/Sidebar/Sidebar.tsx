@@ -336,7 +336,6 @@ const Sidebar = memo(() => {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       aria-hidden={!isExperimentalWorkspace ? undefined : !isVisible}
-      // @ts-expect-error React 19 inert support
       inert={!isExperimentalWorkspace ? undefined : !isVisible ? true : undefined}
     >
       <ErrorBoundary>

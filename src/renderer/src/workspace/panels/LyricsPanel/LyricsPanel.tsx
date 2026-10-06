@@ -98,38 +98,26 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
       : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll');
 
   const headerActions = useMemo(
-    () => (
-      <>
-        {isSynced && (
-          <button
-            type="button"
-            onClick={handleToggleScrollMode}
-            aria-pressed={scrollMode === 'auto'}
-            aria-label={scrollToggleLabel}
-            title={scrollToggleLabel}
-            className={`flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
-              scrollMode === 'auto'
-                ? 'text-accent hover:bg-stone-200 dark:hover:bg-stone-700'
-                : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200 dark:hover:bg-stone-700'
-            }`}
-          >
-            <span className="material-symbols-rounded text-[14px]">
-              {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
-            </span>
-          </button>
-        )}
+    () =>
+      isSynced ? (
         <button
           type="button"
-          onClick={handleExpandToPage}
-          aria-label={t('lyricsPage.expandToFullPage', 'Expand to full page')}
-          title={t('lyricsPage.expandToFullPage', 'Expand to full page')}
-          className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
+          onClick={handleToggleScrollMode}
+          aria-pressed={scrollMode === 'auto'}
+          aria-label={scrollToggleLabel}
+          title={scrollToggleLabel}
+          className={`flex h-4.5 w-4.5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
+            scrollMode === 'auto'
+              ? 'text-accent bg-accent/15 hover:bg-accent/25 dark:bg-accent/20 dark:hover:bg-accent/30 font-semibold'
+              : 'text-font-color-dimmed/70 hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200/60 dark:hover:bg-stone-700/60'
+          }`}
         >
-          <span className="material-symbols-rounded text-[14px]">open_in_new</span>
+          <span className="material-symbols-rounded-outlined text-[12px] leading-none">
+            {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
+          </span>
         </button>
-      </>
-    ),
-    [isSynced, handleToggleScrollMode, scrollMode, scrollToggleLabel, handleExpandToPage, t]
+      ) : null,
+    [isSynced, handleToggleScrollMode, scrollMode, scrollToggleLabel]
   );
 
   const headerMenu = useCallback(

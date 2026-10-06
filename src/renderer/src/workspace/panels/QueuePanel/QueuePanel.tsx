@@ -161,9 +161,11 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
           onClick={handleClearQueue}
           title={t('currentQueuePage.clearQueue', 'Clear queue')}
           aria-label={t('currentQueuePage.clearQueue', 'Clear queue')}
-          className="text-font-color-dimmed flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+          className="text-font-color-dimmed/70 flex h-4.5 w-4.5 cursor-pointer items-center justify-center rounded hover:bg-rose-100/70 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 transition-colors"
         >
-          <span className="material-symbols-rounded text-[14px]">clear_all</span>
+          <span className="material-symbols-rounded-outlined text-[12px] leading-none">
+            clear_all
+          </span>
         </button>
       ) : null,
     [songIds.length, handleClearQueue, t]
