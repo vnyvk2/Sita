@@ -33,12 +33,18 @@ const manageLastFmAuth = async (token: string) => {
     url.searchParams.set('token', token);
     url.searchParams.set('api_sig', sig);
 
-    logger.debug('LastFM Auth url', { url: url.href });
+    const sanitizedUrl = new URL(url.href);
+    sanitizedUrl.searchParams.set('token', '[REDACTED]');
+    sanitizedUrl.searchParams.set('api_sig', '[REDACTED]');
+    logger.debug('LastFM Auth url', { url: sanitizedUrl.href });
 
     const res = await fetch(url);
     const json: LastFMSessionGetResponse = await res.json();
 
-    logger.verbose('LastFM JSON result', { json });
+    logger.verbose('LastFM session response received', {
+      success: 'session' in json,
+      name: 'session' in json ? json.session.name : undefined
+    });
     if ('session' in json) {
       const { key, name } = json.session;
       const encryptedKey = encrypt(key);
@@ -70,7 +76,11 @@ const manageLastFmAuth = async (token: string) => {
     }
 
     const errMessage = 'Session not found in LastFM response.';
-    logger.error(errMessage, { json });
+    const errorDetails =
+      typeof json === 'object' && json !== null && 'error' in json
+        ? { error: (json as Record<string, unknown>).error, message: (json as Record<string, unknown>).message }
+        : {};
+    logger.error(errMessage, errorDetails);
     throw new Error(errMessage);
   } catch (error) {
     return logger.error('Error occurred when authenticating LastFM user data.', { error });

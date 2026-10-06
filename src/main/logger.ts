@@ -1,10 +1,11 @@
+import fs from 'fs';
 import path from 'path';
 
 import { app } from 'electron';
 import winston from 'winston';
 // import { sendMessageToRenderer } from './main';
 
-const IS_DEVELOPMENT = app?.isPackaged || process.env.NODE_ENV === 'development';
+const IS_DEVELOPMENT = !app?.isPackaged && process.env.NODE_ENV === 'development';
 
 export interface LogOptions {
   preventLoggingToConsole?: boolean;
@@ -65,8 +66,37 @@ const getConsoleLogLevel = () => {
   return IS_DEVELOPMENT ? 'info' : 'warn';
 };
 
-const DEFAULT_FILE_LEVEL = 'silly';
+const DEFAULT_FILE_LEVEL = IS_DEVELOPMENT ? 'silly' : 'info';
 const DEFAULT_CONSOLE_LEVEL = getConsoleLogLevel();
+
+export const cleanupOldLogs = (maxAgeDays = 14) => {
+  try {
+    const baseDir = process.env.NORA_USER_DATA || app?.getPath('userData');
+    const logSaveFolder = path?.join(baseDir, 'logs');
+    if (!fs.existsSync(logSaveFolder)) return;
+
+    const now = Date.now();
+    const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+    const files = fs.readdirSync(logSaveFolder);
+
+    for (const file of files) {
+      if (!file.endsWith('.log.txt')) continue;
+      const fullPath = path.join(logSaveFolder, file);
+      try {
+        const stat = fs.statSync(fullPath);
+        if (now - stat.mtimeMs > maxAgeMs) {
+          fs.unlinkSync(fullPath);
+        }
+      } catch {
+        // ignore errors on individual files
+      }
+    }
+  } catch {
+    // best-effort cleanup on startup
+  }
+};
+
+cleanupOldLogs(14);
 
 const transports = {
   console: new winston.transports.Console({
@@ -82,7 +112,10 @@ const transports = {
   }),
   file: new winston.transports.File({
     level: DEFAULT_FILE_LEVEL,
-    filename: logFilePath
+    filename: logFilePath,
+    maxsize: 10 * 1024 * 1024, // 10MB
+    maxFiles: 5,
+    tailable: true
   })
 };
 

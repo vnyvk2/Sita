@@ -6,6 +6,7 @@ import mime from 'mime';
 
 import logger from './logger';
 import { getThumbnail, isThumbnailDisabled } from './thumbnails/thumbnailService';
+import { isAllowedNoraFilePath } from './fs/validateFilePath';
 
 export const decodeNoraFilePath = (urlStr: string): { filePath: string; host: string } => {
   const url = new URL(urlStr);
@@ -18,6 +19,12 @@ export const decodeNoraFilePath = (urlStr: string): { filePath: string; host: st
 export const handleFileProtocol = async (req: GlobalRequest) => {
   try {
     const { filePath, host } = decodeNoraFilePath(req.url);
+
+    const isAllowed = await isAllowedNoraFilePath(filePath);
+    if (!isAllowed) {
+      logger.warn('Forbidden file access attempt via nora:// protocol', { url: req.url, filePath, host });
+      return new Response(null, { status: 403 });
+    }
 
     let stat: Stats;
     try {

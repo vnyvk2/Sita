@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { mkdirSync, rmSync } from 'node:fs';
+import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
@@ -222,14 +222,15 @@ function buildDrizzle(db: DatabaseSync) {
   return { orm, preparedObj, withTxLock, clearCaches, getActiveTxLock: () => txLock };
 }
 
-export function openSqliteEngine(dbPath: string): SqliteEngine {
+function openSqliteEngineInternal(dbPath: string): SqliteEngine {
   if (dbPath !== ':memory:') {
-    mkdirSync(path.dirname(dbPath), { recursive: true });
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   }
 
   const tOpen = performance.now();
   const db = new DatabaseSync(dbPath);
   const openMs = performance.now() - tOpen;
+  try {
 
   const tPragma = performance.now();
   for (const p of SQLITE_PRAGMAS) db.exec(p);
@@ -441,9 +442,67 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
     }
   };
 
-  (orm as any)._engine = engine;
+    (orm as any)._engine = engine;
 
-  return engine;
+    return engine;
+  } catch (error) {
+    try {
+      db.close();
+    } catch {
+      /* best effort close */
+    }
+    throw error;
+  }
+}
+
+/**
+ * Opens SQLite engine with automatic corruption recovery (DAT-01).
+ * If the database file is corrupted or unreadable, backs it up to .corrupt.<ts>
+ * and creates a clean database instead of crashing Nora.
+ */
+export function openSqliteEngine(dbPath: string): SqliteEngine {
+  try {
+    return openSqliteEngineInternal(dbPath);
+  } catch (error) {
+    if (dbPath !== ':memory:' && fs.existsSync(dbPath)) {
+      const ts = Date.now();
+      const corruptPath = `${dbPath}.corrupt.${ts}`;
+      logger.error(
+        '[db] SQLite database corruption or init failure detected. Backing up corrupt database and initializing fresh database.',
+        { dbPath, corruptPath, error }
+      );
+
+      let targetPath = dbPath;
+      try {
+        fs.renameSync(dbPath, corruptPath);
+        if (fs.existsSync(`${dbPath}-wal`)) {
+          fs.renameSync(`${dbPath}-wal`, `${corruptPath}-wal`);
+        }
+        if (fs.existsSync(`${dbPath}-shm`)) {
+          fs.renameSync(`${dbPath}-shm`, `${corruptPath}-shm`);
+        }
+      } catch (backupError) {
+        logger.error('[db] Failed to rename corrupt database files, attempting force removal', { backupError });
+        try {
+          fs.rmSync(dbPath, { force: true });
+          if (fs.existsSync(`${dbPath}-wal`)) fs.rmSync(`${dbPath}-wal`, { force: true });
+          if (fs.existsSync(`${dbPath}-shm`)) fs.rmSync(`${dbPath}-shm`, { force: true });
+        } catch (rmError) {
+          logger.error('[db] Failed to remove corrupt database files, falling back to alternative database path', { rmError });
+        }
+      }
+
+      if (fs.existsSync(dbPath)) {
+        // If the corrupt file is still locked and present at dbPath, redirect to a fallback path to prevent crash loops
+        targetPath = `${dbPath}.recovered.${ts}`;
+        logger.warn('[db] Original database path remains locked. Diverting fresh database to recovered path.', { targetPath });
+      }
+
+      logger.info('[db] Initializing clean SQLite database after corruption recovery', { targetPath });
+      return openSqliteEngineInternal(targetPath);
+    }
+    throw error;
+  }
 }
 
 /** Deletes the database files (nuke). Caller must have closed all connections. */
@@ -451,7 +510,7 @@ export function deleteSqliteFiles(dbPath: string): void {
   if (dbPath === ':memory:') return;
   for (const suffix of ['', '-wal', '-shm']) {
     try {
-      rmSync(dbPath + suffix, { force: true });
+      fs.rmSync(dbPath + suffix, { force: true });
     } catch {
       /* best effort */
     }

@@ -76,6 +76,7 @@ export class NativeAudioDaemonManager {
   private nextRequestId = 1;
   private readyPromise: Promise<void> | null = null;
   private readyResolve: (() => void) | null = null;
+  private readyReject: ((err: Error) => void) | null = null;
 
   private pendingRequests = new Map<
     number,
@@ -200,6 +201,7 @@ export class NativeAudioDaemonManager {
 
     this.readyPromise = new Promise<void>((resolve, reject) => {
       this.readyResolve = resolve;
+      this.readyReject = reject;
 
       const readyTimeout = setTimeout(() => {
         if (this.isStarting) {
@@ -218,7 +220,16 @@ export class NativeAudioDaemonManager {
       this.readyResolve = () => {
         clearTimeout(readyTimeout);
         this.isStarting = false;
+        this.readyReject = null;
         previousResolve();
+      };
+
+      const previousReject = this.readyReject;
+      this.readyReject = (err: Error) => {
+        clearTimeout(readyTimeout);
+        this.isStarting = false;
+        this.readyResolve = null;
+        previousReject(err);
       };
     });
 
@@ -294,6 +305,23 @@ export class NativeAudioDaemonManager {
         const event = parsed as unknown as DaemonPushEvent;
         if (event.event === 'ready') {
           logger.info('Native audio daemon ready handshake received:', event);
+
+          if (event.protocol_version !== 1) {
+            const err = new Error(
+              `Native audio daemon protocol version mismatch: expected 1, received ${event.protocol_version}`
+            );
+            logger.error('Native audio daemon handshake rejected:', err);
+            try {
+              this.child?.kill('SIGKILL');
+            } catch {
+              // ignore kill errors
+            }
+            if (this.readyReject) {
+              this.readyReject(err);
+              this.readyReject = null;
+            }
+            return;
+          }
           // T3-1: single identity line per boot — file vs handshake version
           // correlation. mtime is dev/diagnostic only, never in packaged builds.
           let binaryMtimeMs: number | undefined;

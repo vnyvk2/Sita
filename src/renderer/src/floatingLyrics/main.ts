@@ -1,3 +1,5 @@
+import 'material-symbols/rounded.css';
+
 export {};
 
 interface ParsedLyricLine {

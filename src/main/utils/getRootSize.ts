@@ -60,7 +60,7 @@ const getRootSize = (
           }
         );
       } else if (platform === 'linux')
-        childProcess.execFile('/bin/sh', [`-c`, `df -h "${appPath}"`], (error, stdout) => {
+        childProcess.execFile('df', ['-h', appPath], (error, stdout) => {
           if (error) {
             reject(new Error(`exec error: ${error}`));
           }

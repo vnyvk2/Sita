@@ -910,7 +910,7 @@ class AudioPlayer {
       bindToQueue();
       const songId = this.queue.currentSongId;
       if (songId) {
-        const shouldAutoPlay = this.pendingAutoPlay || !this.audio.paused;
+        const shouldAutoPlay = this.pendingAutoPlay || !this.paused;
         this.pendingAutoPlay = false;
         this.loadSong(songId, { autoPlay: shouldAutoPlay }).catch((err) => {
           console.error('[AudioPlayer.activeQueueChanged] Failed to load song:', err);
@@ -2714,7 +2714,7 @@ class AudioPlayer {
 
     // Handle repeat-one mode (only auto-repeat, not on user skip)
     if (this.repeatMode === 'one' && reason !== 'USER_SKIP') {
-      this.audio.currentTime = 0;
+      this.seek(0);
       await this.play();
 
       // Emit event for listening data recording (repetition)

@@ -27,7 +27,7 @@ import {
   type SaveDialogOptions
 } from 'electron';
 
-if (process.env.REMOTE_DEBUGGING_PORT) {
+if (!app?.isPackaged && process.env.REMOTE_DEBUGGING_PORT) {
   app?.commandLine?.appendSwitch?.('remote-debugging-port', process.env.REMOTE_DEBUGGING_PORT);
 }
 
@@ -95,6 +95,8 @@ import checkForUpdates from './update';
 import { savePendingMetadataUpdates } from './updateSong/updateSongId3Tags';
 import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
 import memProfiler from './utils/memProfiler';
+import safeOpenExternal from './utils/safeOpenExternal';
+import { isAllowedAppNavigation } from './utils/safeNavigation';
 import { isRectOnAnyDisplay, isValidPersistedPosition } from './utils/windowPosition';
 
 // / / / / / / / CONSTANTS / / / / / / / / /
@@ -450,8 +452,14 @@ const createWindow = async () => {
     manageWindowFinishLoad();
   });
   mainWindow.webContents.setWindowOpenHandler((data: { url: string }) => {
-    shell.openExternal(data.url);
+    void safeOpenExternal(data.url);
     return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedAppNavigation(url)) {
+      event.preventDefault();
+      logger.warn('Blocked unauthorized in-window navigation attempt', { url });
+    }
   });
   attachRendererRecovery(mainWindow.webContents, {
     getPlayerType: () => playerType,
@@ -567,7 +575,10 @@ app
       else mainWindow.show();
     });
 
-    // powerMonitor.addListener('shutdown', (e) => e.preventDefault());
+    powerMonitor.addListener('shutdown', () => {
+      logger.info('OS shutdown signal received via powerMonitor; triggering ShutdownCoordinator.');
+      void ShutdownCoordinator.shutdown('main.ts:powerMonitor.shutdown', mainWindow, currentSongPath);
+    });
 
     app.on('before-quit', handleBeforeQuit);
 

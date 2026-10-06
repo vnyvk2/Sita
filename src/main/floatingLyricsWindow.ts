@@ -5,6 +5,7 @@ import { app, BrowserWindow, globalShortcut, screen } from 'electron';
 
 import { getCachedLyrics } from './core/getSongLyrics';
 import logger from './logger';
+import { isAllowedAppNavigation } from './utils/safeNavigation';
 
 let floatingLyricsWindow: BrowserWindow | null = null;
 let isLocked = false;
@@ -159,6 +160,13 @@ export async function createOrToggleFloatingLyricsWindow(
   };
   floatingLyricsWindow.on('moved', updateBounds);
   floatingLyricsWindow.on('resized', updateBounds);
+
+  floatingLyricsWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isAllowedAppNavigation(url)) {
+      event.preventDefault();
+      logger.warn('Blocked unauthorized in-window navigation attempt in floating lyrics', { url });
+    }
+  });
 
   floatingLyricsWindow.on('closed', () => {
     floatingLyricsWindow = null;

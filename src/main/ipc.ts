@@ -183,6 +183,7 @@ import getTranslatedLyrics from './utils/getTranslatedLyrics';
 import memProfiler from './utils/memProfiler';
 import resetLyrics from './utils/resetLyrics';
 import romanizeLyrics from './utils/romanizeLyrics';
+import safeOpenExternal from './utils/safeOpenExternal';
 import { compare } from './utils/safeStorage';
 import { adaptivePolicyEngine } from './workers/adaptivePolicyEngine';
 import { libraryScheduler } from './workers/jobScheduler';
@@ -1076,10 +1077,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       saveArtworkToSystem(artworkPath, saveName)
     );
 
-    ipcMain.on('app/openInBrowser', (_, url: string) => shell.openExternal(url));
+    ipcMain.on('app/openInBrowser', (_, url: string) => void safeOpenExternal(url));
 
     ipcMain.on('app/loginToLastFmInBrowser', () =>
-      shell.openExternal(
+      void safeOpenExternal(
         `https://www.last.fm/api/auth/?api_key=${import.meta.env.MAIN_VITE_LAST_FM_API_KEY}&cb=nora://auth?service=lastfm`
       )
     );
@@ -1264,7 +1265,27 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       return nativeAudioDaemonManager.isAvailable();
     });
 
+    const ALLOWED_AUDIO_COMMANDS = new Set([
+      'load',
+      'preload',
+      'play',
+      'pause',
+      'stop',
+      'seek',
+      'crossfade',
+      'set_volume',
+      'set_eq',
+      'set_dsp',
+      'set_sound_profile',
+      'list_devices',
+      'set_device',
+      'get_state'
+    ]);
+
     ipcMain.handle('audioEngine/send', async (_, command: DaemonCommand) => {
+      if (!command || typeof command !== 'object' || !ALLOWED_AUDIO_COMMANDS.has(command.cmd)) {
+        throw new Error(`Invalid audio engine command: ${command?.cmd}`);
+      }
       return nativeAudioDaemonManager.sendCommand(command);
     });
 

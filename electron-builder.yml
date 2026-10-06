@@ -4,6 +4,7 @@ executableName: Nora
 copyright: Copyright © 2024 Sandakan Nipunajith
 icon: ./build/icon.ico
 artifactName: '${productName} v${version}-${os}-${arch}.${ext}'
+afterPack: ./scripts/afterPack.cjs
 
 extraMetadata:
   description: Nora
