@@ -1,10 +1,24 @@
 import { useStore } from '@tanstack/react-store';
-import { memo, type FC, type ReactNode } from 'react';
+import { memo, useContext, useState, type FC, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
+import { useContextMenu } from '../../hooks/useContextMenu';
 import { dndStore, workspaceActions } from '../store';
 import type { PanelInstanceId, PanelType } from '../types';
 import { DropOverlay } from './DropOverlay';
+import {
+  PanelHeaderSetterContext,
+  TabActionsContext,
+  type PanelHeaderFragment
+} from './PanelHeaderContext';
 import { usePanelDragDrop } from './usePanelDragDrop';
+
+const INTERACTIVE_SELECTOR =
+  'button, a, input, select, textarea, [role="button"], [role="tab"], [role="slider"], [contenteditable], summary, [data-no-drag]';
+
+function isInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(INTERACTIVE_SELECTOR));
+}
 
 interface PanelFrameProps {
   panelId: PanelInstanceId;
@@ -20,8 +34,25 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
   ({ panelId, type, title, icon, canClose = true, showHeader = true, children }) => {
     const isMaximized = useStore(dndStore, (s) => s.maximizedPanelId === panelId);
     const { handlePointerDown } = usePanelDragDrop(panelId);
+    const { updateContextMenuData } = useContextMenu();
+    const [fragment, setFragment] = useState<PanelHeaderFragment | null>(null);
+    const tabActions = useContext(TabActionsContext);
 
-    const handleHeaderDoubleClick = (): void => {
+    const handleClose = (): void => {
+      if (type !== 'router-view') {
+        workspaceActions.dispatchOp({ t: 'panel.close', panelId });
+      }
+    };
+
+    // Gesture guards: header = move, buttons = buttons
+    const handleHeaderPointerDown = (e: React.PointerEvent<HTMLElement>): void => {
+      if (isInteractiveTarget(e.target)) return;
+      if (isMaximized) return;
+      handlePointerDown(e);
+    };
+
+    const handleHeaderDoubleClick = (e: React.MouseEvent): void => {
+      if (isInteractiveTarget(e.target)) return;
       workspaceActions.toggleMaximizePanel(panelId);
     };
 
@@ -30,12 +61,79 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
       workspaceActions.toggleMaximizePanel(panelId);
     };
 
-    const handleCloseClick = (e: React.MouseEvent): void => {
-      e.stopPropagation();
-      if (type !== 'router-view') {
-        workspaceActions.dispatchOp({ t: 'panel.close', panelId });
+    // One menu, two triggers: onContextMenu + caret button
+    const buildHeaderMenu = (): ContextMenuItem[] => {
+      const items: ContextMenuItem[] = [
+        {
+          label: isMaximized ? 'Restore Panel' : 'Maximize Panel',
+          iconName: isMaximized ? 'close_fullscreen' : 'open_in_full',
+          handlerFunction: () => workspaceActions.toggleMaximizePanel(panelId)
+        }
+      ];
+
+      if (fragment?.menu) {
+        const customItems = fragment.menu();
+        for (const item of customItems) {
+          items.push({
+            label: item.label,
+            iconName: item.icon || 'more_horiz',
+            handlerFunction: item.handler
+          });
+        }
       }
+
+      if (canClose && type !== 'router-view') {
+        items.push({
+          label: 'Close Panel',
+          iconName: 'close',
+          handlerFunction: handleClose
+        });
+      }
+      return items;
     };
+
+    const openHeaderMenu = (e: React.MouseEvent): void => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Clamp near viewport edges so menu never renders off-screen
+      const menuWidth = 220;
+      const menuHeight = 240;
+      const x = Math.max(8, Math.min(e.pageX, window.innerWidth - menuWidth - 8));
+      const y = Math.max(8, Math.min(e.pageY + 12, window.innerHeight - menuHeight - 8));
+      updateContextMenuData(true, buildHeaderMenu(), x, y);
+    };
+
+    const portalToTabStrip =
+      !showHeader && fragment && tabActions.target && tabActions.activePanelId === panelId
+        ? createPortal(
+            <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+              {fragment.info && (
+                <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                  {fragment.info}
+                </div>
+              )}
+              {fragment.actions && (
+                <div className="flex shrink-0 items-center gap-1">{fragment.actions}</div>
+              )}
+            </div>,
+            tabActions.target
+          )
+        : null;
+
+    // Misuse guard: showHeader=false is only honored inside a TabGroup provider.
+    // Standalone use silently drops the fragment, so warn in dev instead.
+    if (
+      import.meta.env.DEV &&
+      !showHeader &&
+      fragment &&
+      tabActions.target === null &&
+      tabActions.activePanelId === null
+    ) {
+      console.warn(
+        `[PanelFrame:${panelId}] showHeader=false outside a TabGroup drops header actions. ` +
+          `Render inside TabGroup or use showHeader instead.`
+      );
+    }
 
     return (
       <div
@@ -51,47 +149,82 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
         {showHeader && (
           <header
             onDoubleClick={handleHeaderDoubleClick}
-            onPointerDown={handlePointerDown}
-            className="panel-header group bg-background-color-2/40 dark:bg-dark-background-color-2/40 text-font-color-black dark:text-font-color-white flex h-6 shrink-0 cursor-grab items-center justify-between border-b border-stone-200/60 px-2.5 select-none active:cursor-grabbing dark:border-stone-800/60"
+            onPointerDown={handleHeaderPointerDown}
+            onContextMenu={openHeaderMenu}
+            className={`panel-header group bg-background-color-2/40 dark:bg-dark-background-color-2/40 text-font-color-black dark:text-font-color-white flex h-7 shrink-0 items-center justify-between border-b border-stone-200/60 px-2 select-none dark:border-stone-800/60 ${
+              isMaximized ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+            }`}
           >
-            <div className="flex items-center gap-1.5 overflow-hidden">
+            {/* Left: Identity */}
+            <div className="flex shrink-0 items-center gap-1">
               <span className="material-symbols-rounded text-font-color-dimmed text-xs">
                 {icon}
               </span>
-              <span className="text-font-color-dimmed truncate text-[10px] font-semibold tracking-wider uppercase">
+              <span className="text-font-color-dimmed max-w-[140px] truncate text-[10px] font-semibold tracking-wider uppercase">
                 {title}
               </span>
-            </div>
-
-            <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
               <button
                 type="button"
-                onClick={handleMaximizeClick}
-                title={isMaximized ? 'Restore Panel (Ctrl+Alt+M)' : 'Maximize Panel (Ctrl+Alt+M)'}
-                aria-label={isMaximized ? 'Restore Panel' : 'Maximize Panel'}
-                className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-4 w-4 cursor-pointer items-center justify-center rounded hover:bg-stone-200 dark:hover:bg-stone-700"
+                onClick={openHeaderMenu}
+                aria-haspopup="menu"
+                title="Panel options"
+                className="text-font-color-dimmed/70 hover:text-font-color-black dark:hover:text-font-color-white flex h-4.5 w-4.5 cursor-pointer items-center justify-center rounded hover:bg-stone-200/60 dark:hover:bg-stone-700/60 transition-colors"
               >
-                <span className="material-symbols-rounded text-[11px]">
-                  {isMaximized ? 'close_fullscreen' : 'open_in_full'}
+                <span className="material-symbols-rounded text-[13px] leading-none opacity-80">
+                  expand_more
                 </span>
               </button>
+            </div>
 
-              {canClose && type !== 'router-view' && (
+            {/* Middle: Panel-contributed info */}
+            <div className="text-font-color-dimmed mx-2 flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
+              {fragment?.info}
+            </div>
+
+            {/* Right: Panel actions + Frame controls */}
+            <div className="flex shrink-0 items-center gap-0.5">
+              {fragment?.actions}
+              {fragment?.actions && (
+                <div className="mx-0.5 h-3 w-px bg-stone-300/60 dark:bg-stone-700/60" />
+              )}
+              <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                 <button
                   type="button"
-                  onClick={handleCloseClick}
-                  title="Close Panel"
-                  aria-label="Close Panel"
-                  className="text-font-color-dimmed flex h-4 w-4 cursor-pointer items-center justify-center rounded hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-900/40 dark:hover:text-rose-400"
+                  onClick={handleMaximizeClick}
+                  title={isMaximized ? 'Restore Panel (Ctrl+Alt+M)' : 'Maximize Panel (Ctrl+Alt+M)'}
+                  aria-label={isMaximized ? 'Restore Panel' : 'Maximize Panel'}
+                  className="text-font-color-dimmed/60 hover:text-font-color-black dark:hover:text-font-color-white flex h-4 w-4 cursor-pointer items-center justify-center rounded hover:bg-stone-200/60 dark:hover:bg-stone-700/60 transition-colors"
                 >
-                  <span className="material-symbols-rounded text-[11px]">close</span>
+                  <span className="material-symbols-rounded-outlined text-[10px] leading-none">
+                    {isMaximized ? 'close_fullscreen' : 'open_in_full'}
+                  </span>
                 </button>
-              )}
+                {canClose && type !== 'router-view' && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClose();
+                    }}
+                    title="Close Panel"
+                    aria-label="Close Panel"
+                    className="text-font-color-dimmed/60 hover:text-rose-600 dark:hover:text-rose-400 flex h-4 w-4 cursor-pointer items-center justify-center rounded hover:bg-rose-100/70 dark:hover:bg-rose-900/40 transition-colors"
+                  >
+                    <span className="material-symbols-rounded text-[9.5px] leading-none">close</span>
+                  </button>
+                )}
+              </div>
             </div>
           </header>
         )}
 
-        <main className="panel-content relative min-h-0 flex-1 overflow-hidden">{children}</main>
+        <main className="panel-content relative min-h-0 flex-1 overflow-hidden">
+          <PanelHeaderSetterContext.Provider value={setFragment}>
+            {children}
+          </PanelHeaderSetterContext.Provider>
+        </main>
+
+        {portalToTabStrip}
       </div>
     );
   }

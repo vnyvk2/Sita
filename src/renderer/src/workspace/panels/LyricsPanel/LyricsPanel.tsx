@@ -9,9 +9,10 @@ import { useLyricsQuery } from '@renderer/queries/lyrics';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { memo, useMemo, useRef, type FC } from 'react';
+import { memo, useCallback, useMemo, useRef, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { PanelHeaderSlot } from '../../engine/PanelHeaderSlot';
 import type { PanelProps } from '../../registry';
 
 export const LyricsPanel: FC<PanelProps> = memo(() => {
@@ -61,14 +62,83 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
     );
   }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex, abLoop]);
 
-  const handleExpandToPage = () => {
+  const artistsString = useMemo(() => {
+    return Array.isArray(currentSongData.artists)
+      ? currentSongData.artists.map((a) => a.name).join(', ')
+      : '';
+  }, [currentSongData.artists]);
+
+  const handleExpandToPage = useCallback(() => {
     navigate({
       to: '/main-player/lyrics',
       search: { from: '/main-player' }
     });
-  };
+  }, [navigate]);
 
   const hasLyrics = lyricsComponents.length > 0;
+
+  const headerInfo = useMemo(
+    () => (
+      <span
+        className="truncate text-[11px]"
+        title={`${currentSongData.title || t('lyricsPage.noSongPlaying', 'No track selected')}${artistsString ? ` — ${artistsString}` : ''}`}
+      >
+        <span className="text-font-color-black dark:text-font-color-white font-semibold">
+          {currentSongData.title || t('lyricsPage.noSongPlaying', 'No track selected')}
+        </span>
+        {artistsString && <span className="text-font-color-dimmed"> — {artistsString}</span>}
+      </span>
+    ),
+    [currentSongData.title, artistsString, t]
+  );
+
+  const scrollToggleLabel =
+    scrollMode === 'auto'
+      ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
+      : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll');
+
+  const headerActions = useMemo(
+    () =>
+      isSynced ? (
+        <button
+          type="button"
+          onClick={handleToggleScrollMode}
+          aria-pressed={scrollMode === 'auto'}
+          aria-label={scrollToggleLabel}
+          title={scrollToggleLabel}
+          className={`flex h-4.5 w-4.5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
+            scrollMode === 'auto'
+              ? 'text-accent bg-accent/15 hover:bg-accent/25 dark:bg-accent/20 dark:hover:bg-accent/30 font-semibold'
+              : 'text-font-color-dimmed/70 hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200/60 dark:hover:bg-stone-700/60'
+          }`}
+        >
+          <span className="material-symbols-rounded-outlined text-[12px] leading-none">
+            {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
+          </span>
+        </button>
+      ) : null,
+    [isSynced, handleToggleScrollMode, scrollMode, scrollToggleLabel]
+  );
+
+  const headerMenu = useCallback(
+    () => [
+      ...(isSynced
+        ? [
+            {
+              label: scrollToggleLabel,
+              icon: scrollMode === 'auto' ? 'swap_vert' : 'swipe_up',
+              handler: handleToggleScrollMode
+            }
+          ]
+        : []),
+      {
+        label: t('lyricsPage.expandToFullPage', 'Expand to full page'),
+        icon: 'open_in_new',
+        handler: handleExpandToPage
+      }
+    ],
+    [isSynced, scrollToggleLabel, scrollMode, handleToggleScrollMode, handleExpandToPage, t]
+  );
 
   return (
     <div className="lyrics-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white relative flex h-full w-full flex-col overflow-hidden">
@@ -82,54 +152,7 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
         />
       )}
 
-      {/* Sub-header with track name, scroll mode toggle, and full-page expand */}
-      <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/30 relative z-10 flex shrink-0 items-center justify-between border-b border-stone-200/50 px-2.5 py-1.5 dark:border-stone-800/50">
-        <div className="flex min-w-0 flex-col pr-2">
-          <span className="text-font-color-black dark:text-font-color-white truncate text-[11px] font-semibold">
-            {currentSongData.title || t('lyricsPage.noSongPlaying', 'No track selected')}
-          </span>
-          <span className="text-font-color-dimmed truncate text-[10px]">
-            {Array.isArray(currentSongData.artists)
-              ? currentSongData.artists.map((a) => a.name).join(', ')
-              : ''}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {/* Scroll Mode Toggle */}
-          {isSynced && (
-            <button
-              type="button"
-              onClick={handleToggleScrollMode}
-              aria-pressed={scrollMode === 'auto'}
-              title={
-                scrollMode === 'auto'
-                  ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
-                  : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
-              }
-              className={`flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
-                scrollMode === 'auto'
-                  ? 'text-accent hover:bg-stone-200 dark:hover:bg-stone-700'
-                  : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200 dark:hover:bg-stone-700'
-              }`}
-            >
-              <span className="material-symbols-rounded text-sm">
-                {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
-              </span>
-            </button>
-          )}
-
-          {/* Expand to full page */}
-          <button
-            type="button"
-            onClick={handleExpandToPage}
-            title={t('lyricsPage.expandToFullPage', 'Expand to full page')}
-            className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
-          >
-            <span className="material-symbols-rounded text-sm">open_in_new</span>
-          </button>
-        </div>
-      </div>
+      <PanelHeaderSlot info={headerInfo} actions={headerActions} menu={headerMenu} />
 
       {/* Lyrics lines stream */}
       <div
@@ -165,7 +188,7 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
         <FloatingLyricsSnapBackBtn
           direction={direction}
           onClick={handleSnapBack}
-          className={direction === 'up' ? 'top-11' : 'bottom-4'}
+          className={direction === 'up' ? 'top-2' : 'bottom-4'}
         />
       )}
     </div>

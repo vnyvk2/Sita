@@ -49,7 +49,10 @@ function repairSplitWeights(node: LayoutNode, depth = 0): void {
   }
 }
 
-/** Checks whether a local state property is a safe JSON value (primitives, arrays, or shallow objects). */
+/**
+ * Checks whether a local state property is a safe JSON value (primitives, arrays, or shallow
+ * objects).
+ */
 function isJsonSafeValue(v: unknown): boolean {
   if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v === null) {
     return true;
@@ -77,8 +80,8 @@ function isJsonSafeValue(v: unknown): boolean {
 
 /**
  * Validates and sanitizes an untrusted workspace document (e.g. from localStorage or JSON import).
- * Degrades unknown panel types to 'empty', cleanses local state dictionary, repairs weights,
- * prunes orphans, and asserts all structural invariants.
+ * Degrades unknown panel types to 'empty', cleanses local state dictionary, repairs weights, prunes
+ * orphans, and asserts all structural invariants.
  */
 export function validateWorkspace(untrusted: unknown): Workspace | null {
   if (!untrusted || typeof untrusted !== 'object') {
@@ -144,11 +147,19 @@ export function validateWorkspace(untrusted: unknown): Workspace | null {
 /** Alias for backward compatibility */
 export const sanitizeWorkspace = validateWorkspace;
 
-/** Validates that an entire WorkspaceState is structurally sound and satisfies invariants across all workspaces. */
+/**
+ * Validates that an entire WorkspaceState is structurally sound and satisfies invariants across all
+ * workspaces.
+ */
 export function isValidWorkspaceState(state: unknown): state is WorkspaceState {
   if (!state || typeof state !== 'object') return false;
   const s = state as Partial<WorkspaceState>;
-  if (!s.active || typeof s.active !== 'string' || !s.workspaces || typeof s.workspaces !== 'object') {
+  if (
+    !s.active ||
+    typeof s.active !== 'string' ||
+    !s.workspaces ||
+    typeof s.workspaces !== 'object'
+  ) {
     return false;
   }
 

@@ -39,6 +39,7 @@ class ScrollTraceCoordinator {
   private queueSamples: Array<{ time: number; depth: number }> = [];
   private sampleTimer: ReturnType<typeof setInterval> | null = null;
   private idleAutoStopTimer: ReturnType<typeof setTimeout> | null = null;
+  private summaryTimer: ReturnType<typeof setTimeout> | null = null;
 
   private isScrolling = false;
   private seekEnteredAt: number | undefined;
@@ -67,6 +68,10 @@ class ScrollTraceCoordinator {
     if (this.idleAutoStopTimer) {
       clearTimeout(this.idleAutoStopTimer);
       this.idleAutoStopTimer = null;
+    }
+    if (this.summaryTimer) {
+      clearTimeout(this.summaryTimer);
+      this.summaryTimer = null;
     }
   }
 
@@ -201,7 +206,11 @@ class ScrollTraceCoordinator {
     // Schedule summary dump after short grace period for in-flight requests to complete
     // Only dump to console in development builds to avoid production log spam.
     if (import.meta.env.DEV) {
-      setTimeout(() => {
+      if (this.summaryTimer) {
+        clearTimeout(this.summaryTimer);
+      }
+      this.summaryTimer = setTimeout(() => {
+        this.summaryTimer = null;
         this.dumpSummary();
       }, 400);
     }

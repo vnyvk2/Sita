@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { store } from '../../../store/store';
+import { dndStore, workspaceActions } from '../../../workspace/store';
 import Sidebar from '../Sidebar';
 
 // Mock NavLink to prevent RouterProvider requirement
@@ -29,7 +30,7 @@ let currentPathname = '/main-player/home';
 
 // Mock @tanstack/react-router
 vi.mock('@tanstack/react-router', () => ({
-  useLocation: (opts?: { select?: (loc: any) => any }) => {
+  useLocation: (opts?: { select?: (loc: unknown) => unknown }) => {
     const loc = { pathname: currentPathname, href: `http://localhost${currentPathname}` };
     return opts?.select ? opts.select(loc) : loc;
   },
@@ -305,5 +306,135 @@ describe('SidebarPlaylistsSection Gating', () => {
     // Primary navigation links are still rendered
     expect(screen.getByText('Home')).toBeDefined();
     expect(screen.getByText('Playlists')).toBeDefined();
+  });
+});
+
+describe('Experimental Workspace Sidebar Pinning & 2-Way Width', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    currentPathname = '/main-player/home';
+    store.setState((prev) => ({
+      ...prev,
+      localStorage: {
+        ...prev.localStorage,
+        preferences: {
+          ...prev.localStorage.preferences,
+          isExperimentalWorkspaceEnabled: true
+        }
+      }
+    }));
+    dndStore.setState((s) => ({
+      ...s,
+      isSidebarPinned: true,
+      isSidebarPeeking: false,
+      sidebarWidthMode: 'expanded',
+      sidebarMode: 'expanded'
+    }));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders pin button and 2-way size toggle in expanded pinned mode', () => {
+    render(<Sidebar />);
+    const pinBtn = screen.getByRole('button', { name: /unpin sidebar/i });
+    const collapseBtn = screen.getByRole('button', { name: /collapse to icon rail/i });
+
+    expect(pinBtn).toBeDefined();
+    expect(collapseBtn).toBeDefined();
+  });
+
+  it('toggles width strictly between expanded and compact (no 3-way cycle)', () => {
+    render(<Sidebar />);
+    const collapseBtn = screen.getByRole('button', { name: /collapse to icon rail/i });
+    act(() => {
+      fireEvent.click(collapseBtn);
+    });
+
+    expect(dndStore.state.sidebarWidthMode).toBe('compact');
+    expect(dndStore.state.sidebarMode).toBe('compact');
+
+    // Clicking again expands it back to expanded
+    act(() => {
+      workspaceActions.toggleSidebarWidth();
+    });
+    expect(dndStore.state.sidebarWidthMode).toBe('expanded');
+    expect(dndStore.state.sidebarMode).toBe('expanded');
+  });
+
+  it('unpins sidebar and sets state to unpinned / hidden', () => {
+    render(<Sidebar />);
+    const pinBtn = screen.getByRole('button', { name: /unpin sidebar/i });
+    act(() => {
+      fireEvent.click(pinBtn);
+    });
+
+    expect(dndStore.state.isSidebarPinned).toBe(false);
+    expect(dndStore.state.sidebarMode).toBe('hidden');
+  });
+
+  it('automatically closes peeking sidebar on mouse leave after 250ms debounce', () => {
+    dndStore.setState((s) => ({
+      ...s,
+      isSidebarPinned: false,
+      isSidebarPeeking: true,
+      sidebarMode: 'expanded'
+    }));
+
+    const { container } = render(<Sidebar />);
+    const nav = container.querySelector('nav');
+    expect(nav).toBeDefined();
+
+    fireEvent.mouseLeave(nav!);
+    expect(dndStore.state.isSidebarPeeking).toBe(true); // Still open during grace period
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
+    expect(dndStore.state.isSidebarPeeking).toBe(false);
+    expect(dndStore.state.sidebarMode).toBe('hidden');
+  });
+
+  it('cancels auto-close if mouse re-enters before debounce timer expires', () => {
+    dndStore.setState((s) => ({
+      ...s,
+      isSidebarPinned: false,
+      isSidebarPeeking: true,
+      sidebarMode: 'expanded'
+    }));
+
+    const { container } = render(<Sidebar />);
+    const nav = container.querySelector('nav');
+
+    fireEvent.mouseLeave(nav!);
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    fireEvent.mouseEnter(nav!);
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    expect(dndStore.state.isSidebarPeeking).toBe(true);
+  });
+
+  it('pins sidebar while peeking to make it docked and permanent', () => {
+    dndStore.setState((s) => ({
+      ...s,
+      isSidebarPinned: false,
+      isSidebarPeeking: true,
+      sidebarMode: 'expanded'
+    }));
+
+    render(<Sidebar />);
+    const pinBtn = screen.getByRole('button', { name: /pin sidebar/i });
+    fireEvent.click(pinBtn);
+
+    expect(dndStore.state.isSidebarPinned).toBe(true);
+    expect(dndStore.state.isSidebarPeeking).toBe(false);
+    expect(dndStore.state.sidebarMode).toBe('expanded');
   });
 });

@@ -2,7 +2,7 @@ import { store } from '@renderer/store/store';
 import { dndStore, workspaceActions } from '@renderer/workspace/store';
 import { linkOptions, useLocation } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ErrorBoundary from '../ErrorBoundary';
@@ -23,6 +23,15 @@ const Sidebar = memo(() => {
     (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
   );
   const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
+  const isPinned = useStore(dndStore, (s) => s.isSidebarPinned);
+  const isPeeking = useStore(dndStore, (s) => s.isSidebarPeeking);
+  const sidebarWidthMode = useStore(dndStore, (s) => s.sidebarWidthMode);
+  const isDragging = useStore(dndStore, (s) => s.isDragging);
+  const isContextMenuOpen = useStore(
+    store,
+    (state) =>
+      (state.contextMenuData?.isVisible ?? false) || (state.promptMenuData?.isVisible ?? false)
+  );
   const showSidebarPlaylistsSection = useStore(
     store,
     (state) => state.localStorage.preferences?.showSidebarPlaylistsSection ?? true
@@ -73,6 +82,109 @@ const Sidebar = memo(() => {
   const toggleMovable = useCallback(() => {
     setIsMovableActive((prev) => !prev);
   }, []);
+
+  const sidebarNavRef = useRef<HTMLElement | null>(null);
+  const mouseLeaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isResizingRef = useRef(false);
+
+  const handleResizerDraggingChange = useCallback((dragging: boolean) => {
+    isResizingRef.current = dragging;
+    if (dragging && mouseLeaveTimeoutRef.current) {
+      clearTimeout(mouseLeaveTimeoutRef.current);
+      mouseLeaveTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    if (mouseLeaveTimeoutRef.current) {
+      clearTimeout(mouseLeaveTimeoutRef.current);
+      mouseLeaveTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (!isExperimentalWorkspace || isPinned || !isPeeking) return;
+    if (isDragging || isContextMenuOpen || isResizingRef.current) return;
+
+    if (mouseLeaveTimeoutRef.current) {
+      clearTimeout(mouseLeaveTimeoutRef.current);
+    }
+    mouseLeaveTimeoutRef.current = setTimeout(() => {
+      mouseLeaveTimeoutRef.current = null;
+      // Re-check at fire time: drag / menu / resize may have started during grace
+      const s = dndStore.state;
+      if (s.isDragging || isResizingRef.current) return;
+      const ctx = store.state;
+      if (
+        (ctx.contextMenuData?.isVisible ?? false) ||
+        (ctx.promptMenuData?.isVisible ?? false)
+      )
+        return;
+      if (!dndStore.state.isSidebarPinned && dndStore.state.isSidebarPeeking) {
+        workspaceActions.setSidebarPeeking(false);
+      }
+    }, 250);
+  }, [isExperimentalWorkspace, isPinned, isPeeking, isDragging, isContextMenuOpen]);
+
+  // Cancel pending auto-hide when pinned, so no leaked timer fires later
+  useEffect(() => {
+    if (isPinned && mouseLeaveTimeoutRef.current) {
+      clearTimeout(mouseLeaveTimeoutRef.current);
+      mouseLeaveTimeoutRef.current = null;
+    }
+  }, [isPinned]);
+
+  useEffect(() => {
+    return () => {
+      if (mouseLeaveTimeoutRef.current) {
+        clearTimeout(mouseLeaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isExperimentalWorkspace || isPinned || !isPeeking) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (isResizingRef.current) return;
+      if (sidebarNavRef.current && sidebarNavRef.current.contains(e.target as Node)) {
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.closest?.('.context-menu') ||
+        target?.closest?.('.prompt-menu') ||
+        target?.closest?.('[data-radix-portal]')
+      ) {
+        return;
+      }
+      // Re-check live drag/menu state (closure may be stale)
+      if (dndStore.state.isDragging) return;
+      const ctx = store.state;
+      if ((ctx.contextMenuData?.isVisible ?? false) || (ctx.promptMenuData?.isVisible ?? false))
+        return;
+      workspaceActions.setSidebarPeeking(false);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Don't steal Escape from open dialogs/menus inside peeking sidebar
+        const ctx = store.state;
+        if ((ctx.contextMenuData?.isVisible ?? false) || (ctx.promptMenuData?.isVisible ?? false))
+          return;
+        if (document.querySelector('[role="dialog"], [data-radix-portal]')) return;
+        workspaceActions.setSidebarPeeking(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isExperimentalWorkspace, isPinned, isPeeking]);
 
   const linkData = useMemo(
     () =>
@@ -200,18 +312,34 @@ const Sidebar = memo(() => {
     ? 'bg-side-bar-background/50 dark:bg-dark-background-color-2/50 backdrop-blur-md'
     : 'bg-side-bar-background dark:bg-dark-background-color-2';
 
+  const isVisible = isPinned || isPeeking;
+  const isCompact = isExperimentalWorkspace
+    ? sidebarWidthMode === 'compact'
+    : sidebarMode === 'compact';
+  const widthClass =
+    sidebarWidthMode === 'compact'
+      ? 'w-14 min-w-[3.5rem] max-w-[3.5rem]'
+      : 'w-60 min-w-[15rem] max-w-[18rem]';
+
   const navClassName = isExperimentalWorkspace
-    ? sidebarMode === 'hidden'
-      ? `side-bar relative z-20 order-first flex !h-full w-0 min-w-0 max-w-0 shrink-0 grow-0 opacity-0 pointer-events-none overflow-hidden p-0 m-0 border-0 transition-all duration-300 ${bgClass}`
-      : sidebarMode === 'compact'
-        ? `side-bar relative z-20 order-first flex !h-full w-14 min-w-[3.5rem] max-w-[3.5rem] shrink-0 grow-0 flex-col overflow-hidden rounded-tr-2xl transition-all duration-300 ${bgClass}`
-        : `side-bar relative z-20 order-first flex !h-full w-60 min-w-[15rem] max-w-[18rem] shrink-0 grow-0 flex-col rounded-tr-2xl transition-all duration-300 ${bgClass}`
+    ? !isVisible
+      ? `side-bar absolute left-0 top-0 z-50 flex !h-full w-0 min-w-0 max-w-0 shrink-0 grow-0 opacity-0 pointer-events-none invisible overflow-hidden p-0 m-0 border-0 transition-all duration-300 ${bgClass}`
+      : isPeeking && !isPinned
+        ? `side-bar absolute left-0 top-0 z-50 flex !h-full ${widthClass} shrink-0 grow-0 flex-col rounded-r-2xl shadow-2xl transition-all duration-300 border-r border-stone-200/40 dark:border-stone-800/40 ${bgClass}`
+        : `side-bar relative z-20 order-first flex !h-full ${widthClass} shrink-0 grow-0 flex-col rounded-tr-2xl transition-all duration-300 ${bgClass}`
     : `side-bar relative z-20 order-1 flex !h-full w-[30%] !max-w-[18rem] grow flex-col rounded-tr-2xl transition-[width] ${bgClass} delay-200 md:hover:w-60 lg:absolute lg:w-14 lg:hover:w-[30%] lg:hover:shadow-2xl`;
 
   return (
-    <nav className={navClassName}>
+    <nav
+      ref={sidebarNavRef}
+      className={navClassName}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      aria-hidden={!isExperimentalWorkspace ? undefined : !isVisible}
+      inert={!isExperimentalWorkspace ? undefined : !isVisible ? true : undefined}
+    >
       <ErrorBoundary>
-        {isPlaylistOpened && showSidebarPlaylistsSection && sidebarMode !== 'compact' ? (
+        {isPlaylistOpened && showSidebarPlaylistsSection && !isCompact ? (
           <div
             ref={navContainerRef}
             className="relative flex min-h-0 flex-1 flex-col overflow-hidden"
@@ -231,6 +359,7 @@ const Sidebar = memo(() => {
               onReset={handleReset}
               isMovableActive={isMovableActive}
               onToggleMovable={toggleMovable}
+              onDraggingChange={handleResizerDraggingChange}
             />
 
             {/* Bottom Section: Playlists (Diagram 2/3) */}
@@ -241,23 +370,54 @@ const Sidebar = memo(() => {
             {sideBarItems}
           </ul>
         )}
-        {isExperimentalWorkspace && sidebarMode !== 'hidden' && (
+        {isExperimentalWorkspace && isVisible && (
           <div className="sidebar-collapse-control flex items-center justify-between border-t border-stone-200/40 px-2 py-1.5 dark:border-stone-800/40">
-            {sidebarMode === 'expanded' && (
+            {sidebarWidthMode === 'expanded' ? (
               <span className="text-font-color-dimmed px-2 text-[10px] font-bold tracking-wider uppercase">
                 Sidebar
               </span>
-            )}
-            <button
-              type="button"
-              onClick={() => workspaceActions.cycleSidebarMode()}
-              title={sidebarMode === 'expanded' ? 'Collapse to icon rail' : 'Hide sidebar'}
-              className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-stone-200/50 dark:hover:bg-stone-800/50"
+            ) : null}
+            <div
+              className={`flex items-center gap-1 ${
+                sidebarWidthMode === 'compact' ? 'w-full justify-center' : ''
+              }`}
             >
-              <span className="material-symbols-rounded text-lg">
-                {sidebarMode === 'expanded' ? 'chevron_left' : 'dock_to_left'}
-              </span>
-            </button>
+              {/* Pin / Unpin Button */}
+              <button
+                type="button"
+                onClick={() => workspaceActions.toggleSidebarPinned()}
+                title={
+                  isPinned
+                    ? 'Unpin sidebar (auto-hides when mouse leaves)'
+                    : 'Pin sidebar (keep visible)'
+                }
+                className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors ${
+                  isPinned
+                    ? 'text-accent bg-accent/15 hover:bg-accent/25'
+                    : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200/50 dark:hover:bg-stone-800/50'
+                }`}
+                aria-label={isPinned ? 'Unpin sidebar' : 'Pin sidebar'}
+              >
+                <span className="material-symbols-rounded text-base">
+                  {isPinned ? 'push_pin' : 'keep'}
+                </span>
+              </button>
+
+              {/* 2-Way Size Toggle (Expanded <-> Compact) */}
+              <button
+                type="button"
+                onClick={() => workspaceActions.toggleSidebarWidth()}
+                title={sidebarWidthMode === 'expanded' ? 'Collapse to icon rail' : 'Expand sidebar'}
+                className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-stone-200/50 dark:hover:bg-stone-800/50"
+                aria-label={
+                  sidebarWidthMode === 'expanded' ? 'Collapse to icon rail' : 'Expand sidebar'
+                }
+              >
+                <span className="material-symbols-rounded text-lg">
+                  {sidebarWidthMode === 'expanded' ? 'chevron_left' : 'chevron_right'}
+                </span>
+              </button>
+            </div>
           </div>
         )}
         <LibrarySchedulerStatus />

@@ -132,11 +132,24 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
     let addedAt = 0;
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
+    const persistScrollPosition = () => {
+      const key = currentScrollKeyRef.current;
+      const range = latestRangeRef.current;
+      if (key && range && restorationStateRef.current === 'TRACKING') {
+        scrollRegistry.set(key, {
+          index: range.startIndex,
+          offset: currentScrollTopRef.current
+        });
+      }
+    };
+
     const removeClass = () => {
       if (scrollerElement.classList.contains('is-scrolling')) {
         scrollerElement.classList.remove('is-scrolling');
         onScrollingStateChangeRef.current?.(false);
         scrollTrace.onScrollStop(latestRangeRef.current);
+        // Persist once per scroll gesture instead of on every rangeChanged frame
+        persistScrollPosition();
       }
     };
 
@@ -179,6 +192,8 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
         scrollerElement.classList.remove('is-scrolling');
         onScrollingStateChangeRef.current?.(false);
       }
+      // Persist on unmount too, so a mid-gesture route change keeps position
+      persistScrollPosition();
     };
   }, [scrollerElement]);
 

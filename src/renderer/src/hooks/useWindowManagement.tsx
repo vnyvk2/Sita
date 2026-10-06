@@ -221,15 +221,18 @@ export function useWindowManagement(
    * cleans up listeners on unmount.
    */
   useEffect(() => {
-    // Setup window state listeners
-    window.api.windowControls.onWindowBlur(() => manageWindowBlurOrFocus('blur-sm'));
-    window.api.windowControls.onWindowFocus(() => manageWindowBlurOrFocus('focus'));
+    // Each preload subscription returns its own cleanup — call all four on unmount
+    // so StrictMode/remounts can't double-register handlers.
+    const cleanups = [
+      window.api.windowControls.onWindowBlur(() => manageWindowBlurOrFocus('blur-sm')),
+      window.api.windowControls.onWindowFocus(() => manageWindowBlurOrFocus('focus')),
+      window.api.fullscreen.onEnterFullscreen(() => manageWindowFullscreen('fullscreen')),
+      window.api.fullscreen.onLeaveFullscreen(() => manageWindowFullscreen('windowed'))
+    ];
 
-    window.api.fullscreen.onEnterFullscreen(() => manageWindowFullscreen('fullscreen'));
-    window.api.fullscreen.onLeaveFullscreen(() => manageWindowFullscreen('windowed'));
-
-    // Note: Cleanup is handled by the individual IPC listeners in Electron
-    // If explicit cleanup is needed, return a cleanup function here
+    return () => {
+      cleanups.forEach((cleanup) => cleanup?.());
+    };
   }, [manageWindowBlurOrFocus, manageWindowFullscreen]);
 
   return {

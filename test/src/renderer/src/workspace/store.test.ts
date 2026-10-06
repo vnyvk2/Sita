@@ -17,13 +17,17 @@ describe('Workspace Store and Persistence', () => {
   beforeEach(() => {
     window.localStorage.clear();
     workspaceStore.setState(() => getInitialWorkspaceState());
-    dndStore.setState(() => ({
+    dndStore.setState((s) => ({
+      ...s,
       isDragging: false,
       currentDrag: null,
       hoveredDropTarget: null,
       maximizedPanelId: null,
       isToolbarCollapsed: false,
       sidebarMode: 'expanded',
+      sidebarWidthMode: 'expanded',
+      isSidebarPinned: true,
+      isSidebarPeeking: false,
       isSaveLayoutModalOpen: false,
       saveLayoutModalMode: 'save',
       targetWorkspaceId: null

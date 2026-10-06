@@ -26,6 +26,7 @@ import type {
   WorkspaceState
 } from './types';
 
+export type SidebarWidthMode = 'expanded' | 'compact';
 export type SidebarMode = 'expanded' | 'compact' | 'hidden';
 
 export interface WorkspaceHistoryState {
@@ -51,18 +52,43 @@ const initialToolbarCollapsed = (() => {
   }
 })();
 
-const initialSidebarMode: SidebarMode = (() => {
+const initialSidebarWidthMode: SidebarWidthMode = (() => {
   try {
-    const saved =
+    const savedWidth =
+      typeof localStorage !== 'undefined' ? localStorage.getItem('nora:sidebar-width-mode') : null;
+    if (savedWidth === 'expanded' || savedWidth === 'compact') {
+      return savedWidth;
+    }
+    const legacy =
       typeof localStorage !== 'undefined' ? localStorage.getItem('nora:sidebar-mode') : null;
-    if (saved === 'expanded' || saved === 'compact' || saved === 'hidden') {
-      return saved;
+    if (legacy === 'compact') {
+      return 'compact';
     }
   } catch {
     // ignore
   }
   return 'expanded';
 })();
+
+const initialSidebarPinned: boolean = (() => {
+  try {
+    const savedPinned =
+      typeof localStorage !== 'undefined' ? localStorage.getItem('nora:sidebar-pinned') : null;
+    if (savedPinned !== null) {
+      return savedPinned === 'true';
+    }
+    const legacy =
+      typeof localStorage !== 'undefined' ? localStorage.getItem('nora:sidebar-mode') : null;
+    if (legacy === 'hidden') {
+      return false;
+    }
+  } catch {
+    // ignore
+  }
+  return true;
+})();
+
+const initialSidebarMode: SidebarMode = initialSidebarPinned ? initialSidebarWidthMode : 'hidden';
 
 export interface TransientWorkspaceState {
   isDragging: boolean;
@@ -74,6 +100,9 @@ export interface TransientWorkspaceState {
   maximizedPanelId: PanelInstanceId | null;
   isToolbarCollapsed: boolean;
   sidebarMode: SidebarMode;
+  sidebarWidthMode: SidebarWidthMode;
+  isSidebarPinned: boolean;
+  isSidebarPeeking: boolean;
   isSaveLayoutModalOpen: boolean;
   saveLayoutModalMode: 'save' | 'rename';
   targetWorkspaceId: string | null;
@@ -95,6 +124,9 @@ export const dndStore = new Store<TransientWorkspaceState>({
   maximizedPanelId: null,
   isToolbarCollapsed: initialToolbarCollapsed,
   sidebarMode: initialSidebarMode,
+  sidebarWidthMode: initialSidebarWidthMode,
+  isSidebarPinned: initialSidebarPinned,
+  isSidebarPeeking: false,
   isSaveLayoutModalOpen: false,
   saveLayoutModalMode: 'save',
   targetWorkspaceId: null,
@@ -361,29 +393,96 @@ export const workspaceActions = {
     workspaceActions.setToolbarCollapsed(next);
   },
 
-  setSidebarMode(mode: SidebarMode): void {
+  setSidebarWidthMode(mode: SidebarWidthMode): void {
     try {
+      localStorage.setItem('nora:sidebar-width-mode', mode);
       localStorage.setItem('nora:sidebar-mode', mode);
+    } catch {
+      // ignore
+    }
+    dndStore.setState((state) => {
+      const isVisible = state.isSidebarPinned || state.isSidebarPeeking;
+      return {
+        ...state,
+        sidebarWidthMode: mode,
+        sidebarMode: isVisible ? mode : 'hidden'
+      };
+    });
+  },
+
+  toggleSidebarWidth(): void {
+    const current = dndStore.state.sidebarWidthMode;
+    const next: SidebarWidthMode = current === 'expanded' ? 'compact' : 'expanded';
+    workspaceActions.setSidebarWidthMode(next);
+  },
+
+  setSidebarPinned(pinned: boolean): void {
+    try {
+      localStorage.setItem('nora:sidebar-pinned', String(pinned));
+      if (pinned) {
+        localStorage.setItem('nora:sidebar-mode', dndStore.state.sidebarWidthMode);
+      } else {
+        localStorage.setItem('nora:sidebar-mode', 'hidden');
+      }
     } catch {
       // ignore
     }
     dndStore.setState((state) => ({
       ...state,
-      sidebarMode: mode
+      isSidebarPinned: pinned,
+      isSidebarPeeking: false,
+      sidebarMode: pinned ? state.sidebarWidthMode : 'hidden'
+    }));
+  },
+
+  toggleSidebarPinned(): void {
+    const current = dndStore.state.isSidebarPinned;
+    workspaceActions.setSidebarPinned(!current);
+  },
+
+  setSidebarPeeking(peeking: boolean): void {
+    dndStore.setState((state) => {
+      if (state.isSidebarPinned) {
+        return state;
+      }
+      return {
+        ...state,
+        isSidebarPeeking: peeking,
+        sidebarMode: peeking ? state.sidebarWidthMode : 'hidden'
+      };
+    });
+  },
+
+  setSidebarMode(mode: SidebarMode): void {
+    const widthMode: SidebarWidthMode = mode === 'hidden' ? dndStore.state.sidebarWidthMode : mode;
+    const pinned = mode !== 'hidden';
+    try {
+      localStorage.setItem('nora:sidebar-pinned', String(pinned));
+      localStorage.setItem('nora:sidebar-mode', pinned ? widthMode : 'hidden');
+      localStorage.setItem('nora:sidebar-width-mode', widthMode);
+    } catch {
+      // ignore
+    }
+    dndStore.setState((state) => ({
+      ...state,
+      isSidebarPinned: pinned,
+      isSidebarPeeking: false,
+      sidebarWidthMode: mode === 'hidden' ? state.sidebarWidthMode : mode,
+      sidebarMode: mode === 'hidden' ? 'hidden' : mode
     }));
   },
 
   cycleSidebarMode(): void {
-    const current = dndStore.state.sidebarMode;
-    const next: SidebarMode =
-      current === 'expanded' ? 'compact' : current === 'compact' ? 'hidden' : 'expanded';
-    workspaceActions.setSidebarMode(next);
+    workspaceActions.toggleSidebarWidth();
   },
 
   toggleSidebar(): void {
-    const current = dndStore.state.sidebarMode;
-    const next: SidebarMode = current === 'hidden' ? 'expanded' : 'hidden';
-    workspaceActions.setSidebarMode(next);
+    const { isSidebarPinned, isSidebarPeeking } = dndStore.state;
+    if (!isSidebarPinned) {
+      workspaceActions.setSidebarPeeking(!isSidebarPeeking);
+    } else {
+      workspaceActions.setSidebarPinned(false);
+    }
   },
 
   saveCurrentLayoutAs(name: string): string {

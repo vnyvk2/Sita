@@ -140,6 +140,14 @@ export const CompactSongRow = memo(
       };
     }, [duration]);
 
+    // Stable identity key based on artist IDs, not the array reference itself.
+    // The artists prop is a fresh array from IPC on every window refetch, which would
+    // invalidate this memo even when the actual data is identical.
+    const artistsKey = useMemo(
+      () => artists?.map((a) => a.artistId).join(',') ?? '',
+      [artists]
+    );
+
     // Artists element
     const songArtists = useMemo(() => {
       if (Array.isArray(artists) && artists.length > 0) {
@@ -157,7 +165,8 @@ export const CompactSongRow = memo(
         ));
       }
       return t('common.unknownArtist');
-    }, [artists, t]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [artistsKey, t]);
 
     return (
       <div
@@ -167,7 +176,7 @@ export const CompactSongRow = memo(
         data-song-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
-        className={`compact-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[38px] max-h-[38px] min-h-[38px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none select-none ${
+        className={`compact-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[38px] max-h-[38px] min-h-[38px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none select-none [contain:layout] ${
           isCurrentSong
             ? 'bg-accent/8 dark:bg-accent/12'
             : isAMultipleSelection
