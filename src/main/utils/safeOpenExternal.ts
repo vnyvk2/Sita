@@ -2,7 +2,7 @@ import { shell } from 'electron';
 
 import logger from '../logger';
 
-const ALLOWED_PROTOCOLS = new Set(['http:', 'https:']);
+const ALLOWED_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
 
 /**
  * Safely opens an external URL in the system's default browser.

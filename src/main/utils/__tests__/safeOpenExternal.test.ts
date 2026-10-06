@@ -34,6 +34,12 @@ describe('safeOpenExternal — URL scheme security invariants', () => {
     expect(shell.openExternal).toHaveBeenCalledWith('http://example.com/test');
   });
 
+  it('allows valid mailto: URLs (report bug & support contacts)', async () => {
+    const res = await safeOpenExternal('mailto:vny.vk2@gmail.com');
+    expect(res).toBe(true);
+    expect(shell.openExternal).toHaveBeenCalledWith('mailto:vny.vk2@gmail.com');
+  });
+
   it('blocks file: URLs to prevent local file execution', async () => {
     const res = await safeOpenExternal('file:///C:/Windows/System32/calc.exe');
     expect(res).toBe(false);

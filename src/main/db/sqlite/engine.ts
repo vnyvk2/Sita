@@ -482,13 +482,13 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
           fs.renameSync(`${dbPath}-shm`, `${corruptPath}-shm`);
         }
       } catch (backupError) {
-        logger.error('[db] Failed to rename corrupt database files, attempting force removal', { backupError });
+        logger.error('[db] Failed to rename corrupt database files due to lock; preserving original and attempting non-destructive copy', { backupError });
         try {
-          fs.rmSync(dbPath, { force: true });
-          if (fs.existsSync(`${dbPath}-wal`)) fs.rmSync(`${dbPath}-wal`, { force: true });
-          if (fs.existsSync(`${dbPath}-shm`)) fs.rmSync(`${dbPath}-shm`, { force: true });
-        } catch (rmError) {
-          logger.error('[db] Failed to remove corrupt database files, falling back to alternative database path', { rmError });
+          fs.copyFileSync(dbPath, corruptPath);
+          if (fs.existsSync(`${dbPath}-wal`)) fs.copyFileSync(`${dbPath}-wal`, `${corruptPath}-wal`);
+          if (fs.existsSync(`${dbPath}-shm`)) fs.copyFileSync(`${dbPath}-shm`, `${corruptPath}-shm`);
+        } catch (copyError) {
+          logger.warn('[db] Non-destructive copy also locked; original files preserved intact for quarantine', { copyError });
         }
       }
 

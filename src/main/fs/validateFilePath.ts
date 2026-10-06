@@ -96,12 +96,16 @@ export async function isAllowedNoraFilePath(rawFilePath: string): Promise<boolea
       safeAppPaths.push(app.getPath('temp'));
       try {
         safeAppPaths.push(app.getPath('music'));
-      } catch {}
+      } catch {
+        // OS may not define a standard music directory or permission denied
+      }
     }
     if (app?.getAppPath) {
       safeAppPaths.push(app.getAppPath());
     }
-  } catch {}
+  } catch {
+    // Electron app object may be partially mocked or uninitialized in unit test harness
+  }
 
   for (const safePath of safeAppPaths) {
     if (isPathInside(normalized, safePath)) {
@@ -127,7 +131,9 @@ export async function isAllowedNoraFilePath(rawFilePath: string): Promise<boolea
     if (existing.length > 0) {
       return true;
     }
-  } catch {}
+  } catch {
+    // Database query may fail during early bootstrap or concurrent schema operations; fail closed
+  }
 
   return false;
 }

@@ -32,8 +32,13 @@ if (!app?.isPackaged && process.env.REMOTE_DEBUGGING_PORT) {
 }
 
 // Memory & Process Optimizations:
-// 1. Disable Chromium's spare renderer and run audio in-process (eliminates separate utility process)
-app?.commandLine?.appendSwitch?.('disable-features', 'SpareRendererForSitePerProcess,AudioServiceOutOfProcess');
+// 1. Disable Chromium's spare renderer.
+// NOTE: Do NOT add AudioServiceOutOfProcess here. Forcing the audio service
+// in-process left Web Audio output silent (healthy graph per AnalyserNode RMS,
+// decoding element, yet zero samples reached the device) while the native Rust
+// engine kept playing. The out-of-process audio service costs ~85MB but is
+// required for audible output. See docs/forensic_validation_report.md.
+app?.commandLine?.appendSwitch?.('disable-features', 'SpareRendererForSitePerProcess');
 // 2. Reclaim renderer memory when window is backgrounded / idle
 app?.commandLine?.appendSwitch?.('enable-features', 'PurgeRendererMemoryWhenBackgrounded');
 
