@@ -72,16 +72,19 @@ function DownloadsPanel({ snapshot }: { snapshot: DownloadsSnapshot }) {
 
   return (
     <div className="border-background-color-2/70 bg-background-color-1/80 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/80 mb-6 rounded-xl border p-4">
-      <h4 className="mb-3 text-sm font-semibold">
+      <h4 className="text-font-color-black dark:text-font-color-white mb-3 text-sm font-semibold">
         {t('onlinePage.activeDownloads', 'Active downloads')}
       </h4>
       <ul className="flex flex-col gap-2">
         {activeJobs.map((job) => (
           <li key={job.jobId} className="flex items-center gap-3 text-xs">
-            <span className="material-icons-round text-base">
+            <span className="material-icons-round text-font-color-black dark:text-font-color-white text-base">
               {job.status === 'FAILED' ? 'error' : 'downloading'}
             </span>
-            <span className="min-w-0 flex-1 truncate" title={job.title}>
+            <span
+              className="text-font-color-black dark:text-font-color-white min-w-0 flex-1 truncate"
+              title={job.title}
+            >
               {job.title}
             </span>
             <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed">
@@ -95,7 +98,7 @@ function DownloadsPanel({ snapshot }: { snapshot: DownloadsSnapshot }) {
             {(job.status === 'QUEUED' || job.status === 'DOWNLOADING') && (
               <button
                 type="button"
-                className="material-icons-round-outlined cursor-pointer text-sm"
+                className="material-icons-round-outlined text-font-color-dimmed dark:text-dark-font-color-dimmed cursor-pointer text-sm"
                 title={t('onlinePage.cancelDownload', 'Cancel')}
                 onClick={() => void window.api.downloads.cancel(job.jobId)}
               >
@@ -145,12 +148,15 @@ function TrackRow({ track, playlist, jobState, onEnsureFolder }: TrackRowProps) 
       {thumbnail ? (
         <img src={thumbnail} alt="" className="h-11 w-20 rounded object-cover" loading="lazy" />
       ) : (
-        <span className="material-icons-round bg-background-color-2 dark:bg-dark-background-color-2 h-11 w-20 rounded p-4">
+        <span className="material-icons-round bg-background-color-2 dark:bg-dark-background-color-2 text-font-color-dimmed dark:text-dark-font-color-dimmed h-11 w-20 rounded p-4">
           music_note
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm" title={track.title}>
+        <p
+          className="text-font-color-black dark:text-font-color-white truncate text-sm font-medium"
+          title={track.title}
+        >
           {track.title}
         </p>
         <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed truncate text-xs">
@@ -358,7 +364,7 @@ function OnlinePage() {
               value={searchText}
               onChange={(e) => setSearchText(e.currentTarget.value)}
               placeholder={t('onlinePage.searchPlaceholder')}
-              className="border-background-color-2 bg-background-color-1 focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 flex-1 rounded-lg border px-4 py-2 text-sm outline-none"
+              className="border-background-color-2 bg-background-color-1 focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 text-font-color-black placeholder:text-font-color-highlight dark:text-font-color-white dark:placeholder:text-dark-font-color-highlight flex-1 rounded-lg border px-4 py-2 text-sm outline-none"
             />
             <Button
               label={searchMutation.isPending ? t('onlinePage.searching') : t('onlinePage.search')}
@@ -392,7 +398,7 @@ function OnlinePage() {
               value={playlistUrl}
               onChange={(e) => setPlaylistUrl(e.currentTarget.value)}
               placeholder={t('onlinePage.playlistPlaceholder')}
-              className="border-background-color-2 bg-background-color-1 focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 flex-1 rounded-lg border px-4 py-2 text-sm outline-none"
+              className="border-background-color-2 bg-background-color-1 focus:border-font-color-highlight dark:border-dark-background-color-2 dark:bg-dark-background-color-1 text-font-color-black placeholder:text-font-color-highlight dark:text-font-color-white dark:placeholder:text-dark-font-color-highlight flex-1 rounded-lg border px-4 py-2 text-sm outline-none"
             />
             <Button
               label={
@@ -411,7 +417,9 @@ function OnlinePage() {
             <div className="border-background-color-2/70 bg-background-color-1/60 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/60 rounded-xl border p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold">{playlist.title}</p>
+                  <p className="text-font-color-black dark:text-font-color-white text-sm font-semibold">
+                    {playlist.title}
+                  </p>
                   <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-xs">
                     {t('onlinePage.songsCount', { count: playlist.entries.length })}
                     {playlist.excludedCount > 0 &&
