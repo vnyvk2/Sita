@@ -587,16 +587,19 @@ describe('WorkspaceToolbar', () => {
   });
 
   describe('Sidebar Toggle in Toolbar', () => {
-    it('displays "Show Sidebar" when sidebarMode is hidden and clicking expands it', () => {
-      dndStore.setState((s) => ({ ...s, sidebarMode: 'hidden' }));
+    it('displays Auto-hide when unpinned and clicking pins it', () => {
+      dndStore.setState((s) => ({ ...s, isSidebarPinned: false, sidebarMode: 'hidden' }));
       render(<WorkspaceToolbar />);
 
-      const toggleBtn = screen.getByTitle('Sidebar is hidden. Click to expand sidebar.');
+      const toggleBtn = screen.getByTitle(
+        'Sidebar is unpinned (auto-hides on hover-out). Click to pin.'
+      );
       expect(toggleBtn).toBeDefined();
-      expect(screen.getByText('Show Sidebar')).toBeDefined();
+      expect(screen.getByText('Auto-hide')).toBeDefined();
 
-      // Click to cycle
+      // Click to pin
       fireEvent.click(toggleBtn);
+      expect(dndStore.state.isSidebarPinned).toBe(true);
       expect(dndStore.state.sidebarMode).toBe('expanded');
     });
   });

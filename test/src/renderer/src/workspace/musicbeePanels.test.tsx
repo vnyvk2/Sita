@@ -1,4 +1,5 @@
 import { NodeView } from '@renderer/workspace/engine/NodeView';
+import { PanelFrame } from '@renderer/workspace/engine/PanelFrame';
 import { LyricsPanel } from '@renderer/workspace/panels/LyricsPanel/LyricsPanel';
 import { QueuePanel } from '@renderer/workspace/panels/QueuePanel/QueuePanel';
 import { getInitialWorkspaceState } from '@renderer/workspace/persistence';
@@ -23,7 +24,7 @@ vi.mock('react-i18next', async (importOriginal) => {
 // Mock router navigation
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
-  useLocation: (opts?: { select?: (loc: any) => any }) => {
+  useLocation: (opts?: { select?: (loc: unknown) => unknown }) => {
     const loc = { pathname: '/main-player' };
     return opts?.select ? opts.select(loc) : loc;
   },
@@ -78,7 +79,9 @@ describe('MusicBee Widgets: QueuePanel and LyricsPanel', () => {
       const queryClient = new QueryClient();
       render(
         <QueryClientProvider client={queryClient}>
-          <QueuePanel instance={mockInstance} api={mockApi} />
+          <PanelFrame panelId="p_queue_test" type="queue" title="Queue" icon="queue_music">
+            <QueuePanel instance={mockInstance} api={mockApi} />
+          </PanelFrame>
         </QueryClientProvider>
       );
       expect(screen.getByText('Queue 1')).toBeDefined();
@@ -103,7 +106,11 @@ describe('MusicBee Widgets: QueuePanel and LyricsPanel', () => {
         local: {}
       };
 
-      render(<LyricsPanel instance={mockInstance} api={mockApi} />);
+      render(
+        <PanelFrame panelId="p_lyrics_test" type="lyrics" title="Lyrics" icon="lyrics">
+          <LyricsPanel instance={mockInstance} api={mockApi} />
+        </PanelFrame>
+      );
       expect(screen.getByTitle('Expand to full page')).toBeDefined();
     });
   });

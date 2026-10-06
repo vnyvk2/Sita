@@ -12,6 +12,7 @@ import { useStore } from '@tanstack/react-store';
 import { memo, useMemo, useRef, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { PanelHeaderSlot } from '../../engine/PanelHeaderSlot';
 import type { PanelProps } from '../../registry';
 
 export const LyricsPanel: FC<PanelProps> = memo(() => {
@@ -61,6 +62,12 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
     );
   }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex, abLoop]);
 
+  const artistsString = useMemo(() => {
+    return Array.isArray(currentSongData.artists)
+      ? currentSongData.artists.map((a) => a.name).join(', ')
+      : '';
+  }, [currentSongData.artists]);
+
   const handleExpandToPage = () => {
     navigate({
       to: '/main-player/lyrics',
@@ -82,54 +89,68 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
         />
       )}
 
-      {/* Sub-header with track name, scroll mode toggle, and full-page expand */}
-      <div className="bg-background-color-2/30 dark:bg-dark-background-color-2/30 relative z-10 flex shrink-0 items-center justify-between border-b border-stone-200/50 px-2.5 py-1.5 dark:border-stone-800/50">
-        <div className="flex min-w-0 flex-col pr-2">
-          <span className="text-font-color-black dark:text-font-color-white truncate text-[11px] font-semibold">
-            {currentSongData.title || t('lyricsPage.noSongPlaying', 'No track selected')}
+      <PanelHeaderSlot
+        info={
+          <span className="truncate text-[11px]">
+            <span className="text-font-color-black dark:text-font-color-white font-semibold">
+              {currentSongData.title || t('lyricsPage.noSongPlaying', 'No track selected')}
+            </span>
+            {artistsString && <span className="text-font-color-dimmed"> — {artistsString}</span>}
           </span>
-          <span className="text-font-color-dimmed truncate text-[10px]">
-            {Array.isArray(currentSongData.artists)
-              ? currentSongData.artists.map((a) => a.name).join(', ')
-              : ''}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          {/* Scroll Mode Toggle */}
-          {isSynced && (
+        }
+        actions={
+          <>
+            {isSynced && (
+              <button
+                type="button"
+                onClick={handleToggleScrollMode}
+                aria-pressed={scrollMode === 'auto'}
+                title={
+                  scrollMode === 'auto'
+                    ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
+                    : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
+                }
+                className={`flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
+                  scrollMode === 'auto'
+                    ? 'text-accent hover:bg-stone-200 dark:hover:bg-stone-700'
+                    : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200 dark:hover:bg-stone-700'
+                }`}
+              >
+                <span className="material-symbols-rounded text-[14px]">
+                  {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
+                </span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleToggleScrollMode}
-              aria-pressed={scrollMode === 'auto'}
-              title={
-                scrollMode === 'auto'
-                  ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
-                  : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
-              }
-              className={`flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
-                scrollMode === 'auto'
-                  ? 'text-accent hover:bg-stone-200 dark:hover:bg-stone-700'
-                  : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200 dark:hover:bg-stone-700'
-              }`}
+              onClick={handleExpandToPage}
+              title={t('lyricsPage.expandToFullPage', 'Expand to full page')}
+              className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
             >
-              <span className="material-symbols-rounded text-sm">
-                {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
-              </span>
+              <span className="material-symbols-rounded text-[14px]">open_in_new</span>
             </button>
-          )}
-
-          {/* Expand to full page */}
-          <button
-            type="button"
-            onClick={handleExpandToPage}
-            title={t('lyricsPage.expandToFullPage', 'Expand to full page')}
-            className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
-          >
-            <span className="material-symbols-rounded text-sm">open_in_new</span>
-          </button>
-        </div>
-      </div>
+          </>
+        }
+        menu={() => [
+          ...(isSynced
+            ? [
+                {
+                  label:
+                    scrollMode === 'auto'
+                      ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
+                      : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll'),
+                  icon: scrollMode === 'auto' ? 'swap_vert' : 'swipe_up',
+                  handler: handleToggleScrollMode
+                }
+              ]
+            : []),
+          {
+            label: t('lyricsPage.expandToFullPage', 'Expand to full page'),
+            icon: 'open_in_new',
+            handler: handleExpandToPage
+          }
+        ]}
+      />
 
       {/* Lyrics lines stream */}
       <div
