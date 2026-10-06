@@ -165,7 +165,9 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
       <div className="border-b border-stone-200/50 px-2.5 py-1.5 dark:border-stone-800/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-semibold">{t('common.playlist_other', 'Playlists')}</span>
+            <span className="text-[11px] font-semibold">
+              {t('common.playlist_other', 'Playlists')}
+            </span>
             <span className="text-font-color-dimmed bg-background-color-2/60 dark:bg-dark-background-color-2/60 rounded-full px-1.5 text-[9px] leading-tight">
               {playlists.length}
             </span>

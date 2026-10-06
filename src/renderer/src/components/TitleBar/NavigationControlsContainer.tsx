@@ -1,6 +1,6 @@
+import { dndStore, workspaceActions } from '@renderer/workspace/store';
 import { useCanGoBack, useRouter } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { dndStore, workspaceActions } from '@renderer/workspace/store';
 import { useTranslation } from 'react-i18next';
 
 import { store } from '../../store/store';
@@ -22,7 +22,10 @@ const NavigationControlsContainer = (props: Props) => {
     store,
     (state) => state.localStorage?.preferences?.isExperimentalWorkspaceEnabled ?? false
   );
-  const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
+  const isSidebarPinned = useStore(dndStore, (s) => s.isSidebarPinned);
+  const isSidebarPeeking = useStore(dndStore, (s) => s.isSidebarPeeking);
+  const sidebarWidthMode = useStore(dndStore, (s) => s.sidebarWidthMode);
+  const isSidebarVisible = isSidebarPinned || isSidebarPeeking;
 
   return (
     <div
@@ -31,26 +34,34 @@ const NavigationControlsContainer = (props: Props) => {
       {isExperimentalWorkspace && (
         <Button
           iconName={
-            sidebarMode === 'hidden'
+            !isSidebarVisible
               ? 'left_panel_open'
-              : sidebarMode === 'compact'
-              ? 'left_panel_open'
-              : 'dock_to_left'
+              : sidebarWidthMode === 'compact'
+                ? 'left_panel_open'
+                : 'dock_to_left'
           }
           iconClassName="material-symbols-rounded text-xl!"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           className={`toggleSidebarBtn app-region-no-drag hover:bg-background-color-2 hover:text-font-color-highlight dark:hover:bg-dark-background-color-2 dark:hover:text-dark-font-color-highlight flex h-fit cursor-pointer rounded-md! border-0! bg-transparent px-2! py-1! outline-offset-1 transition-all! dark:bg-transparent ${
-            sidebarMode === 'hidden'
-              ? 'text-accent font-semibold ring-1 ring-accent/40 bg-accent/10'
+            !isSidebarVisible
+              ? 'text-accent ring-accent/40 bg-accent/10 font-semibold ring-1'
               : 'text-accent font-semibold'
           } ${bodyBackgroundImage && 'text-font-color-white! hover:text-font-color-highlight!'}`}
-          clickHandler={() => workspaceActions.cycleSidebarMode()}
+          clickHandler={() => {
+            if (!isSidebarPinned) {
+              workspaceActions.setSidebarPeeking(!isSidebarPeeking);
+            } else {
+              workspaceActions.toggleSidebarWidth();
+            }
+          }}
           tooltipLabel={
-            sidebarMode === 'expanded'
-              ? 'Collapse sidebar to icons'
-              : sidebarMode === 'compact'
-              ? 'Hide sidebar'
-              : 'Expand sidebar'
+            !isSidebarVisible
+              ? 'Open sidebar (peek)'
+              : !isSidebarPinned
+                ? 'Close sidebar'
+                : sidebarWidthMode === 'expanded'
+                  ? 'Collapse sidebar to icons'
+                  : 'Expand sidebar'
           }
         />
       )}

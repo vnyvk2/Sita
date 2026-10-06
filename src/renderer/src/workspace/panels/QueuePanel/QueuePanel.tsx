@@ -146,7 +146,7 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
           <span className="text-font-color-black dark:text-font-color-white truncate text-[11px] font-semibold">
             {queueTitle}
           </span>
-          <span className="text-font-color-dimmed rounded-full bg-stone-200 px-1.5 py-px text-[9px] font-medium leading-tight dark:bg-stone-800">
+          <span className="text-font-color-dimmed rounded-full bg-stone-200 px-1.5 py-px text-[9px] leading-tight font-medium dark:bg-stone-800">
             {songIds.length} {t('common.song_other', 'songs')}
           </span>
         </div>

@@ -77,7 +77,8 @@ export const WorkspaceToolbar: FC = memo(() => {
   const activeId = useStore(workspaceStore, (s) => s.active);
   const workspaces = useStore(workspaceStore, (s) => s.workspaces);
   const isToolbarCollapsed = useStore(dndStore, (s) => s.isToolbarCollapsed);
-  const sidebarMode = useStore(dndStore, (s) => s.sidebarMode);
+  const isSidebarPinned = useStore(dndStore, (s) => s.isSidebarPinned);
+  const sidebarWidthMode = useStore(dndStore, (s) => s.sidebarWidthMode);
   const canUndo = useStore(workspaceHistoryStore, (s) => s.past.length > 0);
   const canRedo = useStore(workspaceHistoryStore, (s) => s.future.length > 0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -486,29 +487,23 @@ export const WorkspaceToolbar: FC = memo(() => {
           {/* Quick Sidebar Toggle */}
           <button
             type="button"
-            onClick={() => workspaceActions.cycleSidebarMode()}
+            onClick={() => workspaceActions.toggleSidebarPinned()}
             title={
-              sidebarMode === 'hidden'
-                ? 'Sidebar is hidden. Click to expand sidebar.'
-                : sidebarMode === 'compact'
-                  ? 'Sidebar is compact. Click to hide sidebar.'
-                  : 'Sidebar is expanded. Click to collapse to icons.'
+              isSidebarPinned
+                ? `Sidebar is pinned (${sidebarWidthMode}). Click to unpin (auto-hide).`
+                : 'Sidebar is unpinned (auto-hides on hover-out). Click to pin.'
             }
             className={`hover:text-font-color-black dark:hover:text-font-color-white flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-xs transition-colors hover:bg-stone-200/50 dark:hover:bg-stone-800/50 ${
-              sidebarMode === 'hidden'
+              !isSidebarPinned
                 ? 'border-accent/60 bg-accent/10 text-accent font-semibold'
                 : 'text-font-color-dimmed border-stone-200/60 dark:border-stone-700/60'
             }`}
           >
             <span className="material-symbols-rounded text-accent text-sm">
-              {sidebarMode === 'hidden'
-                ? 'left_panel_open'
-                : sidebarMode === 'compact'
-                  ? 'left_panel_open'
-                  : 'dock_to_left'}
+              {isSidebarPinned ? 'push_pin' : 'keep'}
             </span>
             <span className="hidden text-[11px] font-medium capitalize sm:inline">
-              {sidebarMode === 'hidden' ? 'Show Sidebar' : sidebarMode}
+              {isSidebarPinned ? `Pinned (${sidebarWidthMode})` : 'Auto-hide'}
             </span>
           </button>
 
