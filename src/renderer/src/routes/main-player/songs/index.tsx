@@ -15,7 +15,9 @@ import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPa
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
 import { SubFilterToolbar } from '@renderer/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
 import { useSongListContextMenuDelegation } from '@renderer/components/SongsPage/useSongListContextMenuDelegation';
-import VirtualizedList from '@renderer/components/VirtualizedList';
+import VirtualizedList, {
+  DEFAULT_SCROLL_SEEK_CONFIG
+} from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
@@ -211,13 +213,14 @@ function SongsPage() {
       align: 'start',
       behavior: 'auto'
     });
-    requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       virtuosoRef.current?.scrollToIndex({
         index: targetIndex,
         align: 'start',
         behavior: 'auto'
       });
     });
+    return () => cancelAnimationFrame(rafId);
   }, [songViewMode]);
 
   const songIdsParams = useMemo(
@@ -251,12 +254,21 @@ function SongsPage() {
   const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
 
   const blacklistedSet = useMemo(() => new Set(blacklistedIds), [blacklistedIds]);
-  const playableSongIds = useMemo(
-    () => filteredSongIds.filter((id) => !blacklistedSet.has(id)),
-    [filteredSongIds, blacklistedSet]
-  );
-  const playableSongIdsRef = useRef(playableSongIds);
-  playableSongIdsRef.current = playableSongIds;
+  const playableSongIdsRef = useRef<number[]>([]);
+  const playableSongIds = useMemo(() => {
+    const next = filteredSongIds.filter((id) => !blacklistedSet.has(id));
+    // Reuse the previous array when content is identical: filter() always
+    // allocates, and a new identity would cascade into selectAllHandler ->
+    // renderSong -> every mounted row re-rendering.
+    const prev = playableSongIdsRef.current;
+    if (prev.length === next.length && prev.every((id, i) => id === next[i])) {
+      return prev;
+    }
+    return next;
+  }, [filteredSongIds, blacklistedSet]);
+  useEffect(() => {
+    playableSongIdsRef.current = playableSongIds;
+  }, [playableSongIds]);
 
   const {
     data: { languages: availableLanguages, genres: availableGenres }
@@ -500,6 +512,13 @@ function SongsPage() {
   );
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+
+  // Stable songId keys so background inserts move rows instead of remounting
+  // the whole visible window (index keys would shift identity for every row).
+  const computeSongItemKey = useCallback(
+    (index: number) => filteredSongIds[index] ?? index,
+    [filteredSongIds]
+  );
   const [activeLetter, setActiveLetter] = useState<string | undefined>(undefined);
   const activeLetterRef = useRef<string | undefined>(undefined);
   activeLetterRef.current = activeLetter;
@@ -920,6 +939,8 @@ function SongsPage() {
                   scrollKey={scrollKey}
                   itemContent={renderSong}
                   onChange={handleListRangeChange}
+                  computeItemKey={computeSongItemKey}
+                  scrollSeekConfiguration={DEFAULT_SCROLL_SEEK_CONFIG}
                 />
               </div>
             </div>

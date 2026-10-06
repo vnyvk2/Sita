@@ -332,11 +332,24 @@ export function useWindowHydration(
     }))
   });
 
+  // Stabilize the per-window data identities: useQueries returns a new wrapper
+  // array on every fetching-state transition, which would otherwise rebuild
+  // the whole index map (plus a responseById map per window) on unrelated
+  // renders. Reuse the previous array while every entry is identical.
+  const queryDatas = queries.map((query) => query.data);
+  const prevDatasRef = useRef(queryDatas);
+  if (
+    queryDatas.length !== prevDatasRef.current.length ||
+    queryDatas.some((data, i) => data !== prevDatasRef.current[i])
+  ) {
+    prevDatasRef.current = queryDatas;
+  }
+  const stableQueryDatas = prevDatasRef.current;
+
   const itemsByIndex = useMemo(() => {
     const map = new Map<number, SongData>();
-    queries.forEach((query, i) => {
+    stableQueryDatas.forEach((data, i) => {
       const win = windows[i];
-      const data = query.data;
       if (!win || !data || !Array.isArray(data)) return;
 
       const responseById = new Map<number, SongData>();
@@ -358,20 +371,56 @@ export function useWindowHydration(
       }
     });
     return map;
-  }, [queries, windows, ids]);
+  }, [stableQueryDatas, windows, ids]);
 
   const itemsByIndexRef = useRef(itemsByIndex);
   itemsByIndexRef.current = itemsByIndex;
 
   // Lazily-built Map<songId, SongData> per window for O(1) fallback lookups
   // instead of linear Array.find scans in the hot render path.
-  const windowLookupCacheRef = useRef(new Map<number, Map<number, SongData>>());
+  // Keyed by list namespace + window: a bare windowStart would collide across
+  // filters sharing an idsVersion, and entries are capped so scrolling a huge
+  // library end-to-end can't pin every visited window for the session.
+  // The map rebuilds when the underlying cached array identity changes, so a
+  // window refetch with new data can't serve stale objects.
+  const windowLookupCacheRef = useRef(
+    new Map<string, { data: SongData[]; map: Map<number, SongData> }>()
+  );
   const windowLookupVersionRef = useRef(idsVersion);
   // Clear the lookup cache when the IDs version changes
   if (windowLookupVersionRef.current !== idsVersion) {
     windowLookupCacheRef.current.clear();
     windowLookupVersionRef.current = idsVersion;
   }
+
+  const getWindowLookupMap = useCallback(
+    (windowStart: number, cachedData: SongData[]) => {
+      const cacheKey = `${listIdentity}:${windowStart}`;
+      let entry = windowLookupCacheRef.current.get(cacheKey);
+      if (!entry || entry.data !== cachedData) {
+        const map = new Map<number, SongData>();
+        for (const s of cachedData) {
+          const id = s.songId ?? (s as unknown as { id: number }).id;
+          if (id !== undefined) map.set(id, s);
+        }
+        entry = { data: cachedData, map };
+        // LRU-ish cap: evict the oldest window when over budget
+        if (windowLookupCacheRef.current.size >= 12) {
+          const oldest = windowLookupCacheRef.current.keys().next();
+          if (!oldest.done) {
+            windowLookupCacheRef.current.delete(oldest.value);
+          }
+        }
+        windowLookupCacheRef.current.set(cacheKey, entry);
+      } else {
+        // Refresh recency on hit
+        windowLookupCacheRef.current.delete(cacheKey);
+        windowLookupCacheRef.current.set(cacheKey, entry);
+      }
+      return entry.map;
+    },
+    [listIdentity]
+  );
 
   const getItem = useCallback(
     (index: number) => {
@@ -402,15 +451,7 @@ export function useWindowHydration(
           }
           // Lazily build a Map<songId, SongData> for this window on first miss,
           // then use O(1) lookups for subsequent misses instead of O(n) Array.find.
-          let windowMap = windowLookupCacheRef.current.get(windowStart);
-          if (!windowMap) {
-            windowMap = new Map<number, SongData>();
-            for (const s of cachedData) {
-              const id = s.songId ?? (s as unknown as { id: number }).id;
-              if (id !== undefined) windowMap.set(id, s);
-            }
-            windowLookupCacheRef.current.set(windowStart, windowMap);
-          }
+          const windowMap = getWindowLookupMap(windowStart, cachedData);
           const found = windowMap.get(targetId);
           if (found) {
             itemsByIndexRef.current.set(index, found);
@@ -421,7 +462,7 @@ export function useWindowHydration(
 
       return undefined;
     },
-    [queryClient, keyPrefix, listIdentity, idsVersion]
+    [queryClient, keyPrefix, listIdentity, idsVersion, getWindowLookupMap]
   );
 
   return { getItem, onRangeChange: handleRangeChange };

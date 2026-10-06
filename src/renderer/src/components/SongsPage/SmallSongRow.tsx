@@ -169,7 +169,7 @@ export const SmallSongRow = memo(
         data-song-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
-        className={`small-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none select-none ${
+        className={`small-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none select-none [contain:layout] ${
           isCurrentSong
             ? 'bg-accent/8 dark:bg-accent/12'
             : isAMultipleSelection

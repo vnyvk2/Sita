@@ -101,8 +101,17 @@ const Img = memo((props: ImgProps) => {
   const imgPropsRef = useRef<ImgProperties>(null);
   const errorCountRef = useRef(0);
   const isFirstTimeRef = useRef(true);
+  const prevSrcRef = useRef<string | undefined>(undefined);
 
   const resolvedSrc = thumbnail ? toThumbnailUrl(src) : src;
+
+  // Row recycling (virtualized lists) reuses this element for a new src:
+  // reset the retry budget so the new image gets its own attempts instead of
+  // inheriting an exhausted counter and pinning to fallback.
+  if (prevSrcRef.current !== resolvedSrc) {
+    prevSrcRef.current = resolvedSrc;
+    errorCountRef.current = 0;
+  }
 
   return (
     // <div className="inline-block relative">

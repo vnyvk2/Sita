@@ -36,14 +36,32 @@ const UpNextSongPopup = (props: Props) => {
 
   const [upNextSongData, setUpNextSongData] = useState<SongData>();
   const upNextSongDataCache = useRef<SongData>(null as unknown as SongData);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     onPopupAppears(!!upNextSongData);
   }, [onPopupAppears, upNextSongData]);
 
+  // Clear pending hide timer on unmount so it never fires setState afterwards
+  useEffect(() => {
+    return () => {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current);
+        hideTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const showPopup = useCallback(() => {
     setUpNextSongData(upNextSongDataCache.current);
-    setTimeout(() => setUpNextSongData(undefined), 10000);
+    // Reset any pending hide so rapid triggers don't stack overlapping timers
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+    }
+    hideTimerRef.current = setTimeout(() => {
+      hideTimerRef.current = null;
+      setUpNextSongData(undefined);
+    }, 10000);
   }, []);
 
   useEffect(() => {

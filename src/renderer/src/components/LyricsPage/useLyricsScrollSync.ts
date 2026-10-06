@@ -40,6 +40,7 @@ export function useLyricsScrollSync({
   const [isUserBrowsing, setIsUserBrowsing] = useState(false);
   const prevSongIdRef = useRef(songId);
   const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const snapBackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Timestamp of the last programmatic (auto-follow / snap-back) scroll. Scroll
   // events arriving inside the quiet window are part of an animation, not the user.
   const lastProgrammaticScrollRef = useRef(0);
@@ -287,11 +288,25 @@ export function useLyricsScrollSync({
     setDirection(null);
 
     if (next === 'auto') {
-      setTimeout(() => {
+      if (snapBackTimeoutRef.current) {
+        clearTimeout(snapBackTimeoutRef.current);
+      }
+      snapBackTimeoutRef.current = setTimeout(() => {
+        snapBackTimeoutRef.current = null;
         handleSnapBack();
       }, 50);
     }
   }, [handleSnapBack, scrollMode]);
+
+  // Drop the pending snap-back so it can't fire setState/scrollTo after unmount
+  useEffect(() => {
+    return () => {
+      if (snapBackTimeoutRef.current) {
+        clearTimeout(snapBackTimeoutRef.current);
+        snapBackTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // In auto mode: auto-scroll is active UNLESS user is actively browsing.
   // In manual mode: auto-scroll is never active.

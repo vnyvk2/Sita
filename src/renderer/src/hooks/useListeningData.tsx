@@ -48,6 +48,9 @@ export function useListeningData(player: AudioPlayer | HTMLAudioElement) {
     return () => {
       detachRef.current?.();
       detachRef.current = undefined;
+      // Stop the live session so its interval/timeout don't keep firing IPC after unmount
+      recordRef.current?.stopRecording();
+      recordRef.current = undefined;
     };
   }, []);
 
