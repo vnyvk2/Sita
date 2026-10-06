@@ -39,6 +39,33 @@ export const FullScreenSeekbar = ({ className = '', onSeek }: FullScreenSeekbarP
   const dragPosRef = useRef(0);
   const isMouseWheelRef = useRef(false);
 
+  // Cleanup ref for active window drag listeners
+  const dragCleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (dragCleanupRef.current) {
+        dragCleanupRef.current();
+        dragCleanupRef.current = null;
+      }
+    };
+  }, []);
+
+  // Debounced seek for wheel scrubbing
+  const debouncedSeekRef = useRef<ReturnType<typeof debounce> | null>(null);
+
+  useEffect(() => {
+    debouncedSeekRef.current = debounce((pos: number) => {
+      isMouseWheelRef.current = false;
+      updateSongPosition(pos);
+      if (onSeek) onSeek(pos);
+    }, 200);
+
+    return () => {
+      debouncedSeekRef.current?.cancel();
+    };
+  }, [onSeek, updateSongPosition]);
+
   // Tooltip hover state
   const [hoverData, setHoverData] = useState<{ x: number; time: string } | null>(null);
 
@@ -70,6 +97,7 @@ export const FullScreenSeekbar = ({ className = '', onSeek }: FullScreenSeekbarP
         const currentPos = e.detail as number;
 
         if (!isDraggingRef.current && !isMouseWheelRef.current) {
+          dragPosRef.current = currentPos;
           const liveDuration = duration > 0 ? duration : currentPos;
           const percent =
             liveDuration > 0 ? Math.min(100, Math.max(0, (currentPos / liveDuration) * 100)) : 0;
@@ -135,6 +163,12 @@ export const FullScreenSeekbar = ({ className = '', onSeek }: FullScreenSeekbarP
         updateLabels(currentPos);
       };
 
+      const cleanup = () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        dragCleanupRef.current = null;
+      };
+
       const handleMouseUp = () => {
         if (isDraggingRef.current) {
           isDraggingRef.current = false;
@@ -142,10 +176,10 @@ export const FullScreenSeekbar = ({ className = '', onSeek }: FullScreenSeekbarP
           updateSongPosition(finalPos);
           if (onSeek) onSeek(finalPos);
         }
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+        cleanup();
       };
 
+      dragCleanupRef.current = cleanup;
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
     },
@@ -180,6 +214,12 @@ export const FullScreenSeekbar = ({ className = '', onSeek }: FullScreenSeekbarP
         updateLabels(currentPos);
       };
 
+      const cleanup = () => {
+        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('touchend', handleTouchEnd);
+        dragCleanupRef.current = null;
+      };
+
       const handleTouchEnd = () => {
         if (isDraggingRef.current) {
           isDraggingRef.current = false;
@@ -187,10 +227,10 @@ export const FullScreenSeekbar = ({ className = '', onSeek }: FullScreenSeekbarP
           updateSongPosition(finalPos);
           if (onSeek) onSeek(finalPos);
         }
-        window.removeEventListener('touchmove', handleTouchMove);
-        window.removeEventListener('touchend', handleTouchEnd);
+        cleanup();
       };
 
+      dragCleanupRef.current = cleanup;
       window.addEventListener('touchmove', handleTouchMove, { passive: true });
       window.addEventListener('touchend', handleTouchEnd);
     },
@@ -235,13 +275,9 @@ export const FullScreenSeekbar = ({ className = '', onSeek }: FullScreenSeekbarP
       }
       updateLabels(nextPos);
 
-      debounce(() => {
-        isMouseWheelRef.current = false;
-        updateSongPosition(nextPos);
-        if (onSeek) onSeek(nextPos);
-      }, 200)();
+      debouncedSeekRef.current?.(nextPos);
     },
-    [duration, onSeek, preferences?.seekbarScrollInterval, updateLabels, updateSongPosition]
+    [duration, preferences?.seekbarScrollInterval, updateLabels]
   );
 
   // Toggle remaining vs total duration

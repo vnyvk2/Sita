@@ -7,6 +7,7 @@ import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import useMouseActiveState from '../../hooks/useMouseActiveState';
+import { useLyricsQuery } from '../../queries/lyrics';
 import AuroraBackground from '../fx/AuroraBackground';
 import BorderBeam from '../fx/BorderBeam';
 import ParticlesLayer from '../fx/ParticlesLayer';
@@ -31,8 +32,10 @@ const FullScreenPlayer = () => {
   const { t } = useTranslation();
 
   const [isLyricsVisible, setIsLyricsVisible] = useState(false);
-  const [isLyricsAvailable, setIsLyricsAvailable] = useState(false);
   const [isQueueVisible, setIsQueueVisible] = useState(false);
+
+  const { data: lyrics } = useLyricsQuery({ enabled: isLyricsVisible });
+  const isLyricsAvailable = Boolean(lyrics?.lyrics);
 
   const fullScreenPlayerContainerRef = useRef<HTMLDivElement>(null);
   const { isMouseActive } = useMouseActiveState(fullScreenPlayerContainerRef, {
@@ -253,7 +256,6 @@ const FullScreenPlayer = () => {
             <section className="relative z-10 h-full flex-1 overflow-hidden">
               <LyricsContainer
                 isLyricsVisible={isLyricsVisible}
-                setIsLyricsAvailable={setIsLyricsAvailable}
                 className="relative flex h-full w-full flex-col items-start overflow-y-auto px-8 py-10 select-none"
               />
             </section>
@@ -328,16 +330,6 @@ const FullScreenPlayer = () => {
                   setIsQueueVisible={setIsQueueVisible}
                 />
               </div>
-
-              {/* Hidden lyrics query mount while lyrics are toggled on but loading */}
-              {isLyricsVisible && !isLyricsAvailable && (
-                <div className="hidden">
-                  <LyricsContainer
-                    isLyricsVisible={isLyricsVisible}
-                    setIsLyricsAvailable={setIsLyricsAvailable}
-                  />
-                </div>
-              )}
             </div>
           </div>
         )}

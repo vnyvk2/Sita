@@ -128,4 +128,58 @@ describe('FullScreenSeekbar', () => {
     expect(mockUpdateSongPosition).toHaveBeenCalledWith(50);
     expect(onSeekMock).toHaveBeenCalledWith(50);
   });
+
+  it('cleans up window listeners on unmount during active drag', () => {
+    const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+    const { unmount } = renderWithContext(<FullScreenSeekbar />);
+
+    const track = screen.getByRole('slider');
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 24,
+      right: 200,
+      bottom: 24,
+      x: 0,
+      y: 0,
+      toJSON: () => {}
+    });
+
+    // Start dragging
+    fireEvent.mouseDown(track, { clientX: 50 });
+
+    // Unmount while dragging
+    unmount();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('mousemove', expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('mouseup', expect.any(Function));
+    removeEventListenerSpy.mockRestore();
+  });
+
+  it('updates position relative to current playback on wheel scrub without jumping to 0', () => {
+    vi.useFakeTimers();
+    const onSeekMock = vi.fn();
+    renderWithContext(<FullScreenSeekbar onSeek={onSeekMock} />);
+
+    // Position updates to 80s during playback
+    const positionEvent = new CustomEvent('player/positionChange', {
+      detail: 80
+    });
+    document.dispatchEvent(positionEvent);
+
+    const track = screen.getByRole('slider');
+
+    // Scroll up (deltaY < 0 means forward by step 5s -> 85s)
+    fireEvent.wheel(track, { deltaY: -100 });
+
+    expect(screen.getByTestId('fullscreen-elapsed-time').textContent).toBe('01:25');
+
+    // Fast forward timer by 200ms
+    vi.advanceTimersByTime(200);
+
+    expect(mockUpdateSongPosition).toHaveBeenCalledWith(85);
+    expect(onSeekMock).toHaveBeenCalledWith(85);
+    vi.useRealTimers();
+  });
 });

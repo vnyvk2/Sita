@@ -1,6 +1,6 @@
 import { store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import useSkipLyricsLines from '../../../hooks/useSkipLyricsLines';
@@ -13,7 +13,6 @@ import { useLyricsScrollSync } from '../../LyricsPage/useLyricsScrollSync';
 
 type Props = {
   isLyricsVisible: boolean;
-  setIsLyricsAvailable: (state: boolean) => void;
   className?: string;
 };
 
@@ -22,7 +21,7 @@ const LyricsContainer = (props: Props) => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const abLoop = useStore(store, (state) => state.player.abLoop);
 
-  const { isLyricsVisible, setIsLyricsAvailable, className } = props;
+  const { isLyricsVisible, className } = props;
   const { t } = useTranslation();
 
   const { data: lyrics } = useLyricsQuery({ enabled: isLyricsVisible });
@@ -48,17 +47,6 @@ const LyricsContainer = (props: Props) => {
     parsedLyrics: lyrics?.lyrics?.parsedLyrics ?? null,
     offset: lyrics?.lyrics?.offset ?? 0
   });
-
-  useEffect(() => {
-    if (isLyricsVisible && lyrics?.lyrics) {
-      setIsLyricsAvailable(true);
-    } else {
-      setIsLyricsAvailable(false);
-    }
-    return () => {
-      setIsLyricsAvailable(false);
-    };
-  }, [isLyricsVisible, lyrics, setIsLyricsAvailable]);
 
   const lyricsComponents = useMemo(() => {
     return renderLyricsLines(

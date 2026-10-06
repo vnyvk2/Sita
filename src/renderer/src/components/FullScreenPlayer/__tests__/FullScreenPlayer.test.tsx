@@ -214,4 +214,20 @@ describe('FullScreenPlayer', () => {
     expect(drawer.className).toContain('translate-x-full');
     expect(mockUpdatePlayerType).not.toHaveBeenCalled();
   });
+
+  it('remains in Showcase layout without thrashing when lyrics are enabled but unavailable', () => {
+    mockUseLyricsQuery.mockReturnValue({
+      data: { lyrics: null }
+    });
+
+    renderPlayer();
+
+    // Lyrics toggle button clicked
+    const lyricsBtn = screen.getByTestId('fullscreen-lyrics-toggle-btn');
+    fireEvent.click(lyricsBtn);
+
+    // Remains in Showcase mode because lyrics are not available
+    expect(screen.getByTestId('fullscreen-showcase-layout')).toBeDefined();
+    expect(screen.queryByTestId('fullscreen-split-layout')).toBeNull();
+  });
 });
