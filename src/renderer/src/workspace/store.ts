@@ -454,12 +454,22 @@ export const workspaceActions = {
   },
 
   setSidebarMode(mode: SidebarMode): void {
-    if (mode === 'hidden') {
-      workspaceActions.setSidebarPinned(false);
-    } else {
-      workspaceActions.setSidebarWidthMode(mode);
-      workspaceActions.setSidebarPinned(true);
+    const widthMode: SidebarWidthMode = mode === 'hidden' ? dndStore.state.sidebarWidthMode : mode;
+    const pinned = mode !== 'hidden';
+    try {
+      localStorage.setItem('nora:sidebar-pinned', String(pinned));
+      localStorage.setItem('nora:sidebar-mode', pinned ? widthMode : 'hidden');
+      localStorage.setItem('nora:sidebar-width-mode', widthMode);
+    } catch {
+      // ignore
     }
+    dndStore.setState((state) => ({
+      ...state,
+      isSidebarPinned: pinned,
+      isSidebarPeeking: false,
+      sidebarWidthMode: mode === 'hidden' ? state.sidebarWidthMode : mode,
+      sidebarMode: mode === 'hidden' ? 'hidden' : mode
+    }));
   },
 
   cycleSidebarMode(): void {

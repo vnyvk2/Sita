@@ -37,7 +37,7 @@ const NavigationControlsContainer = (props: Props) => {
             !isSidebarVisible
               ? 'left_panel_open'
               : sidebarWidthMode === 'compact'
-                ? 'left_panel_open'
+                ? 'left_panel_close'
                 : 'dock_to_left'
           }
           iconClassName="material-symbols-rounded text-xl!"

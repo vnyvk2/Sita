@@ -19,7 +19,10 @@ import FullScreenQueueDrawer from './components/FullScreenQueueDrawer';
 import FullScreenSeekbar from './components/FullScreenSeekbar';
 import LyricsContainer from './containers/LyricsContainer';
 
-const isArtistBackgroundsEnabled = false;
+const isInteractiveShortcutTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest('input, textarea, select, [contenteditable]'));
+};
 
 const FullScreenPlayer = () => {
   const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
@@ -34,8 +37,12 @@ const FullScreenPlayer = () => {
   const [isLyricsVisible, setIsLyricsVisible] = useState(false);
   const [isQueueVisible, setIsQueueVisible] = useState(false);
 
-  const { data: lyrics } = useLyricsQuery({ enabled: isLyricsVisible });
+  const { data: lyrics, isPending: isLyricsPending } = useLyricsQuery({
+    enabled: isLyricsVisible
+  });
   const isLyricsAvailable = Boolean(lyrics?.lyrics);
+  // Hold split layout during fetch to avoid Showcase -> Split snap on late resolve
+  const isSplitLayout = isLyricsVisible && (isLyricsAvailable || isLyricsPending);
 
   const fullScreenPlayerContainerRef = useRef<HTMLDivElement>(null);
   const { isMouseActive } = useMouseActiveState(fullScreenPlayerContainerRef, {
@@ -54,14 +61,8 @@ const FullScreenPlayer = () => {
 
   // Background artwork
   const imgPath = useMemo(() => {
-    const selectedArtist = currentSongData?.artists?.find(
-      (artist) => !!artist.onlineArtworkPaths?.picture_xl
-    );
-
-    if (isArtistBackgroundsEnabled && selectedArtist)
-      return selectedArtist.onlineArtworkPaths?.picture_xl;
     return currentSongData.artworkPath;
-  }, [currentSongData?.artists, currentSongData?.artworkPath]);
+  }, [currentSongData?.artworkPath]);
 
   const isAmbientParticlesEnabled = useStore(
     store,
@@ -79,10 +80,15 @@ const FullScreenPlayer = () => {
   );
 
   // Keyboard ergonomics for Cinema/Fullscreen Mode
+  // Single owner for Escape when queue is concerned is here; drawer has no own listener
+  // to avoid capture/bubble double-handling on window.
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      const activeTag = (document.activeElement?.tagName || '').toLowerCase();
-      if (activeTag === 'input' || activeTag === 'textarea') return;
+      if (isInteractiveShortcutTarget(e.target)) return;
+      if (e.repeat && (e.key === ' ' || e.key === 'l' || e.key === 'L' || e.key === 'q' || e.key === 'Q'))
+        return;
 
       switch (e.key) {
         case 'Escape':
@@ -94,28 +100,32 @@ const FullScreenPlayer = () => {
           }
           break;
         case ' ':
+          // Avoid double-toggle when focus is on a button (native activation + window handler)
+          if (e.target instanceof Element && e.target.closest('button')) return;
           e.preventDefault();
           toggleSongPlayback();
           break;
         case 'ArrowLeft':
           e.preventDefault();
-          if (player) {
+          if (player && Number.isFinite(player.duration)) {
+            player.currentTime = Math.max(0, player.currentTime - 5);
+          } else if (player) {
             player.currentTime = Math.max(0, player.currentTime - 5);
           }
           break;
         case 'ArrowRight':
           e.preventDefault();
-          if (player) {
+          if (player && Number.isFinite(player.duration)) {
             player.currentTime = Math.min(player.duration, player.currentTime + 5);
           }
           break;
         case 'ArrowUp':
           e.preventDefault();
-          updateVolume(Math.min(100, volume + 5));
+          updateVolume(Math.min(100, volumeRef.current + 5));
           break;
         case 'ArrowDown':
           e.preventDefault();
-          updateVolume(Math.max(0, volume - 5));
+          updateVolume(Math.max(0, volumeRef.current - 5));
           break;
         case 'l':
         case 'L':
@@ -129,15 +139,16 @@ const FullScreenPlayer = () => {
           break;
       }
     },
-    [isQueueVisible, player, toggleSongPlayback, updatePlayerType, updateVolume, volume]
+    [isQueueVisible, player, toggleSongPlayback, updatePlayerType, updateVolume]
   );
+
+  const closeQueueDrawer = useCallback(() => setIsQueueVisible(false), []);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  const isSplitLayout = isLyricsVisible && isLyricsAvailable;
   const isControlsVisible = isMouseActive || !isCurrentSongPlaying;
 
   return (
@@ -256,7 +267,9 @@ const FullScreenPlayer = () => {
             <section className="relative z-10 h-full flex-1 overflow-hidden">
               <LyricsContainer
                 isLyricsVisible={isLyricsVisible}
-                className="relative flex h-full w-full flex-col items-start overflow-y-auto px-8 py-10 select-none"
+                lyricsData={lyrics}
+                lyricsLoading={isLyricsPending}
+                className="relative flex h-full w-full flex-col items-start overflow-y-auto px-8 py-10 select-text"
               />
             </section>
           </div>
@@ -336,7 +349,7 @@ const FullScreenPlayer = () => {
       </main>
 
       {/* Slide-over Queue Peek Drawer */}
-      <FullScreenQueueDrawer isOpen={isQueueVisible} onClose={() => setIsQueueVisible(false)} />
+      <FullScreenQueueDrawer isOpen={isQueueVisible} onClose={closeQueueDrawer} />
     </div>
   );
 };

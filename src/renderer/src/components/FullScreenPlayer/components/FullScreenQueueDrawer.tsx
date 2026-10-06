@@ -1,4 +1,4 @@
-import { memo, useEffect } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import QueueContainer from '../../MiniPlayer/containers/QueueContainer';
@@ -11,18 +11,9 @@ interface FullScreenQueueDrawerProps {
 export const FullScreenQueueDrawer = memo(({ isOpen, onClose }: FullScreenQueueDrawerProps) => {
   const { t } = useTranslation();
 
-  // Close on Escape when drawer is open
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [isOpen, onClose]);
+  // NOTE: Escape is owned solely by FullScreenPlayer (bubble listener) which closes
+  // the drawer first when open. No capture listener here to avoid window
+  // capture-vs-bubble double-handling requiring stopImmediatePropagation.
 
   return (
     <>
@@ -41,6 +32,8 @@ export const FullScreenQueueDrawer = memo(({ isOpen, onClose }: FullScreenQueueD
       {/* Slide-over Drawer Panel */}
       <aside
         data-testid="fullscreen-queue-drawer"
+        role="dialog"
+        aria-modal="true"
         aria-label={t('player.currentQueue', 'Queue')}
         className={`fixed top-0 right-0 z-40 flex h-full w-[420px] max-w-[92vw] flex-col border-l border-white/10 bg-zinc-950/90 p-4 shadow-2xl backdrop-blur-2xl transition-transform duration-300 ease-out select-none ${
           isOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full'

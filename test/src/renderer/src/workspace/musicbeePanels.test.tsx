@@ -1,6 +1,7 @@
 import { NodeView } from '@renderer/workspace/engine/NodeView';
 import { PanelFrame } from '@renderer/workspace/engine/PanelFrame';
 import { LyricsPanel } from '@renderer/workspace/panels/LyricsPanel/LyricsPanel';
+import { PlaylistsPanel } from '@renderer/workspace/panels/PlaylistsPanel/PlaylistsPanel';
 import { QueuePanel } from '@renderer/workspace/panels/QueuePanel/QueuePanel';
 import { getInitialWorkspaceState } from '@renderer/workspace/persistence';
 import { MUSICBEE_PRESET } from '@renderer/workspace/presets/musicbee';
@@ -49,6 +50,16 @@ vi.mock('@renderer/components/LyricsPage/useActiveLyricIndex', () => ({
   useActiveLyricIndex: () => 0
 }));
 
+// Mock playlists collection queries/mutations (IPC-backed in production)
+vi.mock('@renderer/hooks/collections/useCollectionQueries', () => ({
+  useRootCollections: () => ({ data: [], isLoading: false })
+}));
+
+vi.mock('@renderer/hooks/collections/useCollectionMutations', () => ({
+  usePinCollection: () => ({ mutate: vi.fn() }),
+  useUnpinCollection: () => ({ mutate: vi.fn() })
+}));
+
 describe('MusicBee Widgets: QueuePanel and LyricsPanel', () => {
   beforeEach(() => {
     workspaceStore.setState(() => ({
@@ -77,7 +88,7 @@ describe('MusicBee Widgets: QueuePanel and LyricsPanel', () => {
       };
 
       const queryClient = new QueryClient();
-      render(
+      const { container } = render(
         <QueryClientProvider client={queryClient}>
           <PanelFrame panelId="p_queue_test" type="queue" title="Queue" icon="queue_music">
             <QueuePanel instance={mockInstance} api={mockApi} />
@@ -86,6 +97,8 @@ describe('MusicBee Widgets: QueuePanel and LyricsPanel', () => {
       );
       expect(screen.getByText('Queue 1')).toBeDefined();
       expect(screen.getByText('Queue is empty')).toBeDefined();
+      // Fused header: exactly one frame header, no legacy internal sub-header
+      expect(container.querySelectorAll('header.panel-header')).toHaveLength(1);
     });
   });
 
@@ -112,6 +125,36 @@ describe('MusicBee Widgets: QueuePanel and LyricsPanel', () => {
         </PanelFrame>
       );
       expect(screen.getByTitle('Expand to full page')).toBeDefined();
+      expect(document.querySelectorAll('header.panel-header')).toHaveLength(1);
+    });
+  });
+
+  describe('PlaylistsPanel', () => {
+    it('renders inside the fused header with no duplicate sub-header', () => {
+      const mockApi = {
+        instanceId: 'p_playlists_test',
+        type: 'playlists' as const,
+        setLocal: vi.fn(),
+        getLocal: vi.fn(),
+        close: vi.fn(),
+        maximize: vi.fn()
+      };
+
+      const mockInstance = {
+        id: 'p_playlists_test',
+        type: 'playlists' as const,
+        local: {}
+      };
+
+      const { container } = render(
+        <PanelFrame panelId="p_playlists_test" type="playlists" title="Playlists" icon="queue_music">
+          <PlaylistsPanel instance={mockInstance} api={mockApi} />
+        </PanelFrame>
+      );
+      // Single fused frame header; panel body contributes count pill via slot
+      expect(container.querySelectorAll('header.panel-header')).toHaveLength(1);
+      expect(container.querySelector('.playlists-panel header')).toBeNull();
+      expect(screen.getByTitle('Create Playlist')).toBeDefined();
     });
   });
 

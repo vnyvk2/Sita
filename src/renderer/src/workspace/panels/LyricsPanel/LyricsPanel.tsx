@@ -9,7 +9,7 @@ import { useLyricsQuery } from '@renderer/queries/lyrics';
 import { store } from '@renderer/store/store';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { memo, useMemo, useRef, type FC } from 'react';
+import { memo, useCallback, useMemo, useRef, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { PanelHeaderSlot } from '../../engine/PanelHeaderSlot';
@@ -68,14 +68,89 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
       : '';
   }, [currentSongData.artists]);
 
-  const handleExpandToPage = () => {
+  const handleExpandToPage = useCallback(() => {
     navigate({
       to: '/main-player/lyrics',
       search: { from: '/main-player' }
     });
-  };
+  }, [navigate]);
 
   const hasLyrics = lyricsComponents.length > 0;
+
+  const headerInfo = useMemo(
+    () => (
+      <span
+        className="truncate text-[11px]"
+        title={`${currentSongData.title || t('lyricsPage.noSongPlaying', 'No track selected')}${artistsString ? ` — ${artistsString}` : ''}`}
+      >
+        <span className="text-font-color-black dark:text-font-color-white font-semibold">
+          {currentSongData.title || t('lyricsPage.noSongPlaying', 'No track selected')}
+        </span>
+        {artistsString && <span className="text-font-color-dimmed"> — {artistsString}</span>}
+      </span>
+    ),
+    [currentSongData.title, artistsString, t]
+  );
+
+  const scrollToggleLabel =
+    scrollMode === 'auto'
+      ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
+      : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll');
+
+  const headerActions = useMemo(
+    () => (
+      <>
+        {isSynced && (
+          <button
+            type="button"
+            onClick={handleToggleScrollMode}
+            aria-pressed={scrollMode === 'auto'}
+            aria-label={scrollToggleLabel}
+            title={scrollToggleLabel}
+            className={`flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
+              scrollMode === 'auto'
+                ? 'text-accent hover:bg-stone-200 dark:hover:bg-stone-700'
+                : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200 dark:hover:bg-stone-700'
+            }`}
+          >
+            <span className="material-symbols-rounded text-[14px]">
+              {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
+            </span>
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleExpandToPage}
+          aria-label={t('lyricsPage.expandToFullPage', 'Expand to full page')}
+          title={t('lyricsPage.expandToFullPage', 'Expand to full page')}
+          className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
+        >
+          <span className="material-symbols-rounded text-[14px]">open_in_new</span>
+        </button>
+      </>
+    ),
+    [isSynced, handleToggleScrollMode, scrollMode, scrollToggleLabel, handleExpandToPage, t]
+  );
+
+  const headerMenu = useCallback(
+    () => [
+      ...(isSynced
+        ? [
+            {
+              label: scrollToggleLabel,
+              icon: scrollMode === 'auto' ? 'swap_vert' : 'swipe_up',
+              handler: handleToggleScrollMode
+            }
+          ]
+        : []),
+      {
+        label: t('lyricsPage.expandToFullPage', 'Expand to full page'),
+        icon: 'open_in_new',
+        handler: handleExpandToPage
+      }
+    ],
+    [isSynced, scrollToggleLabel, scrollMode, handleToggleScrollMode, handleExpandToPage, t]
+  );
 
   return (
     <div className="lyrics-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white relative flex h-full w-full flex-col overflow-hidden">
@@ -89,68 +164,7 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
         />
       )}
 
-      <PanelHeaderSlot
-        info={
-          <span className="truncate text-[11px]">
-            <span className="text-font-color-black dark:text-font-color-white font-semibold">
-              {currentSongData.title || t('lyricsPage.noSongPlaying', 'No track selected')}
-            </span>
-            {artistsString && <span className="text-font-color-dimmed"> — {artistsString}</span>}
-          </span>
-        }
-        actions={
-          <>
-            {isSynced && (
-              <button
-                type="button"
-                onClick={handleToggleScrollMode}
-                aria-pressed={scrollMode === 'auto'}
-                title={
-                  scrollMode === 'auto'
-                    ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
-                    : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
-                }
-                className={`flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
-                  scrollMode === 'auto'
-                    ? 'text-accent hover:bg-stone-200 dark:hover:bg-stone-700'
-                    : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white hover:bg-stone-200 dark:hover:bg-stone-700'
-                }`}
-              >
-                <span className="material-symbols-rounded text-[14px]">
-                  {scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
-                </span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={handleExpandToPage}
-              title={t('lyricsPage.expandToFullPage', 'Expand to full page')}
-              className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded transition-colors hover:bg-stone-200 dark:hover:bg-stone-700"
-            >
-              <span className="material-symbols-rounded text-[14px]">open_in_new</span>
-            </button>
-          </>
-        }
-        menu={() => [
-          ...(isSynced
-            ? [
-                {
-                  label:
-                    scrollMode === 'auto'
-                      ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
-                      : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll'),
-                  icon: scrollMode === 'auto' ? 'swap_vert' : 'swipe_up',
-                  handler: handleToggleScrollMode
-                }
-              ]
-            : []),
-          {
-            label: t('lyricsPage.expandToFullPage', 'Expand to full page'),
-            icon: 'open_in_new',
-            handler: handleExpandToPage
-          }
-        ]}
-      />
+      <PanelHeaderSlot info={headerInfo} actions={headerActions} menu={headerMenu} />
 
       {/* Lyrics lines stream */}
       <div
@@ -186,7 +200,7 @@ export const LyricsPanel: FC<PanelProps> = memo(() => {
         <FloatingLyricsSnapBackBtn
           direction={direction}
           onClick={handleSnapBack}
-          className={direction === 'up' ? 'top-11' : 'bottom-4'}
+          className={direction === 'up' ? 'top-2' : 'bottom-4'}
         />
       )}
     </div>

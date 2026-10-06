@@ -24,13 +24,25 @@ const TabButton: FC<TabButtonProps> = memo(
     const def = instance ? getPanelDefinition(instance.type) : null;
     const { handlePointerDown } = usePanelDragDrop(panelId, nodeId);
 
+    const handleTabPointerDown = (e: React.PointerEvent) => {
+      // Don't start tab drag from the close button
+      if (e.target instanceof Element && e.target.closest('[data-tab-close]')) return;
+      handlePointerDown(e as React.PointerEvent<HTMLElement>);
+    };
+
     return (
-      <button
+      <div
         role="tab"
-        type="button"
+        tabIndex={0}
         aria-selected={isActive}
         onClick={() => onTabClick(panelId)}
-        onPointerDown={handlePointerDown}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onTabClick(panelId);
+          }
+        }}
+        onPointerDown={handleTabPointerDown}
         className={`group flex cursor-grab items-center gap-1 rounded-t-md px-2.5 py-1 text-[11px] font-medium transition-all active:cursor-grabbing ${
           isActive
             ? 'bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white border-accent border-b-2 shadow-xs'
@@ -41,24 +53,19 @@ const TabButton: FC<TabButtonProps> = memo(
         <span className="max-w-[120px] truncate">{def?.title ?? panelId}</span>
 
         {canClose && (
-          <span
-            role="button"
-            tabIndex={0}
+          <button
+            type="button"
+            data-tab-close
             onClick={(e) => onCloseTab(e, panelId)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.stopPropagation();
-                workspaceActions.dispatchOp({ t: 'panel.close', panelId });
-              }
-            }}
+            onPointerDown={(e) => e.stopPropagation()}
             title="Close tab"
             aria-label={`Close tab ${def?.title ?? panelId}`}
-            className="ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-80 hover:bg-stone-300 hover:opacity-100 dark:hover:bg-stone-700"
+            className="ml-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full opacity-0 transition-opacity group-hover:opacity-80 hover:bg-stone-300 hover:opacity-100 focus-visible:opacity-100 dark:hover:bg-stone-700"
           >
             <span className="material-symbols-rounded text-[10px]">close</span>
-          </span>
+          </button>
         )}
-      </button>
+      </div>
     );
   }
 );
@@ -152,7 +159,10 @@ export const TabGroup: FC<TabGroupProps> = memo(({ node }) => {
             })}
           </div>
 
-          <div ref={setActionsTarget} className="flex shrink-0 items-center gap-1 px-1.5" />
+          <div
+            ref={setActionsTarget}
+            className="flex shrink-0 items-center gap-1 px-1.5 empty:gap-0 empty:px-0"
+          />
         </div>
 
         {/* Tab Panels */}

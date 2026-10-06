@@ -11,6 +11,7 @@ import { useLocation, useNavigate } from '@tanstack/react-router';
 import { lazy, memo, useCallback, useContext, useMemo, useState, type FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { PanelHeaderSlot } from '../../engine/PanelHeaderSlot';
 import type { PanelProps } from '../../registry';
 
 const NewPlaylistPrompt = lazy(
@@ -35,6 +36,41 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
   const openNewPlaylistPrompt = useCallback(() => {
     changePromptMenuData(true, <NewPlaylistPrompt currentPlaylists={playlists} />);
   }, [changePromptMenuData, playlists]);
+
+  const headerInfo = useMemo(
+    () => (
+      <span className="text-font-color-dimmed rounded-full bg-stone-200 px-1.5 py-px text-[9px] leading-tight font-medium dark:bg-stone-800">
+        {playlists.length}
+      </span>
+    ),
+    [playlists.length]
+  );
+
+  const headerActions = useMemo(
+    () => (
+      <button
+        type="button"
+        onClick={openNewPlaylistPrompt}
+        title={t('playlistsPage.createPlaylist', 'Create Playlist')}
+        aria-label={t('playlistsPage.createPlaylist', 'Create Playlist')}
+        className="hover:bg-background-color-2 text-font-color-dimmed hover:text-font-color-black dark:hover:bg-dark-background-color-2 dark:hover:text-font-color-white flex h-5 w-5 cursor-pointer items-center justify-center rounded transition-colors"
+      >
+        <span className="material-symbols-rounded text-sm">add</span>
+      </button>
+    ),
+    [openNewPlaylistPrompt, t]
+  );
+
+  const headerMenu = useCallback(
+    () => [
+      {
+        label: t('playlistsPage.createPlaylist', 'Create Playlist'),
+        icon: 'add',
+        handler: openNewPlaylistPrompt
+      }
+    ],
+    [openNewPlaylistPrompt, t]
+  );
 
   const filteredPlaylists = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -145,10 +181,11 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
           type="button"
           onClick={(e) => handleTogglePin(e, playlist)}
           title={playlist.isPinned ? t('playlist.unpin', 'Unpin') : t('playlist.pin', 'Pin')}
-          className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded transition-colors ${
+          aria-label={playlist.isPinned ? t('playlist.unpin', 'Unpin') : t('playlist.pin', 'Pin')}
+          className={`flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded transition-colors focus-visible:opacity-100 ${
             playlist.isPinned
               ? 'text-accent opacity-90 hover:opacity-100'
-              : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white opacity-0 group-hover:opacity-100'
+              : 'text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white opacity-0 group-focus-within:opacity-100 group-hover:opacity-100'
           }`}
         >
           <span className="material-symbols-rounded text-sm">
@@ -161,31 +198,12 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
 
   return (
     <div className="playlists-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white flex h-full w-full flex-col overflow-hidden">
-      {/* Header */}
-      <div className="border-b border-stone-200/50 px-2.5 py-1.5 dark:border-stone-800/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-semibold">
-              {t('common.playlist_other', 'Playlists')}
-            </span>
-            <span className="text-font-color-dimmed bg-background-color-2/60 dark:bg-dark-background-color-2/60 rounded-full px-1.5 text-[9px] leading-tight">
-              {playlists.length}
-            </span>
-          </div>
+      <PanelHeaderSlot info={headerInfo} actions={headerActions} menu={headerMenu} />
 
-          <button
-            type="button"
-            onClick={openNewPlaylistPrompt}
-            title={t('playlistsPage.createPlaylist', 'Create Playlist')}
-            className="hover:bg-background-color-2 text-font-color-dimmed hover:text-font-color-black dark:hover:bg-dark-background-color-2 dark:hover:text-font-color-white flex h-5 w-5 cursor-pointer items-center justify-center rounded transition-colors"
-          >
-            <span className="material-symbols-rounded text-sm">add</span>
-          </button>
-        </div>
-
-        {/* Search Filter Input */}
-        {playlists.length > 3 && (
-          <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 mt-1 flex items-center rounded-md border border-stone-200/60 px-2 py-0.5 dark:border-stone-800/60">
+      {/* Filter input stays in body so the fused 28px header stays single-line */}
+      {playlists.length > 3 && (
+        <div className="px-2 pt-1.5">
+          <div className="bg-background-color-2/50 dark:bg-dark-background-color-2/50 flex items-center rounded-md border border-stone-200/60 px-2 py-0.5 dark:border-stone-800/60">
             <span className="material-symbols-rounded text-font-color-dimmed mr-1.5 text-xs">
               search
             </span>
@@ -194,20 +212,22 @@ export const PlaylistsPanel: FC<PanelProps> = memo(() => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('common.search', 'Filter playlists...')}
+              aria-label={t('common.search', 'Filter playlists...')}
               className="placeholder:text-font-color-dimmed/60 w-full bg-transparent text-[11px] outline-none"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
+                aria-label={t('common.clear', 'Clear')}
                 className="text-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white flex h-4 w-4 cursor-pointer items-center justify-center"
               >
                 <span className="material-symbols-rounded text-xs">close</span>
               </button>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Playlists List */}
       <div className="flex-1 overflow-x-hidden overflow-y-auto p-1.5">

@@ -84,7 +84,16 @@ const Sidebar = memo(() => {
   }, []);
 
   const sidebarNavRef = useRef<HTMLElement | null>(null);
-  const mouseLeaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mouseLeaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isResizingRef = useRef(false);
+
+  const handleResizerDraggingChange = useCallback((dragging: boolean) => {
+    isResizingRef.current = dragging;
+    if (dragging && mouseLeaveTimeoutRef.current) {
+      clearTimeout(mouseLeaveTimeoutRef.current);
+      mouseLeaveTimeoutRef.current = null;
+    }
+  }, []);
 
   const handleMouseEnter = useCallback(() => {
     if (mouseLeaveTimeoutRef.current) {
@@ -95,15 +104,35 @@ const Sidebar = memo(() => {
 
   const handleMouseLeave = useCallback(() => {
     if (!isExperimentalWorkspace || isPinned || !isPeeking) return;
-    if (isDragging || isContextMenuOpen) return;
+    if (isDragging || isContextMenuOpen || isResizingRef.current) return;
 
     if (mouseLeaveTimeoutRef.current) {
       clearTimeout(mouseLeaveTimeoutRef.current);
     }
     mouseLeaveTimeoutRef.current = setTimeout(() => {
-      workspaceActions.setSidebarPeeking(false);
+      mouseLeaveTimeoutRef.current = null;
+      // Re-check at fire time: drag / menu / resize may have started during grace
+      const s = dndStore.state;
+      if (s.isDragging || isResizingRef.current) return;
+      const ctx = store.state;
+      if (
+        (ctx.contextMenuData?.isVisible ?? false) ||
+        (ctx.promptMenuData?.isVisible ?? false)
+      )
+        return;
+      if (!dndStore.state.isSidebarPinned && dndStore.state.isSidebarPeeking) {
+        workspaceActions.setSidebarPeeking(false);
+      }
     }, 250);
   }, [isExperimentalWorkspace, isPinned, isPeeking, isDragging, isContextMenuOpen]);
+
+  // Cancel pending auto-hide when pinned, so no leaked timer fires later
+  useEffect(() => {
+    if (isPinned && mouseLeaveTimeoutRef.current) {
+      clearTimeout(mouseLeaveTimeoutRef.current);
+      mouseLeaveTimeoutRef.current = null;
+    }
+  }, [isPinned]);
 
   useEffect(() => {
     return () => {
@@ -117,6 +146,7 @@ const Sidebar = memo(() => {
     if (!isExperimentalWorkspace || isPinned || !isPeeking) return;
 
     const handlePointerDown = (e: PointerEvent) => {
+      if (isResizingRef.current) return;
       if (sidebarNavRef.current && sidebarNavRef.current.contains(e.target as Node)) {
         return;
       }
@@ -128,11 +158,21 @@ const Sidebar = memo(() => {
       ) {
         return;
       }
+      // Re-check live drag/menu state (closure may be stale)
+      if (dndStore.state.isDragging) return;
+      const ctx = store.state;
+      if ((ctx.contextMenuData?.isVisible ?? false) || (ctx.promptMenuData?.isVisible ?? false))
+        return;
       workspaceActions.setSidebarPeeking(false);
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // Don't steal Escape from open dialogs/menus inside peeking sidebar
+        const ctx = store.state;
+        if ((ctx.contextMenuData?.isVisible ?? false) || (ctx.promptMenuData?.isVisible ?? false))
+          return;
+        if (document.querySelector('[role="dialog"], [data-radix-portal]')) return;
         workspaceActions.setSidebarPeeking(false);
       }
     };
@@ -283,7 +323,7 @@ const Sidebar = memo(() => {
 
   const navClassName = isExperimentalWorkspace
     ? !isVisible
-      ? `side-bar absolute left-0 top-0 z-50 flex !h-full w-0 min-w-0 max-w-0 shrink-0 grow-0 opacity-0 pointer-events-none overflow-hidden p-0 m-0 border-0 transition-all duration-300 ${bgClass}`
+      ? `side-bar absolute left-0 top-0 z-50 flex !h-full w-0 min-w-0 max-w-0 shrink-0 grow-0 opacity-0 pointer-events-none invisible overflow-hidden p-0 m-0 border-0 transition-all duration-300 ${bgClass}`
       : isPeeking && !isPinned
         ? `side-bar absolute left-0 top-0 z-50 flex !h-full ${widthClass} shrink-0 grow-0 flex-col rounded-r-2xl shadow-2xl transition-all duration-300 border-r border-stone-200/40 dark:border-stone-800/40 ${bgClass}`
         : `side-bar relative z-20 order-first flex !h-full ${widthClass} shrink-0 grow-0 flex-col rounded-tr-2xl transition-all duration-300 ${bgClass}`
@@ -295,6 +335,9 @@ const Sidebar = memo(() => {
       className={navClassName}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      aria-hidden={!isExperimentalWorkspace ? undefined : !isVisible}
+      // @ts-expect-error React 19 inert support
+      inert={!isExperimentalWorkspace ? undefined : !isVisible ? true : undefined}
     >
       <ErrorBoundary>
         {isPlaylistOpened && showSidebarPlaylistsSection && !isCompact ? (
@@ -317,6 +360,7 @@ const Sidebar = memo(() => {
               onReset={handleReset}
               isMovableActive={isMovableActive}
               onToggleMovable={toggleMovable}
+              onDraggingChange={handleResizerDraggingChange}
             />
 
             {/* Bottom Section: Playlists (Diagram 2/3) */}

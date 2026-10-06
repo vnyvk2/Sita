@@ -14,6 +14,8 @@ import { useLyricsScrollSync } from '../../LyricsPage/useLyricsScrollSync';
 type Props = {
   isLyricsVisible: boolean;
   className?: string;
+  lyricsData?: SongLyrics | null;
+  lyricsLoading?: boolean;
 };
 
 const LyricsContainer = (props: Props) => {
@@ -21,10 +23,15 @@ const LyricsContainer = (props: Props) => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const abLoop = useStore(store, (state) => state.player.abLoop);
 
-  const { isLyricsVisible, className } = props;
+  const { isLyricsVisible, className, lyricsData, lyricsLoading } = props;
   const { t } = useTranslation();
 
-  const { data: lyrics } = useLyricsQuery({ enabled: isLyricsVisible });
+  // When parent owns the query (passes lyricsLoading), use its data directly —
+  // even while undefined/pending — to avoid a duplicate subscription.
+  const parentOwnsQuery = lyricsLoading !== undefined;
+  const fallbackQuery = useLyricsQuery({ enabled: isLyricsVisible && !parentOwnsQuery });
+  const lyrics = parentOwnsQuery ? lyricsData : fallbackQuery.data;
+  const isLoadingLyrics = parentOwnsQuery ? (lyricsLoading ?? false) : fallbackQuery.isPending;
   useSkipLyricsLines(lyrics);
 
   const activeLineIndex = useActiveLyricIndex(isLyricsVisible ? lyrics : null);
@@ -89,6 +96,11 @@ const LyricsContainer = (props: Props) => {
           type="button"
           onClick={handleToggleScrollMode}
           aria-pressed={scrollMode === 'auto'}
+          aria-label={
+            scrollMode === 'auto'
+              ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
+              : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
+          }
           title={
             scrollMode === 'auto'
               ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
@@ -101,20 +113,28 @@ const LyricsContainer = (props: Props) => {
           </span>
         </button>
       )}
-      {isLyricsVisible && lyricsComponents.length > 0 && lyrics && lyrics.lyrics.isSynced && (
+      {isLyricsVisible && isLoadingLyrics && (
+        <div className="flex h-full w-full flex-col items-center justify-center opacity-60">
+          <span className="material-icons-round-outlined mb-2 animate-spin text-5xl">
+            progress_activity
+          </span>
+          <p>{t('common.loading', 'Loading...')}</p>
+        </div>
+      )}
+      {isLyricsVisible && !isLoadingLyrics && lyricsComponents.length > 0 && lyrics?.lyrics?.isSynced && (
         <>
           {lyricsComponents}
           {lyricsSource}
         </>
       )}
-      {isLyricsVisible && lyrics && !lyrics.lyrics.isSynced && (
+      {isLyricsVisible && !isLoadingLyrics && lyrics?.lyrics && !lyrics.lyrics.isSynced && (
         <div className="text-font-color-highlight flex h-full w-full flex-col justify-center text-2xl opacity-50">
           <span className="material-icons-round-outlined mb-2 text-5xl">brightness_alert</span>
           {t('lyricsPage.noSyncedLyrics')}
           <p className="mt-4 text-base">{t('lyricsPage.noSyncedLyricsDescription')}</p>
         </div>
       )}
-      {isLyricsVisible && lyrics === undefined && (
+      {isLyricsVisible && !isLoadingLyrics && !lyrics?.lyrics && (
         <div className="text-font-color-highlight flex h-full w-full flex-col justify-center text-2xl opacity-50">
           <span className="material-icons-round-outlined mb-2 text-5xl">brightness_alert</span>
           <p>{t('lyricsPage.noLyrics')}</p>

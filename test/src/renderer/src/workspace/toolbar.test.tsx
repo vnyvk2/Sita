@@ -29,6 +29,9 @@ describe('WorkspaceToolbar', () => {
       maximizedPanelId: null,
       isToolbarCollapsed: false,
       sidebarMode: 'expanded',
+      sidebarWidthMode: 'expanded',
+      isSidebarPinned: true,
+      isSidebarPeeking: false,
       isSaveLayoutModalOpen: false,
       saveLayoutModalMode: 'save',
       targetWorkspaceId: null

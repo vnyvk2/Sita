@@ -7,10 +7,18 @@ interface SidebarResizerProps {
   isMovableActive: boolean;
   onToggleMovable: () => void;
   containerRef: React.RefObject<HTMLElement | null>;
+  onDraggingChange?: (dragging: boolean) => void;
 }
 
 export const SidebarResizer = memo(
-  ({ onResize, onReset, isMovableActive, onToggleMovable, containerRef }: SidebarResizerProps) => {
+  ({
+    onResize,
+    onReset,
+    isMovableActive,
+    onToggleMovable,
+    containerRef,
+    onDraggingChange
+  }: SidebarResizerProps) => {
     const { t } = useTranslation();
     const [isDragging, setIsDragging] = useState(false);
     const startYRef = useRef<number>(0);
@@ -21,6 +29,7 @@ export const SidebarResizer = memo(
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(true);
+        onDraggingChange?.(true);
         startYRef.current = e.clientY;
 
         const container = containerRef.current;
@@ -30,7 +39,7 @@ export const SidebarResizer = memo(
           initialRatioRef.current = Math.min(Math.max(currentY / rect.height, 0.2), 0.8);
         }
       },
-      [containerRef]
+      [containerRef, onDraggingChange]
     );
 
     useEffect(() => {
@@ -41,6 +50,7 @@ export const SidebarResizer = memo(
         if (!container) return;
 
         const rect = container.getBoundingClientRect();
+        if (rect.height <= 0) return;
         const relativeY = e.clientY - rect.top;
         const newRatio = Math.min(Math.max(relativeY / rect.height, 0.2), 0.8);
         onResize(newRatio);
@@ -48,6 +58,7 @@ export const SidebarResizer = memo(
 
       const handleMouseUp = () => {
         setIsDragging(false);
+        onDraggingChange?.(false);
       };
 
       window.addEventListener('mousemove', handleMouseMove);
@@ -61,7 +72,7 @@ export const SidebarResizer = memo(
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
       };
-    }, [isDragging, onResize, containerRef]);
+    }, [isDragging, onResize, containerRef, onDraggingChange]);
 
     return (
       <div

@@ -28,7 +28,7 @@ const useMouseActiveState = (
 ) => {
   const { idleTimeout, activeTimeout, range, idleOnMouseOut } = options;
 
-  const [isMouseActive, setIsMouseActive] = useState(false);
+  const [isMouseActive, setIsMouseActive] = useState(true);
   const prevPositionRef = useRef({ x: 0, y: 0 });
   const activeTimeOutIdRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const idleTimeOutIdRef = useRef<NodeJS.Timeout | undefined>(undefined);

@@ -19,7 +19,8 @@ vi.mock('@renderer/hooks/useContextMenu', () => ({
 describe('Panel Header Fusion & PanelHeaderSlot', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    dndStore.setState(() => ({
+    dndStore.setState((s) => ({
+      ...s,
       isDragging: false,
       currentDrag: null,
       hoveredDropTarget: null,
@@ -350,6 +351,59 @@ describe('Panel Header Fusion & PanelHeaderSlot', () => {
       expect(portalTarget.querySelector('[data-testid="inactive-clear-btn"]')).toBeNull();
 
       document.body.removeChild(portalTarget);
+    });
+
+    it('hands off portal content synchronously when the active tab switches', () => {
+      const portalTarget = document.createElement('div');
+      document.body.appendChild(portalTarget);
+
+      const tabsTree = (activePanelId: string) => (
+        <TabActionsContext.Provider value={{ target: portalTarget, activePanelId }}>
+          <PanelFrame panelId="p_a" type="queue" title="A" icon="a" showHeader={false}>
+            <PanelHeaderSlot info={<span data-testid="info-a">A info</span>} />
+          </PanelFrame>
+          <PanelFrame panelId="p_b" type="queue" title="B" icon="b" showHeader={false}>
+            <PanelHeaderSlot info={<span data-testid="info-b">B info</span>} />
+          </PanelFrame>
+        </TabActionsContext.Provider>
+      );
+
+      // Both frames stay mounted across the switch (inactive keeps fragment
+      // registered but gated), so the incoming portal appears on the same commit.
+      const { rerender } = render(tabsTree('p_a'));
+      expect(portalTarget.querySelector('[data-testid="info-a"]')?.textContent).toBe('A info');
+      expect(portalTarget.querySelector('[data-testid="info-b"]')).toBeNull();
+
+      rerender(tabsTree('p_b'));
+      expect(portalTarget.querySelector('[data-testid="info-a"]')).toBeNull();
+      expect(portalTarget.querySelector('[data-testid="info-b"]')?.textContent).toBe('B info');
+
+      document.body.removeChild(portalTarget);
+    });
+
+    it('updates header fragment in place when slot props change (no remount)', () => {
+      const { rerender } = render(
+        <PanelFrame panelId="p_test" type="queue" title="Queue" icon="queue_music">
+          <PanelHeaderSlot info={<span data-testid="swap-info">v1</span>} />
+        </PanelFrame>
+      );
+      expect(screen.getByTestId('swap-info').textContent).toBe('v1');
+
+      rerender(
+        <PanelFrame panelId="p_test" type="queue" title="Queue" icon="queue_music">
+          <PanelHeaderSlot info={<span data-testid="swap-info">v2</span>} />
+        </PanelFrame>
+      );
+      expect(screen.getByTestId('swap-info').textContent).toBe('v2');
+    });
+  });
+
+  describe('Store hygiene', () => {
+    it('preserves sidebar fields across test resets', () => {
+      // Guards the regression where setState without spread wiped these to undefined
+      expect(dndStore.state.sidebarWidthMode).toBeDefined();
+      expect(dndStore.state.isSidebarPinned).toBeDefined();
+      expect(dndStore.state.isSidebarPeeking).toBeDefined();
     });
   });
 });

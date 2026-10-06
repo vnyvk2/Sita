@@ -81,7 +81,9 @@ describe('FullScreenPlayer', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseLyricsQuery.mockReturnValue({ data: undefined });
+    mockUseLyricsQuery.mockReturnValue({ data: undefined, isPending: false });
+    mockAudioPlayer.currentTime = 45;
+    mockAudioPlayer.duration = 180;
 
     // Mock window.api appControls
     window.api = {
@@ -123,7 +125,7 @@ describe('FullScreenPlayer', () => {
   });
 
   afterEach(() => {
-    store.setState(() => initialStore);
+    store.setState(() => ({ ...initialStore }));
   });
 
   it('renders FullScreenPlayer in Centered Showcase layout when lyrics are inactive', () => {
@@ -154,7 +156,8 @@ describe('FullScreenPlayer', () => {
             }
           ]
         }
-      }
+      },
+      isPending: false
     });
 
     renderPlayer();
@@ -217,7 +220,8 @@ describe('FullScreenPlayer', () => {
 
   it('remains in Showcase layout without thrashing when lyrics are enabled but unavailable', () => {
     mockUseLyricsQuery.mockReturnValue({
-      data: { lyrics: null }
+      data: { lyrics: null },
+      isPending: false
     });
 
     renderPlayer();

@@ -139,43 +139,53 @@ export const QueuePanel: FC<PanelProps> = memo(() => {
     return `${t('common.queue', 'Queue')} ${activeQueueIndex + 1}`;
   }, [currentQueue?.metadata, activeQueueIndex, t]);
 
+  const headerInfo = useMemo(
+    () => (
+      <>
+        <span className="text-font-color-black dark:text-font-color-white truncate text-[11px] font-semibold">
+          {queueTitle}
+        </span>
+        <span className="text-font-color-dimmed rounded-full bg-stone-200 px-1.5 py-px text-[9px] leading-tight font-medium dark:bg-stone-800">
+          {songIds.length} {t('common.song_other', 'songs')}
+        </span>
+      </>
+    ),
+    [queueTitle, songIds.length, t]
+  );
+
+  const headerActions = useMemo(
+    () =>
+      songIds.length > 0 ? (
+        <button
+          type="button"
+          onClick={handleClearQueue}
+          title={t('currentQueuePage.clearQueue', 'Clear queue')}
+          aria-label={t('currentQueuePage.clearQueue', 'Clear queue')}
+          className="text-font-color-dimmed flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
+        >
+          <span className="material-symbols-rounded text-[14px]">clear_all</span>
+        </button>
+      ) : null,
+    [songIds.length, handleClearQueue, t]
+  );
+
+  const headerMenu = useCallback(
+    () =>
+      songIds.length > 0
+        ? [
+            {
+              label: t('currentQueuePage.clearQueue', 'Clear queue'),
+              icon: 'clear_all',
+              handler: handleClearQueue
+            }
+          ]
+        : [],
+    [songIds.length, handleClearQueue, t]
+  );
+
   return (
     <div className="queue-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white flex h-full w-full flex-col overflow-hidden">
-      <PanelHeaderSlot
-        info={
-          <>
-            <span className="text-font-color-black dark:text-font-color-white truncate text-[11px] font-semibold">
-              {queueTitle}
-            </span>
-            <span className="text-font-color-dimmed rounded-full bg-stone-200 px-1.5 py-px text-[9px] leading-tight font-medium dark:bg-stone-800">
-              {songIds.length} {t('common.song_other', 'songs')}
-            </span>
-          </>
-        }
-        actions={
-          songIds.length > 0 ? (
-            <button
-              type="button"
-              onClick={handleClearQueue}
-              title={t('currentQueuePage.clearQueue', 'Clear queue')}
-              className="text-font-color-dimmed flex h-5 w-5 cursor-pointer items-center justify-center rounded hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400"
-            >
-              <span className="material-symbols-rounded text-[14px]">clear_all</span>
-            </button>
-          ) : null
-        }
-        menu={() =>
-          songIds.length > 0
-            ? [
-                {
-                  label: t('currentQueuePage.clearQueue', 'Clear queue'),
-                  icon: 'clear_all',
-                  handler: handleClearQueue
-                }
-              ]
-            : []
-        }
-      />
+      <PanelHeaderSlot info={headerInfo} actions={headerActions} menu={headerMenu} />
 
       {/* Song list */}
       <div className="min-h-0 flex-1 overflow-hidden p-1">

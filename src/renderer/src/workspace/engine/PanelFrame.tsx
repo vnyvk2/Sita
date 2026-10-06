@@ -13,7 +13,8 @@ import {
 } from './PanelHeaderContext';
 import { usePanelDragDrop } from './usePanelDragDrop';
 
-const INTERACTIVE_SELECTOR = 'button, a, input, select, textarea, [role="button"], [data-no-drag]';
+const INTERACTIVE_SELECTOR =
+  'button, a, input, select, textarea, [role="button"], [role="tab"], [role="slider"], [contenteditable], summary, [data-no-drag]';
 
 function isInteractiveTarget(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(INTERACTIVE_SELECTOR));
@@ -75,7 +76,7 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
         for (const item of customItems) {
           items.push({
             label: item.label,
-            iconName: item.icon,
+            iconName: item.icon || 'more_horiz',
             handlerFunction: item.handler
           });
         }
@@ -94,7 +95,12 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
     const openHeaderMenu = (e: React.MouseEvent): void => {
       e.preventDefault();
       e.stopPropagation();
-      updateContextMenuData(true, buildHeaderMenu(), e.pageX, e.pageY + 12);
+      // Clamp near viewport edges so menu never renders off-screen
+      const menuWidth = 220;
+      const menuHeight = 240;
+      const x = Math.max(8, Math.min(e.pageX, window.innerWidth - menuWidth - 8));
+      const y = Math.max(8, Math.min(e.pageY + 12, window.innerHeight - menuHeight - 8));
+      updateContextMenuData(true, buildHeaderMenu(), x, y);
     };
 
     const portalToTabStrip =
@@ -113,6 +119,21 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
             tabActions.target
           )
         : null;
+
+    // Misuse guard: showHeader=false is only honored inside a TabGroup provider.
+    // Standalone use silently drops the fragment, so warn in dev instead.
+    if (
+      import.meta.env.DEV &&
+      !showHeader &&
+      fragment &&
+      tabActions.target === null &&
+      tabActions.activePanelId === null
+    ) {
+      console.warn(
+        `[PanelFrame:${panelId}] showHeader=false outside a TabGroup drops header actions. ` +
+          `Render inside TabGroup or use showHeader instead.`
+      );
+    }
 
     return (
       <div
@@ -161,7 +182,7 @@ export const PanelFrame: FC<PanelFrameProps> = memo(
             {/* Right: Panel actions + Frame controls */}
             <div className="flex shrink-0 items-center gap-1">
               {fragment?.actions}
-              <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                 <button
                   type="button"
                   onClick={handleMaximizeClick}

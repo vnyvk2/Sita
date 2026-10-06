@@ -9,7 +9,14 @@ export const FullScreenAudioBadge = memo(() => {
     if (!currentSongData || !currentSongData.songId) return null;
 
     const path = currentSongData.path || '';
-    const extension = path.includes('.') ? path.split('.').pop()?.toUpperCase() : '';
+    // Robust extension: strip query/fragment, take basename, then extension after last dot
+    const cleanPath = path.split(/[?#]/)[0] ?? '';
+    const basename = cleanPath.split(/[\\/]/).pop() ?? '';
+    const dotIndex = basename.lastIndexOf('.');
+    const extension =
+      dotIndex > 0 && dotIndex < basename.length - 1
+        ? basename.slice(dotIndex + 1).toUpperCase()
+        : '';
 
     const isLossless = ['FLAC', 'WAV', 'ALAC', 'AIFF', 'DSD', 'APE'].includes(extension || '');
     const sampleRateKHz = currentSongData.sampleRate

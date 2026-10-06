@@ -122,4 +122,56 @@ describe('FullScreenAudioBadge', () => {
     expect(screen.getByText('320 kbps')).toBeDefined();
     expect(screen.queryByText('Lossless')).toBeNull();
   });
+
+  it('does not treat dotted directories as extensions', () => {
+    store.setState((prev) => ({
+      ...prev,
+      currentSongData: {
+        songId: 104,
+        title: 'Extensionless',
+        duration: 180,
+        isAFavorite: false,
+        isArtworkAvailable: false,
+        path: '/music.v2/song',
+        sampleRate: 44100,
+        bitrate: 320000,
+        addedDate: 0,
+        isBlacklisted: false,
+        artworkPaths: {
+          artworkPath: '',
+          optimizedArtworkPath: '',
+          isDefaultArtwork: true
+        }
+      }
+    }));
+
+    render(<FullScreenAudioBadge />);
+    // Must not render a garbage "V2/SONG" pill
+    expect(screen.queryByText('V2/SONG')).toBeNull();
+  });
+
+  it('strips query strings from stream URLs before parsing extension', () => {
+    store.setState((prev) => ({
+      ...prev,
+      currentSongData: {
+        songId: 105,
+        title: 'Stream',
+        duration: 180,
+        isAFavorite: false,
+        isArtworkAvailable: false,
+        path: 'http://stream/song.mp3?token=123',
+        addedDate: 0,
+        isBlacklisted: false,
+        artworkPaths: {
+          artworkPath: '',
+          optimizedArtworkPath: '',
+          isDefaultArtwork: true
+        }
+      }
+    }));
+
+    render(<FullScreenAudioBadge />);
+    expect(screen.getByText('MP3')).toBeDefined();
+    expect(screen.queryByText('MP3?TOKEN=123')).toBeNull();
+  });
 });

@@ -13,9 +13,9 @@ import VolumeSlider from '../../VolumeSlider';
 
 interface FullScreenControlsProps {
   isLyricsVisible: boolean;
-  setIsLyricsVisible: (fn: (prev: boolean) => boolean) => void;
+  setIsLyricsVisible: React.Dispatch<React.SetStateAction<boolean>>;
   isQueueVisible: boolean;
-  setIsQueueVisible: (fn: (prev: boolean) => boolean) => void;
+  setIsQueueVisible: React.Dispatch<React.SetStateAction<boolean>>;
   className?: string;
 }
 
@@ -199,7 +199,7 @@ export const FullScreenControls = ({
                 : 'opacity-70 hover:opacity-100'
             }`}
             tooltipLabel={t('player.muteUnmute')}
-            iconName={isMuted ? 'volume_off' : volume > 50 ? 'volume_up' : 'volume_down_alt'}
+            iconName={isMuted || volume === 0 ? 'volume_off' : volume > 50 ? 'volume_up' : 'volume_down_alt'}
             iconClassName="material-icons-round text-xl"
             clickHandler={() => toggleMutedState(!isMuted)}
           />

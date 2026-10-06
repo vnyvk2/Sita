@@ -272,7 +272,12 @@ export const WorkspaceToolbar: FC = memo(() => {
   if (!activeWs) return null;
 
   if (isToolbarCollapsed) {
-    return <SaveLayoutModal />;
+    return (
+      <>
+        <SaveLayoutModal />
+        <ConfirmDeleteModal />
+      </>
+    );
   }
 
   return (

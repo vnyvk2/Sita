@@ -1,7 +1,7 @@
 import { AppUpdateContext, type AppUpdateContextType } from '@renderer/contexts/AppUpdateContext';
 import { store } from '@renderer/store/store';
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -74,7 +74,7 @@ describe('FullScreenSeekbar', () => {
     expect(progressBar.style.width).toBe('25%');
   });
 
-  it('shows hover scrub preview tooltip when hovering over track', () => {
+  it('shows hover scrub preview tooltip when hovering over track', async () => {
     renderWithContext(<FullScreenSeekbar />);
 
     const track = screen.getByRole('slider');
@@ -93,6 +93,11 @@ describe('FullScreenSeekbar', () => {
 
     // Hover at clientX = 300 (middle, which is 50% = 100 seconds = 01:40)
     fireEvent.mouseMove(track, { clientX: 300 });
+
+    // Tooltip is rAF-throttled: flush one frame inside act
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
 
     const tooltip = screen.getByTestId('fullscreen-seekbar-tooltip');
     expect(tooltip).toBeDefined();
@@ -181,5 +186,89 @@ describe('FullScreenSeekbar', () => {
     expect(mockUpdateSongPosition).toHaveBeenCalledWith(85);
     expect(onSeekMock).toHaveBeenCalledWith(85);
     vi.useRealTimers();
+  });
+
+  it('resumes position updates after touchcancel instead of freezing', () => {
+    renderWithContext(<FullScreenSeekbar />);
+
+    const track = screen.getByRole('slider');
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 200,
+      height: 24,
+      right: 200,
+      bottom: 24,
+      x: 0,
+      y: 0,
+      toJSON: () => {}
+    });
+
+    // Start touch drag, then OS cancels it (interruption / gesture takeover)
+    fireEvent.touchStart(track, { touches: [{ clientX: 50 }] });
+    window.dispatchEvent(new Event('touchcancel'));
+
+    // Next playback tick must still update the bar (no stuck-drag freeze)
+    document.dispatchEvent(new CustomEvent('player/positionChange', { detail: 60 }));
+    expect(screen.getByTestId('fullscreen-elapsed-time').textContent).toBe('01:00');
+    expect(screen.getByTestId('fullscreen-seekbar-progress').style.width).toBe('30%');
+  });
+
+  it('ignores clicks when track has no layout box instead of seeking to end', () => {
+    const onSeekMock = vi.fn();
+    renderWithContext(<FullScreenSeekbar onSeek={onSeekMock} />);
+
+    const track = screen.getByRole('slider');
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 0,
+      height: 24,
+      right: 0,
+      bottom: 24,
+      x: 0,
+      y: 0,
+      toJSON: () => {}
+    });
+
+    fireEvent.mouseDown(track, { clientX: 100 });
+    window.dispatchEvent(new MouseEvent('mouseup'));
+
+    expect(mockUpdateSongPosition).not.toHaveBeenCalled();
+    expect(onSeekMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId('fullscreen-seekbar-progress').style.width).toBe('0%');
+  });
+
+  it('does not reset progress to 0 when duration resolves late mid-song', () => {
+    renderWithContext(<FullScreenSeekbar />);
+
+    document.dispatchEvent(new CustomEvent('player/positionChange', { detail: 50 }));
+    expect(screen.getByTestId('fullscreen-seekbar-progress').style.width).toBe('25%');
+
+    // Late metadata: same songId, duration arrives (store update re-renders)
+    store.setState((prev) => ({
+      ...prev,
+      currentSongData: { ...prev.currentSongData, duration: 200 }
+    }));
+    document.dispatchEvent(new CustomEvent('player/positionChange', { detail: 60 }));
+
+    expect(screen.getByTestId('fullscreen-elapsed-time').textContent).toBe('01:00');
+    expect(screen.getByTestId('fullscreen-seekbar-progress').style.width).toBe('30%');
+  });
+
+  it('supports keyboard seeking on the slider with correct aria value', () => {
+    const onSeekMock = vi.fn();
+    renderWithContext(<FullScreenSeekbar onSeek={onSeekMock} />);
+
+    document.dispatchEvent(new CustomEvent('player/positionChange', { detail: 50 }));
+    const track = screen.getByRole('slider');
+    expect(track.getAttribute('aria-valuenow')).toBe('50');
+
+    fireEvent.keyDown(track, { key: 'ArrowRight' });
+    expect(mockUpdateSongPosition).toHaveBeenCalledWith(55);
+    expect(track.getAttribute('aria-valuenow')).toBe('55');
+
+    fireEvent.keyDown(track, { key: 'Home' });
+    expect(mockUpdateSongPosition).toHaveBeenCalledWith(0);
   });
 });
