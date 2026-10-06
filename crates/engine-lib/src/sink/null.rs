@@ -60,11 +60,7 @@ impl NullSink {
 
     /// Drain a chunk of samples directly from an rtrb consumer.
     /// Updates low-water mark and detects buffer starvation (xruns) if available < requested.
-    pub fn drain_chunk(
-        &mut self,
-        consumer: &mut rtrb::Consumer<f32>,
-        chunk_size: usize,
-    ) -> usize {
+    pub fn drain_chunk(&mut self, consumer: &mut rtrb::Consumer<f32>, chunk_size: usize) -> usize {
         if !self.is_open || !self.is_running {
             return 0;
         }
@@ -128,7 +124,8 @@ impl NullSink {
 
 impl OutputBackend for NullSink {
     fn open(&mut self, spec: AudioSpec) -> Result<(), SinkError> {
-        spec.validate().map_err(|e| SinkError::InvalidState(e.to_string()))?;
+        spec.validate()
+            .map_err(|e| SinkError::InvalidState(e.to_string()))?;
         self.spec = Some(spec);
         self.is_open = true;
         self.is_running = false;
@@ -175,5 +172,9 @@ impl OutputBackend for NullSink {
 
     fn is_running(&self) -> bool {
         self.is_running
+    }
+
+    fn sink_type(&self) -> &'static str {
+        engine_protocol::SINK_TYPE_NULL
     }
 }

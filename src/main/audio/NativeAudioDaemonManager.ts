@@ -227,7 +227,11 @@ export class NativeAudioDaemonManager {
       this.lastBinaryPath = binaryPath;
       const child = spawn(binaryPath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        windowsHide: true
+        windowsHide: true,
+        env: {
+          ...process.env,
+          RUST_LOG: process.env.RUST_LOG ?? 'info'
+        }
       });
 
       this.child = child;

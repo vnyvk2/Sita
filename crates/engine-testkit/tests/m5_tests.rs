@@ -100,6 +100,7 @@ fn test_all_9_daemon_events_json_roundtrip() {
             duration_secs: 240.0,
             wallclock_ms: 12500,
             is_playing: true,
+            sink_type: Some(engine_protocol::SINK_TYPE_CPAL_HARDWARE.to_string()),
         },
     ];
 

@@ -127,7 +127,8 @@ impl WavSink {
 
 impl OutputBackend for WavSink {
     fn open(&mut self, spec: AudioSpec) -> Result<(), SinkError> {
-        spec.validate().map_err(|e| SinkError::InvalidState(e.to_string()))?;
+        spec.validate()
+            .map_err(|e| SinkError::InvalidState(e.to_string()))?;
 
         let hound_spec = hound::WavSpec {
             channels: spec.channels,
@@ -195,6 +196,10 @@ impl OutputBackend for WavSink {
 
     fn is_running(&self) -> bool {
         self.is_running
+    }
+
+    fn sink_type(&self) -> &'static str {
+        engine_protocol::SINK_TYPE_WAV
     }
 }
 

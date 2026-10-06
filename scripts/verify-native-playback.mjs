@@ -1,5 +1,6 @@
-import { _electron as electron } from 'playwright';
 import path from 'path';
+
+import { _electron as electron } from 'playwright';
 
 async function run() {
   console.log('=== STARTING FULL END-TO-END VERIFICATION ===');
@@ -29,7 +30,10 @@ async function run() {
   });
 
   // Wait for window.api
-  await page.waitForFunction(() => typeof window.api !== 'undefined' && typeof window.api.audioLibraryControls !== 'undefined');
+  await page.waitForFunction(
+    () =>
+      typeof window.api !== 'undefined' && typeof window.api.audioLibraryControls !== 'undefined'
+  );
   console.log('window.api and audioLibraryControls are ready');
 
   // Step 1: Navigate to Settings Page
@@ -87,7 +91,9 @@ async function run() {
   await page.waitForTimeout(2000);
 
   // Wait for .play-all-btn
-  await page.waitForFunction(() => document.querySelector('button.play-all-btn') !== null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('button.play-all-btn') !== null, {
+    timeout: 15000
+  });
 
   // Step 4: Click Play All
   console.log('\n--- Step 4: Starting playback with Play All ---');
@@ -104,7 +110,9 @@ async function run() {
     const playState = await page.evaluate(async () => {
       const bottomTitleEl = document.querySelector('.song-controls-container .song-title');
       const bottomTitle = bottomTitleEl ? bottomTitleEl.textContent?.trim() : null;
-      const nativeSetting = JSON.parse(localStorage.getItem('playback') || '{}')?.useNativeAudioEngine;
+      const nativeSetting = JSON.parse(
+        localStorage.getItem('playback') || '{}'
+      )?.useNativeAudioEngine;
       let daemon = null;
       try {
         daemon = await window.api.audioEngine.send({ cmd: 'get_state' });
@@ -138,7 +146,9 @@ async function run() {
     const playState = await page.evaluate(async () => {
       const bottomTitleEl = document.querySelector('.song-controls-container .song-title');
       const bottomTitle = bottomTitleEl ? bottomTitleEl.textContent?.trim() : null;
-      const nativeSetting = JSON.parse(localStorage.getItem('playback') || '{}')?.useNativeAudioEngine;
+      const nativeSetting = JSON.parse(
+        localStorage.getItem('playback') || '{}'
+      )?.useNativeAudioEngine;
       let daemon = null;
       try {
         daemon = await window.api.audioEngine.send({ cmd: 'get_state' });
@@ -161,21 +171,42 @@ async function run() {
   console.log(`Track 1 title in bottom player: "${song1Data}"`);
   console.log(`Track 2 title in bottom player: "${song2Data}"`);
 
-  // Final check: is native engine still active or did it fall back?
+  // Final check: is native engine still active and emitting hardware audio?
   const finalNative = await page.evaluate(() => {
     return JSON.parse(localStorage.getItem('playback') || '{}')?.useNativeAudioEngine;
   });
   console.log(`Final useNativeAudioEngine in localStorage: ${finalNative}`);
-  const pass = finalNative === true && song1Data !== null && song2Data !== null && song1Data !== song2Data;
+
+  const daemonResp = await page.evaluate(async () => {
+    try {
+      return await window.api.audioEngine.send({ cmd: 'get_state' });
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+
+  const sinkType = daemonResp?.data?.sink_type ?? null;
+  const isPlaying = daemonResp?.data?.state === 'playing';
+
+  console.log(
+    `Verification state: ${JSON.stringify({ nativeSetting: finalNative, sinkType, isPlaying })}`
+  );
+
+  const pass =
+    finalNative === true &&
+    sinkType === 'cpal_hardware' &&
+    isPlaying === true &&
+    song1Data !== null &&
+    song2Data !== null &&
+    song1Data !== song2Data;
+
   console.log(`VERIFICATION RESULT: ${pass ? 'PASSED (100% SUCCESS)' : 'FAILED'}`);
 
   await app.close();
-  if (!pass) {
-    process.exit(1);
-  }
+  process.exitCode = pass ? 0 : 1;
 }
 
 run().catch((err) => {
   console.error('Test run failed:', err);
-  process.exit(1);
+  process.exitCode = 1;
 });

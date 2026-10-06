@@ -5,16 +5,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use engine_protocol::{
-    generate_boot_id, DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, DaemonResult,
-    PlaybackState, SlotId, SoundProfile, SoundProfileStatus,
-};
 use engine_lib::buffer::BoundedAudioTransport;
 use engine_lib::decoder::{DecoderPipeline, StereoResampler};
 use engine_lib::dsp::{DspConfig, DspPipeline};
 use engine_lib::mixer::{DualSlotMixer, SlotId as LibSlotId};
 use engine_lib::sink::{AudioSource, CpalBackend, OutputBackend};
 use engine_lib::types::{AudioSpec, SinkError};
+use engine_protocol::{
+    generate_boot_id, DaemonCommand, DaemonEvent, DaemonRequest, DaemonResponse, DaemonResult,
+    PlaybackState, SlotId, SoundProfile, SoundProfileStatus,
+};
 
 /// Core daemon controller managing background decoder threads, audio sinks, and the 4Hz heartbeat.
 ///
@@ -34,7 +34,7 @@ pub struct EngineDaemon {
     is_playing: Arc<AtomicBool>,
     state: PlaybackState,
     active_slot: Arc<AtomicU8>, // 0 for SlotId::A, 1 for SlotId::B
-    volume: Arc<AtomicU32>, // master gain as f32 bits; applied post-DSP (see below)
+    volume: Arc<AtomicU32>,     // master gain as f32 bits; applied post-DSP (see below)
     shared_engine: Arc<Mutex<(DualSlotMixer, DspPipeline)>>,
     backend: CpalBackend,
     start_time: Instant,
@@ -43,7 +43,7 @@ pub struct EngineDaemon {
     slot_frames_consumed: Arc<(AtomicU64, AtomicU64)>, // lock-free frames consumed mirror
     slot_paths: Arc<Mutex<[Option<String>; 2]>>, // last loaded path per slot for seek respawn
     eos_notified: Arc<(AtomicBool, AtomicBool)>, // TrackEnd already emitted per slot
-    output_rate: Arc<AtomicU32>, // device render rate in Hz; single source of truth
+    output_rate: Arc<AtomicU32>,                 // device render rate in Hz; single source of truth
     cb_contention: Arc<AtomicU64>, // RT callback lock losses; DAC-session audit instrument
 }
 
@@ -65,7 +65,10 @@ impl EngineDaemon {
             state: PlaybackState::Stopped,
             active_slot: Arc::new(AtomicU8::new(0)),
             volume: Arc::new(AtomicU32::new(1.0f32.to_bits())),
-            shared_engine: Arc::new(Mutex::new((DualSlotMixer::new(), DspPipeline::new(48000.0)))),
+            shared_engine: Arc::new(Mutex::new((
+                DualSlotMixer::new(),
+                DspPipeline::new(48000.0),
+            ))),
             backend: CpalBackend::new(),
             start_time: Instant::now(),
             slot_durations: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
@@ -170,8 +173,12 @@ impl EngineDaemon {
                     LibSlotId::B => 1,
                 };
                 active_slot_cb.store(slot_idx, Ordering::Relaxed);
-                frames_consumed_cb.0.store(mixer.slot_a.frames_consumed, Ordering::Relaxed);
-                frames_consumed_cb.1.store(mixer.slot_b.frames_consumed, Ordering::Relaxed);
+                frames_consumed_cb
+                    .0
+                    .store(mixer.slot_a.frames_consumed, Ordering::Relaxed);
+                frames_consumed_cb
+                    .1
+                    .store(mixer.slot_b.frames_consumed, Ordering::Relaxed);
                 written
             } else {
                 // Contention policy (documented, deliberate): the callback
@@ -207,9 +214,13 @@ impl EngineDaemon {
 
     fn set_base_secs(&self, idx: usize, secs: f64) {
         if idx == 0 {
-            self.slot_base_secs.0.store(secs.to_bits(), Ordering::Release);
+            self.slot_base_secs
+                .0
+                .store(secs.to_bits(), Ordering::Release);
         } else {
-            self.slot_base_secs.1.store(secs.to_bits(), Ordering::Release);
+            self.slot_base_secs
+                .1
+                .store(secs.to_bits(), Ordering::Release);
         }
     }
 
@@ -252,7 +263,11 @@ impl EngineDaemon {
         let lib_slot = if idx == 0 { LibSlotId::A } else { LibSlotId::B };
         let target = target_secs.max(0.0);
         let duration = self.duration_secs(idx);
-        let clamped = if duration > 0.0 { target.min(duration) } else { target };
+        let clamped = if duration > 0.0 {
+            target.min(duration)
+        } else {
+            target
+        };
 
         let path = self
             .slot_paths
@@ -275,7 +290,10 @@ impl EngineDaemon {
 
         if let Ok(mut guard) = self.shared_engine.lock() {
             guard.0.cancel_crossfade(lib_slot);
-            guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
+            guard
+                .0
+                .slot_mut(lib_slot)
+                .prime(consumer, spec, stop_signal);
             // Keep the freshly primed slot playing if we were playing.
             if self.state == PlaybackState::Playing {
                 guard.0.slot_mut(lib_slot).play();
@@ -314,7 +332,11 @@ impl EngineDaemon {
             }
             let in_rate = pipeline.spec().sample_rate;
             let Ok(mut resampler) = StereoResampler::new(in_rate, target_rate) else {
-                log::error!("resampler construction failed ({} -> {})", in_rate, target_rate);
+                log::error!(
+                    "resampler construction failed ({} -> {})",
+                    in_rate,
+                    target_rate
+                );
                 stop_flag.store(true, Ordering::Relaxed);
                 return;
             };
@@ -372,17 +394,30 @@ impl EngineDaemon {
 
         let probed = match engine_lib::decoder::probe_file(&path) {
             Ok(p) => p,
-            Err(e) => return DaemonResult::Error { message: format!("Probe failed: {}", e) },
+            Err(e) => {
+                return DaemonResult::Error {
+                    message: format!("Probe failed: {}", e),
+                }
+            }
         };
 
-        let duration_secs = probed.estimated_duration.map(|d| d.as_secs_f64()).unwrap_or(0.0);
+        let duration_secs = probed
+            .estimated_duration
+            .map(|d| d.as_secs_f64())
+            .unwrap_or(0.0);
         let sample_rate = probed.spec.sample_rate;
         let channels = probed.spec.channels;
         let codec = probed.codec.clone();
 
         match slot {
-            SlotId::A => self.slot_durations.0.store(duration_secs.to_bits(), Ordering::Release),
-            SlotId::B => self.slot_durations.1.store(duration_secs.to_bits(), Ordering::Release),
+            SlotId::A => self
+                .slot_durations
+                .0
+                .store(duration_secs.to_bits(), Ordering::Release),
+            SlotId::B => self
+                .slot_durations
+                .1
+                .store(duration_secs.to_bits(), Ordering::Release),
         }
         // Fresh per-slot playhead: base 0, no stale TrackEnd.
         self.set_base_secs(Self::slot_idx(slot), 0.0);
@@ -401,25 +436,45 @@ impl EngineDaemon {
         let stop_signal = Arc::new(AtomicBool::new(false));
 
         // Spawn background decoder thread with sinc resampling
-        Self::spawn_decoder_thread(path.clone(), 0.0, producer, Arc::clone(&stop_signal), target_rate);
+        Self::spawn_decoder_thread(
+            path.clone(),
+            0.0,
+            producer,
+            Arc::clone(&stop_signal),
+            target_rate,
+        );
 
         // prime() signals any previous decoder on this slot to exit
         // before dropping its consumer (no orphaned threads).
         if let Ok(mut guard) = self.shared_engine.lock() {
             let was_crossfading = guard.0.crossfade.is_some();
             let current_active_idx = self.active_slot.load(Ordering::Relaxed) as usize;
-            let current_active_lib = if current_active_idx == 0 { LibSlotId::A } else { LibSlotId::B };
-            let current_active_empty = guard.0.slot(current_active_lib).state == engine_lib::mixer::SlotState::Empty;
-            let current_active_eos = guard.0.slot(current_active_lib).state == engine_lib::mixer::SlotState::Eos;
+            let current_active_lib = if current_active_idx == 0 {
+                LibSlotId::A
+            } else {
+                LibSlotId::B
+            };
+            let current_active_empty =
+                guard.0.slot(current_active_lib).state == engine_lib::mixer::SlotState::Empty;
+            let current_active_eos =
+                guard.0.slot(current_active_lib).state == engine_lib::mixer::SlotState::Eos;
             let target_is_active = current_active_lib == lib_slot;
 
-            let should_activate = !is_preload && (was_crossfading || current_active_empty || current_active_eos || target_is_active);
+            let should_activate = !is_preload
+                && (was_crossfading
+                    || current_active_empty
+                    || current_active_eos
+                    || target_is_active);
 
             if should_activate {
                 guard.0.set_active_slot(lib_slot);
-                self.active_slot.store(Self::slot_idx(slot) as u8, Ordering::Release);
+                self.active_slot
+                    .store(Self::slot_idx(slot) as u8, Ordering::Release);
             }
-            guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
+            guard
+                .0
+                .slot_mut(lib_slot)
+                .prime(consumer, spec, stop_signal);
         }
 
         if lib_slot == LibSlotId::A {
@@ -444,9 +499,7 @@ impl EngineDaemon {
     /// Execute command and return synchronous result.
     pub fn handle_command(&mut self, cmd: DaemonCommand) -> DaemonResult {
         match cmd {
-            DaemonCommand::Load { slot, path } => {
-                self.load_slot(slot, path, false)
-            }
+            DaemonCommand::Load { slot, path } => self.load_slot(slot, path, false),
             DaemonCommand::Preload { path } => {
                 let standby = if self.active_slot.load(Ordering::Relaxed) == 0 {
                     SlotId::B
@@ -544,7 +597,9 @@ impl EngineDaemon {
                     ((duration_ms as f64 / 1000.0) * self.output_rate_hz() as f64).round() as usize;
                 if let Ok(mut guard) = self.shared_engine.lock() {
                     if let Err(e) = guard.0.start_crossfade(frames) {
-                        return DaemonResult::Error { message: e.to_string() };
+                        return DaemonResult::Error {
+                            message: e.to_string(),
+                        };
                     }
                 }
                 DaemonResult::Ok { data: None }
@@ -566,7 +621,12 @@ impl EngineDaemon {
                 }
                 DaemonResult::Ok { data: None }
             }
-            DaemonCommand::SetDsp { bypass, rg_db, karaoke, limiter } => {
+            DaemonCommand::SetDsp {
+                bypass,
+                rg_db,
+                karaoke,
+                limiter,
+            } => {
                 if let Ok(mut guard) = self.shared_engine.lock() {
                     let current_gains = guard.1.config().eq_gains;
                     let current_profile = guard.1.config().sound_profile;
@@ -607,7 +667,9 @@ impl EngineDaemon {
             }
             DaemonCommand::SetDevice { device_id } => {
                 if let Err(e) = self.backend.select_device(Some(&device_id)) {
-                    DaemonResult::Error { message: e.to_string() }
+                    DaemonResult::Error {
+                        message: e.to_string(),
+                    }
                 } else {
                     DaemonResult::Ok { data: None }
                 }
@@ -631,6 +693,7 @@ impl EngineDaemon {
                 DaemonResult::Ok {
                     data: Some(serde_json::json!({
                         "state": self.state,
+                        "sink_type": self.backend.sink_type(),
                         "active_slot": slot_id,
                         "volume": f32::from_bits(self.volume.load(Ordering::Acquire)),
                         "xrun_count": stats.xrun_count,
@@ -678,6 +741,7 @@ impl EngineDaemon {
         let output_rate_hb = Arc::clone(&self.output_rate);
         let eos_notified_hb = Arc::clone(&self.eos_notified);
         let device_error_hb = self.backend.device_error_flag();
+        let is_mock_hb = self.backend.is_mock_fallback_flag();
         let shared_hb = Arc::clone(&self.shared_engine);
         let stdout_hb = Arc::clone(&stdout_lock);
         let start_time = self.start_time;
@@ -719,16 +783,22 @@ impl EngineDaemon {
                         .try_lock()
                         .ok()
                         .map(|mut g| {
-                            let id = if slot_idx == 0 { LibSlotId::A } else { LibSlotId::B };
-                            let standby = if slot_idx == 0 { LibSlotId::B } else { LibSlotId::A };
-                            let is_eos =
-                                g.0.slot(id).state == engine_lib::mixer::SlotState::Eos;
+                            let id = if slot_idx == 0 {
+                                LibSlotId::A
+                            } else {
+                                LibSlotId::B
+                            };
+                            let standby = if slot_idx == 0 {
+                                LibSlotId::B
+                            } else {
+                                LibSlotId::A
+                            };
+                            let is_eos = g.0.slot(id).state == engine_lib::mixer::SlotState::Eos;
                             // A beat landing between drain and splice would
                             // otherwise emit a spurious TrackEnd for a track
                             // that continues seamlessly: if the standby is
                             // buffered, the next render splices — wait for it.
-                            let splice_imminent =
-                                is_eos && g.0.slot(standby).has_audio();
+                            let splice_imminent = is_eos && g.0.slot(standby).has_audio();
                             let transition = g.0.pending_transition_complete.take();
                             (pos, is_eos && !splice_imminent, transition)
                         })
@@ -743,8 +813,16 @@ impl EngineDaemon {
                         LibSlotId::A => SlotId::A,
                         LibSlotId::B => SlotId::B,
                     };
-                    events.push(DaemonEvent::TransitionComplete { active_slot: new_slot });
+                    events.push(DaemonEvent::TransitionComplete {
+                        active_slot: new_slot,
+                    });
                 }
+
+                let sink_type_str = if is_mock_hb.load(Ordering::Relaxed) {
+                    engine_protocol::SINK_TYPE_DUMMY_PACED_CLOCK
+                } else {
+                    engine_protocol::SINK_TYPE_CPAL_HARDWARE
+                };
 
                 events.push(DaemonEvent::Heartbeat {
                     active_slot: slot_id,
@@ -752,6 +830,7 @@ impl EngineDaemon {
                     duration_secs,
                     wallclock_ms,
                     is_playing: true,
+                    sink_type: Some(sink_type_str.to_string()),
                 });
 
                 if eos {
@@ -769,7 +848,10 @@ impl EngineDaemon {
                         // Natural end: renderer auto-advance depends on these.
                         events.push(DaemonEvent::SlotEnd { slot: slot_id });
                         events.push(DaemonEvent::TrackEnd { slot: slot_id });
-                        events.push(DaemonEvent::StateChanged { state: PlaybackState::Stopped, position_secs: Some(position_secs) });
+                        events.push(DaemonEvent::StateChanged {
+                            state: PlaybackState::Stopped,
+                            position_secs: Some(position_secs),
+                        });
                         is_playing_hb.store(false, Ordering::Release);
                     }
                 }
@@ -854,7 +936,10 @@ impl EngineDaemon {
                         Err(e) => {
                             // u64::MAX can never collide with a real request id
                             // assigned from 1 upward.
-                            let resp = DaemonResponse::error(u64::MAX, format!("Malformed request JSON: {}", e));
+                            let resp = DaemonResponse::error(
+                                u64::MAX,
+                                format!("Malformed request JSON: {}", e),
+                            );
                             if let Ok(resp_json) = serde_json::to_string(&resp) {
                                 if let Ok(mut out) = stdout_lock.lock() {
                                     use std::io::Write;

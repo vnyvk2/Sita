@@ -405,6 +405,7 @@ fn test_daemon_push_event_heartbeat_4hz_schema() {
         duration_secs: 180.0,
         wallclock_ms: 1700000000,
         is_playing: true,
+        sink_type: None,
     };
     let json = serde_json::to_string(&event).unwrap();
     assert!(json.contains("\"event\":\"heartbeat\""));

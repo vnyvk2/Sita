@@ -53,6 +53,7 @@ pub struct CpalBackend {
     device_error: Arc<AtomicBool>,
     fallback_thread: Option<std::thread::JoinHandle<()>>,
     fallback_stop: Arc<AtomicBool>,
+    is_mock_fallback: Arc<AtomicBool>,
 }
 
 impl Default for CpalBackend {
@@ -75,6 +76,7 @@ impl CpalBackend {
             device_error: Arc::new(AtomicBool::new(false)),
             fallback_thread: None,
             fallback_stop: Arc::new(AtomicBool::new(false)),
+            is_mock_fallback: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -98,11 +100,13 @@ impl CpalBackend {
                 .output_devices()
                 .map_err(|e| SinkError::DeviceUnavailable(e.to_string()))?
                 .find(|d| d.name().is_ok_and(|n| n == target))
-                .ok_or_else(|| SinkError::DeviceUnavailable(format!("Device not found: {}", target)))?
+                .ok_or_else(|| {
+                    SinkError::DeviceUnavailable(format!("Device not found: {}", target))
+                })?
         } else {
-            self.host
-                .default_output_device()
-                .ok_or_else(|| SinkError::DeviceUnavailable("No default output audio device found".to_string()))?
+            self.host.default_output_device().ok_or_else(|| {
+                SinkError::DeviceUnavailable("No default output audio device found".to_string())
+            })?
         };
 
         self.device = Some(target_device);
@@ -132,6 +136,11 @@ impl CpalBackend {
         Arc::clone(&self.device_error)
     }
 
+    /// Shared ownership of the mock fallback flag for telemetry reporting (heartbeat).
+    pub fn is_mock_fallback_flag(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.is_mock_fallback)
+    }
+
     /// Sample rate of the device's default output config, if hardware is present.
     /// The engine renders at this rate (resample-to-device policy); callers
     /// use it to configure decoder resamplers, DSP coefficients, and the
@@ -145,7 +154,11 @@ impl CpalBackend {
 
     /// Open CPAL output with a custom real-time audio render callback.
     /// If hardware audio devices are unavailable, automatically falls back to a real-time paced clock.
-    pub fn open_with_render_fn<F>(&mut self, spec: AudioSpec, mut render_fn: F) -> Result<(), SinkError>
+    pub fn open_with_render_fn<F>(
+        &mut self,
+        spec: AudioSpec,
+        mut render_fn: F,
+    ) -> Result<(), SinkError>
     where
         F: FnMut(&mut [f32]) -> usize + Send + 'static,
     {
@@ -157,18 +170,20 @@ impl CpalBackend {
             let _ = self.select_device(None);
         }
 
-        // Check if physical hardware output is accessible
-        let hardware_ready = if let Some(device) = self.device.as_ref() {
-            device.default_output_config().is_ok()
-        } else {
-            false
+        // Check if physical hardware output is accessible and capture concrete error
+        let hardware_config_result = match self.device.as_ref() {
+            Some(device) => device.default_output_config().map_err(|e| {
+                SinkError::CpalError(format!("CPAL default_output_config failed: {}", e))
+            }),
+            None => Err(SinkError::CpalError(
+                "No CPAL output audio device found or selected".to_string(),
+            )),
         };
+        let hardware_ready = hardware_config_result.is_ok();
 
         if hardware_ready {
             let device = self.device.as_ref().unwrap();
-            let supported_config = device
-                .default_output_config()
-                .map_err(|e| SinkError::CpalError(e.to_string()))?;
+            let supported_config = hardware_config_result.unwrap();
 
             let sample_format = supported_config.sample_format();
             let config: StreamConfig = supported_config.into();
@@ -232,8 +247,7 @@ impl CpalBackend {
                                     let mut valid_frames = 0usize;
                                     let mut f = 0usize;
                                     while f < total_frames {
-                                        let want =
-                                            (total_frames - f).min(stereo.len() / 2);
+                                        let want = (total_frames - f).min(stereo.len() / 2);
                                         let got = render_fn(&mut stereo[..want * 2]) / 2;
                                         for k in 0..want {
                                             let base = (f + k) * channels;
@@ -325,8 +339,7 @@ impl CpalBackend {
                                     if scratch.len() < total_frames * 2 {
                                         scratch.resize(total_frames * 2, 0.0);
                                     }
-                                    let written =
-                                        render_fn(&mut scratch[..total_frames * 2]) / 2;
+                                    let written = render_fn(&mut scratch[..total_frames * 2]) / 2;
                                     if written < total_frames {
                                         scratch[written * 2..total_frames * 2].fill(0.0);
                                         stats.record_xrun();
@@ -339,15 +352,13 @@ impl CpalBackend {
                                         };
                                         let base = f * channels;
                                         if channels == 1 {
-                                            let s = ((l + r) * 0.5 + dither.next_tpdf_i16())
-                                                * 32767.0;
-                                            data[base] =
-                                                s.round().clamp(-32768.0, 32767.0) as i16;
+                                            let s =
+                                                ((l + r) * 0.5 + dither.next_tpdf_i16()) * 32767.0;
+                                            data[base] = s.round().clamp(-32768.0, 32767.0) as i16;
                                         } else {
                                             let sl = (l + dither.next_tpdf_i16()) * 32767.0;
                                             let sr = (r + dither.next_tpdf_i16()) * 32767.0;
-                                            data[base] =
-                                                sl.round().clamp(-32768.0, 32767.0) as i16;
+                                            data[base] = sl.round().clamp(-32768.0, 32767.0) as i16;
                                             data[base + 1] =
                                                 sr.round().clamp(-32768.0, 32767.0) as i16;
                                             for c in 2..channels {
@@ -372,9 +383,29 @@ impl CpalBackend {
             };
 
             self.stream = Some(SendStream(stream));
+            self.is_mock_fallback.store(false, Ordering::Release);
+            log::info!(
+                "Audio output sink opened successfully: {}",
+                engine_protocol::SINK_TYPE_CPAL_HARDWARE
+            );
         } else {
-            // Physical audio device unavailable — start real-time paced fallback thread
-            log::warn!("Audio output device unavailable; starting real-time paced fallback clock");
+            // Production builds must fail loudly on hardware unavailability so Electron
+            // automatically falls back to Web Audio. Mock sink is strictly opt-in for CI/tests.
+            if std::env::var("NORA_HEADLESS_AUDIO_MOCK").as_deref() != Ok("1") {
+                let underlying_err = match hardware_config_result {
+                    Err(e) => e,
+                    Ok(_) => unreachable!(),
+                };
+                log::error!(
+                    "Hardware output sink initialization failed: {}",
+                    underlying_err
+                );
+                return Err(underlying_err);
+            }
+            log::warn!(
+                "NORA_HEADLESS_AUDIO_MOCK=1 active: starting real-time paced fallback clock"
+            );
+            self.is_mock_fallback.store(true, Ordering::Release);
             let stats_clone = Arc::clone(&self.stats);
             let stop_flag = Arc::new(AtomicBool::new(false));
             self.fallback_stop = Arc::clone(&stop_flag);
@@ -434,7 +465,10 @@ impl OutputBackend for CpalBackend {
         }
 
         if let Some(stream) = &self.stream {
-            stream.0.play().map_err(|e| SinkError::CpalError(e.to_string()))?;
+            stream
+                .0
+                .play()
+                .map_err(|e| SinkError::CpalError(e.to_string()))?;
         }
 
         self.stats.is_paused.store(false, Ordering::Release);
@@ -482,6 +516,16 @@ impl OutputBackend for CpalBackend {
 
     fn is_running(&self) -> bool {
         self.is_running
+    }
+
+    fn sink_type(&self) -> &'static str {
+        if self.fallback_thread.is_some() {
+            engine_protocol::SINK_TYPE_DUMMY_PACED_CLOCK
+        } else if self.stream.is_some() {
+            engine_protocol::SINK_TYPE_CPAL_HARDWARE
+        } else {
+            engine_protocol::SINK_TYPE_UNKNOWN
+        }
     }
 }
 

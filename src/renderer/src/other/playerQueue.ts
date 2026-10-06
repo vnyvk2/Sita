@@ -251,13 +251,12 @@ class PlayerQueue {
       currentSongId: this.currentSongId,
       queueLength: this.songIds.length
     });
-    if (oldPosition !== this.position) {
-      this.emit('positionChange', {
-        oldPosition,
-        newPosition: this.position,
-        currentSongId: this.currentSongId
-      });
-    }
+    // Always emit so listeners (such as player track reloads) receive the user request
+    this.emit('positionChange', {
+      oldPosition,
+      newPosition: this.position,
+      currentSongId: this.currentSongId
+    });
   }
 
   /** Moves to the last song in the queue */

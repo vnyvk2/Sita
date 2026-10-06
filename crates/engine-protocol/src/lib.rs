@@ -6,6 +6,13 @@
 //! `schema_tag_lock` below pins every `cmd`/`event` string so a rename here
 //! fails loudly instead of silently desyncing the Electron side.
 
+/// Canonical sink vocabulary shared across engine daemon, protocol, and test verifiers.
+pub const SINK_TYPE_CPAL_HARDWARE: &str = "cpal_hardware";
+pub const SINK_TYPE_DUMMY_PACED_CLOCK: &str = "dummy_paced_clock";
+pub const SINK_TYPE_NULL: &str = "null";
+pub const SINK_TYPE_WAV: &str = "wav";
+pub const SINK_TYPE_UNKNOWN: &str = "unknown";
+
 use serde::{Deserialize, Serialize};
 
 /// Slot identifier matching engine-lib.
@@ -162,6 +169,8 @@ pub enum DaemonEvent {
         duration_secs: f64,
         wallclock_ms: u64,
         is_playing: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sink_type: Option<String>,
     },
 }
 
@@ -233,10 +242,18 @@ mod schema_tag_lock {
     fn all_14_command_tags_pinned() {
         let cmds = [
             (
-                DaemonCommand::Load { slot: SlotId::A, path: String::new() },
+                DaemonCommand::Load {
+                    slot: SlotId::A,
+                    path: String::new(),
+                },
                 "load",
             ),
-            (DaemonCommand::Preload { path: String::new() }, "preload"),
+            (
+                DaemonCommand::Preload {
+                    path: String::new(),
+                },
+                "preload",
+            ),
             (DaemonCommand::Play, "play"),
             (DaemonCommand::Pause, "pause"),
             (DaemonCommand::Stop, "stop"),
@@ -245,15 +262,27 @@ mod schema_tag_lock {
             (DaemonCommand::SetVolume { volume: 0.0 }, "set_volume"),
             (DaemonCommand::SetEq { gains: [0.0; 10] }, "set_eq"),
             (
-                DaemonCommand::SetDsp { bypass: false, rg_db: 0.0, karaoke: false, limiter: true },
+                DaemonCommand::SetDsp {
+                    bypass: false,
+                    rg_db: 0.0,
+                    karaoke: false,
+                    limiter: true,
+                },
                 "set_dsp",
             ),
             (
-                DaemonCommand::SetSoundProfile { profile: SoundProfile::StudioReference },
+                DaemonCommand::SetSoundProfile {
+                    profile: SoundProfile::StudioReference,
+                },
                 "set_sound_profile",
             ),
             (DaemonCommand::ListDevices, "list_devices"),
-            (DaemonCommand::SetDevice { device_id: String::new() }, "set_device"),
+            (
+                DaemonCommand::SetDevice {
+                    device_id: String::new(),
+                },
+                "set_device",
+            ),
             (DaemonCommand::GetState, "get_state"),
         ];
         assert_eq!(cmds.len(), 14);
@@ -273,21 +302,35 @@ mod schema_tag_lock {
     fn all_9_event_tags_pinned() {
         let evs = [
             (
-                DaemonEvent::Ready { protocol_version: 1, engine_version: String::new(), boot_id: 1 },
+                DaemonEvent::Ready {
+                    protocol_version: 1,
+                    engine_version: String::new(),
+                    boot_id: 1,
+                },
                 "ready",
             ),
             (
-                DaemonEvent::StateChanged { state: PlaybackState::Playing, position_secs: None },
+                DaemonEvent::StateChanged {
+                    state: PlaybackState::Playing,
+                    position_secs: None,
+                },
                 "state_changed",
             ),
             (DaemonEvent::SlotEnd { slot: SlotId::A }, "slot_end"),
             (DaemonEvent::TrackEnd { slot: SlotId::A }, "track_end"),
             (
-                DaemonEvent::TransitionComplete { active_slot: SlotId::B },
+                DaemonEvent::TransitionComplete {
+                    active_slot: SlotId::B,
+                },
                 "transition_complete",
             ),
             (DaemonEvent::Xrun { count: 0 }, "xrun"),
-            (DaemonEvent::DeviceError { message: String::new() }, "device_error"),
+            (
+                DaemonEvent::DeviceError {
+                    message: String::new(),
+                },
+                "device_error",
+            ),
             (
                 DaemonEvent::SoundProfileChanged {
                     profile: SoundProfile::StudioReference,
@@ -304,6 +347,7 @@ mod schema_tag_lock {
                     duration_secs: 0.0,
                     wallclock_ms: 0,
                     is_playing: true,
+                    sink_type: None,
                 },
                 "heartbeat",
             ),
@@ -316,7 +360,10 @@ mod schema_tag_lock {
 
     #[test]
     fn request_response_envelope_roundtrip() {
-        let req = DaemonRequest { id: 42, command: DaemonCommand::Play };
+        let req = DaemonRequest {
+            id: 42,
+            command: DaemonCommand::Play,
+        };
         let line = serde_json::to_string(&req).unwrap();
         let back: DaemonRequest = serde_json::from_str(&line).unwrap();
         assert_eq!(back, req);
@@ -341,10 +388,7 @@ mod schema_tag_lock {
             let parsed: DaemonRequest =
                 serde_json::from_value(req.clone()).expect("command example must parse");
             let roundtrip = serde_json::to_value(&parsed).unwrap();
-            assert_eq!(
-                &roundtrip, req,
-                "command wire shape drifted: {req}"
-            );
+            assert_eq!(&roundtrip, req, "command wire shape drifted: {req}");
         }
         for ev in doc["events"].as_array().unwrap() {
             let parsed: DaemonEvent =

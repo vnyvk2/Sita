@@ -1,6 +1,6 @@
 /**
- * Nora Native Audio Engine JSON-Lines Daemon Protocol Definitions.
- * Aligns strictly with crates/engine-protocol/src/lib.rs.
+ * Nora Native Audio Engine JSON-Lines Daemon Protocol Definitions. Aligns strictly with
+ * crates/engine-protocol/src/lib.rs.
  */
 
 export type SlotId = 'a' | 'b';
@@ -20,7 +20,10 @@ export type DaemonCommand =
   | { cmd: 'seek'; position_secs: number }
   | { cmd: 'crossfade'; duration_ms: number }
   | { cmd: 'set_volume'; volume: number }
-  | { cmd: 'set_eq'; gains: [number, number, number, number, number, number, number, number, number, number] }
+  | {
+      cmd: 'set_eq';
+      gains: [number, number, number, number, number, number, number, number, number, number];
+    }
   | { cmd: 'set_dsp'; bypass: boolean; rg_db: number; karaoke: boolean; limiter: boolean }
   | { cmd: 'set_sound_profile'; profile: SoundProfile }
   | { cmd: 'list_devices' }
@@ -48,11 +51,18 @@ export interface DaemonSoundProfileResultData {
   sequence_id: number;
 }
 
+export const SINK_TYPE_CPAL_HARDWARE = 'cpal_hardware';
+export const SINK_TYPE_DUMMY_PACED_CLOCK = 'dummy_paced_clock';
+export const SINK_TYPE_NULL = 'null';
+export const SINK_TYPE_WAV = 'wav';
+export const SINK_TYPE_UNKNOWN = 'unknown';
+
 export interface DaemonStateResultData {
   state: PlaybackState;
   active_slot: SlotId;
   volume: number;
   backend: string;
+  sink_type?: string;
   xrun_count: number;
   low_water_mark: number;
   sound_profile?: SoundProfile;
@@ -119,4 +129,5 @@ export type DaemonPushEvent =
       duration_secs: number;
       wallclock_ms: number;
       is_playing: boolean;
+      sink_type?: string;
     };

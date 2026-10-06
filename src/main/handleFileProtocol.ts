@@ -71,6 +71,7 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
         status: 304,
         headers: {
           ETag: etag,
+          'Access-Control-Allow-Origin': '*',
           'Cache-Control': 'no-cache'
         }
       });
@@ -82,6 +83,7 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
     const headers: Record<string, string> = {
       'Content-Type': mimeType,
       'Accept-Ranges': 'bytes',
+      'Access-Control-Allow-Origin': '*',
       'Cache-Control': 'no-cache',
       ETag: etag
     };
@@ -164,6 +166,7 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
       resHeaders.set('ETag', etag);
       resHeaders.set('Cache-Control', 'no-cache');
       resHeaders.set('Accept-Ranges', 'bytes');
+      resHeaders.set('Access-Control-Allow-Origin', '*');
       if (mimeType) {
         resHeaders.set('Content-Type', mimeType);
       }
@@ -178,6 +181,7 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
         status: 200,
         headers: {
           'Content-Type': mimeType,
+          'Access-Control-Allow-Origin': '*',
           'Cache-Control': 'no-cache',
           'Accept-Ranges': 'bytes',
           'Content-Length': fileSize.toString(),

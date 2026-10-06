@@ -1,12 +1,12 @@
 //! Pluggable audio sink backends: offline rendering (WavSink), headless soak (NullSink), and live audio (CpalBackend).
 
-pub mod wav;
-pub mod null;
 pub mod cpal;
+pub mod null;
+pub mod wav;
 
-pub use wav::WavSink;
-pub use null::NullSink;
 pub use cpal::CpalBackend;
+pub use null::NullSink;
+pub use wav::WavSink;
 
 use crate::types::{AudioSpec, BackendStats, SinkError};
 
@@ -33,6 +33,11 @@ pub trait OutputBackend: Send {
 
     /// Returns true if the sink is actively running (started and not paused).
     fn is_running(&self) -> bool;
+
+    /// Reports the concrete sink implementation type: "cpal_hardware", "dummy_paced_clock", "null", "wav"
+    fn sink_type(&self) -> &'static str {
+        "unknown"
+    }
 }
 
 /// Real-time sample generator interface providing interleaved f32 audio.

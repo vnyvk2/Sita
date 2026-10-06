@@ -50,6 +50,7 @@ export class NativeAudioBackend {
   private currentBootId = 0;
   private lastSeenSequenceId = 0;
   private hasSeenReady = false;
+  private hasLoggedSinkType = false;
 
   constructor(private callbacks: NativeAudioBackendCallbacks) {
     this.startRafLoop();
@@ -77,6 +78,10 @@ export class NativeAudioBackend {
     this.unsubscribeEvents = window.api.audioEngine.onEvent((event: DaemonPushEvent) => {
       switch (event.event) {
         case 'heartbeat':
+          if (!this.hasLoggedSinkType && event.sink_type) {
+            this.hasLoggedSinkType = true;
+            console.info('[nativeAudioBackend] Active audio sink:', event.sink_type);
+          }
           // Re-anchor playhead position on each 4Hz monotonic daemon heartbeat
           this.anchor = {
             posSecs: event.position_secs,

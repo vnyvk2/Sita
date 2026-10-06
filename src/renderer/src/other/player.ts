@@ -279,10 +279,10 @@ class AudioPlayer {
   }
 
   /**
-   * Centralized Web Audio Quiescence Invariant:
-   * Spec-safe teardown of all registered HTMLAudioElements and timer hygiene.
-   * Enforces: isNativeEngineActive === true => no HTML media element is loaded or playing.
-   * Safe across all readyState transitions (no currentTime traps on unloaded media).
+   * Centralized Web Audio Quiescence Invariant: Spec-safe teardown of all registered
+   * HTMLAudioElements and timer hygiene. Enforces: isNativeEngineActive === true => no HTML media
+   * element is loaded or playing. Safe across all readyState transitions (no currentTime traps on
+   * unloaded media).
    */
   public quiesceWebAudio(): void {
     this.crossfadeScheduler.cancel();
@@ -417,7 +417,7 @@ class AudioPlayer {
           console.error('[AudioPlayer] NativeAudioBackend error:', err);
           this.emit('error', err);
           if (this.isNativeEngineActive) {
-            this.fallbackToWebAudio();
+            this.fallbackToWebAudio(this.nativeIsPlaying);
           }
         }
       });
@@ -680,14 +680,14 @@ class AudioPlayer {
       });
   }
 
-  private fallbackToWebAudio() {
+  private fallbackToWebAudio(forcePlay = false) {
     // Tier-1 invalidation-first: bump BEFORE teardown/awaits so in-flight
     // native completions (transition_complete, load, seek) arrive stale.
     // Idempotent: repeated fallback calls bump again but restore same state.
     const fallbackGeneration = this.bumpPlaybackGeneration();
     // Capture intent BEFORE flipping flags: paused routes natively while
     // active, so read it first. Never auto-start playback the user paused.
-    const wasPlaying = !this.paused;
+    const wasPlaying = forcePlay || !this.paused;
     // Capture audible state before any dispatch below: persisting the latch
     // notifies store subscribers synchronously (including our own volume
     // sync), which must not alter the restored output.
@@ -757,7 +757,7 @@ class AudioPlayer {
       if (wasPlaying && this.isGenerationCurrent(fallbackGeneration)) {
         // Immediate play call satisfies synchronous tests and triggers browser auto-buffer/play
         this.play().catch((err) => {
-          logPlayer('[AudioPlayer] Play on fallback failed:', err);
+          console.error('[AudioPlayer] Play on fallback failed:', err);
         });
       }
 
@@ -772,7 +772,9 @@ class AudioPlayer {
           }
           applyResumePosition();
           if (wasPlaying && this.audio.paused) {
-            this.play().catch(() => {});
+            this.play().catch((err) => {
+              console.error('[AudioPlayer] Play on metadata resume failed:', err);
+            });
           }
           this.audio.removeEventListener('loadedmetadata', onMetadata);
           this.audio.removeEventListener('canplay', onMetadata);
@@ -839,7 +841,7 @@ class AudioPlayer {
             return;
           }
           const songId = queue.currentSongId;
-          const wasPlaying = !this.audio.paused;
+          const wasPlaying = !this.paused;
           logPlayer('[AudioPlayer.positionChange]', {
             position: queue.position,
             songId,
@@ -931,8 +933,8 @@ class AudioPlayer {
   }
 
   /**
-   * Bumps loadRequestId and nulls in-flight references to invalidate any
-   * pending asynchronous track fetches, preventing resurrected playback on empty queue.
+   * Bumps loadRequestId and nulls in-flight references to invalidate any pending asynchronous track
+   * fetches, preventing resurrected playback on empty queue.
    */
   private cancelPendingLoads(): void {
     this.loadRequestId += 1;
@@ -1245,7 +1247,7 @@ class AudioPlayer {
               '[AudioPlayer] Native load failed, falling back to WebAudio:',
               nativeLoadErr
             );
-            this.fallbackToWebAudio();
+            this.fallbackToWebAudio(effectiveAutoPlay);
           }
         }
 
@@ -1743,14 +1745,16 @@ class AudioPlayer {
   /**
    * Gate 3.2: Dynamic Headroom Gain Staging (Option A).
    *
-   * Reconciles FX headroom (-1.5 dB when reverb/treble/lowpass active) with composite EQ
-   * peak accumulation G_composite = max_w |prod H_k(e^jw)|.
+   * Reconciles FX headroom (-1.5 dB when reverb/treble/lowpass active) with composite EQ peak
+   * accumulation G_composite = max_w |prod H_k(e^jw)|.
    *
    * Staging rules:
+   *
    * 1. If audio FX (reverb, nightcore treble, lowpass) are engaged, fxHeadroom = 0.8414 (-1.5 dB).
    * 2. If composite EQ gain G_composite > 0 dB, eqHeadroom = 10^(-G_composite / 20).
-   * 3. targetHeadroom = min(fxHeadroom, eqHeadroom).
-   * 4. When no FX and no EQ boost (flat or cutting only), targetHeadroom = 1.0 (0 dB, bit-transparent).
+   * 3. TargetHeadroom = min(fxHeadroom, eqHeadroom).
+   * 4. When no FX and no EQ boost (flat or cutting only), targetHeadroom = 1.0 (0 dB,
+   *    bit-transparent).
    */
   public updateHeadroomGain(immediate = false): void {
     if (!this.headroomGainNode || !this.currentContext) return;
@@ -1763,10 +1767,7 @@ class AudioPlayer {
     const fxHeadroom = isFxEngaged ? 0.8414 : 1.0;
     const presenceBoostDb = this.currentSoundProfile === 'vocal_nuance_boost' ? 0.6 : 0.0;
     const effectiveBoostDb = this.currentCompositeEqGainDb + presenceBoostDb;
-    const eqHeadroom =
-      effectiveBoostDb > 0.001
-        ? Math.pow(10, -effectiveBoostDb / 20)
-        : 1.0;
+    const eqHeadroom = effectiveBoostDb > 0.001 ? Math.pow(10, -effectiveBoostDb / 20) : 1.0;
 
     const targetHeadroom = Math.min(fxHeadroom, eqHeadroom);
     const now = this.currentContext.currentTime;
@@ -1914,7 +1915,7 @@ class AudioPlayer {
                   this.refreshNativeStandby(this.currentSongData!.songId);
                 } catch (err) {
                   console.warn('[AudioPlayer] Failed to load song on native toggle:', err);
-                  this.fallbackToWebAudio();
+                  this.fallbackToWebAudio(shouldPlay);
                 }
               })();
             }
@@ -2501,7 +2502,7 @@ class AudioPlayer {
         return;
       } catch (nativePlayErr) {
         console.warn('[AudioPlayer] Native play failed, falling back to WebAudio:', nativePlayErr);
-        this.fallbackToWebAudio();
+        this.fallbackToWebAudio(true);
         return;
       }
     }
@@ -2759,8 +2760,8 @@ class AudioPlayer {
       hasPrevious: this.queue.hasPrevious
     });
 
-    // If more than 5 seconds into song, restart it
-    if (position > 5) {
+    // If more than 5 seconds into song and previous exists, restart it
+    if (position > 5 && this.queue.hasPrevious) {
       this.seek(0);
       return;
     }
@@ -2772,8 +2773,12 @@ class AudioPlayer {
         this.queue.moveToPrevious();
       } else {
         // At first song, restart it
-        this.pendingAutoPlay = true;
-        this.queue.moveToStart();
+        this.seek(0);
+        if (!this.paused) {
+          this.play().catch((err) => {
+            console.error('[AudioPlayer] Play on skipBackward restart failed:', err);
+          });
+        }
       }
     } else if (this.queue.length > 0) {
       // No current song but queue has songs, play first
