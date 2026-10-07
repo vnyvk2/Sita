@@ -293,5 +293,53 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByText(/toolbar tools/i)).toBeNull();
     });
+
+    it('renders slim bars SVG inside Compact View button', () => {
+      render(<SubFilterToolbar {...defaultProps} />);
+
+      const compactBtn = screen.getByRole('button', { name: /compact view/i });
+      const svg = compactBtn.querySelector('svg');
+      expect(svg).toBeDefined();
+      const rects = svg?.querySelectorAll('rect');
+      // In normal mode, renders 2 slim horizontal bars
+      expect(rects?.length).toBe(2);
+    });
+
+    it('renders Language and Genre dropdowns with fixed width w-[9.5rem] and leading icons', () => {
+      const { container } = render(<SubFilterToolbar {...defaultProps} />);
+
+      const langTrigger = screen.getByRole('button', { name: /all languages/i });
+      expect(langTrigger.className).toContain('w-[9.5rem]');
+      expect(langTrigger.textContent).toContain('translate');
+
+      const genreTrigger = screen.getByRole('button', { name: /all genres/i });
+      expect(genreTrigger.className).toContain('w-[9.5rem]');
+      expect(genreTrigger.textContent).toContain('music_note');
+    });
+
+    it('renders quick clear button when language/genre filter is active and resets to "all" on click', () => {
+      const onLanguageChange = vi.fn();
+      const onGenreChange = vi.fn();
+      render(
+        <SubFilterToolbar
+          {...defaultProps}
+          language="en"
+          onLanguageChange={onLanguageChange}
+          genre="rock"
+          onGenreChange={onGenreChange}
+        />
+      );
+
+      const clearBtns = screen.getAllByRole('button', { name: /clear filter/i });
+      expect(clearBtns.length).toBe(2); // One for language, one for genre
+
+      // Click clear on language
+      fireEvent.click(clearBtns[0]);
+      expect(onLanguageChange).toHaveBeenCalledWith('all');
+
+      // Click clear on genre
+      fireEvent.click(clearBtns[1]);
+      expect(onGenreChange).toHaveBeenCalledWith('all');
+    });
   });
 });
