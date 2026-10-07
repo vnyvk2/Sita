@@ -381,6 +381,16 @@ export const settingsCatalog: SettingCatalogEntry[] = [
     keywords: ['equalizer indicator', 'soundbars', 'playing icon', 'tracklist equalizer']
   },
   {
+    id: 'setting-preferences-artwork-slot-color',
+    sectionKey: 'preferences',
+    titleKey: 'settingsPage.showArtworkSlotColor',
+    defaultTitle: 'Colored artwork placeholders in song lists',
+    descriptionKey: 'settingsPage.showArtworkSlotColorDescription',
+    defaultDescription:
+      'Paint each song row thumbnail slot with a per-song color while artwork loads.',
+    keywords: ['artwork placeholder', 'thumbnail color', 'slot color', 'song art']
+  },
+  {
     id: 'setting-preferences-artist-artwork',
     sectionKey: 'preferences',
     titleKey: 'settingsPage.showArtistArtworkNearSongControls',

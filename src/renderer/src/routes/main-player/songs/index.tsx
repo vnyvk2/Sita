@@ -13,6 +13,7 @@ import { CompactListHeader } from '@renderer/components/SongsPage/CompactListHea
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
+import { artSlotColor } from '@renderer/components/SongsPage/artSlotColor';
 import { SubFilterToolbar } from '@renderer/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
 import { useSongListContextMenuDelegation } from '@renderer/components/SongsPage/useSongListContextMenuDelegation';
 import VirtualizedList, {
@@ -131,6 +132,10 @@ function SongsPage() {
   // Single parent-level subscription passed to all Song rows via prop,
   // eliminating ~25 per-row store subscriptions in the hot scrolling path.
   const hasBodyBackgroundImage = useStore(store, (state) => Boolean(state.bodyBackgroundImage));
+  const showArtworkSlotColor = useStore(
+    store,
+    (state) => state.localStorage?.preferences?.showArtworkSlotColor ?? true
+  );
   const isMultipleSelectionEnabled = useStore(
     store,
     (state) =>
@@ -497,11 +502,16 @@ function SongsPage() {
           index={index}
           isCompact={isCompactSongView}
           rowSize={songViewMode === 'small' ? 'small' : 'normal'}
+          slotColor={
+            showArtworkSlotColor ? artSlotColor(filteredSongIds[index] ?? index) : undefined
+          }
         />
       );
     },
     [
       getItem,
+      filteredSongIds,
+      showArtworkSlotColor,
       isSongIndexingEnabled,
       handleSongPlayBtnClick,
       selectAllHandler,

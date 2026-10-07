@@ -140,6 +140,25 @@ const PreferencesSettings = () => {
           </div>
         </li>
 
+        <li id="setting-preferences-artwork-slot-color" className="checkbox-container">
+          <div className="secondary-container toggle-artwork-slot-color mb-4">
+            <div className="description">
+              {t(
+                'settingsPage.showArtworkSlotColorDescription',
+                'Paint each song row thumbnail slot with a per-song color while artwork loads.'
+              )}
+            </div>
+            <Checkbox
+              id="showArtworkSlotColor"
+              isChecked={preferences?.showArtworkSlotColor ?? true}
+              checkedStateUpdateFunction={(state) =>
+                storage.preferences.setPreferences('showArtworkSlotColor', state)
+              }
+              labelContent={t('settingsPage.showArtworkSlotColor', 'Colored artwork placeholders')}
+            />
+          </div>
+        </li>
+
         <li id="setting-preferences-artist-artwork" className="checkbox-container">
           <div className="secondary-container show-artists-artwork-near-song-controls mb-4">
             <div className="description">

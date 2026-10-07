@@ -7,6 +7,13 @@ interface SongRowSkeletonProps {
   className?: string;
   isCompact?: boolean;
   rowSize?: 'normal' | 'small';
+  /**
+   * Paints the art slot with the song's deterministic color and disables the
+   * pulse, so boundary rows look calm and already match the real row that
+   * will replace them (same slot color, zero visual snap). Omit for legacy
+   * pulsing behavior.
+   */
+  slotColor?: string;
 }
 
 /**
@@ -15,8 +22,23 @@ interface SongRowSkeletonProps {
  * Mirrors the Song row's 60px, 48px, or 38px grid so swapping in the real row causes zero layout shift.
  */
 const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
-  ({ index, height: _height, style, className = '', isCompact = false, rowSize = 'normal' }, ref) => {
+  (
+    {
+      index,
+      height: _height,
+      style,
+      className = '',
+      isCompact = false,
+      rowSize = 'normal',
+      slotColor
+    },
+    ref
+  ) => {
     const isOdd = typeof index === 'number' && (index + 1) % 2 === 1;
+    // Calm mode: static bars (no pulse) for known songs at true fetch
+    // boundaries; the art slot already wears the incoming row's color.
+    const calm = slotColor !== undefined;
+    const pulse = calm ? '' : 'animate-pulse';
 
     if (isCompact) {
       return (
@@ -24,7 +46,7 @@ const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
           ref={ref}
           data-skeleton-index={index}
           style={{ ...style, height: 38 }}
-          className={`compact-song-skeleton border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[38px] w-full animate-pulse items-center border-b px-2 text-xs select-none ${
+          className={`compact-song-skeleton border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[38px] w-full ${pulse} items-center border-b px-2 text-xs select-none ${
             isOdd
               ? 'bg-background-color-2/40! dark:bg-dark-background-color-2/30!'
               : 'bg-background-color-1! dark:bg-dark-background-color-1!'
@@ -57,7 +79,7 @@ const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
           ref={ref}
           data-skeleton-index={index}
           style={{ ...style, height: 48 }}
-          className={`small-song-skeleton border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full animate-pulse items-center border-b px-2 text-xs select-none ${
+          className={`small-song-skeleton border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full ${pulse} items-center border-b px-2 text-xs select-none ${
             isOdd
               ? 'bg-background-color-2/40! dark:bg-dark-background-color-2/30!'
               : 'bg-background-color-1! dark:bg-dark-background-color-1!'
@@ -68,7 +90,10 @@ const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-3 w-3 rounded-sm opacity-50" />
           </div>
           <div className="mx-2 h-8 w-8 shrink-0 overflow-hidden rounded">
-            <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-full w-full opacity-60" />
+            <div
+              className="bg-background-color-2! dark:bg-dark-background-color-2! h-full w-full opacity-60"
+              style={slotColor ? { backgroundColor: slotColor, opacity: 1 } : undefined}
+            />
           </div>
           <div className="min-w-0 flex-1 pr-2 pl-1">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-3 w-[70%] rounded-full opacity-60" />
@@ -99,12 +124,15 @@ const SongRowSkeleton = forwardRef<HTMLDivElement, SongRowSkeletonProps>(
         } ${className}`}
         aria-hidden="true"
       >
-        <div className="flex h-full w-full animate-pulse items-center gap-2">
+        <div className={`flex h-full w-full ${pulse} items-center gap-2`}>
           <div className="ml-1 w-[0.625rem] shrink-0">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! aspect-square rounded-sm opacity-60" />
           </div>
           <div className="relative aspect-square h-[85%] shrink-0 overflow-hidden rounded-md">
-            <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-full w-full opacity-60" />
+            <div
+              className="bg-background-color-2! dark:bg-dark-background-color-2! h-full w-full opacity-60"
+              style={slotColor ? { backgroundColor: slotColor, opacity: 1 } : undefined}
+            />
           </div>
           <div className="grid min-w-0 flex-1 grid-cols-[45%_1fr_minmax(4.5rem,6rem)] items-center gap-2 sm:grid-cols-[35%_2fr_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] sm:gap-3 lg:grid-cols-[40%_1fr_minmax(4rem,5rem)_minmax(4.5rem,6.5rem)] lg:gap-0!">
             <div className="bg-background-color-2! dark:bg-dark-background-color-2! h-3.5 w-[80%] rounded-full opacity-60" />

@@ -1,6 +1,6 @@
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
-import { type MouseEvent as ReactMouseEvent, memo, useRef } from 'react';
+import { type MouseEvent as ReactMouseEvent, memo, useLayoutEffect, useRef, useState } from 'react';
 
 import DefaultImage from '../assets/images/webp/song_cover_default.webp';
 import { toThumbnailUrl } from '../utils/artwork';
@@ -29,6 +29,14 @@ type ImgProps = {
   enableImgFadeIns?: boolean;
   decoding?: 'async' | 'auto' | 'sync';
   thumbnail?: boolean;
+  /**
+   * Decode-then-reveal for virtualized rows: the image starts transparent
+   * (over a parent-painted slot, never a blank box) and crossfades in once
+   * decoded — with no delay. Unlike the legacy fade path it also honors
+   * images that finished decoding before handlers attached (cached bytes can
+   * complete synchronously on mount). Opt-in; default preserves legacy behavior.
+   */
+  revealOnDecode?: boolean;
 };
 
 /* <picture
@@ -94,7 +102,8 @@ const Img = memo((props: ImgProps) => {
     draggable = false,
     enableImgFadeIns = true,
     decoding = 'async',
-    thumbnail = false
+    thumbnail = false,
+    revealOnDecode = false
   } = props;
 
   const imgRef = useRef<HTMLImageElement>(null);
@@ -113,6 +122,21 @@ const Img = memo((props: ImgProps) => {
     errorCountRef.current = 0;
   }
 
+  // Decode-then-reveal state. Starts hidden so the first paint never flashes
+  // the image before we know its decode state; a layout effect (pre-paint)
+  // reveals it synchronously when the bytes are already decoded (cached
+  // images completing synchronously on mount). Uncached images stay hidden
+  // until onLoad — one paint, then the crossfade, no intermediate renders.
+  const [isDecoded, setIsDecoded] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!revealOnDecode) return;
+    const el = imgRef.current;
+    if (el && el.complete && el.naturalWidth > 0) {
+      setIsDecoded(true);
+    }
+  }, [revealOnDecode, resolvedSrc]);
+
   return (
     // <div className="inline-block relative">
     <img
@@ -121,9 +145,11 @@ const Img = memo((props: ImgProps) => {
       ref={imgRef}
       decoding={decoding}
       className={`relative outline-offset-4 focus-visible:!outline ${
-        enableImgFadeIns && isFirstTimeRef.current
-          ? 'opacity-0 transition-opacity delay-[250ms]'
-          : 'opacity-100! transition-none!'
+        revealOnDecode
+          ? `transition-opacity duration-150 ${isDecoded ? 'opacity-100' : 'opacity-0'}`
+          : enableImgFadeIns && isFirstTimeRef.current
+            ? 'opacity-0 transition-opacity delay-[250ms]'
+            : 'opacity-100! transition-none!'
       } ${className}`}
       draggable={draggable}
       onError={(e) => {
@@ -157,6 +183,7 @@ const Img = memo((props: ImgProps) => {
       loading={loading}
       onContextMenu={onContextMenu}
       onLoad={(e) => {
+        if (revealOnDecode) setIsDecoded(true);
         if (isFirstTimeRef.current) {
           isFirstTimeRef.current = false;
         }

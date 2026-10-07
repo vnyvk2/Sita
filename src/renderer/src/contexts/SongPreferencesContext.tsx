@@ -6,6 +6,7 @@ import { resolveSongViewMode, type SongViewMode } from '@renderer/utils/songView
 export interface SongPreferences {
   showTrackNumberAsSongIndex: boolean;
   showEqualizerOnTracklist: boolean;
+  showArtworkSlotColor: boolean;
   isAnimationDisabled: boolean;
   doNotShowBlacklistSongConfirm: boolean;
   bodyBackgroundImage: boolean;
@@ -17,6 +18,7 @@ export interface SongPreferences {
 export const defaultSongPreferences: SongPreferences = {
   showTrackNumberAsSongIndex: false,
   showEqualizerOnTracklist: true,
+  showArtworkSlotColor: true,
   isAnimationDisabled: false,
   doNotShowBlacklistSongConfirm: false,
   bodyBackgroundImage: false,
@@ -37,6 +39,10 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
   const showEqualizerOnTracklist = useStore(
     store,
     (state) => state.localStorage?.preferences?.showEqualizerOnTracklist ?? true
+  );
+  const showArtworkSlotColor = useStore(
+    store,
+    (state) => state.localStorage?.preferences?.showArtworkSlotColor ?? true
   );
   const isAnimationDisabled = useStore(
     store,
@@ -71,6 +77,7 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
     () => ({
       showTrackNumberAsSongIndex,
       showEqualizerOnTracklist,
+      showArtworkSlotColor,
       isAnimationDisabled,
       doNotShowBlacklistSongConfirm,
       bodyBackgroundImage,
@@ -81,6 +88,7 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
     [
       showTrackNumberAsSongIndex,
       showEqualizerOnTracklist,
+      showArtworkSlotColor,
       isAnimationDisabled,
       doNotShowBlacklistSongConfirm,
       bodyBackgroundImage,

@@ -639,6 +639,7 @@ declare global {
     songViewMode?: 'compact' | 'small' | 'normal';
     showSidebarPlaylistsSection?: boolean;
     pinnedSubFilterTools?: string[];
+    showArtworkSlotColor?: boolean;
   }
 
   interface PlayerBarControlsIn3Dots {

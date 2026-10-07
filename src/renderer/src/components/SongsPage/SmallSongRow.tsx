@@ -7,10 +7,8 @@ import {
   memo,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
-  useState
+  useRef
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +23,7 @@ import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
+import { artSlotColor } from './artSlotColor';
 import SongArtist from './SongArtist';
 import type { SongProp } from './StandardSongRow';
 import useSongContextMenu from './useSongContextMenu';
@@ -60,6 +59,17 @@ export const SmallSongRow = memo(
       onMoreOptionsClick: directMoreOptionsClick
     } = props;
 
+    // Always-painted art slot: deterministic per-song color behind the thumbnail
+    // so the row mounts complete and the photo crossfades in over it — no blank
+    // box, no remount, no layout move. Pure function, zero async cost.
+    // User-toggable via the artwork slot color preference (granular selector
+    // so only this key's changes re-render the row).
+    const showArtworkSlotColor = useStore(
+      store,
+      (state) => state.localStorage?.preferences?.showArtworkSlotColor ?? true
+    );
+    const artSlot = showArtworkSlotColor ? artSlotColor(songId) : undefined;
+
     // Granular store subscriptions: only subscribe to primitives relevant to this specific song
     const isCurrentSong = useStore(store, (state) => state.currentSongData?.songId === songId);
     const isSongPlaying = useStore(
@@ -74,7 +84,7 @@ export const SmallSongRow = memo(
     const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
       useSongSelection(songId);
 
-    const { playSong, toggleIsFavorite, toggleMultipleSelections, updateMultipleSelections } =
+    const { playSong, toggleMultipleSelections, updateMultipleSelections } =
       useContext(AppUpdateContext);
     const { t } = useTranslation();
 
@@ -238,15 +248,18 @@ export const SmallSongRow = memo(
         </div>
 
         {/* 32px Thumbnail artwork */}
-        <div className="relative mr-2.5 ml-1.5 h-8 w-8 shrink-0 overflow-hidden rounded-md shadow-xs">
+        <div
+          className="relative mr-2.5 ml-1.5 h-8 w-8 shrink-0 overflow-hidden rounded-md shadow-xs"
+          style={artSlot ? { backgroundColor: artSlot } : undefined}
+        >
           <Img
             src={artworkPaths?.optimizedArtworkPath || artworkPaths?.artworkPath || DefaultSongCover}
             fallbackSrc={DefaultSongCover}
             alt={title}
             className="h-full w-full object-cover"
-            loading="lazy"
             decoding="async"
             enableImgFadeIns={false}
+            revealOnDecode
           />
         </div>
 

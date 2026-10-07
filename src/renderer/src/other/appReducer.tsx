@@ -531,6 +531,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     lyricsArtworkAnimation: true,
     isSongCardDynamicArtworkBackgroundEnabled: false,
     showEqualizerOnTracklist: true,
+    showArtworkSlotColor: true,
     reduceVisualEffectsOnBattery: false,
     ambientParticles: false,
     isWaveformSeekbarEnabled: false,

@@ -1,6 +1,7 @@
 import { ALBUM_SUMMARIES_ROOT, albumQuery } from '@renderer/queries/albums';
 import { ARTIST_SUMMARIES_ROOT, artistQuery } from '@renderer/queries/artists';
 import { GENRE_SUMMARIES_ROOT, genreQuery } from '@renderer/queries/genres';
+import { songQuery } from '@renderer/queries/songs';
 import type { QueryClient } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 
@@ -103,6 +104,18 @@ describe('useDataSync - Query Invalidation & Batching', () => {
     it('should request surgical window refresh for likes and artwork events', () => {
       expect(getInvalidationTargetsForEvent('songs/likes')).toContain('songs:windows');
       expect(getInvalidationTargetsForEvent('songs/artworks')).toContain('songs:windows');
+    });
+
+    it('should scope songs/likes ids refresh to like-sensitive lists so plain views never flash', () => {
+      const targets = getInvalidationTargetsForEvent('songs/likes');
+
+      // A like changes no ids/order/counts except under favorites/nonFavorites
+      // filters — so the blanket ids bump (which rebuilds every window key and
+      // flashes full-list skeletons) must not be requested.
+      expect(targets).not.toContain('songs:ids');
+      expect(targets).toContain('songs:ids:likes');
+      expect(targets).toContain('songs:favorites');
+      expect(targets).toContain('songs:windows');
     });
   });
 
@@ -212,6 +225,57 @@ describe('useDataSync - Query Invalidation & Batching', () => {
 
       batcher.cleanup();
       expect(cancelScheduledFn).toHaveBeenCalled();
+    });
+  });
+
+  describe('songs:ids:likes conditional invalidation', () => {
+    it('should invalidate only favorites/nonFavorites ids queries, leaving plain views untouched', () => {
+      const invalidateQueries = vi.fn();
+      const favKey = [...songQuery.ids._def, { sortType: 'addedOrder', filterType: 'favorites' }];
+      const nonFavKey = [
+        ...songQuery.ids._def,
+        { sortType: 'addedOrder', filterType: 'nonFavorites' }
+      ];
+      const allKey = [...songQuery.ids._def, { sortType: 'addedOrder', filterType: 'notSelected' }];
+      const mockCacheClient = {
+        invalidateQueries,
+        getQueryCache: () => ({
+          findAll: () => [
+            { queryKey: favKey, state: {} },
+            { queryKey: nonFavKey, state: {} },
+            { queryKey: allKey, state: {} }
+          ]
+        })
+      } as unknown as QueryClient;
+
+      invalidateTarget('songs:ids:likes', mockCacheClient);
+
+      // Membership can only change under like-sensitive filters; the plain
+      // list must not refetch (its refetch would bump the window version and
+      // flash skeletons for unchanged data).
+      expect(invalidateQueries).toHaveBeenCalledTimes(2);
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: favKey });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: nonFavKey });
+      expect(invalidateQueries).not.toHaveBeenCalledWith({ queryKey: allKey });
+    });
+
+    it('should invalidate nothing when no like-sensitive list is cached', () => {
+      const invalidateQueries = vi.fn();
+      const mockCacheClient = {
+        invalidateQueries,
+        getQueryCache: () => ({
+          findAll: () => [
+            {
+              queryKey: [...songQuery.ids._def, { sortType: 'addedOrder', filterType: 'notSelected' }],
+              state: {}
+            }
+          ]
+        })
+      } as unknown as QueryClient;
+
+      invalidateTarget('songs:ids:likes', mockCacheClient);
+
+      expect(invalidateQueries).not.toHaveBeenCalled();
     });
   });
 

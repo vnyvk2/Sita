@@ -9,10 +9,8 @@ import {
   memo,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
-  useState
+  useRef
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,6 +28,7 @@ import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
 import SoundBarsIndicator from '../SoundBarsIndicator';
+import { artSlotColor } from './artSlotColor';
 import SongArtist from './SongArtist';
 import useSongContextMenu from './useSongContextMenu';
 import { useSongFavoriteToggle } from './useSongFavoriteToggle';
@@ -128,18 +127,21 @@ export const StandardSongRow = memo(
     const showEqualizerOnTracklist = preferences.showEqualizerOnTracklist;
     const isAnimationDisabled = preferences.isAnimationDisabled;
 
+    // Always-painted art slot: deterministic per-song color behind the thumbnail
+    // so the row mounts complete and the photo crossfades in over it — no blank
+    // box, no remount, no layout move. Pure function, zero async cost.
+    // User-toggable via the artwork slot color preference.
+    const showArtworkSlotColor = preferences.showArtworkSlotColor ?? true;
+    const artSlot = showArtworkSlotColor ? artSlotColor(songId) : undefined;
+
     const {
       playSong,
-      addNewNotifications,
-      toggleIsFavorite,
       toggleMultipleSelections,
       updateMultipleSelections
     } = useContext(AppUpdateContext);
     const { t } = useTranslation();
 
     const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
-    // Monotonic counter to prevent race conditions on rapid successive favorite toggles
-    const likeMutationSeqRef = useRef(0);
     const { isBursting, triggerBurst } = useHeartBurst();
 
     const initialFavorite =
@@ -342,6 +344,7 @@ export const StandardSongRow = memo(
             className={`song-cover-container relative mr-4 ml-2 flex h-[90%] min-w-12 flex-row items-center justify-center overflow-hidden rounded-md ${
               (isIndexingSongs || isMultipleSelectionEnabled || isBlacklisted) && 'sm:hidden'
             }`}
+            style={artSlot ? { backgroundColor: artSlot } : undefined}
           >
             {!isIndexingSongs &&
               !showTrackNumberAsSongIndex &&
@@ -376,13 +379,13 @@ export const StandardSongRow = memo(
                 DefaultSongCover
               }
               thumbnail={!artworkPaths?.optimizedArtworkPath && Boolean(artworkPaths?.artworkPath)}
-              loading="lazy"
               decoding="async"
               alt="Song cover"
-              className={`aspect-square max-h-full min-w-full object-contain py-[0.1rem] transition-[filter]! duration-300 group-focus-within:brightness-50 group-hover:brightness-50 ${
+              className={`aspect-square max-h-full min-w-full object-contain py-[0.1rem] transition-[filter,opacity]! duration-300 group-focus-within:brightness-50 group-hover:brightness-50 ${
                 isSongPlaying && !showEqualizerOnTracklist ? 'brightness-50' : ''
               }`}
               enableImgFadeIns={false}
+              revealOnDecode
             />
           </div>
         </div>
