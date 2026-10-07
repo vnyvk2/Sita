@@ -29,7 +29,7 @@ describe('Production handleFileProtocol Deterministic Tests', () => {
   });
 
   it('returns 404 for non-existent file paths', async () => {
-    const missingUrl = addDefaultAppProtocolToFilePath('C:/invalid/path/missing.mp3');
+    const missingUrl = addDefaultAppProtocolToFilePath(path.join(tempDir, 'missing.mp3'));
     const req = new Request(missingUrl);
 
     const response = await handleFileProtocol(req as any);

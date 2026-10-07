@@ -5,7 +5,7 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import { songCacheKeys, songQuery } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
-import type { PaginatedResult, SongData, SongSortTypes } from '../../../../../types/app';
+import type { PaginatedResult, SongData, SongSortTypes } from '../../../../types/app';
 
 export interface UseSongFavoriteToggleProps {
   songId: number;

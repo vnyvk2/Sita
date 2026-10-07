@@ -7,10 +7,8 @@ import {
   memo,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
-  useState
+  useRef
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -70,7 +68,7 @@ export const CompactSongRow = memo(
     const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
       useSongSelection(songId);
 
-    const { playSong, toggleIsFavorite, toggleMultipleSelections, updateMultipleSelections } =
+    const { playSong, toggleMultipleSelections, updateMultipleSelections } =
       useContext(AppUpdateContext);
     const { t } = useTranslation();
 

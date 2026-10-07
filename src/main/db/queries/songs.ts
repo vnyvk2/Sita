@@ -173,6 +173,8 @@ export const mapRawFlatRowToSongData = (row: RawFlatSongRow): SongData => {
     noOfChannels: row.noOfChannels != null ? Number(row.noOfChannels) : undefined,
     language,
     musicBrainzId,
+    // TRIPWIRE: DO NOT join paletteData into bulk catalog projections.
+    // Fast list hydration uses deterministic artSlotColor(songId) to maintain 0ms O(1) row setup.
     paletteData: undefined
   };
 };
@@ -260,6 +262,8 @@ export const mapRawCompactRowToSongData = (row: RawCompactSongRow): SongData => 
     discNo: row.discNo != null ? Number(row.discNo) : undefined,
     albumArtists: undefined,
     genres: undefined,
+    // TRIPWIRE: DO NOT join paletteData into bulk catalog projections.
+    // Fast list hydration uses deterministic artSlotColor(songId) to maintain 0ms O(1) row setup.
     paletteData: undefined,
     bitrate: undefined,
     sampleRate: undefined,

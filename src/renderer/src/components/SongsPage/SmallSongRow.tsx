@@ -252,12 +252,16 @@ export const SmallSongRow = memo(
           className="relative mr-2.5 ml-1.5 h-8 w-8 shrink-0 overflow-hidden rounded-md shadow-xs"
           style={artSlot ? { backgroundColor: artSlot } : undefined}
         >
+          {/* TRIPWIRE: DO NOT add loading="lazy". Virtualization already bounds DOM mounts.
+              Eager loading with content-addressed immutable cache avoids Chromium-level paint deferrals. */}
           <Img
             src={artworkPaths?.optimizedArtworkPath || artworkPaths?.artworkPath || DefaultSongCover}
             fallbackSrc={DefaultSongCover}
             alt={title}
             className="h-full w-full object-cover"
             decoding="async"
+            // TRIPWIRE: DO NOT enable image fade-ins in virtualized rows (disabled since May 2024;
+            // Virtuoso item recycling causes jarring delayed flashes).
             enableImgFadeIns={false}
             revealOnDecode
           />

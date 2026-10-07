@@ -123,6 +123,11 @@ describe('Challenger 2 — Adversarial Stress & Concurrency Test Suite (Mileston
       },
       playerControls: {
         toggleLikeSongs: vi.fn().mockResolvedValue({ likes: [], dislikes: [] })
+      },
+      messages: {
+        getMessageFromMain: vi.fn(),
+        removeMessageListener: vi.fn(),
+        removeMessageToRendererEventListener: vi.fn()
       }
     };
   });
@@ -318,11 +323,11 @@ describe('Challenger 2 — Adversarial Stress & Concurrency Test Suite (Mileston
   });
 
   // --------------------------------------------------------------------------
-  // TEST 4: Verification of lazy artwork decoding attributes in Song component
+  // TEST 4: Verification of eager artwork mounting & deterministic art slot in Song component
   // --------------------------------------------------------------------------
-  it('Adversarial 4: Song component renders loading="lazy" and decoding="async" attributes on artwork img element', () => {
+  it('Adversarial 4: Song component renders eager artwork loading and decoding="async" attributes on artwork img element with painted art slot', () => {
     const mockSongData = createMockSong(101, {
-      title: 'Lazy Async Song',
+      title: 'Eager Async Song',
       artworkPaths: {
         isDefaultArtwork: false,
         artworkPath: 'C:\\AppData\\art_101.jpg',
@@ -352,7 +357,13 @@ describe('Challenger 2 — Adversarial Stress & Concurrency Test Suite (Mileston
     // Query artwork image
     const imgElement = container.querySelector('img[alt="Song cover"]');
     expect(imgElement).not.toBeNull();
-    expect(imgElement?.getAttribute('loading')).toBe('lazy');
+    // Eager mounting: loading attribute must NOT be "lazy" (eliminated second deferral in virtualized rows)
+    expect(imgElement?.getAttribute('loading')).not.toBe('lazy');
     expect(imgElement?.getAttribute('decoding')).toBe('async');
+
+    // Query artwork container: must have painted slot background color
+    const coverContainer = container.querySelector('.song-cover-container');
+    expect(coverContainer).not.toBeNull();
+    expect((coverContainer as HTMLElement)?.style.backgroundColor).toBeTruthy();
   });
 });

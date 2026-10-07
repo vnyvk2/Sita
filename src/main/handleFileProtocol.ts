@@ -88,6 +88,8 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
     const fileSize = stat.size;
     const mtimeMs = Math.trunc(stat.mtimeMs);
     const etag = `"${fileSize}-${mtimeMs}"`;
+    // TRIPWIRE: Content-addressed sha256 filenames MUST serve 'public, max-age=31536000, immutable'.
+    // Only default assets and on-demand nora://thumb/ endpoints use ETag revalidation.
     // Immutable artwork never revalidates (Chromium skips the request
     // entirely); the ETag below stays as a dormant fallback.
     const cacheControl = isImmutableArtworkFile(filePath)

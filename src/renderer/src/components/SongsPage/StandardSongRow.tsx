@@ -372,6 +372,8 @@ export const StandardSongRow = memo(
                 iconName={isSongPlaying ? 'pause_circle' : 'play_circle'}
               />
             </div>
+            {/* TRIPWIRE: DO NOT add loading="lazy". Virtualization already bounds DOM mounts.
+                Eager loading with content-addressed immutable cache avoids Chromium-level paint deferrals. */}
             <Img
               src={
                 artworkPaths?.optimizedArtworkPath ||
@@ -384,6 +386,8 @@ export const StandardSongRow = memo(
               className={`aspect-square max-h-full min-w-full object-contain py-[0.1rem] transition-[filter,opacity]! duration-300 group-focus-within:brightness-50 group-hover:brightness-50 ${
                 isSongPlaying && !showEqualizerOnTracklist ? 'brightness-50' : ''
               }`}
+              // TRIPWIRE: DO NOT enable image fade-ins in virtualized rows (disabled since May 2024;
+              // Virtuoso item recycling causes jarring delayed flashes).
               enableImgFadeIns={false}
               revealOnDecode
             />

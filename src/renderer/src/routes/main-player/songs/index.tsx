@@ -523,8 +523,26 @@ function SongsPage() {
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
-  // Stable songId keys so background inserts move rows instead of remounting
-  // the whole visible window (index keys would shift identity for every row).
+  const virtuosoComponents = useMemo(
+    () => ({
+      ScrollSeekPlaceholder: ({ index, height }: { index: number; height: number }) => (
+        <SongRowSkeleton
+          index={index}
+          height={height}
+          isCompact={isCompactSongView}
+          rowSize={songViewMode === 'small' ? 'small' : 'normal'}
+          slotColor={
+            showArtworkSlotColor ? artSlotColor(filteredSongIds[index] ?? index) : undefined
+          }
+        />
+      )
+    }),
+    [isCompactSongView, songViewMode, showArtworkSlotColor, filteredSongIds]
+  );
+
+  // TRIPWIRE: Keys must be the songId only — never include window, stage, or hydration data.
+  // Skeleton and Song share the key by design (in-place reconciliation swap). Stage keys
+  // force remounts, reset Img decode state, and cause the historical two-frame flash.
   const computeSongItemKey = useCallback(
     (index: number) => filteredSongIds[index] ?? index,
     [filteredSongIds]
@@ -948,8 +966,13 @@ function SongsPage() {
                   fixedItemHeight={fixedItemHeight}
                   scrollKey={scrollKey}
                   itemContent={renderSong}
+                  components={virtuosoComponents}
                   onChange={handleListRangeChange}
                   computeItemKey={computeSongItemKey}
+                  // TRIPWIRE: DO NOT disable scrollSeekConfiguration (setting to false causes 25.4% jank >33ms
+                  // during rapid flings on 50k libraries; see docs/perf-decisions.md & PERFORMANCE_WORKLOG.md L105).
+                  // Enter threshold must stay >=2500 px/s (800 px/s caused normal wheel scrolling to blank; see perf-decisions.md).
+                  // Calm slot placeholders eliminate the double-swap visual defect without frame drops.
                   scrollSeekConfiguration={DEFAULT_SCROLL_SEEK_CONFIG}
                 />
               </div>

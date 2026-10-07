@@ -23,6 +23,10 @@ import { scrollTrace } from '../utils/scrollTrace';
 export const SCROLL_IDLE_MS = 150;
 export const MIN_HOLD_MS = 400;
 
+// TRIPWIRE: DO NOT disable scrollSeekConfiguration (setting to false causes 25.4% jank >33ms
+// during rapid flings on 50k libraries; see docs/perf-decisions.md & PERFORMANCE_WORKLOG.md L105).
+// Enter threshold must stay >=2500 px/s (800 px/s caused normal wheel scrolling to blank; see perf-decisions.md).
+// Calm slot placeholders eliminate the double-swap visual defect without frame drops.
 export const DEFAULT_SCROLL_SEEK_CONFIG: ScrollSeekConfiguration = {
   enter: (velocity) => {
     const shouldEnter = Math.abs(velocity) > 2500;

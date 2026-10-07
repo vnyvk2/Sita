@@ -1168,6 +1168,8 @@ input[type='checkbox']:checked ~ .checkmark .icon {
   }
 }
 
+/* TRIPWIRE: .is-scrolling suppresses hover transitions and backdrop filters during scroll.
+   It does NOT hide images or suppress opacity. Do not blame empty image slots on this class. */
 /* Fast-Scrolling Optimization: Scope strictly to row descendants so scroller retains wheel/scrollbar events */
 .is-scrolling .list-row,
 .is-scrolling .song-item,
