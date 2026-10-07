@@ -132,9 +132,10 @@ const Img = memo((props: ImgProps) => {
   useLayoutEffect(() => {
     if (!revealOnDecode) return;
     const el = imgRef.current;
-    if (el && el.complete && el.naturalWidth > 0) {
-      setIsDecoded(true);
-    }
+    // Always assign from the check: a src change on a recycled instance must
+    // clear a stale `true`, or the new image renders opacity-100 undecoded.
+    // setState with an unchanged value bails out, so steady state costs nothing.
+    setIsDecoded(Boolean(el && el.complete && el.naturalWidth > 0));
   }, [revealOnDecode, resolvedSrc]);
 
   return (
@@ -187,7 +188,12 @@ const Img = memo((props: ImgProps) => {
         if (isFirstTimeRef.current) {
           isFirstTimeRef.current = false;
         }
-        e.currentTarget.classList.add('opacity-100!');
+        // The legacy fade path depends on this imperative class; the reveal
+        // path must skip it — once injected, `!important` permanently
+        // overrides the declarative opacity and later srcs can never hide.
+        if (!revealOnDecode) {
+          e.currentTarget.classList.add('opacity-100!');
+        }
         if (showImgPropsOnTooltip) {
           const width = e.currentTarget.naturalWidth;
           const height = e.currentTarget.naturalHeight;

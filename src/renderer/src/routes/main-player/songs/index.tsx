@@ -523,6 +523,13 @@ function SongsPage() {
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
+  // Ref mirror for the seek placeholder: reading filteredSongIds directly here
+  // would put the array in the memo deps and rebuild Virtuoso's components
+  // object (whole-list re-render) on every ids identity change. A one-commit
+  // stale color on a transient placeholder is harmless; a remount is not.
+  const filteredSongIdsRef = useRef(filteredSongIds);
+  filteredSongIdsRef.current = filteredSongIds;
+
   const virtuosoComponents = useMemo(
     () => ({
       ScrollSeekPlaceholder: ({ index, height }: { index: number; height: number }) => (
@@ -532,12 +539,14 @@ function SongsPage() {
           isCompact={isCompactSongView}
           rowSize={songViewMode === 'small' ? 'small' : 'normal'}
           slotColor={
-            showArtworkSlotColor ? artSlotColor(filteredSongIds[index] ?? index) : undefined
+            showArtworkSlotColor
+              ? artSlotColor(filteredSongIdsRef.current[index] ?? index)
+              : undefined
           }
         />
       )
     }),
-    [isCompactSongView, songViewMode, showArtworkSlotColor, filteredSongIds]
+    [isCompactSongView, songViewMode, showArtworkSlotColor]
   );
 
   // TRIPWIRE: Keys must be the songId only — never include window, stage, or hydration data.
