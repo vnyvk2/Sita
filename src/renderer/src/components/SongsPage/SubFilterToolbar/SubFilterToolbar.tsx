@@ -102,11 +102,13 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
   const availableTools = SUB_FILTER_TOOLS.filter((tool) => tool.contexts.includes(context));
 
 interface SlimDensityBarsIconProps {
-  mode: SongViewMode;
+  isCompact?: boolean;
+  mode?: SongViewMode;
 }
 
-const SlimDensityBarsIcon: FC<SlimDensityBarsIconProps> = ({ mode }) => {
-  if (mode === 'normal') {
+const SlimDensityBarsIcon: FC<SlimDensityBarsIconProps> = ({ isCompact, mode }) => {
+  const showCompactBars = isCompact !== undefined ? isCompact : mode === 'compact';
+  if (showCompactBars) {
     return (
       <svg
         width="16"
@@ -117,25 +119,10 @@ const SlimDensityBarsIcon: FC<SlimDensityBarsIconProps> = ({ mode }) => {
         xmlns="http://www.w3.org/2000/svg"
         aria-hidden="true"
       >
-        <rect x="0.5" y="4" width="15" height="2" rx="1" fill="currentColor" />
-        <rect x="0.5" y="10" width="15" height="2" rx="1" fill="currentColor" />
-      </svg>
-    );
-  }
-  if (mode === 'small') {
-    return (
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 16 16"
-        fill="none"
-        className="shrink-0"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-      >
-        <rect x="0.5" y="2.5" width="15" height="2" rx="1" fill="currentColor" />
-        <rect x="0.5" y="7" width="15" height="2" rx="1" fill="currentColor" />
-        <rect x="0.5" y="11.5" width="15" height="2" rx="1" fill="currentColor" />
+        <rect x="0.5" y="2" width="15" height="1.8" rx="0.9" fill="currentColor" />
+        <rect x="0.5" y="5.4" width="15" height="1.8" rx="0.9" fill="currentColor" />
+        <rect x="0.5" y="8.8" width="15" height="1.8" rx="0.9" fill="currentColor" />
+        <rect x="0.5" y="12.2" width="15" height="1.8" rx="0.9" fill="currentColor" />
       </svg>
     );
   }
@@ -149,10 +136,8 @@ const SlimDensityBarsIcon: FC<SlimDensityBarsIconProps> = ({ mode }) => {
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      <rect x="0.5" y="2" width="15" height="1.8" rx="0.9" fill="currentColor" />
-      <rect x="0.5" y="5.4" width="15" height="1.8" rx="0.9" fill="currentColor" />
-      <rect x="0.5" y="8.8" width="15" height="1.8" rx="0.9" fill="currentColor" />
-      <rect x="0.5" y="12.2" width="15" height="1.8" rx="0.9" fill="currentColor" />
+      <rect x="0.5" y="4" width="15" height="2" rx="1" fill="currentColor" />
+      <rect x="0.5" y="10" width="15" height="2" rx="1" fill="currentColor" />
     </svg>
   );
 };
@@ -161,39 +146,27 @@ const SlimDensityBarsIcon: FC<SlimDensityBarsIconProps> = ({ mode }) => {
   const renderToolPill = (id: SubFilterToolId): ReactNode => {
     switch (id) {
       case 'compactView': {
-        const currentMode: SongViewMode = songViewMode ?? (isCompact ? 'compact' : 'normal');
-        const nextModeMap: Record<SongViewMode, SongViewMode> = {
-          normal: 'small',
-          small: 'compact',
-          compact: 'normal'
-        };
         const handlePillClick = () => {
-          if (onViewModeChange) {
-            onViewModeChange(nextModeMap[currentMode]);
-          } else if (onToggleCompact) {
+          if (onToggleCompact) {
             onToggleCompact();
+          } else if (onViewModeChange) {
+            onViewModeChange(isCompact ? 'normal' : 'compact');
           }
         };
 
-        const modeLabels: Record<SongViewMode, string> = {
-          normal: 'Normal (60px)',
-          small: 'Small (48px)',
-          compact: 'Compact (38px)'
-        };
-
-        const tooltipLabel = onViewModeChange
-          ? `${t('common.compactView', 'Compact View')} / ${t('common.viewMode', 'Density')}: ${modeLabels[currentMode]} (${t('common.clickToCycle', 'click to cycle')})`
+        const tooltipLabel = isCompact
+          ? t('common.showArtwork', 'Show Artwork')
           : t('common.compactView', 'Compact View');
 
         return (
           <Button
             key="compact-view-pill"
             className={`compact-view-pill mr-0! shrink-0 cursor-pointer rounded-3xl border border-background-color-2/60 dark:border-dark-background-color-2/60 px-2.5 py-1 text-xs transition-colors md:text-sm ${
-              currentMode !== 'normal'
+              isCompact
                 ? 'bg-accent text-font-color-white font-medium shadow-xs border-accent!'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
             }`}
-            icon={<SlimDensityBarsIcon mode={currentMode} />}
+            icon={<SlimDensityBarsIcon isCompact={isCompact} mode={songViewMode} />}
             tooltipLabel={tooltipLabel}
             clickHandler={handlePillClick}
           />

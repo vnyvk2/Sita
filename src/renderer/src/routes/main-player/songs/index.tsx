@@ -39,11 +39,13 @@ import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { scrollRegistry } from '@renderer/utils/scrollStore';
 import {
+  getPreferredSongRowSize,
   getSongRowHeight,
   resolveSongViewMode,
   setSongViewMode,
   type SongViewMode
 } from '@renderer/utils/songViewMode';
+import { getSongRowSizeContextMenuItem } from '@renderer/components/SongsPage/getSongRowSizeContextMenu';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -126,6 +128,9 @@ function SongsPage() {
   const songViewMode = useStore(store, (state) =>
     resolveSongViewMode(state.localStorage.preferences)
   );
+  const songRowSize = useStore(store, (state) =>
+    getPreferredSongRowSize(state.localStorage.preferences)
+  );
   const preToggleAnchorIndexRef = useRef<number | null>(null);
   const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
 
@@ -204,9 +209,10 @@ function SongsPage() {
   );
 
   const handleToggleCompactView = useCallback(() => {
-    const nextMode: SongViewMode = songViewMode === 'compact' ? 'normal' : 'compact';
+    const targetNonCompactMode = songRowSize === 'small' ? 'small' : 'normal';
+    const nextMode: SongViewMode = songViewMode === 'compact' ? targetNonCompactMode : 'compact';
     handleViewModeChange(nextMode);
-  }, [handleViewModeChange, songViewMode]);
+  }, [handleViewModeChange, songRowSize, songViewMode]);
 
   useLayoutEffect(() => {
     if (preToggleAnchorIndexRef.current === null) return;
@@ -623,9 +629,25 @@ function SongsPage() {
             })
           });
         }
+      }),
+      getSongRowSizeContextMenuItem({
+        t,
+        currentRowSize: songRowSize,
+        currentViewMode: songViewMode,
+        onRowSizeChange: (newSize) => {
+          handleViewModeChange(newSize);
+        }
       })
     ],
-    [alphabetScrubberPosition, navigate, sortingOrder, t]
+    [
+      alphabetScrubberPosition,
+      handleViewModeChange,
+      navigate,
+      songRowSize,
+      songViewMode,
+      sortingOrder,
+      t
+    ]
   );
 
   const normalizedKeyword = keyword?.trim();

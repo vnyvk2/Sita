@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import storage from '@renderer/utils/localStorage';
 import {
   SONG_ROW_HEIGHTS,
+  getPreferredSongRowSize,
   getSongRowHeight,
   resolveSongViewMode,
   setSongViewMode,
@@ -64,22 +65,45 @@ describe('songViewMode utilities', () => {
     });
   });
 
+  describe('getPreferredSongRowSize', () => {
+    it('resolves explicit row sizes', () => {
+      expect(getPreferredSongRowSize('small')).toBe('small');
+      expect(getPreferredSongRowSize('normal')).toBe('normal');
+      expect(getPreferredSongRowSize({ songRowSize: 'small' })).toBe('small');
+      expect(getPreferredSongRowSize({ songRowSize: 'normal' })).toBe('normal');
+    });
+
+    it('falls back to songViewMode if songRowSize is not set', () => {
+      expect(getPreferredSongRowSize({ songViewMode: 'small' })).toBe('small');
+      expect(getPreferredSongRowSize({ songViewMode: 'normal' })).toBe('normal');
+    });
+
+    it('defaults to normal for empty preferences or compact mode', () => {
+      expect(getPreferredSongRowSize(null)).toBe('normal');
+      expect(getPreferredSongRowSize({})).toBe('normal');
+      expect(getPreferredSongRowSize({ songViewMode: 'compact' })).toBe('normal');
+    });
+  });
+
   describe('setSongViewMode', () => {
-    it('atomically persists both songViewMode and isCompactSongView for compact', () => {
+    it('atomically persists both songViewMode and isCompactSongView for compact without wiping songRowSize', () => {
       setSongViewMode('compact');
       expect(storage.preferences.setPreferences).toHaveBeenCalledWith('songViewMode', 'compact');
       expect(storage.preferences.setPreferences).toHaveBeenCalledWith('isCompactSongView', true);
+      expect(storage.preferences.setPreferences).not.toHaveBeenCalledWith('songRowSize', 'compact');
     });
 
-    it('atomically persists both songViewMode and isCompactSongView for small', () => {
+    it('atomically persists songViewMode, songRowSize, and isCompactSongView for small', () => {
       setSongViewMode('small');
       expect(storage.preferences.setPreferences).toHaveBeenCalledWith('songViewMode', 'small');
+      expect(storage.preferences.setPreferences).toHaveBeenCalledWith('songRowSize', 'small');
       expect(storage.preferences.setPreferences).toHaveBeenCalledWith('isCompactSongView', false);
     });
 
-    it('atomically persists both songViewMode and isCompactSongView for normal', () => {
+    it('atomically persists songViewMode, songRowSize, and isCompactSongView for normal', () => {
       setSongViewMode('normal');
       expect(storage.preferences.setPreferences).toHaveBeenCalledWith('songViewMode', 'normal');
+      expect(storage.preferences.setPreferences).toHaveBeenCalledWith('songRowSize', 'normal');
       expect(storage.preferences.setPreferences).toHaveBeenCalledWith('isCompactSongView', false);
     });
   });

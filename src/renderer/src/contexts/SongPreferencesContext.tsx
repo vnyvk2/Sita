@@ -1,7 +1,11 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useStore } from '@tanstack/react-store';
 import { store } from '@renderer/store/store';
-import { resolveSongViewMode, type SongViewMode } from '@renderer/utils/songViewMode';
+import {
+  getPreferredSongRowSize,
+  resolveSongViewMode,
+  type SongViewMode
+} from '@renderer/utils/songViewMode';
 
 export interface SongPreferences {
   showTrackNumberAsSongIndex: boolean;
@@ -12,6 +16,7 @@ export interface SongPreferences {
   bodyBackgroundImage: boolean;
   isCompactSongView: boolean;
   songViewMode: SongViewMode;
+  songRowSize: 'normal' | 'small';
   pinnedSubFilterTools: string[];
 }
 
@@ -24,6 +29,7 @@ export const defaultSongPreferences: SongPreferences = {
   bodyBackgroundImage: false,
   isCompactSongView: false,
   songViewMode: 'normal',
+  songRowSize: 'normal',
   pinnedSubFilterTools: ['compactView', 'language', 'genre']
 };
 
@@ -65,8 +71,16 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
     store,
     (state) => state.localStorage?.preferences?.isCompactSongView
   );
+  const rawSongRowSize = useStore(
+    store,
+    (state) => state.localStorage?.preferences?.songRowSize
+  );
   const songViewMode = resolveSongViewMode(rawSongViewMode, rawIsCompact);
   const isCompactSongView = songViewMode === 'compact';
+  const songRowSize = getPreferredSongRowSize({
+    songRowSize: rawSongRowSize,
+    songViewMode: rawSongViewMode
+  });
 
   const pinnedSubFilterTools = useStore(
     store,
@@ -83,6 +97,7 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
       bodyBackgroundImage,
       isCompactSongView,
       songViewMode,
+      songRowSize,
       pinnedSubFilterTools
     }),
     [
@@ -94,6 +109,7 @@ export function SongPreferencesProvider({ children }: { children: ReactNode }) {
       bodyBackgroundImage,
       isCompactSongView,
       songViewMode,
+      songRowSize,
       pinnedSubFilterTools
     ]
   );

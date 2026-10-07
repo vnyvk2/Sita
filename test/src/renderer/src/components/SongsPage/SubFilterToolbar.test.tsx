@@ -294,15 +294,24 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
       expect(screen.queryByText(/toolbar tools/i)).toBeNull();
     });
 
-    it('renders slim bars SVG inside Compact View button', () => {
-      render(<SubFilterToolbar {...defaultProps} />);
+    it('renders slim bars SVG inside Compact View button and toggles between 2 bars (standard) and 4 bars (compact)', () => {
+      const { rerender } = render(<SubFilterToolbar {...defaultProps} isCompact={false} />);
 
       const compactBtn = screen.getByRole('button', { name: /compact view/i });
-      const svg = compactBtn.querySelector('svg');
+      expect(compactBtn.className).not.toContain('bg-accent');
+      let svg = compactBtn.querySelector('svg');
       expect(svg).toBeDefined();
-      const rects = svg?.querySelectorAll('rect');
-      // In normal mode, renders 2 slim horizontal bars
-      expect(rects?.length).toBe(2);
+      expect(svg?.querySelectorAll('rect').length).toBe(2);
+
+      // In compact mode, renders 4 slim horizontal bars with active styling and "Show Artwork" tooltip
+      rerender(<SubFilterToolbar {...defaultProps} isCompact={true} />);
+      const artworkBtn = screen.getByRole('button', { name: /show artwork/i });
+      expect(artworkBtn.className).toContain('bg-accent');
+      svg = artworkBtn.querySelector('svg');
+      expect(svg?.querySelectorAll('rect').length).toBe(4);
+
+      fireEvent.click(artworkBtn);
+      expect(defaultProps.onToggleCompact).toHaveBeenCalled();
     });
 
     it('renders Language and Genre dropdowns with fixed width w-[9.5rem] and leading icons', () => {
