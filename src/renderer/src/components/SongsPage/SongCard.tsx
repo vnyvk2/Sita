@@ -541,36 +541,47 @@ const SongCard = (props: SongCardProp) => {
                   duration: 4000
                 }
               ]);
-              const stats = await fillMetadataGaps(targetSongs);
-              addNewNotifications([
-                {
-                  id: `gapfill-done-${Date.now()}`,
-                  content: `Gap fill complete: ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed.`,
-                  iconName: stats.updated > 0 ? 'check_circle' : 'info',
-                  duration: 8000,
-                  buttons:
-                    stats.updated > 0
-                      ? [
-                          {
-                            label: 'Undo',
-                            clickHandler: async () => {
-                              const undo = await undoFillGaps();
-                              if (undo.success && undo.restoredCount > 0) {
-                                addNewNotifications([
-                                  {
-                                    id: `gapfill-undone-${Date.now()}`,
-                                    content: `Reverted gap fill for ${undo.restoredCount} track${undo.restoredCount > 1 ? 's' : ''}.`,
-                                    iconName: 'check_circle',
-                                    duration: 5000
-                                  }
-                                ]);
+              try {
+                const stats = await fillMetadataGaps(targetSongs);
+                addNewNotifications([
+                  {
+                    id: `gapfill-done-${Date.now()}`,
+                    content: `Gap fill complete: ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed.`,
+                    iconName: stats.updated > 0 ? 'check_circle' : 'info',
+                    duration: 8000,
+                    buttons:
+                      stats.updated > 0
+                        ? [
+                            {
+                              label: 'Undo',
+                              clickHandler: async () => {
+                                const undo = await undoFillGaps();
+                                if (undo.success && undo.restoredCount > 0) {
+                                  addNewNotifications([
+                                    {
+                                      id: `gapfill-undone-${Date.now()}`,
+                                      content: `Reverted gap fill for ${undo.restoredCount} track${undo.restoredCount > 1 ? 's' : ''}.`,
+                                      iconName: 'check_circle',
+                                      duration: 5000
+                                    }
+                                  ]);
+                                }
                               }
                             }
-                          }
-                        ]
-                      : []
-                }
-              ]);
+                          ]
+                        : []
+                  }
+                ]);
+              } catch (err: unknown) {
+                addNewNotifications([
+                  {
+                    id: `gapfill-error-${Date.now()}`,
+                    content: `Gap fill failed: ${err instanceof Error ? err.message : String(err)}`,
+                    iconName: 'error',
+                    duration: 6000
+                  }
+                ]);
+              }
             }
           },
           {

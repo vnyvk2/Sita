@@ -147,4 +147,26 @@ describe('GapFillService', () => {
     expect(workflowService.executeMutations).not.toHaveBeenCalled();
     expect(res.skipped).toBe(1);
   });
+
+  it('rejects oversized selections instead of queueing hours of rate-limited work', async () => {
+    const { service, workflowService } = harness();
+    const many = Array.from({ length: 201 }, (_, i) => song({ songId: 100 + i }));
+    await expect(service.fillGaps(many)).rejects.toThrow(/up to 200 songs/);
+    expect(workflowService.executeMutations).not.toHaveBeenCalled();
+  });
+
+  it('skips artwork for album-less singles but still fills their genre', async () => {
+    const { service, workflowService } = harness({
+      genreMutations: [genreMutation(11, 'Rock')],
+      artworkMutations: [artworkMutation(11, 'http://x/cover.jpg')]
+    });
+    const res = await service.fillGaps([
+      song({ songId: 11, album: '', title: 'Solo', genre: '', path: '/tmp/s.mp3' })
+    ]);
+    expect(res.updated).toBe(1);
+    const mutations = workflowService.executeMutations.mock.calls[0][0];
+    expect(mutations).toHaveLength(1);
+    expect(mutations[0].fields.map((f: any) => f.fieldId)).toEqual(['genre']);
+    expect(mutations[0].artwork).toBeUndefined();
+  });
 });

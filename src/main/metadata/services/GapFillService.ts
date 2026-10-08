@@ -20,6 +20,9 @@ export interface GapFillResult extends GapFillStats {
 const isEmptyVal = (v: unknown): boolean =>
   v === undefined || v === null || String(v).trim().length === 0;
 
+/** Upper bound per invocation: Discogs' 1 req/s limiter makes larger batches hours-long. */
+export const MAX_GAP_FILL_SONGS = 200;
+
 const hasArtwork = (s: LocalSongInput): boolean =>
   !isEmptyVal(s.artworkPath) || !isEmptyVal(s.artworkUrl);
 
@@ -68,6 +71,11 @@ export class GapFillService {
 
     const locals = songs.filter((s) => s && s.songId > 0 && !isEmptyVal(s.path));
     if (locals.length === 0) return result;
+    if (locals.length > MAX_GAP_FILL_SONGS) {
+      throw new Error(
+        `Gap fill supports up to ${MAX_GAP_FILL_SONGS} songs per run (received ${locals.length}). Select fewer songs and run again.`
+      );
+    }
 
     // Authoritative baseline: a caller that omits genre (partial literal,
     // failed resolve) must not read as "empty" when the database has a value.
@@ -121,6 +129,7 @@ export class GapFillService {
     }
 
     const first = groupSongs[0];
+    const groupHasAlbum = !isEmptyVal(first.album?.trim());
     const query = {
       album: first.album?.trim() || undefined,
       artist: first.artist?.trim() || undefined,
@@ -144,7 +153,9 @@ export class GapFillService {
             if (!local || !isEmptyVal(local.genre)) continue;
             const fields = rm.fieldMutations.filter((fm) => !isEmptyVal(fm.newValue));
             if (fields.length === 0) continue;
-            mutations.push(this.toMutation(rm, fields, operationId, `Gap fill for ${label}`));
+            mutations.push(
+              this.toMutation(rm, fields, operationId, `Gap fill for ${label}`, local.path)
+            );
           }
         }
       } catch {
@@ -152,8 +163,10 @@ export class GapFillService {
       }
     }
 
-    // Artwork (CAA with Discogs fallback).
-    if (missingArtwork.length > 0) {
+    // Artwork (CAA with Discogs fallback). Album-less singles are excluded:
+    // title-only artwork matching is too ambiguous for unattended writes
+    // (genre stays eligible - its word-boundary matcher guards mismatches).
+    if (missingArtwork.length > 0 && groupHasAlbum) {
       try {
         const workflow = this.workflowService.getWorkflow('artwork');
         const candidates = await workflow.search(query, signal);
@@ -232,13 +245,14 @@ export class GapFillService {
     rm: ResourceMutationPayload,
     fields: ResourceMutationPayload['fieldMutations'],
     operationId: string,
-    description: string
+    description: string,
+    fallbackPath: string
   ): NormalizedMutation {
     return {
       mutationId: `${operationId}:${String(rm.resourceId)}`,
       operationId,
       songId: Number(rm.resourceId),
-      filePath: rm.filePath ?? '',
+      filePath: rm.filePath || fallbackPath,
       fields: fields.map((fm) => ({
         fieldId: fm.fieldId as ApplyFieldId,
         oldValue: fm.oldValue ?? null,
