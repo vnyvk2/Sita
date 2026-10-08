@@ -92,9 +92,7 @@ export const SmallSongRow = memo(
     const { isBursting, triggerBurst } = useHeartBurst();
 
     const initialFavorite =
-      isCurrentSong && currentSongFavorite !== undefined
-        ? currentSongFavorite
-        : props.isAFavorite;
+      isCurrentSong && currentSongFavorite !== undefined ? currentSongFavorite : props.isAFavorite;
 
     const { isFavorite: isAFavorite, toggleFavorite: toggleSingleSongFavorite } =
       useSongFavoriteToggle({
@@ -150,10 +148,7 @@ export const SmallSongRow = memo(
       };
     }, [duration]);
 
-    const artistsKey = useMemo(
-      () => artists?.map((a) => a.artistId).join(',') ?? '',
-      [artists]
-    );
+    const artistsKey = useMemo(() => artists?.map((a) => a.artistId).join(',') ?? '', [artists]);
 
     const songArtists = useMemo(() => {
       if (Array.isArray(artists) && artists.length > 0) {
@@ -179,7 +174,7 @@ export const SmallSongRow = memo(
         data-song-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
-        className={`small-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none select-none [contain:layout] ${
+        className={`small-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none [contain:layout] select-none ${
           isCurrentSong
             ? 'bg-accent/8 dark:bg-accent/12'
             : isAMultipleSelection
@@ -220,7 +215,7 @@ export const SmallSongRow = memo(
               <button
                 type="button"
                 onClick={handlePlayBtnClick}
-                className="text-accent hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110"
+                className="text-accent fx-row-play-appear hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110 active:scale-95"
                 title={isSongPlaying ? t('common.pause') : t('common.play')}
               >
                 <span className="material-icons-round text-base leading-none">
@@ -230,15 +225,16 @@ export const SmallSongRow = memo(
             </>
           ) : (
             <>
-              <span className="text-font-color-dimmed text-xs font-mono group-hover:hidden opacity-75">
-                {typeof trackNo === 'number' || (typeof trackNo === 'string' && trackNo.trim().length > 0)
+              <span className="text-font-color-dimmed font-mono text-xs opacity-75 group-hover:hidden">
+                {typeof trackNo === 'number' ||
+                (typeof trackNo === 'string' && trackNo.trim().length > 0)
                   ? trackNo
                   : index + 1}
               </span>
               <button
                 type="button"
                 onClick={handlePlayBtnClick}
-                className="text-font-color-black dark:text-font-color-white hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110"
+                className="text-font-color-black dark:text-font-color-white fx-row-play-appear hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110 active:scale-95"
                 title={t('common.play')}
               >
                 <span className="material-icons-round text-base leading-none">play_arrow</span>
@@ -255,7 +251,9 @@ export const SmallSongRow = memo(
           {/* TRIPWIRE: DO NOT add loading="lazy". Virtualization already bounds DOM mounts.
               Eager loading with content-addressed immutable cache avoids Chromium-level paint deferrals. */}
           <Img
-            src={artworkPaths?.optimizedArtworkPath || artworkPaths?.artworkPath || DefaultSongCover}
+            src={
+              artworkPaths?.optimizedArtworkPath || artworkPaths?.artworkPath || DefaultSongCover
+            }
             fallbackSrc={DefaultSongCover}
             alt={title}
             className="h-full w-full object-cover"

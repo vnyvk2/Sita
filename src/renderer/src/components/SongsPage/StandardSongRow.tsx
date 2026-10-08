@@ -61,15 +61,21 @@ export interface SongProp {
   /** When provided, highlights the matching portion of the title in search results */
   highlightText?: string;
   /**
-   * When provided, skips the per-row store subscription for bodyBackgroundImage.
-   * Pass from the parent to avoid N store subscriptions in the hot scrolling path.
+   * When provided, skips the per-row store subscription for bodyBackgroundImage. Pass from the
+   * parent to avoid N store subscriptions in the hot scrolling path.
    */
   hasBodyBackgroundImage?: boolean;
   /** When true, renders compact 38px MusicBee-style row without artwork */
   isCompact?: boolean;
-  /** Active row size for views with artwork ('normal' = 60px card, 'small' = 48px row). Defaults to 'normal'. */
+  /**
+   * Active row size for views with artwork ('normal' = 60px card, 'small' = 48px row). Defaults to
+   * 'normal'.
+   */
   rowSize?: 'normal' | 'small';
-  /** When true, contextmenu and more-options click events bubble to list container without local interception */
+  /**
+   * When true, contextmenu and more-options click events bubble to list container without local
+   * interception
+   */
   isDelegated?: boolean;
   /** Optional direct contextmenu handler for tests/delegation */
   onContextMenu?: (e: React.MouseEvent) => void;
@@ -134,20 +140,15 @@ export const StandardSongRow = memo(
     const showArtworkSlotColor = preferences.showArtworkSlotColor ?? true;
     const artSlot = showArtworkSlotColor ? artSlotColor(songId) : undefined;
 
-    const {
-      playSong,
-      toggleMultipleSelections,
-      updateMultipleSelections
-    } = useContext(AppUpdateContext);
+    const { playSong, toggleMultipleSelections, updateMultipleSelections } =
+      useContext(AppUpdateContext);
     const { t } = useTranslation();
 
     const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
     const { isBursting, triggerBurst } = useHeartBurst();
 
     const initialFavorite =
-      isCurrentSong && currentSongFavorite !== undefined
-        ? currentSongFavorite
-        : props.isAFavorite;
+      isCurrentSong && currentSongFavorite !== undefined ? currentSongFavorite : props.isAFavorite;
 
     const { isFavorite: isAFavorite, toggleFavorite: toggleSingleSongFavorite } =
       useSongFavoriteToggle({
@@ -180,10 +181,7 @@ export const StandardSongRow = memo(
     // Stable identity key based on artist IDs, not the array reference itself.
     // The artists prop is a fresh array from IPC on every window refetch, which would
     // invalidate useMemo even when the actual data is identical.
-    const artistsKey = useMemo(
-      () => artists?.map((a) => a.artistId).join(',') ?? '',
-      [artists]
-    );
+    const artistsKey = useMemo(() => artists?.map((a) => a.artistId).join(',') ?? '', [artists]);
 
     const songArtists = useMemo(() => {
       if (Array.isArray(artists) && artists.length > 0) {
@@ -360,10 +358,10 @@ export const StandardSongRow = memo(
                   </span>
                 </div>
               )}
-            <div className="play-btn-container absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+            <div className="play-btn-container absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center transition-transform duration-150 group-hover:scale-105 active:scale-95">
               <Button
                 className="m-0! rounded-none! border-0! bg-transparent p-0! outline-offset-1 transition-colors! hover:bg-transparent focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
-                iconClassName={`text-3xl! text-font-color-white/0 leading-none! ${
+                iconClassName={`text-3xl! text-font-color-white/0 leading-none! transition-[color,transform] duration-150 ${
                   isCurrentSong && !showEqualizerOnTracklist && 'text-font-color-white/100'
                 } group-focus-within:text-font-color-white/100 group-hover:text-font-color-white/100 ${
                   isSongPlaying && !showEqualizerOnTracklist && 'text-font-color-white/75!'
@@ -376,9 +374,7 @@ export const StandardSongRow = memo(
                 Eager loading with content-addressed immutable cache avoids Chromium-level paint deferrals. */}
             <Img
               src={
-                artworkPaths?.optimizedArtworkPath ||
-                artworkPaths?.artworkPath ||
-                DefaultSongCover
+                artworkPaths?.optimizedArtworkPath || artworkPaths?.artworkPath || DefaultSongCover
               }
               thumbnail={!artworkPaths?.optimizedArtworkPath && Boolean(artworkPaths?.artworkPath)}
               decoding="async"
