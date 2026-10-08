@@ -72,7 +72,6 @@ const SeekBarSlider = (props: Props) => {
 
   const prevSongIdRef = useRef(currentSongData.songId);
 
-  // Reset progress on track change
   useEffect(() => {
     if (prevSongIdRef.current !== currentSongData.songId) {
       prevSongIdRef.current = currentSongData.songId;

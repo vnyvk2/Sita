@@ -21,6 +21,7 @@ import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import { useSongPreferences } from '../../contexts/SongPreferencesContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
 import { store } from '../../store/store';
+import { resolveAutoTagSongs, type SongDataForAutoTag } from '../../utils/autoTagUtils';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
 import Img from '../Img';
@@ -29,6 +30,8 @@ import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
 import SoundBarsIndicator from '../SoundBarsIndicator';
 import { artSlotColor } from './artSlotColor';
+import MetadataGapBadge from './MetadataGapBadge';
+import { getMetadataGaps } from './metadataGaps';
 import SongArtist from './SongArtist';
 import useSongContextMenu from './useSongContextMenu';
 import { useSongFavoriteToggle } from './useSongFavoriteToggle';
@@ -61,15 +64,21 @@ export interface SongProp {
   /** When provided, highlights the matching portion of the title in search results */
   highlightText?: string;
   /**
-   * When provided, skips the per-row store subscription for bodyBackgroundImage.
-   * Pass from the parent to avoid N store subscriptions in the hot scrolling path.
+   * When provided, skips the per-row store subscription for bodyBackgroundImage. Pass from the
+   * parent to avoid N store subscriptions in the hot scrolling path.
    */
   hasBodyBackgroundImage?: boolean;
   /** When true, renders compact 38px MusicBee-style row without artwork */
   isCompact?: boolean;
-  /** Active row size for views with artwork ('normal' = 60px card, 'small' = 48px row). Defaults to 'normal'. */
+  /**
+   * Active row size for views with artwork ('normal' = 60px card, 'small' = 48px row). Defaults to
+   * 'normal'.
+   */
   rowSize?: 'normal' | 'small';
-  /** When true, contextmenu and more-options click events bubble to list container without local interception */
+  /**
+   * When true, contextmenu and more-options click events bubble to list container without local
+   * interception
+   */
   isDelegated?: boolean;
   /** Optional direct contextmenu handler for tests/delegation */
   onContextMenu?: (e: React.MouseEvent) => void;
@@ -137,17 +146,18 @@ export const StandardSongRow = memo(
     const {
       playSong,
       toggleMultipleSelections,
-      updateMultipleSelections
+      updateMultipleSelections,
+      openAutoTagDialog,
+      openTrackIdentifyDialog
     } = useContext(AppUpdateContext);
     const { t } = useTranslation();
 
     const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
+    const gapFixInFlightRef = useRef(false);
     const { isBursting, triggerBurst } = useHeartBurst();
 
     const initialFavorite =
-      isCurrentSong && currentSongFavorite !== undefined
-        ? currentSongFavorite
-        : props.isAFavorite;
+      isCurrentSong && currentSongFavorite !== undefined ? currentSongFavorite : props.isAFavorite;
 
     const { isFavorite: isAFavorite, toggleFavorite: toggleSingleSongFavorite } =
       useSongFavoriteToggle({
@@ -161,6 +171,58 @@ export const StandardSongRow = memo(
       if (onPlayClick) return onPlayClick(songId);
       return playSong(songId);
     }, [onPlayClick, playSong, songId]);
+
+    // Incomplete-metadata badge: pure derivation over row props (no new
+    // subscriptions), click resolves the song and opens the album autotag flow.
+    const metadataGaps = useMemo(
+      () => getMetadataGaps({ genres, year, artworkPaths, artists }),
+      [genres, year, artworkPaths, artists]
+    );
+
+    const handleGapFix = useCallback(async () => {
+      // Guard against double-clicks firing duplicate resolve IPC + dialogs.
+      if (gapFixInFlightRef.current) return;
+      gapFixInFlightRef.current = true;
+      try {
+        const resolved = await resolveAutoTagSongs([songId]);
+        const target: SongDataForAutoTag = resolved[0] ?? {
+          songId,
+          title,
+          artists,
+          album,
+          genres,
+          trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+          discNo,
+          year,
+          path,
+          duration,
+          artworkPath: artworkPaths?.artworkPath ?? undefined
+        };
+        // Album-less singles go to track identification instead of the album flow.
+        if (!album?.name && openTrackIdentifyDialog) {
+          openTrackIdentifyDialog([target]);
+          return;
+        }
+        if (!openAutoTagDialog) return;
+        openAutoTagDialog([target], album?.name, artists?.[0]?.name, 'album');
+      } finally {
+        gapFixInFlightRef.current = false;
+      }
+    }, [
+      openAutoTagDialog,
+      openTrackIdentifyDialog,
+      songId,
+      title,
+      artists,
+      album,
+      genres,
+      trackNo,
+      discNo,
+      year,
+      path,
+      duration,
+      artworkPaths
+    ]);
 
     const { minutes, seconds } = useMemo(() => {
       const addZero = (num: number) => {
@@ -180,10 +242,7 @@ export const StandardSongRow = memo(
     // Stable identity key based on artist IDs, not the array reference itself.
     // The artists prop is a fresh array from IPC on every window refetch, which would
     // invalidate useMemo even when the actual data is identical.
-    const artistsKey = useMemo(
-      () => artists?.map((a) => a.artistId).join(',') ?? '',
-      [artists]
-    );
+    const artistsKey = useMemo(() => artists?.map((a) => a.artistId).join(',') ?? '', [artists]);
 
     const songArtists = useMemo(() => {
       if (Array.isArray(artists) && artists.length > 0) {
@@ -360,10 +419,10 @@ export const StandardSongRow = memo(
                   </span>
                 </div>
               )}
-            <div className="play-btn-container absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+            <div className="play-btn-container absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center transition-transform duration-150 group-hover:scale-105 active:scale-95">
               <Button
                 className="m-0! rounded-none! border-0! bg-transparent p-0! outline-offset-1 transition-colors! hover:bg-transparent focus-visible:outline! dark:bg-transparent dark:hover:bg-transparent"
-                iconClassName={`text-3xl! text-font-color-white/0 leading-none! ${
+                iconClassName={`text-3xl! text-font-color-white/0 leading-none! transition-[color,transform] duration-150 ${
                   isCurrentSong && !showEqualizerOnTracklist && 'text-font-color-white/100'
                 } group-focus-within:text-font-color-white/100 group-hover:text-font-color-white/100 ${
                   isSongPlaying && !showEqualizerOnTracklist && 'text-font-color-white/75!'
@@ -376,9 +435,7 @@ export const StandardSongRow = memo(
                 Eager loading with content-addressed immutable cache avoids Chromium-level paint deferrals. */}
             <Img
               src={
-                artworkPaths?.optimizedArtworkPath ||
-                artworkPaths?.artworkPath ||
-                DefaultSongCover
+                artworkPaths?.optimizedArtworkPath || artworkPaths?.artworkPath || DefaultSongCover
               }
               thumbnail={!artworkPaths?.optimizedArtworkPath && Boolean(artworkPaths?.artworkPath)}
               decoding="async"
@@ -455,8 +512,13 @@ export const StandardSongRow = memo(
               />
               <HeartBurst isBursting={isBursting} />
             </div>
-            <span className="">
-              {minutes ?? '--'}:{seconds ?? '--'}
+            <span className="flex items-center gap-1.5">
+              {metadataGaps.length > 0 && (
+                <MetadataGapBadge gaps={metadataGaps} onFix={handleGapFix} />
+              )}
+              <span>
+                {minutes ?? '--'}:{seconds ?? '--'}
+              </span>
             </span>
           </div>
         </div>

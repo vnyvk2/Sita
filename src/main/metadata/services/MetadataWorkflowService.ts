@@ -250,6 +250,20 @@ export class MetadataWorkflowService extends EventEmitter {
     return this.transactionManager.rollbackLastTransaction();
   }
 
+  /**
+   * Executes caller-built normalized mutations through the single authoritative orchestrator (used
+   * by GapFillService for per-album grouped commits).
+   */
+  public async executeMutations(
+    mutations: import('../apply/contract').NormalizedMutation[],
+    opts?: { albumTitle?: string; groupUndo?: { description: string } }
+  ): Promise<import('../apply/contract').OrchestratorResult> {
+    if (!this.orchestrator) {
+      throw new Error('[MetadataWorkflowService] Orchestrator not configured');
+    }
+    return this.orchestrator.execute(mutations, opts);
+  }
+
   private emitProgress(
     stage: string,
     message: string,

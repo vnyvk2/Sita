@@ -17,6 +17,7 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
 import { store } from '../../store/store';
+import { resolveAutoTagSongs, type SongDataForAutoTag } from '../../utils/autoTagUtils';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
 import Img from '../Img';
@@ -24,6 +25,8 @@ import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
 import { artSlotColor } from './artSlotColor';
+import MetadataGapBadge from './MetadataGapBadge';
+import { getMetadataGaps } from './metadataGaps';
 import SongArtist from './SongArtist';
 import type { SongProp } from './StandardSongRow';
 import useSongContextMenu from './useSongContextMenu';
@@ -84,17 +87,21 @@ export const SmallSongRow = memo(
     const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
       useSongSelection(songId);
 
-    const { playSong, toggleMultipleSelections, updateMultipleSelections } =
-      useContext(AppUpdateContext);
+    const {
+      playSong,
+      toggleMultipleSelections,
+      updateMultipleSelections,
+      openAutoTagDialog,
+      openTrackIdentifyDialog
+    } = useContext(AppUpdateContext);
     const { t } = useTranslation();
 
     const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
+    const gapFixInFlightRef = useRef(false);
     const { isBursting, triggerBurst } = useHeartBurst();
 
     const initialFavorite =
-      isCurrentSong && currentSongFavorite !== undefined
-        ? currentSongFavorite
-        : props.isAFavorite;
+      isCurrentSong && currentSongFavorite !== undefined ? currentSongFavorite : props.isAFavorite;
 
     const { isFavorite: isAFavorite, toggleFavorite: toggleSingleSongFavorite } =
       useSongFavoriteToggle({
@@ -108,6 +115,58 @@ export const SmallSongRow = memo(
       if (onPlayClick) return onPlayClick(songId);
       return playSong(songId);
     }, [onPlayClick, playSong, songId]);
+
+    // Incomplete-metadata badge: pure derivation over row props (no new
+    // subscriptions), click resolves the song and opens the album autotag flow.
+    const metadataGaps = useMemo(
+      () => getMetadataGaps({ genres, year, artworkPaths, artists }),
+      [genres, year, artworkPaths, artists]
+    );
+
+    const handleGapFix = useCallback(async () => {
+      // Guard against double-clicks firing duplicate resolve IPC + dialogs.
+      if (gapFixInFlightRef.current) return;
+      gapFixInFlightRef.current = true;
+      try {
+        const resolved = await resolveAutoTagSongs([songId]);
+        const target: SongDataForAutoTag = resolved[0] ?? {
+          songId,
+          title,
+          artists,
+          album,
+          genres,
+          trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+          discNo,
+          year,
+          path,
+          duration,
+          artworkPath: artworkPaths?.artworkPath ?? undefined
+        };
+        // Album-less singles go to track identification instead of the album flow.
+        if (!album?.name && openTrackIdentifyDialog) {
+          openTrackIdentifyDialog([target]);
+          return;
+        }
+        if (!openAutoTagDialog) return;
+        openAutoTagDialog([target], album?.name, artists?.[0]?.name, 'album');
+      } finally {
+        gapFixInFlightRef.current = false;
+      }
+    }, [
+      openAutoTagDialog,
+      openTrackIdentifyDialog,
+      songId,
+      title,
+      artists,
+      album,
+      genres,
+      trackNo,
+      discNo,
+      year,
+      path,
+      duration,
+      artworkPaths
+    ]);
 
     // Local context menu fallback for isolated testing or non-delegated contexts
     const fallbackContextMenu = useSongContextMenu({
@@ -150,10 +209,7 @@ export const SmallSongRow = memo(
       };
     }, [duration]);
 
-    const artistsKey = useMemo(
-      () => artists?.map((a) => a.artistId).join(',') ?? '',
-      [artists]
-    );
+    const artistsKey = useMemo(() => artists?.map((a) => a.artistId).join(',') ?? '', [artists]);
 
     const songArtists = useMemo(() => {
       if (Array.isArray(artists) && artists.length > 0) {
@@ -179,7 +235,7 @@ export const SmallSongRow = memo(
         data-song-index={index}
         {...provided?.draggableProps}
         {...provided?.dragHandleProps}
-        className={`small-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none select-none [contain:layout] ${
+        className={`small-song-row group border-background-color-2/30 dark:border-dark-background-color-2/30 relative flex h-[48px] max-h-[48px] min-h-[48px] w-full cursor-pointer items-center border-b px-2 text-xs transition-none [contain:layout] select-none ${
           isCurrentSong
             ? 'bg-accent/8 dark:bg-accent/12'
             : isAMultipleSelection
@@ -220,7 +276,7 @@ export const SmallSongRow = memo(
               <button
                 type="button"
                 onClick={handlePlayBtnClick}
-                className="text-accent hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110"
+                className="text-accent fx-row-play-appear hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110 active:scale-95"
                 title={isSongPlaying ? t('common.pause') : t('common.play')}
               >
                 <span className="material-icons-round text-base leading-none">
@@ -230,15 +286,16 @@ export const SmallSongRow = memo(
             </>
           ) : (
             <>
-              <span className="text-font-color-dimmed text-xs font-mono group-hover:hidden opacity-75">
-                {typeof trackNo === 'number' || (typeof trackNo === 'string' && trackNo.trim().length > 0)
+              <span className="text-font-color-dimmed font-mono text-xs opacity-75 group-hover:hidden">
+                {typeof trackNo === 'number' ||
+                (typeof trackNo === 'string' && trackNo.trim().length > 0)
                   ? trackNo
                   : index + 1}
               </span>
               <button
                 type="button"
                 onClick={handlePlayBtnClick}
-                className="text-font-color-black dark:text-font-color-white hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110"
+                className="text-font-color-black dark:text-font-color-white fx-row-play-appear hidden cursor-pointer items-center justify-center transition-transform group-hover:flex hover:scale-110 active:scale-95"
                 title={t('common.play')}
               >
                 <span className="material-icons-round text-base leading-none">play_arrow</span>
@@ -255,7 +312,9 @@ export const SmallSongRow = memo(
           {/* TRIPWIRE: DO NOT add loading="lazy". Virtualization already bounds DOM mounts.
               Eager loading with content-addressed immutable cache avoids Chromium-level paint deferrals. */}
           <Img
-            src={artworkPaths?.optimizedArtworkPath || artworkPaths?.artworkPath || DefaultSongCover}
+            src={
+              artworkPaths?.optimizedArtworkPath || artworkPaths?.artworkPath || DefaultSongCover
+            }
             fallbackSrc={DefaultSongCover}
             alt={title}
             className="h-full w-full object-cover"
@@ -311,8 +370,11 @@ export const SmallSongRow = memo(
         </div>
 
         {/* Duration column */}
-        <div className="song-duration text-font-color-dimmed min-w-[3.5rem] pr-3 text-right font-mono text-xs opacity-75">
-          {minutes}:{seconds}
+        <div className="song-duration text-font-color-dimmed flex min-w-[3.5rem] items-center justify-end gap-1.5 pr-3 text-right font-mono text-xs opacity-75">
+          {metadataGaps.length > 0 && <MetadataGapBadge gaps={metadataGaps} onFix={handleGapFix} />}
+          <span>
+            {minutes}:{seconds}
+          </span>
         </div>
 
         {/* Actions column */}

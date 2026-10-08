@@ -1,19 +1,21 @@
+import type { TFunction } from 'i18next';
 /* eslint-disable react-refresh/only-export-components */
 import { lazy } from 'react';
-import type { TFunction } from 'i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
-import Img from '../Img';
-import { buildSongPlaylistMenuItem } from './songPlaylistMenu';
+import { songCacheKeys, songQuery } from '../../queries/songs';
+import { queryClient } from '../../queryClient';
+import { store } from '../../store/store';
 import {
+  fillMetadataGaps,
   resolveAutoTagSongs,
+  undoFillGaps,
   updateMissingArtworkForSongs,
   updateMissingLyricsForSongs,
   type SongDataForAutoTag
 } from '../../utils/autoTagUtils';
-import { songCacheKeys, songQuery } from '../../queries/songs';
-import { queryClient } from '../../queryClient';
-import { store } from '../../store/store';
+import Img from '../Img';
+import { buildSongPlaylistMenuItem } from './songPlaylistMenu';
 
 const BlacklistSongConfirmPrompt = lazy(() => import('./BlacklistSongConfirmPrompt'));
 const DeleteSongsFromSystemConfrimPrompt = lazy(
@@ -52,7 +54,11 @@ export interface SongContextMenuServices {
     addSelections?: number[],
     replaceSelections?: boolean
   ) => void;
-  updateMultipleSelections?: (id: number, selectionType: QueueTypes, type: 'add' | 'remove') => void;
+  updateMultipleSelections?: (
+    id: number,
+    selectionType: QueueTypes,
+    type: 'add' | 'remove'
+  ) => void;
   createQueue: (
     songIds: number[],
     queueType: QueueTypes,
@@ -178,7 +184,9 @@ export async function buildSongContextMenuItems(
               if (!old?.data) return old;
               return {
                 ...old,
-                data: old.data.map((s) => (s.songId === songId ? { ...s, isAFavorite: nextFav } : s))
+                data: old.data.map((s) =>
+                  s.songId === songId ? { ...s, isAFavorite: nextFav } : s
+                )
               };
             }
           );
@@ -587,6 +595,81 @@ export async function buildSongContextMenuItems(
           }
         },
         {
+          label: 'Fill Metadata Gaps',
+          iconName: 'auto_fix_high',
+          handlerFunction: async () => {
+            let targetSongs: SongDataForAutoTag[] = [
+              {
+                songId,
+                title,
+                artists,
+                album,
+                genres,
+                trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+                discNo,
+                year,
+                path,
+                duration,
+                artworkPath:
+                  artworkPaths?.artworkPath ?? artworkPaths?.optimizedArtworkPath ?? undefined
+              }
+            ];
+            if (isMultiSelectionActive) {
+              const resolved = await resolveAutoTagSongs(songIds);
+              if (resolved.length > 0) targetSongs = resolved;
+            }
+            addNewNotifications([
+              {
+                id: `gapfill-start-${Date.now()}`,
+                content: `Filling empty genre/artwork for ${targetSongs.length} track${targetSongs.length > 1 ? 's' : ''}...`,
+                iconName: 'auto_fix_high',
+                duration: 4000
+              }
+            ]);
+            try {
+              const stats = await fillMetadataGaps(targetSongs);
+              addNewNotifications([
+                {
+                  id: `gapfill-done-${Date.now()}`,
+                  content: `Gap fill complete: ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed.`,
+                  iconName: stats.updated > 0 ? 'check_circle' : 'info',
+                  duration: 8000,
+                  buttons:
+                    stats.updated > 0
+                      ? [
+                          {
+                            label: 'Undo',
+                            clickHandler: async () => {
+                              const undo = await undoFillGaps();
+                              if (undo.success && undo.restoredCount > 0) {
+                                addNewNotifications([
+                                  {
+                                    id: `gapfill-undone-${Date.now()}`,
+                                    content: `Reverted gap fill for ${undo.restoredCount} track${undo.restoredCount > 1 ? 's' : ''}.`,
+                                    iconName: 'check_circle',
+                                    duration: 5000
+                                  }
+                                ]);
+                              }
+                            }
+                          }
+                        ]
+                      : []
+                }
+              ]);
+            } catch (err: unknown) {
+              addNewNotifications([
+                {
+                  id: `gapfill-error-${Date.now()}`,
+                  content: `Gap fill failed: ${err instanceof Error ? err.message : String(err)}`,
+                  iconName: 'error',
+                  duration: 6000
+                }
+              ]);
+            }
+          }
+        },
+        {
           label: 'Infer Tags from Filename',
           iconName: 'description',
           handlerFunction: () => {
@@ -665,7 +748,10 @@ export async function buildSongContextMenuItems(
 }
 
 export function buildSongContextMenuData(
-  song: Pick<SongContextMenuInput, 'title' | 'artists' | 'artworkPaths' | 'isAMultipleSelection' | 'isMultipleSelectionEnabled'>,
+  song: Pick<
+    SongContextMenuInput,
+    'title' | 'artists' | 'artworkPaths' | 'isAMultipleSelection' | 'isMultipleSelectionEnabled'
+  >,
   services: Pick<SongContextMenuServices, 't'>,
   isCompact: boolean = false
 ): ContextMenuAdditionalData {
@@ -688,7 +774,8 @@ export function buildSongContextMenuData(
 
   return {
     title: song.title || services.t('common.unknownTitle'),
-    subTitle: song.artists?.map((artist) => artist.name).join(', ') ?? services.t('common.unknownArtist'),
-    artworkPath: isCompact ? undefined : (song.artworkPaths?.optimizedArtworkPath || DefaultSongCover)
+    subTitle:
+      song.artists?.map((artist) => artist.name).join(', ') ?? services.t('common.unknownArtist'),
+    artworkPath: isCompact ? undefined : song.artworkPaths?.optimizedArtworkPath || DefaultSongCover
   };
 }

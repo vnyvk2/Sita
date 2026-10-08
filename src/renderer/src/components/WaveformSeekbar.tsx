@@ -559,10 +559,10 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     // 3. Normal seek release
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
+      const finalPos = calculateSeekFromEvent(e.clientX);
       try {
         (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
       } catch {}
-      const finalPos = calculateSeekFromEvent(e.clientX);
       const totalDuration = getEffectiveDuration();
       progressPercentRef.current =
         totalDuration > 0 ? Math.min(1, Math.max(0, finalPos / totalDuration)) : 0;

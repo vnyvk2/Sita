@@ -16,6 +16,14 @@ export interface AvailableSearchProviderInfo {
   isOnline: boolean;
 }
 
+export interface GapFillStats {
+  updated: number;
+  skipped: number;
+  failed: number;
+  albumsProcessed: number;
+  errors: string[];
+}
+
 export interface MetadataAutoTagApi {
   searchAlbums: (
     albumName: string,
@@ -37,6 +45,7 @@ export interface MetadataAutoTagApi {
     operationId?: string
   ) => Promise<{ success: boolean; restoredCount: number; errors?: string[] }>;
   cancelAutoTag: (operationId?: string) => void;
+  fillGaps: (localSongs: unknown[], operationId?: string) => Promise<GapFillStats>;
   onProgress: (callback: (payload: ProgressEventPayload) => void) => () => void;
   getMetadataPreferences: () => Promise<MetadataProviderPreferences>;
   saveMetadataPreferences: (

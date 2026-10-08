@@ -5,6 +5,8 @@ import {
 import { inArray } from 'drizzle-orm';
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
+import type { DaemonCommand, DaemonPushEvent } from '../common/audioEngineProtocol';
+import { nativeAudioDaemonManager } from './audio/NativeAudioDaemonManager';
 import { setupCollectionIpc } from './collections/ipc/setupCollectionIpc';
 import {
   playlistEngine,
@@ -98,8 +100,6 @@ import {
 } from './db/queries/userPreferences';
 import { songs as songsTable } from './db/schema';
 import { setupDownloadsIpc } from './downloads/setupDownloads';
-import { nativeAudioDaemonManager } from './audio/NativeAudioDaemonManager';
-import type { DaemonCommand, DaemonPushEvent } from '../common/audioEngineProtocol';
 import {
   broadcastLyricsToFloatingWindow,
   broadcastPlayStateToFloatingWindow,
@@ -164,7 +164,6 @@ import { playlistBatchOrchestrator, playlistBatchPlanner } from './playlistBatch
 import { setupPlaylistExportIpc } from './playlistExport/ipc/setupPlaylistExportIpc';
 import { setupPlaylistImportIpc } from './playlistImport/ipc/setupPlaylistImportIpc';
 import { playlistImportWorkflow, importHistoryService } from './playlistImport/setup';
-
 import removeSongsFromLibrary from './removeSongsFromLibrary';
 import saveLyricsToSong from './saveLyricsToSong';
 import { SearchCoordinator } from './search/coordinator/SearchCoordinator';
@@ -255,7 +254,8 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
         metadataContainer.application.workflowService,
         metadataContainer.application.preferencesService,
         mainWindow,
-        metadataContainer.application.providerRuntime
+        metadataContainer.application.providerRuntime,
+        metadataContainer.application.gapFillService
       );
       logger.info(
         'AutoTag IPC handlers initialized successfully via MetadataBootstrap composition root'
@@ -1079,10 +1079,12 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.on('app/openInBrowser', (_, url: string) => void safeOpenExternal(url));
 
-    ipcMain.on('app/loginToLastFmInBrowser', () =>
-      void safeOpenExternal(
-        `https://www.last.fm/api/auth/?api_key=${import.meta.env.MAIN_VITE_LAST_FM_API_KEY}&cb=nora://auth?service=lastfm`
-      )
+    ipcMain.on(
+      'app/loginToLastFmInBrowser',
+      () =>
+        void safeOpenExternal(
+          `https://www.last.fm/api/auth/?api_key=${import.meta.env.MAIN_VITE_LAST_FM_API_KEY}&cb=nora://auth?service=lastfm`
+        )
     );
 
     ipcMain.handle('app/exportAppData', (_, localStorageData: string) =>

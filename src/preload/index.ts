@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 import type {
+  HistoryPeriod,
+  ListeningAnalyticsData,
+  LibraryAudioStatsData
+} from '../common/analytics';
+import type { DaemonCommand, DaemonPushEvent, DaemonResponse } from '../common/audioEngineProtocol';
+import type {
   PlaylistDto as CollectionDto,
   CollectionHierarchyNodeDto as BreadcrumbDto,
   PlaylistEntryDto
@@ -38,13 +44,7 @@ import type {
   BatchImportProgressPayload,
   BatchImportSummaryResult
 } from '../common/collections/types';
-
 import type { MetadataProviderPreferences, MetadataSearchOptions } from '../common/metadata';
-import type {
-  HistoryPeriod,
-  ListeningAnalyticsData,
-  LibraryAudioStatsData
-} from '../common/analytics';
 import type {
   ArtistDiscographyPayload,
   ArtistOnlineProfilePayload,
@@ -53,7 +53,6 @@ import type {
 import type { LastFMAlbumInfo } from '../types/last_fm_album_info_api';
 import type { LastFMTrackInfoApi } from '../types/last_fm_api';
 import type { SimilarTracksOutput } from '../types/last_fm_similar_tracks_api';
-import type { DaemonCommand, DaemonPushEvent, DaemonResponse } from '../common/audioEngineProtocol';
 
 // const { contextBridge, ipcRenderer } = require('electron');
 
@@ -976,7 +975,6 @@ const collections = {
   }
 };
 
-
 const membership = {
   getMembers: (collection: { kind: string; id: string | number }, memberKind: string) =>
     ipcRenderer.invoke('membership:getMembers', collection, memberKind),
@@ -1071,6 +1069,8 @@ export const api = {
       ipcRenderer.invoke('metadata/undoLastAutoTag', operationId),
     cancelAutoTag: (operationId?: string) =>
       ipcRenderer.invoke('metadata/cancelAutoTag', operationId),
+    fillGaps: (localSongs: unknown[], operationId?: string) =>
+      ipcRenderer.invoke('metadata/fillGaps', localSongs, operationId),
     getMetadataPreferences: () => ipcRenderer.invoke('metadata/getPreferences'),
     saveMetadataPreferences: (prefs: Partial<MetadataProviderPreferences>) =>
       ipcRenderer.invoke('metadata/savePreferences', prefs),

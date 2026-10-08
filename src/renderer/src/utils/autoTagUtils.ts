@@ -245,3 +245,71 @@ export async function updateMissingLyricsForSongs(
 
   return { updated, skipped, failed };
 }
+
+/**
+ * Fill only empty genre/artwork fields for an array of songs via the main-process gap-fill service
+ * (per-album grouped commits, one undo checkpoint per album). Identity fields are never touched.
+ */
+export async function fillMetadataGaps(
+  songs: SongDataForAutoTag[],
+  onProgress?: (current: number, total: number) => void
+): Promise<{
+  updated: number;
+  skipped: number;
+  failed: number;
+  albumsProcessed: number;
+  errors: string[];
+}> {
+  const { metadataApi } = await import('../services/metadataApi');
+  const { queryClient } = await import('../queryClient');
+  const { songQuery } = await import('../queries/songs');
+  const { albumQuery } = await import('../queries/albums');
+  const { genreQuery } = await import('../queries/genres');
+
+  onProgress?.(0, songs.length);
+  const res = await metadataApi.fillGaps(
+    songs.map((song) => ({
+      songId: song.songId,
+      title: song.title,
+      artist: song.artists?.[0]?.name,
+      album: song.album?.name,
+      genre: song.genres?.[0]?.name,
+      year: song.year,
+      trackNumber: song.trackNo,
+      discNumber: song.discNo,
+      path: song.path,
+      duration: song.duration,
+      artworkPath: song.artworkPath
+    })),
+    `gapfill-${Date.now()}`
+  );
+  onProgress?.(songs.length, songs.length);
+
+  if (res.updated > 0) {
+    queryClient.invalidateQueries({ queryKey: songQuery._def });
+    queryClient.invalidateQueries({ queryKey: albumQuery._def });
+    queryClient.invalidateQueries({ queryKey: genreQuery._def });
+  }
+
+  return res;
+}
+
+/**
+ * Rolls back the most recent gap-fill checkpoint (checkpoints are journaled per album, so one undo
+ * reverts one album) and refreshes library queries.
+ */
+export async function undoFillGaps(): Promise<{ success: boolean; restoredCount: number }> {
+  const { metadataApi } = await import('../services/metadataApi');
+  const { queryClient } = await import('../queryClient');
+  const { songQuery } = await import('../queries/songs');
+  const { albumQuery } = await import('../queries/albums');
+  const { genreQuery } = await import('../queries/genres');
+
+  const res = await metadataApi.undoLastAutoTag(`gapfill-undo-${Date.now()}`);
+  if (res.success && res.restoredCount > 0) {
+    queryClient.invalidateQueries({ queryKey: songQuery._def });
+    queryClient.invalidateQueries({ queryKey: albumQuery._def });
+    queryClient.invalidateQueries({ queryKey: genreQuery._def });
+  }
+  return { success: res.success, restoredCount: res.restoredCount };
+}

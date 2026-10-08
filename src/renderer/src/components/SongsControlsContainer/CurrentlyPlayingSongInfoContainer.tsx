@@ -19,6 +19,7 @@ const DeleteSongsFromSystemConfrimPrompt = lazy(
 
 const CurrentlyPlayingSongInfoContainer = () => {
   const currentSongData = useStore(store, (state) => state.currentSongData);
+  const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const navigate = useNavigate();
 
@@ -246,15 +247,13 @@ const CurrentlyPlayingSongInfoContainer = () => {
   return (
     <div className="current-playing-song-info-container grid w-full max-w-full grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 lg:grid-cols-[minmax(0,1fr)]">
       <div
-        className="song-cover-container relativeflex aspect-square h-full items-center justify-center overflow-hidden p-2 lg:hidden"
+        className="song-cover-container relative flex aspect-square h-full items-center justify-center overflow-hidden p-2 lg:hidden"
         id="currentSongCover"
       >
-        {/* ${
-               !currentSongData.artworkPath &&
-               `before:absolute before:h-[85%] before:w-[85%] before:rounded-md before:bg-background-color-2 before:bg-dark-background-color-2 before:content-[''] after:absolute after:h-5 after:w-5 after:animate-spin-ease after:rounded-full after:border-2 after:border-[transparent] after:border-t-font-color-black after:content-[''] dark:after:border-t-font-color-white`
-             } */}
         <Img
-          className="aspect-square h-full max-w-full rounded-lg object-cover object-center shadow-xl"
+          className={`aspect-square h-full max-w-full rounded-lg object-cover object-center shadow-xl transition-transform duration-500 ${
+            isCurrentSongPlaying ? 'fx-art-pulse' : 'fx-art-pulse--paused'
+          }`}
           src={currentSongData.artworkPath}
           fallbackSrc={DefaultSongCover}
           alt="Default song cover"
