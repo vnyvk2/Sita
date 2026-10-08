@@ -70,9 +70,9 @@ const ContextMenu = memo(() => {
   return (
     <div
       id="context-menu-root"
-      className={`context-menu invisible scale-75 opacity-0 ${
+      className={`context-menu invisible scale-95 opacity-0 ${
         isVisible ? 'visible! scale-100! opacity-100!' : ''
-      } absolute z-50 flex h-fit w-fit min-w-[15rem] origin-top-left flex-col overflow-visible rounded-lg shadow-[10px_0px_53px_0px_rgba(0,0,0,0.22)] backdrop-blur-md transition-[opacity,scale,transform,visibility,width,height]!`}
+      } absolute z-50 flex h-fit w-fit min-w-[15rem] origin-top-left flex-col overflow-visible rounded-lg shadow-[10px_0px_53px_0px_rgba(0,0,0,0.22)] backdrop-blur-md transition-[opacity,transform,visibility] duration-150 ease-out`}
       onClick={(e) => e.stopPropagation()}
       style={{
         top: dimensions.positionY,

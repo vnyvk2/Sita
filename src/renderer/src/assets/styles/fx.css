@@ -407,13 +407,144 @@
   transform: scale(0.96);
 }
 
+/* Row hover play icon glide entrance */
+.fx-row-play-appear {
+  animation: fx-row-play-appear 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fx-row-play-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.82) translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+}
+
+/* ? TRANSPORT CONTROLS & TACTILE FEEDBACK ---------------------------------
+   Compositor-only spring pops and directional nudges for playback controls. */
+
+/* Play/Pause spring bounce */
+.fx-play-pop {
+  animation: fx-play-pop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+}
+
+@keyframes fx-play-pop {
+  0% {
+    transform: scale(0.82);
+  }
+  45% {
+    transform: scale(1.14);
+  }
+  75% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Skip backward directional recoil */
+.fx-skip-prev {
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fx-skip-prev:not(:disabled):active {
+  transform: translateX(-3px) scale(0.92);
+}
+
+/* Skip forward directional nudge */
+.fx-skip-next {
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fx-skip-next:not(:disabled):active {
+  transform: translateX(3px) scale(0.92);
+}
+
+/* Shuffle/Repeat toggle tactile twist */
+.fx-toggle-pop {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.fx-toggle-pop:not(:disabled):active {
+  transform: scale(0.86) rotate(-8deg);
+}
+
+/* Currently playing cover art ambient breathing pulse */
+.fx-art-pulse {
+  animation: fx-art-pulse 4.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.fx-art-pulse--paused {
+  animation-play-state: paused;
+}
+
+@keyframes fx-art-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.025);
+  }
+}
+
+/* Flyout submenu spring reveal */
+.fx-submenu-appear {
+  animation: fx-submenu-appear 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top left;
+}
+
+@keyframes fx-submenu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+}
+
+/* Queue icon dock bounce */
+.fx-dock-bounce {
+  animation: fx-dock-bounce 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes fx-dock-bounce {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.2) rotate(-5deg);
+  }
+  70% {
+    transform: scale(0.95) rotate(2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .fx-rise {
+  .fx-rise,
+  .fx-row-play-appear,
+  .fx-play-pop,
+  .fx-art-pulse,
+  .fx-submenu-appear,
+  .fx-dock-bounce {
     animation: none !important;
   }
 
-  .fx-press:not(:disabled):active {
-    transform: none;
+  .fx-press:not(:disabled):active,
+  .fx-skip-prev:not(:disabled):active,
+  .fx-skip-next:not(:disabled):active,
+  .fx-toggle-pop:not(:disabled):active {
+    transform: none !important;
   }
 }
 
@@ -534,6 +665,7 @@
 [data-fx-paused] .fx-auto-graph-dot,
 [data-fx-paused] .fx-skeleton::after,
 [data-fx-paused] .fx-beam--animate::before,
+[data-fx-paused] .fx-art-pulse,
 .fx-paused .animate-ambient-drift,
 .fx-paused .animate-marquee-scroll,
 .fx-paused .fx-aurora__blob,
@@ -543,7 +675,8 @@
 .fx-paused .fx-insights__dot,
 .fx-paused .fx-auto-graph-dot,
 .fx-paused .fx-skeleton::after,
-.fx-paused .fx-beam--animate::before {
+.fx-paused .fx-beam--animate::before,
+.fx-paused .fx-art-pulse {
   animation-play-state: paused !important;
 }
 

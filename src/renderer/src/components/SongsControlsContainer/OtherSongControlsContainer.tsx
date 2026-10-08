@@ -293,12 +293,12 @@ const OtherSongControlsContainer = () => {
             e.preventDefault();
             toggleOverlay('/main-player/queue');
           }}
-          className={`queue-btn text-font-color-black text-opacity-60 after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight !mr-6 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:rounded-full after:opacity-0 after:transition-opacity hover:bg-transparent focus-visible:!outline lg:hidden dark:bg-transparent dark:hover:bg-transparent ${
-            currentlyActivePage.pageTitle === 'CurrentQueue' && 'after:opacity-100'
+          className={`queue-btn fx-press text-font-color-black text-opacity-60 after:bg-font-color-highlight dark:text-font-color-white dark:after:bg-dark-font-color-highlight !mr-6 !rounded-none !border-0 bg-transparent !p-0 outline-offset-1 after:absolute after:h-1 after:w-1 after:translate-y-4 after:scale-0 after:rounded-full after:opacity-0 after:transition-[opacity,transform] after:duration-200 after:ease-out hover:bg-transparent focus-visible:!outline lg:hidden dark:bg-transparent dark:hover:bg-transparent ${
+            currentlyActivePage.pageTitle === 'CurrentQueue' && 'after:scale-100 after:opacity-100'
           }`}
           title={t('player.currentQueue')}
         >
-          <QueueIcon className="group-[.active]:text-font-color-highlight dark:group-[.active]:text-dark-font-color-highlight h-6 w-6 opacity-60 transition-[color,opacity] group-[.active]:opacity-100 hover:opacity-80" />
+          <QueueIcon className="group-[.active]:text-font-color-highlight dark:group-[.active]:text-dark-font-color-highlight h-6 w-6 opacity-60 transition-[color,opacity,transform] duration-150 group-[.active]:opacity-100 hover:scale-105 hover:opacity-80 active:scale-95" />
         </NavLink>
       )}
 

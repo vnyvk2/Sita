@@ -128,7 +128,7 @@ const ContextMenuItem = (props: ContextMenuItem) => {
     <div
       ref={submenuRef}
       data-testid="flyout-submenu"
-      className="bg-context-menu-background/95 text-font-color-black dark:bg-dark-context-menu-background/95 dark:text-font-color-white border-font-color-black/10 dark:border-font-color-white/10 absolute z-50 flex max-h-[22rem] max-w-[22rem] min-w-[15rem] flex-col overflow-x-hidden overflow-y-auto rounded-lg border p-1 shadow-[10px_0px_53px_0px_rgba(0,0,0,0.28)] backdrop-blur-md"
+      className="bg-context-menu-background/95 text-font-color-black dark:bg-dark-context-menu-background/95 dark:text-font-color-white border-font-color-black/10 dark:border-font-color-white/10 fx-submenu-appear absolute z-50 flex max-h-[22rem] max-w-[22rem] min-w-[15rem] flex-col overflow-x-hidden overflow-y-auto rounded-lg border p-1 shadow-[10px_0px_53px_0px_rgba(0,0,0,0.28)] backdrop-blur-md"
       style={{
         top: `${flyoutStyle.top}px`,
         left: flyoutStyle.left !== undefined ? `${flyoutStyle.left}px` : undefined,
@@ -154,7 +154,7 @@ const ContextMenuItem = (props: ContextMenuItem) => {
       <div
         className={`menu-item ${
           props.class || ''
-        } text-font-color-black hover:bg-context-menu-list-hover/75 dark:text-font-color-white dark:hover:bg-dark-context-menu-list-hover/25 flex cursor-pointer flex-row items-center justify-between rounded-md px-4 py-1 text-sm font-light select-none`}
+        } text-font-color-black hover:bg-context-menu-list-hover/75 dark:text-font-color-white dark:hover:bg-dark-context-menu-list-hover/25 flex cursor-pointer flex-row items-center justify-between rounded-md px-4 py-1 text-sm font-light transition-[background-color,color,transform] duration-150 select-none active:scale-[0.99]`}
         onClick={(e) => {
           e.stopPropagation();
           if (hasInnerMenus) {
@@ -171,7 +171,7 @@ const ContextMenuItem = (props: ContextMenuItem) => {
         <div className="flex min-w-0 flex-1 items-center">
           {props.iconName && (
             <span
-              className={`material-icons-round icon mr-3 shrink-0 text-lg ${props.iconClassName || ''}`}
+              className={`material-icons-round icon mr-3 shrink-0 text-lg transition-transform duration-150 ${props.iconClassName || ''}`}
             >
               {props.iconName}
             </span>
