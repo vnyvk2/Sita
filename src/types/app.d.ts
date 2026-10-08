@@ -641,6 +641,7 @@ declare global {
     showSidebarPlaylistsSection?: boolean;
     pinnedSubFilterTools?: string[];
     showArtworkSlotColor?: boolean;
+    preferredArtistBioSource?: 'Last.fm' | 'Wikipedia';
   }
 
   interface PlayerBarControlsIn3Dots {

@@ -1312,10 +1312,15 @@
   },
 
   "biography": {
-    "readMore": "Read more...",
+    "readMore": "Read Full Biography →",
     "readMoreInLastFm": "Read more in LastFM",
     "aboutName": "About <span/>",
-    "goToTagInLastFm": "Go to {{name}} tag in LastFM"
+    "goToTagInLastFm": "Go to {{name}} tag in LastFM",
+    "aboutArtist": "Biography & Background Details",
+    "noBioFound": "No detailed biography available for this artist.",
+    "noBioSummary": "No detailed biography snippet available.",
+    "readFullArticleOnSource": "Read on {{source}}",
+    "selectBioSource": "Switch biography source to {{source}}"
   },
 
   "notifications": {

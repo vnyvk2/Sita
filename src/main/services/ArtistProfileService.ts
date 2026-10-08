@@ -16,6 +16,7 @@ import {
 } from '@main/utils/normalizeTrackTitle';
 
 import type {
+  ArtistBiographyEntry,
   ArtistFeaturedImage,
   ArtistOnlineProfilePayload,
   ArtistPopularTrack
@@ -101,6 +102,7 @@ export class ArtistProfileService {
       artistName,
       fetchedAt: Date.now(),
       bioParagraphs: [],
+      availableBiographies: [],
       tags: [],
       topTracks: [],
       similarArtists: { availableArtists: [], unAvailableArtists: [] },
@@ -140,10 +142,14 @@ export class ArtistProfileService {
       const wikiBio = wikiBioRes.status === 'fulfilled' ? wikiBioRes.value : null;
 
       // 1. Resolve Biography with Quality Gating
-      const { bioSummary, bioFull, bioParagraphs, bioSource, bioUrl } = this.resolveBiography(
-        lastFmInfo,
-        wikiBio
-      );
+      const {
+        bioSummary,
+        bioFull,
+        bioParagraphs,
+        bioSource,
+        bioUrl,
+        availableBiographies
+      } = this.resolveBiography(lastFmInfo, wikiBio);
 
       // 2. Resolve Featured Image with Provenance
       const featuredImage = this.resolveFeaturedImage(
@@ -198,6 +204,7 @@ export class ArtistProfileService {
         bioParagraphs,
         bioSource,
         bioUrl,
+        availableBiographies,
         featuredImage,
         tags,
         topTracks,
@@ -220,7 +227,7 @@ export class ArtistProfileService {
     }
   }
 
-  /** Resolves the biography using quality-gated Last.fm -> Wikipedia fallback. */
+  /** Resolves all available quality-gated biographies (Last.fm and Wikipedia). */
   private resolveBiography(
     lastFmInfo: any,
     wikiBio: any
@@ -230,38 +237,48 @@ export class ArtistProfileService {
     bioParagraphs: string[];
     bioSource?: 'Last.fm' | 'Wikipedia';
     bioUrl?: string;
+    availableBiographies: ArtistBiographyEntry[];
   } {
-    // 1. Try Last.fm biography
+    const availableBiographies: ArtistBiographyEntry[] = [];
+
+    // 1. Process Last.fm biography
     const rawLastFmContent = lastFmInfo?.artist?.bio?.content || lastFmInfo?.artist?.bio?.summary;
     if (rawLastFmContent) {
       const normalized = normalizeBioText(rawLastFmContent);
       if (normalized.isValid && normalized.paragraphs.length > 0) {
-        return {
-          bioSummary: normalized.summary,
-          bioFull: normalized.fullText,
-          bioParagraphs: normalized.paragraphs,
-          bioSource: 'Last.fm',
-          bioUrl: lastFmInfo.artist.url
-        };
+        availableBiographies.push({
+          source: 'Last.fm',
+          summary: normalized.summary,
+          fullText: normalized.fullText,
+          paragraphs: normalized.paragraphs,
+          url: lastFmInfo?.artist?.url
+        });
       }
     }
 
-    // 2. Fallback to Wikipedia biography
+    // 2. Process Wikipedia biography
     if (wikiBio?.fullExtract) {
       const normalizedWiki = normalizeBioText(wikiBio.fullExtract, 80); // Wikipedia extracts are authoritative
       if (normalizedWiki.isValid && normalizedWiki.paragraphs.length > 0) {
-        return {
-          bioSummary: wikiBio.summary || normalizedWiki.summary,
-          bioFull: normalizedWiki.fullText,
-          bioParagraphs: normalizedWiki.paragraphs,
-          bioSource: 'Wikipedia',
-          bioUrl: wikiBio.pageUrl
-        };
+        availableBiographies.push({
+          source: 'Wikipedia',
+          summary: wikiBio.summary || normalizedWiki.summary,
+          fullText: normalizedWiki.fullText,
+          paragraphs: normalizedWiki.paragraphs,
+          url: wikiBio.pageUrl
+        });
       }
     }
 
+    const primaryBio = availableBiographies[0];
+
     return {
-      bioParagraphs: []
+      bioSummary: primaryBio?.summary,
+      bioFull: primaryBio?.fullText,
+      bioParagraphs: primaryBio?.paragraphs ?? [],
+      bioSource: primaryBio?.source,
+      bioUrl: primaryBio?.url,
+      availableBiographies
     };
   }
 
