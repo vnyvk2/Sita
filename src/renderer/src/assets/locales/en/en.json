@@ -84,6 +84,8 @@
     "sortBy": "Sort By",
     "filterBy": "Filter By",
     "moreOptions": "More options",
+    "compactView": "Compact View",
+    "showArtwork": "Show Artwork",
     "title": "Title",
     "suggestion": "Suggestion",
     "hideSuggestion": "Hide suggestion",
@@ -580,6 +582,8 @@
     "showTrackNumberAsSongIndex": "Show track number as song index",
     "showEqualizerOnTracklistDescription": "Show an animated dot-matrix mini-equalizer indicator on the currently playing track in tracklists and queue.",
     "showEqualizerOnTracklist": "Show mini-equalizer on playing track",
+    "showArtworkSlotColorDescription": "Paint each song row thumbnail slot with a per-song color while artwork loads.",
+    "showArtworkSlotColor": "Colored artwork placeholders",
     "showArtistArtworkNearSongControlsDescription": "Shows artist artworks next to the artist names near the title of the song on the song controls panel.",
     "showArtistArtworkNearSongControls": "Show available artist artworks next to their name (bottom left).",
     "disableBackgroundArtworksDescription": "Disables the large artworks shown on the background of some pages.",
@@ -589,6 +593,9 @@
     "alphabetScrubberOff": "Off",
     "alphabetScrubberTop": "Top (Horizontal)",
     "alphabetScrubberLeft": "Left (Vertical)",
+    "songRowSize": "Song Row Size",
+    "rowSizeNormal": "Normal (60px)",
+    "rowSizeSmall": "Small (48px)",
     "playlistArtworksDescription": "Change the behavior of artworks made from song covers.",
     "enablePlaylistArtworks": "Enable artworks made from song covers on playlists",
     "shuffleArtworkFromSongCovers": "Enable shuffling the artwork made from song covers. (The artworks shuffle each time a page refresh happens.)",
@@ -1305,10 +1312,15 @@
   },
 
   "biography": {
-    "readMore": "Read more...",
+    "readMore": "Read Full Biography →",
     "readMoreInLastFm": "Read more in LastFM",
     "aboutName": "About <span/>",
-    "goToTagInLastFm": "Go to {{name}} tag in LastFM"
+    "goToTagInLastFm": "Go to {{name}} tag in LastFM",
+    "aboutArtist": "Biography & Background Details",
+    "noBioFound": "No detailed biography available for this artist.",
+    "noBioSummary": "No detailed biography snippet available.",
+    "readFullArticleOnSource": "Read on {{source}}",
+    "selectBioSource": "Switch biography source to {{source}}"
   },
 
   "notifications": {

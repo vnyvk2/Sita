@@ -531,6 +531,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     lyricsArtworkAnimation: true,
     isSongCardDynamicArtworkBackgroundEnabled: false,
     showEqualizerOnTracklist: true,
+    showArtworkSlotColor: true,
     reduceVisualEffectsOnBattery: false,
     ambientParticles: false,
     isWaveformSeekbarEnabled: false,
@@ -547,6 +548,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     },
     isCompactSongView: false,
     songViewMode: 'normal' as const,
+    songRowSize: 'normal' as const,
     showSidebarPlaylistsSection: true,
     pinnedSubFilterTools: ['compactView', 'language', 'genre']
   },

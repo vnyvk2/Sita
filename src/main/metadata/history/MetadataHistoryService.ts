@@ -14,6 +14,13 @@ export interface SongMetadataSnapshot {
   genre?: string;
   isrc?: string;
   musicBrainzRecordingId?: string;
+  /**
+   * DEF-TAG-05: previous embedded front-cover bytes (base64) captured when an apply replaced
+   * artwork. `undefined` = unknown (snapshots journaled before artwork capture existed - artwork
+   * undo is skipped for those); `null` = the file verifiably had no embedded picture, so undo
+   * clears the added one.
+   */
+  artworkBase64?: string | null;
 }
 
 export interface MetadataHistorySnapshot {

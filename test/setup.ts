@@ -1,3 +1,4 @@
+import os from 'os';
 import { vi, afterEach } from 'vitest';
 
 // Mock Electron app globally for all tests
@@ -5,6 +6,7 @@ vi.mock('electron', () => ({
   app: {
     getPath: vi.fn((name: string) => {
       if (name === 'userData') return '/mock/user/data';
+      if (name === 'temp') return os.tmpdir();
       return '/mock/path';
     }),
     getAppPath: vi.fn(() => process.cwd()),
@@ -204,6 +206,11 @@ if (typeof window !== 'undefined') {
     },
     userData: {
       saveUserData: vi.fn().mockResolvedValue(undefined)
+    },
+    messages: {
+      getMessageFromMain: vi.fn(),
+      removeMessageListener: vi.fn(),
+      removeMessageToRendererEventListener: vi.fn()
     }
   };
 

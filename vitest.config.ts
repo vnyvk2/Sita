@@ -3,11 +3,16 @@ import path from 'path';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  server: {
+    fs: {
+      strict: false
+    }
+  },
   test: {
     globals: true,
     environment: 'node',
     include: ['test/**/*.test.ts', 'test/**/*.test.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
-    setupFiles: ['./test/setup.ts'],
+    setupFiles: [path.resolve(__dirname, 'test/setup.ts')],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

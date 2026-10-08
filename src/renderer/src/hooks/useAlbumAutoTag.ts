@@ -547,9 +547,7 @@ export function useAlbumAutoTag(
         matches: effectiveMatches
       };
       const effectiveReplaceArtwork =
-        replaceArtwork &&
-        selectedGlobalFields.has('artwork') &&
-        artworkSource !== 'local';
+        replaceArtwork && selectedGlobalFields.has('artwork') && artworkSource !== 'local';
       const suggestedGenre =
         preview.album.genre ||
         preview.matches
@@ -760,8 +758,10 @@ export function useAlbumAutoTag(
     ];
   }, [preview]);
 
-  // Exact Change-Count Calculation:
-  // totalChanges = selectedGlobalChangedFields.length + sum(selectedTracks: selectedChangedTrackFields(track))
+  // Exact Change-Count Calculation (DEF-TAG-07: decoupled from the table view filter so
+  // switching filter tabs can never lock the Apply button, and global fields are counted
+  // once in globalCount instead of N times across tracks):
+  // totalChanges = selectedGlobalChangedFields.length + sum(selectedTracks: selectedChangedNonGlobalTrackFields(track))
   const totalChanges = useMemo(() => {
     if (!preview) return 0;
 
@@ -771,21 +771,15 @@ export function useAlbumAutoTag(
       (g) => selectedGlobalFields.has(g.fieldId) && g.isChanged
     ).length;
 
-    const trackChangesCount = filteredMatches.reduce((acc, match) => {
-      if (
-        match.isMissingLocally ||
-        match.localSongId <= 0 ||
-        !selectedTrackIds.has(match.localSongId)
-      )
-        return acc;
+    const countableMatches = preview.matches.filter(
+      (m) => !m.isMissingLocally && m.localSongId > 0 && selectedTrackIds.has(m.localSongId)
+    );
 
+    const trackChangesCount = countableMatches.reduce((acc, match) => {
       const changedTrackFields = match.fieldDiffs.filter((d) => {
+        if (isGlobalField(d.fieldId)) return false;
         const key = `${match.localSongId}::${d.fieldId}`;
-        const isApplied = isGlobalField(d.fieldId)
-          ? selectedFieldMap.has(key)
-            ? (selectedFieldMap.get(key) ?? false)
-            : selectedGlobalFields.has(d.fieldId)
-          : (selectedFieldMap.get(key) ?? d.applyField);
+        const isApplied = selectedFieldMap.get(key) ?? d.applyField;
         return isApplied && (d.status === 'changed' || d.status === 'new');
       }).length;
 
@@ -793,14 +787,7 @@ export function useAlbumAutoTag(
     }, 0);
 
     return globalCount + trackChangesCount;
-  }, [
-    preview,
-    globalFieldDiffs,
-    selectedGlobalFields,
-    filteredMatches,
-    selectedTrackIds,
-    selectedFieldMap
-  ]);
+  }, [preview, globalFieldDiffs, selectedGlobalFields, selectedTrackIds, selectedFieldMap]);
 
   return {
     state: {

@@ -4,8 +4,11 @@ import Img from '@renderer/components/Img';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePreviewAudio } from '@renderer/hooks/usePreviewAudio';
 import { artistQuery } from '@renderer/queries/artists';
+import { store } from '@renderer/store/store';
+import storage from '@renderer/utils/localStorage';
 import { useQuery } from '@tanstack/react-query';
-import { useContext, useState } from 'react';
+import { useStore } from '@tanstack/react-store';
+import { useContext, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import ArtistBioModal from './ArtistBioModal';
@@ -30,12 +33,66 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
   const { playPreview, isCurrentTrackPlaying } = usePreviewAudio();
   const [imgLoadError, setImgLoadError] = useState(false);
 
+  const preferredBioSource = useStore(
+    store,
+    (state) => state.localStorage.preferences?.preferredArtistBioSource
+  );
+  const [selectedSource, setSelectedSource] = useState<'Last.fm' | 'Wikipedia' | undefined>(
+    undefined
+  );
+
   const {
     data: profile,
     isLoading,
     isError,
     refetch
   } = useQuery(artistQuery.onlineProfile({ artistId, artistName }));
+
+  const availableBiographies = useMemo(
+    () => profile?.availableBiographies ?? [],
+    [profile?.availableBiographies]
+  );
+
+  const activeBio = useMemo(() => {
+    if (!profile) return null;
+
+    // 1. Explicit user selection in this view
+    if (selectedSource) {
+      const match = availableBiographies.find((b) => b.source === selectedSource);
+      if (match) return match;
+    }
+
+    // 2. Persisted user preference
+    if (preferredBioSource) {
+      const prefMatch = availableBiographies.find((b) => b.source === preferredBioSource);
+      if (prefMatch) return prefMatch;
+    }
+
+    // 3. Backend-resolved default source
+    if (profile.bioSource) {
+      const sourceMatch = availableBiographies.find((b) => b.source === profile.bioSource);
+      if (sourceMatch) return sourceMatch;
+    }
+
+    // 4. First available biography entry
+    if (availableBiographies.length > 0) {
+      return availableBiographies[0];
+    }
+
+    // 5. Fallback synthesized from profile root fields
+    return {
+      source: profile.bioSource,
+      summary: profile.bioSummary,
+      fullText: profile.bioFull,
+      paragraphs: profile.bioParagraphs ?? [],
+      url: profile.bioUrl
+    };
+  }, [profile, selectedSource, preferredBioSource, availableBiographies]);
+
+  const handleSelectSource = (source: 'Last.fm' | 'Wikipedia') => {
+    setSelectedSource(source);
+    storage.preferences.setPreferences('preferredArtistBioSource', source);
+  };
 
   const handlePlayLocalSong = (songId: number) => {
     createQueue([songId], 'artist', false, artistId, false, artistName);
@@ -51,18 +108,21 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
   };
 
   const handleOpenBioModal = () => {
-    if (!profile) return;
+    if (!profile || !activeBio) return;
     changePromptMenuData(
       true,
       <ArtistBioModal
         artistName={artistName}
         bioParagraphs={
-          profile.bioParagraphs && profile.bioParagraphs.length > 0
-            ? profile.bioParagraphs
-            : [profile.bioSummary || profile.bioFull || '']
+          activeBio.paragraphs && activeBio.paragraphs.length > 0
+            ? activeBio.paragraphs
+            : [activeBio.summary || activeBio.fullText || '']
         }
-        bioSource={profile.bioSource}
-        bioUrl={profile.bioUrl}
+        bioSource={activeBio.source}
+        bioUrl={activeBio.url}
+        availableBiographies={availableBiographies}
+        initialSource={activeBio.source}
+        onSourceChange={handleSelectSource}
         tags={profile.tags}
       />,
       'artist-bio-modal'
@@ -145,19 +205,51 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
                 <h2 className="text-font-color-highlight dark:text-dark-font-color-highlight text-3xl font-extrabold">
                   {artistName}
                 </h2>
-                {profile.bioSource && (
-                  <span
-                    className={`flex items-center space-x-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      profile.bioSource === 'Wikipedia'
-                        ? 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
-                        : 'bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400'
-                    }`}
-                  >
-                    <span className="material-icons-round text-xs">
-                      {profile.bioSource === 'Wikipedia' ? 'menu_book' : 'public'}
+                {availableBiographies.length > 1 ? (
+                  <div className="flex items-center gap-1 rounded-full bg-background-color-1/70 dark:bg-dark-background-color-1/70 p-0.5 border border-background-color-2/70 dark:border-dark-background-color-2/70">
+                    {availableBiographies.map((b) => {
+                      const isActive = activeBio?.source === b.source;
+                      const isWiki = b.source === 'Wikipedia';
+                      return (
+                        <button
+                          key={b.source}
+                          type="button"
+                          onClick={() => handleSelectSource(b.source)}
+                          className={`flex items-center space-x-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all cursor-pointer ${
+                            isActive
+                              ? isWiki
+                                ? 'bg-blue-500/20 text-blue-600 dark:bg-blue-500/30 dark:text-blue-300 shadow-xs'
+                                : 'bg-red-500/20 text-red-600 dark:bg-red-500/30 dark:text-red-300 shadow-xs'
+                              : 'text-font-color-dimmed hover:text-font-color-black dark:text-dark-font-color-dimmed dark:hover:text-font-color-white opacity-70 hover:opacity-100'
+                          }`}
+                          title={t('biography.selectBioSource', {
+                            source: b.source,
+                            defaultValue: `Switch biography source to ${b.source}`
+                          })}
+                        >
+                          <span className="material-icons-round text-xs">
+                            {isWiki ? 'menu_book' : 'public'}
+                          </span>
+                          <span>{b.source}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  activeBio?.source && (
+                    <span
+                      className={`flex items-center space-x-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        activeBio.source === 'Wikipedia'
+                          ? 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400'
+                          : 'bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400'
+                      }`}
+                    >
+                      <span className="material-icons-round text-xs">
+                        {activeBio.source === 'Wikipedia' ? 'menu_book' : 'public'}
+                      </span>
+                      <span>{activeBio.source}</span>
                     </span>
-                    <span>{profile.bioSource}</span>
-                  </span>
+                  )
                 )}
               </div>
 
@@ -172,7 +264,7 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
 
               {/* Bio Summary Snippet */}
               <p className="text-font-color-black/80 dark:text-font-color-white/80 line-clamp-4 text-sm leading-relaxed">
-                {profile.bioSummary || profile.bioFull || (
+                {activeBio?.summary || activeBio?.fullText || (
                   <span className="italic opacity-60">
                     {t('biography.noBioSummary', 'No detailed biography snippet available.')}
                   </span>
@@ -181,12 +273,14 @@ export function ArtistProfileTab({ artistId, artistName, artistData }: ArtistPro
             </div>
 
             {/* Read More Action Button */}
-            {(profile.bioParagraphs.length > 0 || profile.bioSummary) && (
+            {((activeBio?.paragraphs && activeBio.paragraphs.length > 0) ||
+              activeBio?.summary ||
+              activeBio?.fullText) && (
               <div className="pt-2">
                 <button
                   type="button"
                   onClick={handleOpenBioModal}
-                  className="bg-background-color-2 text-font-color-highlight hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight dark:hover:bg-dark-background-color-3 inline-flex items-center space-x-2 rounded-full px-4 py-1.5 text-xs font-semibold shadow-sm transition-all hover:scale-105"
+                  className="bg-background-color-2 text-font-color-highlight hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:text-dark-font-color-highlight dark:hover:bg-dark-background-color-3 inline-flex items-center space-x-2 rounded-full px-4 py-1.5 text-xs font-semibold shadow-sm transition-all hover:scale-105 cursor-pointer"
                 >
                   <span className="material-icons-round text-sm">article</span>
                   <span>{t('biography.readMore', 'Read Full Biography →')}</span>

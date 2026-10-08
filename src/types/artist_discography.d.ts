@@ -61,6 +61,14 @@ export interface ArtistFeaturedImage {
   source: 'Local' | 'Deezer' | 'Wikipedia' | 'iTunes';
 }
 
+export interface ArtistBiographyEntry {
+  source: 'Last.fm' | 'Wikipedia';
+  summary?: string;
+  fullText?: string;
+  paragraphs: string[];
+  url?: string;
+}
+
 export interface ArtistOnlineProfilePayload {
   artistId: number;
   artistName: string;
@@ -70,6 +78,7 @@ export interface ArtistOnlineProfilePayload {
   bioParagraphs: string[];
   bioSource?: 'Last.fm' | 'Wikipedia';
   bioUrl?: string;
+  availableBiographies?: ArtistBiographyEntry[];
   featuredImage?: ArtistFeaturedImage;
   tags: Array<{ name: string; url: string }>;
   topTracks: ArtistPopularTrack[];

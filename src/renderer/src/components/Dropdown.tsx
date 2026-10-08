@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useId,
@@ -30,6 +31,10 @@ export interface DropdownProp<T extends string> {
   isDisabled?: boolean;
   type?: string;
   showTypeInTrigger?: boolean;
+  leadingIcon?: ReactNode;
+  leadingIconName?: string;
+  isClearable?: boolean;
+  onClear?: () => void;
 }
 
 function Dropdown<T extends string>(props: DropdownProp<T>) {
@@ -43,7 +48,11 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
     options,
     isDisabled = false,
     type = '',
-    showTypeInTrigger = true
+    showTypeInTrigger = true,
+    leadingIcon,
+    leadingIconName,
+    isClearable = false,
+    onClear
   } = props;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -268,19 +277,48 @@ function Dropdown<T extends string>(props: DropdownProp<T>) {
             triggerClassName
           )}
         >
-          <span className="truncate">
-            {type && showTypeInTrigger ? `${type} ` : ''}
-            {selectedOption?.label ?? name}
-          </span>
-          <span
-            className={`material-icons-round text-base transition-transform duration-150 ${
-              isOpen
-                ? 'text-font-color-highlight dark:text-dark-font-color-highlight rotate-180'
-                : 'opacity-60'
-            }`}
-          >
-            expand_more
-          </span>
+          <div className="flex min-w-0 items-center gap-1.5 truncate">
+            {leadingIcon ? (
+              <span className="flex shrink-0 items-center">{leadingIcon}</span>
+            ) : leadingIconName ? (
+              <span className="material-icons-round shrink-0 text-base opacity-75">{leadingIconName}</span>
+            ) : null}
+            <span className="truncate">
+              {type && showTypeInTrigger ? `${type} ` : ''}
+              {selectedOption?.label ?? name}
+            </span>
+          </div>
+          {isClearable && onClear ? (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Clear filter"
+              title="Clear filter"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClear();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.stopPropagation();
+                  onClear();
+                }
+              }}
+              className="material-icons-round ml-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-black/10 text-xs transition-colors hover:bg-black/20 dark:bg-white/20 dark:hover:bg-white/35 cursor-pointer"
+            >
+              close
+            </span>
+          ) : (
+            <span
+              className={`material-icons-round shrink-0 text-base transition-transform duration-150 ${
+                isOpen
+                  ? 'text-font-color-highlight dark:text-dark-font-color-highlight rotate-180'
+                  : 'opacity-60'
+              }`}
+            >
+              expand_more
+            </span>
+          )}
         </button>
       )}
 

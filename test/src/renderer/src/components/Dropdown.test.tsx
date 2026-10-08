@@ -183,4 +183,42 @@ describe('Glassmorphic Dropdown Popover Component', () => {
     fireEvent.click(trigger);
     expect(screen.getByRole('menu')).toBeDefined();
   });
+
+  it('renders leadingIconName and leadingIcon when provided in selector mode', () => {
+    const handleChange = vi.fn();
+    render(
+      <Dropdown
+        name="customSelectWithIcon"
+        value="aToZ"
+        options={options}
+        onChange={handleChange}
+        leadingIconName="translate"
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: /A to Z/i });
+    expect(trigger.textContent).toContain('translate');
+  });
+
+  it('renders clear button when isClearable and onClear are provided, calling onClear on click without opening menu', () => {
+    const handleChange = vi.fn();
+    const handleClear = vi.fn();
+    render(
+      <Dropdown
+        name="clearableSelect"
+        value="zToA"
+        options={options}
+        onChange={handleChange}
+        isClearable={true}
+        onClear={handleClear}
+      />
+    );
+
+    const clearBtn = screen.getByRole('button', { name: /clear filter/i });
+    expect(clearBtn).toBeDefined();
+
+    fireEvent.click(clearBtn);
+    expect(handleClear).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
 });

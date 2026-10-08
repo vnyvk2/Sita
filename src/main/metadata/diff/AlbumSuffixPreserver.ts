@@ -30,6 +30,12 @@ export class AlbumSuffixPreserver {
       if (trimmedRemote.toLowerCase().includes(localSuffix.toLowerCase())) {
         return remoteAlbum;
       }
+      // Remote carries its own distinct edition descriptor (e.g. local "(Deluxe Edition)"
+      // vs remote "(Remastered 2009)"): prefer the provider's canonical title instead of
+      // concatenating both editions into "X (Remastered 2009) (Deluxe Edition)".
+      if (KNOWN_SUFFIX_REGEX.test(trimmedRemote)) {
+        return remoteAlbum;
+      }
       return `${trimmedRemote} ${localSuffix}`;
     }
 

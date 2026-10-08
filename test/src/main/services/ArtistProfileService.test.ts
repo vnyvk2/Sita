@@ -152,6 +152,10 @@ describe('ArtistProfileService', () => {
     expect(profile.artistName).toBe('Gracie Abrams');
     expect(profile.bioSource).toBe('Last.fm');
     expect(profile.bioParagraphs).toHaveLength(2);
+    expect(profile.availableBiographies).toHaveLength(2);
+    expect(profile.availableBiographies?.[0].source).toBe('Last.fm');
+    expect(profile.availableBiographies?.[1].source).toBe('Wikipedia');
+    expect(profile.availableBiographies?.[1].paragraphs).toHaveLength(3);
     expect(profile.featuredImage?.source).toBe('Local'); // Local artwork prioritized
     expect(profile.featuredImage?.url).toBe('https://local-art/gracie-xl.jpg');
 
@@ -197,6 +201,8 @@ describe('ArtistProfileService', () => {
 
     expect(profile.bioSource).toBe('Wikipedia');
     expect(profile.bioParagraphs).toHaveLength(3);
+    expect(profile.availableBiographies).toHaveLength(1);
+    expect(profile.availableBiographies?.[0].source).toBe('Wikipedia');
     expect(profile.bioParagraphs[0]).toContain('Gracie Madigan Abrams');
     expect(profile.bioUrl).toBe('https://en.wikipedia.org/wiki/Gracie_Abrams');
   });

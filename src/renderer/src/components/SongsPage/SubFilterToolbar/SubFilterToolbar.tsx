@@ -101,94 +101,135 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
 
   const availableTools = SUB_FILTER_TOOLS.filter((tool) => tool.contexts.includes(context));
 
+interface SlimDensityBarsIconProps {
+  isCompact?: boolean;
+  mode?: SongViewMode;
+}
+
+const SlimDensityBarsIcon: FC<SlimDensityBarsIconProps> = ({ isCompact, mode }) => {
+  const showCompactBars = isCompact !== undefined ? isCompact : mode === 'compact';
+  if (showCompactBars) {
+    return (
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        fill="none"
+        className="shrink-0"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <rect x="0.5" y="2" width="15" height="1.8" rx="0.9" fill="currentColor" />
+        <rect x="0.5" y="5.4" width="15" height="1.8" rx="0.9" fill="currentColor" />
+        <rect x="0.5" y="8.8" width="15" height="1.8" rx="0.9" fill="currentColor" />
+        <rect x="0.5" y="12.2" width="15" height="1.8" rx="0.9" fill="currentColor" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      className="shrink-0"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <rect x="0.5" y="4" width="15" height="2" rx="1" fill="currentColor" />
+      <rect x="0.5" y="10" width="15" height="2" rx="1" fill="currentColor" />
+    </svg>
+  );
+};
+
   // Render individual pinned tool pill
   const renderToolPill = (id: SubFilterToolId): ReactNode => {
     switch (id) {
       case 'compactView': {
-        const currentMode: SongViewMode = songViewMode ?? (isCompact ? 'compact' : 'normal');
-        const nextModeMap: Record<SongViewMode, SongViewMode> = {
-          normal: 'small',
-          small: 'compact',
-          compact: 'normal'
-        };
         const handlePillClick = () => {
-          if (onViewModeChange) {
-            onViewModeChange(nextModeMap[currentMode]);
-          } else if (onToggleCompact) {
+          if (onToggleCompact) {
             onToggleCompact();
+          } else if (onViewModeChange) {
+            onViewModeChange(isCompact ? 'normal' : 'compact');
           }
         };
 
-        const modeLabels: Record<SongViewMode, string> = {
-          normal: 'Normal (60px)',
-          small: 'Small (48px)',
-          compact: 'Compact (38px)'
-        };
-
-        const modeIcons: Record<SongViewMode, string> = {
-          normal: 'view_agenda',
-          small: 'density_medium',
-          compact: 'table_rows'
-        };
-
-        const tooltipLabel = onViewModeChange
-          ? `${t('common.compactView', 'Compact View')} / ${t('common.viewMode', 'Density')}: ${modeLabels[currentMode]} (${t('common.clickToCycle', 'click to cycle')})`
+        const tooltipLabel = isCompact
+          ? t('common.showArtwork', 'Show Artwork')
           : t('common.compactView', 'Compact View');
 
         return (
           <Button
             key="compact-view-pill"
-            className={`compact-view-pill mr-0! shrink-0 cursor-pointer rounded-3xl px-2.5 py-1 text-xs transition-colors md:text-sm ${
-              currentMode !== 'normal'
-                ? 'bg-accent text-font-color-white font-medium shadow-xs'
+            className={`compact-view-pill mr-0! shrink-0 cursor-pointer rounded-3xl border border-background-color-2/60 dark:border-dark-background-color-2/60 px-2.5 py-1 text-xs transition-colors md:text-sm ${
+              isCompact
+                ? 'bg-accent text-font-color-white font-medium shadow-xs border-accent!'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
             }`}
-            iconName={modeIcons[currentMode]}
+            icon={<SlimDensityBarsIcon isCompact={isCompact} mode={songViewMode} />}
             tooltipLabel={tooltipLabel}
             clickHandler={handlePillClick}
           />
         );
       }
-      case 'language':
+      case 'language': {
         if (!onLanguageChange || languageOptions.length === 0) return null;
+        const isLangActive = language !== 'all' && language !== '';
         return (
           <div key="language-pill" className="shrink-0">
             <Dropdown
               name="songsPageLanguageDropdown"
               className="ml-0!"
-              triggerClassName="h-auto py-1 px-3 w-auto min-w-[6.5rem] max-w-[12rem] rounded-3xl border-0 bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 text-xs md:text-sm font-normal"
+              triggerClassName={`h-auto py-1 px-3 w-[9.5rem] rounded-3xl border text-xs md:text-sm transition-colors ${
+                isLangActive
+                  ? 'border-font-color-highlight/40! bg-font-color-highlight/15 text-font-color-highlight dark:border-dark-font-color-highlight/40! dark:bg-dark-font-color-highlight/20 dark:text-dark-font-color-highlight font-semibold'
+                  : 'border-background-color-2/60 bg-background-color-2/50 hover:border-background-color-3 hover:bg-background-color-3 dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/50 dark:hover:border-dark-background-color-3 dark:hover:bg-dark-background-color-3 font-normal'
+              }`}
               type={`${t('common.language', 'Language')} :`}
               showTypeInTrigger={false}
+              leadingIconName="translate"
+              isClearable={isLangActive}
+              onClear={() => onLanguageChange('all')}
               value={language}
               options={languageOptions as DropdownOption<string>[]}
               onChange={(e) => onLanguageChange(e.currentTarget.value)}
             />
           </div>
         );
-      case 'genre':
+      }
+      case 'genre': {
         if (!onGenreChange || genreOptions.length === 0) return null;
+        const isGenreActive = genre !== 'all' && genre !== '';
         return (
           <div key="genre-pill" className="shrink-0">
             <Dropdown
               name="songsPageGenreDropdown"
               className="ml-0!"
-              triggerClassName="h-auto py-1 px-3 w-auto min-w-[6.5rem] max-w-[12rem] rounded-3xl border-0 bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 text-xs md:text-sm font-normal"
+              triggerClassName={`h-auto py-1 px-3 w-[9.5rem] rounded-3xl border text-xs md:text-sm transition-colors ${
+                isGenreActive
+                  ? 'border-font-color-highlight/40! bg-font-color-highlight/15 text-font-color-highlight dark:border-dark-font-color-highlight/40! dark:bg-dark-font-color-highlight/20 dark:text-dark-font-color-highlight font-semibold'
+                  : 'border-background-color-2/60 bg-background-color-2/50 hover:border-background-color-3 hover:bg-background-color-3 dark:border-dark-background-color-2/60 dark:bg-dark-background-color-2/50 dark:hover:border-dark-background-color-3 dark:hover:bg-dark-background-color-3 font-normal'
+              }`}
               type={`${t('common.genre', 'Genre')} :`}
               showTypeInTrigger={false}
+              leadingIconName="music_note"
+              isClearable={isGenreActive}
+              onClear={() => onGenreChange('all')}
               value={genre}
               options={genreOptions as DropdownOption<string>[]}
               onChange={(e) => onGenreChange(e.currentTarget.value)}
             />
           </div>
         );
+      }
       case 'favoriteArtists':
         if (!onToggleFavoriteArtists) return null;
         return (
           <Button
             key="fav-artists-filter-btn"
-            className={`fav-artists-filter-btn mr-0! shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm ${
+            className={`fav-artists-filter-btn mr-0! shrink-0 cursor-pointer rounded-3xl border border-background-color-2/60 dark:border-dark-background-color-2/60 px-3 py-1 text-xs md:text-sm ${
               onlyFavoriteArtists
-                ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
+                ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black! border-background-color-3! dark:border-dark-background-color-3!'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
             }`}
             iconName={onlyFavoriteArtists ? 'star' : 'star_outline'}
@@ -202,9 +243,9 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="fav-albums-filter-btn"
-            className={`fav-albums-filter-btn mr-0! shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm ${
+            className={`fav-albums-filter-btn mr-0! shrink-0 cursor-pointer rounded-3xl border border-background-color-2/60 dark:border-dark-background-color-2/60 px-3 py-1 text-xs md:text-sm ${
               onlyFavoriteAlbums
-                ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black!'
+                ? 'bg-background-color-3 dark:bg-dark-background-color-3 text-font-color-black! border-background-color-3! dark:border-dark-background-color-3!'
                 : 'bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3'
             }`}
             iconName="album"
@@ -218,7 +259,7 @@ export const SubFilterToolbar: FC<SubFilterToolbarProps> = memo((props) => {
         return (
           <Button
             key="clear-duplicates-btn"
-            className="clear-duplicates-btn mr-0! bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 shrink-0 cursor-pointer rounded-3xl px-3 py-1 text-xs md:text-sm"
+            className="clear-duplicates-btn mr-0! bg-background-color-2/50 dark:bg-dark-background-color-2/50 hover:bg-background-color-3 dark:hover:bg-dark-background-color-3 shrink-0 cursor-pointer rounded-3xl border border-background-color-2/60 dark:border-dark-background-color-2/60 px-3 py-1 text-xs md:text-sm"
             iconName="cleaning_services"
             label={t('duplicateSongsPrompt.openButtonShort', 'Clear Dups')}
             tooltipLabel={t('duplicateSongsPrompt.openButtonShort', 'Clear Dups')}

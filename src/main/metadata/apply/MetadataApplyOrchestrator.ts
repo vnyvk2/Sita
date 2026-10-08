@@ -18,11 +18,7 @@ import type { TagWritePayload, TagWriterService } from '../services/TagWriterSer
 import type { ArtworkDownloaderService } from '../transactions/ArtworkDownloaderService';
 import type { NormalizedMutation, OrchestratorResult } from './contract';
 
-export type DataUpdateCallback = (
-  dataType: string,
-  data?: number[],
-  message?: string
-) => void;
+export type DataUpdateCallback = (dataType: string, data?: number[], message?: string) => void;
 
 export interface MetadataApplyOrchestratorOptions {
   tagWriter: TagWriterService;
@@ -177,6 +173,11 @@ export class MetadataApplyOrchestrator {
   private buildTagPayload(m: NormalizedMutation, artworkBuffer?: Buffer): TagWritePayload {
     const payload: TagWritePayload = { filePath: m.filePath };
     for (const f of m.fields) {
+      // DEF-TAG-11: never coerce empty input into numeric 0 (Number('') === 0 would
+      // write track 0 / year 0 into files). Empty numerics are skipped so the tag
+      // is left untouched; DB layer null-normalizes the same way.
+      const isEmpty =
+        f.newValue === '' || (typeof f.newValue === 'string' && f.newValue.trim() === '');
       switch (f.fieldId) {
         case 'title':
           payload.title = String(f.newValue);
@@ -191,12 +192,15 @@ export class MetadataApplyOrchestrator {
           payload.genre = String(f.newValue);
           break;
         case 'year':
+          if (isEmpty) break;
           payload.year = Number(f.newValue);
           break;
         case 'trackNumber':
+          if (isEmpty) break;
           payload.trackNumber = Number(f.newValue);
           break;
         case 'discNumber':
+          if (isEmpty) break;
           payload.discNumber = Number(f.newValue);
           break;
         case 'isrc':
@@ -272,6 +276,20 @@ export class MetadataApplyOrchestrator {
       musicBrainzRecordingId: currentRow.musicBrainzRecordingId ?? undefined
     };
 
+    // DEF-TAG-05: when this mutation replaces artwork, capture the currently
+    // embedded picture so undo can restore it. Distinguish "no picture" (null)
+    // from "unreadable" (left undefined) - only a verified read participates
+    // in artwork undo; failures keep text-only undo working.
+    if (m.artwork?.buffer && m.artwork.buffer.length > 0) {
+      try {
+        const existing = await this.tagWriter.readEmbeddedArtworkBuffer(previous.path);
+        previous.artworkBase64 =
+          existing && existing.length > 0 ? existing.toString('base64') : null;
+      } catch {
+        // artwork capture is best-effort; text baseline above still stands
+      }
+    }
+
     let artworkBuffer = m.artwork?.buffer;
     if (!artworkBuffer) {
       const legacyUrl = (m as unknown as { artworkUrl?: string }).artworkUrl;
@@ -321,9 +339,18 @@ export class MetadataApplyOrchestrator {
     setIf('artist', this.fieldNew(m, 'artist') as string | undefined);
     setIf('albumArtist', m.albumArtistNewValue);
     setIf('album', this.fieldNew(m, 'album') as string | undefined);
-    setIf('year', this.fieldNew(m, 'year') as number | undefined);
-    setIf('trackNumber', this.fieldNew(m, 'trackNumber') as number | undefined);
-    setIf('discNumber', this.fieldNew(m, 'discNumber') as number | undefined);
+    // DEF-TAG-11: empty numerics never enter the undo journal (see buildTagPayload).
+    const numOrUndef = (v: string | number | undefined): number | undefined => {
+      if (v === undefined) return undefined;
+      if (typeof v === 'string' && v.trim() === '') return undefined;
+      return v as number;
+    };
+    setIf('year', numOrUndef(this.fieldNew(m, 'year') as string | number | undefined));
+    setIf(
+      'trackNumber',
+      numOrUndef(this.fieldNew(m, 'trackNumber') as string | number | undefined)
+    );
+    setIf('discNumber', numOrUndef(this.fieldNew(m, 'discNumber') as string | number | undefined));
     setIf('genre', this.fieldNew(m, 'genre') as string | undefined);
     setIf('isrc', this.fieldNew(m, 'isrc') as string | undefined);
     setIf(
@@ -363,9 +390,10 @@ export class MetadataApplyOrchestrator {
               artists: [{ name: String(this.fieldNew(m, 'artist')) }]
             }),
             ...(this.fieldNew(m, 'album') !== undefined && {
-              albums: String(this.fieldNew(m, 'album')).trim() === ''
-                ? []
-                : [{ title: String(this.fieldNew(m, 'album')) }]
+              albums:
+                String(this.fieldNew(m, 'album')).trim() === ''
+                  ? []
+                  : [{ title: String(this.fieldNew(m, 'album')) }]
             }),
             ...(this.fieldNew(m, 'genre') !== undefined && {
               genres: [{ name: String(this.fieldNew(m, 'genre')) }]
@@ -520,9 +548,9 @@ export class MetadataApplyOrchestrator {
       };
     }
 
-    return { 
-      success: true, 
-      appliedArtwork: Boolean(artworkBuffer && artworkBuffer.length > 0) 
+    return {
+      success: true,
+      appliedArtwork: Boolean(artworkBuffer && artworkBuffer.length > 0)
     };
   }
 }

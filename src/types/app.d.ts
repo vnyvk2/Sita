@@ -637,8 +637,11 @@ declare global {
     playerBarControlsIn3Dots?: PlayerBarControlsIn3Dots;
     isCompactSongView?: boolean;
     songViewMode?: 'compact' | 'small' | 'normal';
+    songRowSize?: 'normal' | 'small';
     showSidebarPlaylistsSection?: boolean;
     pinnedSubFilterTools?: string[];
+    showArtworkSlotColor?: boolean;
+    preferredArtistBioSource?: 'Last.fm' | 'Wikipedia';
   }
 
   interface PlayerBarControlsIn3Dots {

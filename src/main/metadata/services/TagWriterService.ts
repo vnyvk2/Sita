@@ -1,7 +1,8 @@
-import { ByteVector, Picture, PictureType } from 'node-taglib-sharp';
+import { ByteVector, File, Picture, PictureType } from 'node-taglib-sharp';
 import sharp from 'sharp';
 
 import { removeDefaultAppProtocolFromFilePath } from '../../fs/resolveFilePaths';
+import { extractFrontCover } from '../../utils/extractFrontCover';
 import { withAtomicFileWrite } from '../../utils/withAtomicFileWrite';
 
 export interface TagWritePayload {
@@ -22,6 +23,11 @@ export interface TagWritePayload {
   language?: string | null;
   musicBrainzRecordingId?: string | null;
   artworkBuffer?: Buffer;
+  /**
+   * DEF-TAG-05: when true, embedded pictures are removed (undo of an artwork add). Evaluated before
+   * artworkBuffer: an explicit buffer still wins.
+   */
+  clearArtwork?: boolean;
 }
 
 export interface TagWriteResult {
@@ -102,6 +108,16 @@ export class TagWriterService {
               artErr
             );
           }
+        } else if (payload.clearArtwork) {
+          // DEF-TAG-05: undo path - remove previously-added embedded pictures.
+          try {
+            file.tag.pictures = [];
+          } catch (clearErr: unknown) {
+            console.warn(
+              `[TagWriterService] Failed to clear artwork for ${payload.filePath}:`,
+              clearErr
+            );
+          }
         }
       });
 
@@ -120,5 +136,31 @@ export class TagWriterService {
       results.push(res);
     }
     return results;
+  }
+
+  /**
+   * DEF-TAG-05: reads the currently embedded front-cover bytes without modifying the file. Returns
+   * undefined when the file has no embedded picture or cannot be read - callers treat that as
+   * "unknown" and skip artwork undo.
+   */
+  public async readEmbeddedArtworkBuffer(filePath: string): Promise<Buffer | undefined> {
+    try {
+      if (!filePath) return undefined;
+      const realPath = removeDefaultAppProtocolFromFilePath(filePath);
+      const file = File.createFromPath(realPath);
+      try {
+        const bytes = extractFrontCover(file.tag.pictures as never);
+        if (!bytes || bytes.length === 0) return undefined;
+        return Buffer.from(bytes);
+      } finally {
+        try {
+          file.dispose();
+        } catch {
+          // dispose is best-effort for read handles
+        }
+      }
+    } catch {
+      return undefined;
+    }
   }
 }

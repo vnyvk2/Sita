@@ -293,5 +293,62 @@ describe('SubFilterToolbar & subFilterRegistry', () => {
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByText(/toolbar tools/i)).toBeNull();
     });
+
+    it('renders slim bars SVG inside Compact View button and toggles between 2 bars (standard) and 4 bars (compact)', () => {
+      const { rerender } = render(<SubFilterToolbar {...defaultProps} isCompact={false} />);
+
+      const compactBtn = screen.getByRole('button', { name: /compact view/i });
+      expect(compactBtn.className).not.toContain('bg-accent');
+      let svg = compactBtn.querySelector('svg');
+      expect(svg).toBeDefined();
+      expect(svg?.querySelectorAll('rect').length).toBe(2);
+
+      // In compact mode, renders 4 slim horizontal bars with active styling and "Show Artwork" tooltip
+      rerender(<SubFilterToolbar {...defaultProps} isCompact={true} />);
+      const artworkBtn = screen.getByRole('button', { name: /show artwork/i });
+      expect(artworkBtn.className).toContain('bg-accent');
+      svg = artworkBtn.querySelector('svg');
+      expect(svg?.querySelectorAll('rect').length).toBe(4);
+
+      fireEvent.click(artworkBtn);
+      expect(defaultProps.onToggleCompact).toHaveBeenCalled();
+    });
+
+    it('renders Language and Genre dropdowns with fixed width w-[9.5rem] and leading icons', () => {
+      const { container } = render(<SubFilterToolbar {...defaultProps} />);
+
+      const langTrigger = screen.getByRole('button', { name: /all languages/i });
+      expect(langTrigger.className).toContain('w-[9.5rem]');
+      expect(langTrigger.textContent).toContain('translate');
+
+      const genreTrigger = screen.getByRole('button', { name: /all genres/i });
+      expect(genreTrigger.className).toContain('w-[9.5rem]');
+      expect(genreTrigger.textContent).toContain('music_note');
+    });
+
+    it('renders quick clear button when language/genre filter is active and resets to "all" on click', () => {
+      const onLanguageChange = vi.fn();
+      const onGenreChange = vi.fn();
+      render(
+        <SubFilterToolbar
+          {...defaultProps}
+          language="en"
+          onLanguageChange={onLanguageChange}
+          genre="rock"
+          onGenreChange={onGenreChange}
+        />
+      );
+
+      const clearBtns = screen.getAllByRole('button', { name: /clear filter/i });
+      expect(clearBtns.length).toBe(2); // One for language, one for genre
+
+      // Click clear on language
+      fireEvent.click(clearBtns[0]);
+      expect(onLanguageChange).toHaveBeenCalledWith('all');
+
+      // Click clear on genre
+      fireEvent.click(clearBtns[1]);
+      expect(onGenreChange).toHaveBeenCalledWith('all');
+    });
   });
 });

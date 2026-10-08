@@ -346,13 +346,18 @@ export class MetadataBootstrap {
         const completeTags = await SongMetadataBuilder.buildCompleteTags(songId, data);
         await updateSongId3Tags(songId, completeTags, true, true);
       },
+      // DEF-TAG-06: share the journal so legacy transaction rollbacks observe the
+      // same undo stack as orchestrator/apply-service writes.
+      historyService: applyHistoryService,
       requestPipeline: caaPipeline
     });
 
     const workflowService = new MetadataWorkflowService({
       transactionManager,
       orchestrator,
-      coverArtBufferService
+      coverArtBufferService,
+      // DEF-TAG-06: workflow undo delegates to the shared apply service journal.
+      applyService
     });
 
     workflowService.registerWorkflow(new AlbumWorkflow(albumMetadataService));
@@ -362,9 +367,7 @@ export class MetadataBootstrap {
     workflowService.registerWorkflow(
       new ArtworkWorkflow(coverArtArchiveAdapter, discogsAdapter, musicBrainzAdapter)
     );
-    workflowService.registerWorkflow(
-      new TrackWorkflow(musicBrainzAdapter, coverArtArchiveAdapter)
-    );
+    workflowService.registerWorkflow(new TrackWorkflow(musicBrainzAdapter, coverArtArchiveAdapter));
 
     const providerMergePolicy = new DefaultMetadataMergePolicy();
     const planner = new MetadataQueryPlanner(repository);

@@ -43,6 +43,14 @@ import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { scrollRegistry } from '@renderer/utils/scrollStore';
+import {
+  getPreferredSongRowSize,
+  getSongRowHeight,
+  resolveSongViewMode,
+  setSongViewMode,
+  type SongViewMode
+} from '@renderer/utils/songViewMode';
+import { getSongRowSizeContextMenuItem } from '@renderer/components/SongsPage/getSongRowSizeContextMenu';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -96,6 +104,7 @@ type PlaylistRowProps = {
   isDragging?: boolean;
   buildContextMenuItems: (item: PlaylistRowSong, index: number) => ContextMenuItem[];
   isCompact?: boolean;
+  rowSize?: 'normal' | 'small';
 };
 
 type PlaylistVirtuosoContext = {
@@ -104,6 +113,7 @@ type PlaylistVirtuosoContext = {
   filteredSongs: PlaylistRowSong[];
   isDraggingActive: boolean;
   isCompact: boolean;
+  songViewMode: SongViewMode;
 };
 
 const HeightPreservingItem = memo(function HeightPreservingItem({
@@ -116,8 +126,10 @@ const HeightPreservingItem = memo(function HeightPreservingItem({
   item?: unknown;
   context?: unknown;
 }) {
-  const isCompact = (context as PlaylistVirtuosoContext | undefined)?.isCompact;
-  const size = props['data-known-size'] ?? (isCompact ? 38 : 60);
+  const virtuosoCtx = context as PlaylistVirtuosoContext | undefined;
+  const isCompact = virtuosoCtx?.isCompact;
+  const standardHeight = virtuosoCtx?.songViewMode === 'small' ? 48 : 60;
+  const size = props['data-known-size'] ?? (isCompact ? 38 : standardHeight);
   return (
     <div {...props} style={{ ...props.style, minHeight: size, boxSizing: 'border-box' }}>
       {children}
@@ -165,7 +177,8 @@ const PlaylistRow = memo(
     provided,
     isDragging = false,
     buildContextMenuItems,
-    isCompact = false
+    isCompact = false,
+    rowSize = 'normal'
   }: PlaylistRowProps) => {
     const additionalContextMenuItems = useMemo(
       () => buildContextMenuItems(item, index),
@@ -185,6 +198,7 @@ const PlaylistRow = memo(
         trackNo={undefined}
         additionalContextMenuItems={additionalContextMenuItems}
         isCompact={isCompact}
+        rowSize={rowSize}
       />
     );
   }
@@ -204,12 +218,24 @@ function PlaylistInfoPage() {
   const isCompactSongView = useStore(store, (state) =>
     Boolean(state.localStorage.preferences.isCompactSongView)
   );
+  const songViewMode = useStore(store, (state) =>
+    resolveSongViewMode(state.localStorage.preferences)
+  );
+  const songRowSize = useStore(store, (state) =>
+    getPreferredSongRowSize(state.localStorage.preferences)
+  );
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
   const preToggleAnchorIndexRef = useRef<number | null>(null);
 
-  const { updateQueueData, changePromptMenuData, addNewNotifications, createQueue, playSong } =
-    useContext(AppUpdateContext);
+  const {
+    updateQueueData,
+    changePromptMenuData,
+    addNewNotifications,
+    createQueue,
+    playSong,
+    updateContextMenuData
+  } = useContext(AppUpdateContext);
   const { t } = useTranslation();
   const {
     sortingOrder = playlistSortingState || 'customOrder',
@@ -235,6 +261,21 @@ function PlaylistInfoPage() {
     [playlistId, sortingOrder, filteringOrder, language, keyword]
   );
 
+  const handleToggleRowSize = useCallback(
+    (newSize: 'normal' | 'small') => {
+      const currentAnchor =
+        latestVisibleRangeRef.current?.startIndex ??
+        (scrollKey ? scrollRegistry.getIndex(scrollKey) : 0) ??
+        0;
+      preToggleAnchorIndexRef.current = currentAnchor;
+      if (scrollKey) {
+        scrollRegistry.set(scrollKey, { index: currentAnchor });
+      }
+      setSongViewMode(newSize);
+    },
+    [scrollKey]
+  );
+
   const handleToggleCompactView = useCallback(() => {
     const currentAnchor =
       latestVisibleRangeRef.current?.startIndex ??
@@ -244,8 +285,11 @@ function PlaylistInfoPage() {
     if (scrollKey) {
       scrollRegistry.set(scrollKey, { index: currentAnchor });
     }
-    storage.preferences.setPreferences('isCompactSongView', !isCompactSongView);
-  }, [isCompactSongView, scrollKey]);
+    const targetMode = isCompactSongView
+      ? (songRowSize === 'small' ? 'small' : 'normal')
+      : 'compact';
+    setSongViewMode(targetMode);
+  }, [isCompactSongView, scrollKey, songRowSize]);
 
   useLayoutEffect(() => {
     if (preToggleAnchorIndexRef.current === null) return;
@@ -264,7 +308,7 @@ function PlaylistInfoPage() {
         behavior: 'auto'
       });
     });
-  }, [isCompactSongView]);
+  }, [isCompactSongView, songViewMode]);
 
   useEffect(() => {
     storage.sortingStates.setSortingStates('playlistDetailPage', sortingOrder);
@@ -467,9 +511,25 @@ function PlaylistInfoPage() {
         onAutoSwitchSort: (order) => {
           navigate({ search: (prev) => ({ ...prev, sortingOrder: order }) });
         }
+      }),
+      getSongRowSizeContextMenuItem({
+        t,
+        currentRowSize: songRowSize,
+        currentViewMode: songViewMode,
+        onRowSizeChange: (newSize) => {
+          handleToggleRowSize(newSize);
+        }
       })
     ],
-    [alphabetScrubberPosition, navigate, sortingOrder, t]
+    [
+      alphabetScrubberPosition,
+      handleToggleRowSize,
+      navigate,
+      songRowSize,
+      songViewMode,
+      sortingOrder,
+      t
+    ]
   );
 
   const normalizedKeyword = keyword?.trim();
@@ -485,9 +545,10 @@ function PlaylistInfoPage() {
       playlistSongs,
       filteredSongs,
       isDraggingActive,
-      isCompact: isCompactSongView
+      isCompact: isCompactSongView,
+      songViewMode
     }),
-    [playlistData, playlistSongs, filteredSongs, isDraggingActive, isCompactSongView]
+    [playlistData, playlistSongs, filteredSongs, isDraggingActive, isCompactSongView, songViewMode]
   );
 
   const handleReorder = useCallback(
@@ -1019,6 +1080,7 @@ function PlaylistInfoPage() {
           context="playlist"
           isCompact={isCompactSongView}
           onToggleCompact={handleToggleCompactView}
+          songViewMode={songViewMode}
           language={language}
           languageOptions={languageDropdownOptions}
           onLanguageChange={(val) => {
@@ -1097,16 +1159,17 @@ function PlaylistInfoPage() {
                           isDragging={renderCloneSnapshot.isDragging}
                           buildContextMenuItems={getContextMenuItems}
                           isCompact={isCompactSongView}
+                          rowSize={songViewMode === 'small' ? 'small' : 'normal'}
                         />
                       );
                     }}
                   >
                     {(droppableProvided) => (
                       <VirtualizedList
-                        key={isCompactSongView ? 'compact' : 'standard'}
+                        key={isCompactSongView ? 'compact' : `standard-${songViewMode}`}
                         ref={virtuosoRef}
                         data={filteredSongs}
-                        fixedItemHeight={isCompactSongView ? 38 : 60}
+                        fixedItemHeight={isCompactSongView ? 38 : getSongRowHeight(songViewMode)}
                         scrollerRef={droppableProvided.innerRef}
                         scrollKey={scrollKey}
                         scrollSeekConfiguration={false}
@@ -1137,6 +1200,7 @@ function PlaylistInfoPage() {
                                 }
                                 buildContextMenuItems={getContextMenuItems}
                                 isCompact={isCompactSongView}
+                                rowSize={songViewMode === 'small' ? 'small' : 'normal'}
                               />
                             )}
                           </Draggable>
@@ -1147,10 +1211,10 @@ function PlaylistInfoPage() {
                 </DragDropContext>
               ) : (
                 <VirtualizedList
-                  key={isCompactSongView ? 'compact' : 'standard'}
+                  key={isCompactSongView ? 'compact' : `standard-${songViewMode}`}
                   ref={virtuosoRef}
                   data={filteredSongs}
-                  fixedItemHeight={isCompactSongView ? 38 : 60}
+                  fixedItemHeight={isCompactSongView ? 38 : getSongRowHeight(songViewMode)}
                   scrollKey={scrollKey}
                   context={virtuosoContext}
                   components={virtuosoComponents}
@@ -1168,6 +1232,7 @@ function PlaylistInfoPage() {
                       selectAllHandler={selectAllHandler}
                       buildContextMenuItems={getContextMenuItems}
                       isCompact={isCompactSongView}
+                      rowSize={songViewMode === 'small' ? 'small' : 'normal'}
                     />
                   )}
                 />

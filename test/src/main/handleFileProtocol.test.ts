@@ -5,7 +5,11 @@ import path from 'path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { addDefaultAppProtocolToFilePath } from '../../../src/main/fs/resolveFilePaths';
-import { decodeNoraFilePath, handleFileProtocol } from '../../../src/main/handleFileProtocol';
+import {
+  decodeNoraFilePath,
+  handleFileProtocol,
+  isImmutableArtworkFile
+} from '../../../src/main/handleFileProtocol';
 
 describe('Production handleFileProtocol Deterministic Tests', () => {
   let tempDir: string;
@@ -25,7 +29,7 @@ describe('Production handleFileProtocol Deterministic Tests', () => {
   });
 
   it('returns 404 for non-existent file paths', async () => {
-    const missingUrl = addDefaultAppProtocolToFilePath('C:/invalid/path/missing.mp3');
+    const missingUrl = addDefaultAppProtocolToFilePath(path.join(tempDir, 'missing.mp3'));
     const req = new Request(missingUrl);
 
     const response = await handleFileProtocol(req as any);
@@ -154,8 +158,7 @@ describe('Production handleFileProtocol Deterministic Tests', () => {
     expect(res.headers.get('ETag')).toBeDefined();
   });
 
-  it('rethrows non-ENOENT filesystem errors (e.g. EACCES) resulting in 500 Internal Server Error', async () => {
-    const fileUrl = addDefaultAppProtocolToFilePath(sampleFilePath);
+  it('rethrows non-ENOENT filesystem errors (e.g. EACCES) resulting in 500 Internal Server Error', async () => {    const fileUrl = addDefaultAppProtocolToFilePath(sampleFilePath);
     const req = new Request(fileUrl);
 
     // Mock fsp.stat to reject with EACCES
@@ -168,5 +171,33 @@ describe('Production handleFileProtocol Deterministic Tests', () => {
     expect(await res.text()).toBe('Internal Server Error');
 
     statSpy.mockRestore();
+  });
+
+  it('serves immutable cache headers for content-hashed artwork files only', async () => {
+    const hash = 'a'.repeat(64);
+    const coversDir = path.join(tempDir, 'song_covers');
+    fs.mkdirSync(coversDir, { recursive: true });
+    const artPath = path.join(coversDir, `${hash}-optimized.webp`);
+    fs.writeFileSync(artPath, Buffer.alloc(1024, 0x11));
+
+    const artUrl = addDefaultAppProtocolToFilePath(artPath);
+    const artRes = await handleFileProtocol(new Request(artUrl) as any);
+    expect(artRes.status).toBe(200);
+    expect(artRes.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+    expect(artRes.headers.get('ETag')).toBeDefined();
+
+    // Non-artwork files keep revalidation
+    const fileUrl = addDefaultAppProtocolToFilePath(sampleFilePath);
+    const res = await handleFileProtocol(new Request(fileUrl) as any);
+    expect(res.headers.get('Cache-Control')).toBe('no-cache');
+  });
+
+  it('isImmutableArtworkFile matches only hash-named artwork files', () => {
+    const hash = 'b'.repeat(64);
+    expect(isImmutableArtworkFile(`C:/data/song_covers/${hash}.webp`)).toBe(true);
+    expect(isImmutableArtworkFile(`C:/data/song_covers/${hash}-optimized.webp`)).toBe(true);
+    expect(isImmutableArtworkFile('C:/data/song_covers/cover.webp')).toBe(false);
+    expect(isImmutableArtworkFile(`C:/data/other/${hash}-optimized.webp`)).toBe(false);
+    expect(isImmutableArtworkFile('C:/data/song_covers/default-song.webp')).toBe(false);
   });
 });

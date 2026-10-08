@@ -16,6 +16,23 @@ export const decodeNoraFilePath = (urlStr: string): { filePath: string; host: st
   return { filePath, host: url.host };
 };
 
+/**
+ * Content-addressed artwork files (`<sha256>[-optimized].webp` inside the
+ * `song_covers` dir — see DEFAULT_ARTWORK_SAVE_LOCATION) are immutable by
+ * construction: the URL is the sha256 of the bytes, new bytes always mint a
+ * new URL, and files are never overwritten in place. Safe to cache forever,
+ * which removes the per-mount ETag revalidation IPC for scrolled rows.
+ * Everything else (bundled defaults, on-demand thumbs, audio) keeps
+ * revalidation: those URLs can change bytes in place across app updates.
+ */
+const IMMUTABLE_ARTWORK_RE = /(^|[\\/])song_covers[\\/][0-9a-f]{64}(-optimized)?\.webp$/i;
+
+export const isImmutableArtworkFile = (filePath: string): boolean =>
+  IMMUTABLE_ARTWORK_RE.test(filePath);
+
+const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+const REVALIDATE_CACHE_CONTROL = 'no-cache';
+
 export const handleFileProtocol = async (req: GlobalRequest) => {
   try {
     const { filePath, host } = decodeNoraFilePath(req.url);
@@ -71,6 +88,13 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
     const fileSize = stat.size;
     const mtimeMs = Math.trunc(stat.mtimeMs);
     const etag = `"${fileSize}-${mtimeMs}"`;
+    // TRIPWIRE: Content-addressed sha256 filenames MUST serve 'public, max-age=31536000, immutable'.
+    // Only default assets and on-demand nora://thumb/ endpoints use ETag revalidation.
+    // Immutable artwork never revalidates (Chromium skips the request
+    // entirely); the ETag below stays as a dormant fallback.
+    const cacheControl = isImmutableArtworkFile(filePath)
+      ? IMMUTABLE_CACHE_CONTROL
+      : REVALIDATE_CACHE_CONTROL;
 
     const ifNoneMatch = req.headers.get('if-none-match');
     if (ifNoneMatch && ifNoneMatch === etag) {
@@ -79,7 +103,9 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
         headers: {
           ETag: etag,
           'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'no-cache'
+          // Same scoping as 200/206: a 304 updates the stored entry's headers,
+          // so immutable files must not be downgraded to revalidation here.
+          'Cache-Control': cacheControl
         }
       });
     }
@@ -91,7 +117,7 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
       'Content-Type': mimeType,
       'Accept-Ranges': 'bytes',
       'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': cacheControl,
       ETag: etag
     };
 
@@ -171,7 +197,7 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
       const response = await net.fetch(asFileUrl);
       const resHeaders = new Headers(response.headers);
       resHeaders.set('ETag', etag);
-      resHeaders.set('Cache-Control', 'no-cache');
+      resHeaders.set('Cache-Control', cacheControl);
       resHeaders.set('Accept-Ranges', 'bytes');
       resHeaders.set('Access-Control-Allow-Origin', '*');
       if (mimeType) {
@@ -189,7 +215,7 @@ export const handleFileProtocol = async (req: GlobalRequest) => {
         headers: {
           'Content-Type': mimeType,
           'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'no-cache',
+          'Cache-Control': cacheControl,
           'Accept-Ranges': 'bytes',
           'Content-Length': fileSize.toString(),
           ETag: etag

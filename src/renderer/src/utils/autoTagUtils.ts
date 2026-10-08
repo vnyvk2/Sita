@@ -1,9 +1,8 @@
 /**
  * Shared types and utilities for auto-tag operations.
  *
- * Used by TrackIdentifyDialog, GenreStyleDialog, and background
- * quick-actions (artwork, lyrics) to resolve full song data from
- * songIds obtained via multi-selection.
+ * Used by TrackIdentifyDialog, GenreStyleDialog, and background quick-actions (artwork, lyrics) to
+ * resolve full song data from songIds obtained via multi-selection.
  */
 
 export interface SongDataForAutoTag {
@@ -21,13 +20,11 @@ export interface SongDataForAutoTag {
 }
 
 /**
- * Resolve full song data for auto-tag operations from an array of songIds.
- * Uses the existing `getSongInfo` IPC endpoint with `preserveIdOrder = true`
- * to maintain the caller's ordering (important for sequential track processing).
+ * Resolve full song data for auto-tag operations from an array of songIds. Uses the existing
+ * `getSongInfo` IPC endpoint with `preserveIdOrder = true` to maintain the caller's ordering
+ * (important for sequential track processing).
  */
-export async function resolveAutoTagSongs(
-  songIds: number[]
-): Promise<SongDataForAutoTag[]> {
+export async function resolveAutoTagSongs(songIds: number[]): Promise<SongDataForAutoTag[]> {
   const songs = await window.api.audioLibraryControls.getSongInfo(
     songIds,
     undefined,
@@ -52,12 +49,10 @@ export async function resolveAutoTagSongs(
 }
 
 /**
- * Group songs by album name for album-level operations (genre/style, artwork).
- * Songs without an album are grouped under '(No Album)'.
+ * Group songs by album name for album-level operations (genre/style, artwork). Songs without an
+ * album are grouped under '(No Album)'.
  */
-export function groupSongsByAlbum(
-  songs: SongDataForAutoTag[]
-): Map<string, SongDataForAutoTag[]> {
+export function groupSongsByAlbum(songs: SongDataForAutoTag[]): Map<string, SongDataForAutoTag[]> {
   const groups = new Map<string, SongDataForAutoTag[]>();
   for (const song of songs) {
     const key = song.album?.name || '(No Album)';
@@ -69,10 +64,8 @@ export function groupSongsByAlbum(
 }
 
 /**
- * Update missing artwork for an array of songs.
- * For each song, searches for artwork by album & artist,
- * builds preview and applies it.
- * Returns statistics of { updated, skipped, failed }.
+ * Update missing artwork for an array of songs. For each song, searches for artwork by album &
+ * artist, builds preview and applies it. Returns statistics of { updated, skipped, failed }.
  */
 export async function updateMissingArtworkForSongs(
   songs: SongDataForAutoTag[],
@@ -86,75 +79,89 @@ export async function updateMissingArtworkForSongs(
   let updated = 0;
   let skipped = 0;
   let failed = 0;
-  const opId = `artwork-bg-${Date.now()}`;
+  // DEF-TAG-10: group by album so one search/preview/apply cycle covers a whole
+  // album instead of N+1 per-track cycles, and use a unique operation id per IPC
+  // call - MetadataWorkflowService.createAbortSignal cancels the previous
+  // controller for a reused id, so sharing one id across a loop risks
+  // self-inflicted aborts.
+  const baseOpId = `artwork-bg-${Date.now()}`;
+  const groups = groupSongsByAlbum(songs);
+  let groupIdx = 0;
 
-  for (let i = 0; i < songs.length; i++) {
-    const song = songs[i];
-    onProgress?.(i + 1, songs.length);
+  for (const [, groupSongs] of groups) {
+    const gi = groupIdx++;
 
-    const albumName = song.album?.name;
-    const artistName = song.artists?.[0]?.name;
+    const first = groupSongs[0];
+    const albumName = first.album?.name;
+    const artistName = first.artists?.[0]?.name;
 
-    if (!albumName && !song.title) {
-      skipped++;
+    if (!albumName && !first.title) {
+      skipped += groupSongs.length;
       continue;
     }
 
     try {
+      const searchOpId = `${baseOpId}-g${gi}-search`;
       const candidates = await metadataApi.workflowSearch(
         'artwork',
-        { album: albumName ?? song.title, artist: artistName },
-        opId
+        { album: albumName ?? first.title, artist: artistName },
+        searchOpId
       );
 
       if (!candidates || candidates.length === 0) {
-        skipped++;
+        skipped += groupSongs.length;
         continue;
       }
 
-      const localInput = [
-        {
-          songId: song.songId,
-          title: song.title,
-          artist: artistName ?? '',
-          album: albumName ?? '',
-          path: song.path,
-          trackNumber: song.trackNo,
-          discNumber: song.discNo,
-          year: song.year,
-          duration: song.duration,
-          artworkPath: song.artworkPath
-        }
-      ];
+      const localInput = groupSongs.map((song) => ({
+        songId: song.songId,
+        title: song.title,
+        artist: song.artists?.[0]?.name ?? '',
+        album: song.album?.name ?? '',
+        path: song.path,
+        trackNumber: song.trackNo,
+        discNumber: song.discNo,
+        year: song.year,
+        duration: song.duration,
+        artworkPath: song.artworkPath
+      }));
 
       const topCandidate = candidates[0];
+      const previewOpId = `${baseOpId}-g${gi}-preview`;
       const preview = await metadataApi.workflowBuildPreview(
         'artwork',
         localInput,
         topCandidate.id,
         topCandidate.provider,
-        opId
+        previewOpId
       );
 
       if (preview) {
+        const applyOpId = `${baseOpId}-g${gi}-apply`;
         const res = await metadataApi.workflowApplyPreview(
           'artwork',
           preview,
           ['artworkUrl', 'artworkPath'],
           undefined,
-          opId
+          applyOpId
         );
         if (res.success) {
-          updated++;
+          // Honor per-song counts when the result reports them; a group apply
+          // can partially succeed.
+          const groupUpdated =
+            typeof res.updatedCount === 'number' ? res.updatedCount : groupSongs.length;
+          updated += groupUpdated;
+          failed += Math.max(0, groupSongs.length - groupUpdated);
         } else {
-          failed++;
+          failed += groupSongs.length;
         }
       } else {
-        failed++;
+        failed += groupSongs.length;
       }
     } catch {
-      failed++;
+      failed += groupSongs.length;
     }
+    onProgress?.(gi + 1, groups.size);
   }
 
   if (updated > 0) {
@@ -166,9 +173,9 @@ export async function updateMissingArtworkForSongs(
 }
 
 /**
- * Update missing lyrics for an array of songs.
- * For each song without existing lyrics, fetches lyrics online via LRCLIB and automatically saves them.
- * Returns statistics of { updated, skipped, failed }.
+ * Update missing lyrics for an array of songs. For each song without existing lyrics, fetches
+ * lyrics online via LRCLIB and automatically saves them. Returns statistics of { updated, skipped,
+ * failed }.
  */
 export async function updateMissingLyricsForSongs(
   songs: SongDataForAutoTag[],
@@ -198,8 +205,8 @@ export async function updateMissingLyricsForSongs(
 
       const hasOfflineLyrics = Boolean(
         offline?.isOfflineLyricsAvailable ||
-          offline?.lyrics?.unparsedLyrics ||
-          (offline?.lyrics?.parsedLyrics && offline.lyrics.parsedLyrics.length > 0)
+        offline?.lyrics?.unparsedLyrics ||
+        (offline?.lyrics?.parsedLyrics && offline.lyrics.parsedLyrics.length > 0)
       );
 
       if (hasOfflineLyrics) {
@@ -223,7 +230,7 @@ export async function updateMissingLyricsForSongs(
 
       const hasFetchedLyrics = Boolean(
         fetched?.lyrics?.unparsedLyrics ||
-          (fetched?.lyrics?.parsedLyrics && fetched.lyrics.parsedLyrics.length > 0)
+        (fetched?.lyrics?.parsedLyrics && fetched.lyrics.parsedLyrics.length > 0)
       );
 
       if (hasFetchedLyrics) {

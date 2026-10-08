@@ -5,7 +5,6 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import { songCacheKeys, songQuery } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
-import type { PaginatedResult, SongData, SongSortTypes } from '../../../../../types/app';
 
 export interface UseSongFavoriteToggleProps {
   songId: number;
@@ -112,7 +111,10 @@ export function useSongFavoriteToggle({
             toggleIsFavorite(!nextFav, true);
           }
         } else {
-          queryClient.invalidateQueries({ queryKey: songCacheKeys.favorites() });
+          // songCacheKeys has no favorites() factory (it only holds window
+          // keys); the favorites list key lives on songQuery — same key the
+          // data-sync layer invalidates for 'songs:favorites'.
+          queryClient.invalidateQueries({ queryKey: songQuery.favorites._def });
         }
       })
       .catch((err) => {

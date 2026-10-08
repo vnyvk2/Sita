@@ -13,6 +13,7 @@ import { CompactListHeader } from '@renderer/components/SongsPage/CompactListHea
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
+import { artSlotColor } from '@renderer/components/SongsPage/artSlotColor';
 import { SubFilterToolbar } from '@renderer/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
 import { useSongListContextMenuDelegation } from '@renderer/components/SongsPage/useSongListContextMenuDelegation';
 import VirtualizedList, {
@@ -38,11 +39,13 @@ import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { scrollRegistry } from '@renderer/utils/scrollStore';
 import {
+  getPreferredSongRowSize,
   getSongRowHeight,
   resolveSongViewMode,
   setSongViewMode,
   type SongViewMode
 } from '@renderer/utils/songViewMode';
+import { getSongRowSizeContextMenuItem } from '@renderer/components/SongsPage/getSongRowSizeContextMenu';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -125,12 +128,19 @@ function SongsPage() {
   const songViewMode = useStore(store, (state) =>
     resolveSongViewMode(state.localStorage.preferences)
   );
+  const songRowSize = useStore(store, (state) =>
+    getPreferredSongRowSize(state.localStorage.preferences)
+  );
   const preToggleAnchorIndexRef = useRef<number | null>(null);
   const latestVisibleRangeRef = useRef<ListRange | undefined>(undefined);
 
   // Single parent-level subscription passed to all Song rows via prop,
   // eliminating ~25 per-row store subscriptions in the hot scrolling path.
   const hasBodyBackgroundImage = useStore(store, (state) => Boolean(state.bodyBackgroundImage));
+  const showArtworkSlotColor = useStore(
+    store,
+    (state) => state.localStorage?.preferences?.showArtworkSlotColor ?? true
+  );
   const isMultipleSelectionEnabled = useStore(
     store,
     (state) =>
@@ -199,9 +209,10 @@ function SongsPage() {
   );
 
   const handleToggleCompactView = useCallback(() => {
-    const nextMode: SongViewMode = songViewMode === 'compact' ? 'normal' : 'compact';
+    const targetNonCompactMode = songRowSize === 'small' ? 'small' : 'normal';
+    const nextMode: SongViewMode = songViewMode === 'compact' ? targetNonCompactMode : 'compact';
     handleViewModeChange(nextMode);
-  }, [handleViewModeChange, songViewMode]);
+  }, [handleViewModeChange, songRowSize, songViewMode]);
 
   useLayoutEffect(() => {
     if (preToggleAnchorIndexRef.current === null) return;
@@ -497,11 +508,16 @@ function SongsPage() {
           index={index}
           isCompact={isCompactSongView}
           rowSize={songViewMode === 'small' ? 'small' : 'normal'}
+          slotColor={
+            showArtworkSlotColor ? artSlotColor(filteredSongIds[index] ?? index) : undefined
+          }
         />
       );
     },
     [
       getItem,
+      filteredSongIds,
+      showArtworkSlotColor,
       isSongIndexingEnabled,
       handleSongPlayBtnClick,
       selectAllHandler,
@@ -513,8 +529,35 @@ function SongsPage() {
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
-  // Stable songId keys so background inserts move rows instead of remounting
-  // the whole visible window (index keys would shift identity for every row).
+  // Ref mirror for the seek placeholder: reading filteredSongIds directly here
+  // would put the array in the memo deps and rebuild Virtuoso's components
+  // object (whole-list re-render) on every ids identity change. A one-commit
+  // stale color on a transient placeholder is harmless; a remount is not.
+  const filteredSongIdsRef = useRef(filteredSongIds);
+  filteredSongIdsRef.current = filteredSongIds;
+
+  const virtuosoComponents = useMemo(
+    () => ({
+      ScrollSeekPlaceholder: ({ index, height }: { index: number; height: number }) => (
+        <SongRowSkeleton
+          index={index}
+          height={height}
+          isCompact={isCompactSongView}
+          rowSize={songViewMode === 'small' ? 'small' : 'normal'}
+          slotColor={
+            showArtworkSlotColor
+              ? artSlotColor(filteredSongIdsRef.current[index] ?? index)
+              : undefined
+          }
+        />
+      )
+    }),
+    [isCompactSongView, songViewMode, showArtworkSlotColor]
+  );
+
+  // TRIPWIRE: Keys must be the songId only — never include window, stage, or hydration data.
+  // Skeleton and Song share the key by design (in-place reconciliation swap). Stage keys
+  // force remounts, reset Img decode state, and cause the historical two-frame flash.
   const computeSongItemKey = useCallback(
     (index: number) => filteredSongIds[index] ?? index,
     [filteredSongIds]
@@ -586,9 +629,25 @@ function SongsPage() {
             })
           });
         }
+      }),
+      getSongRowSizeContextMenuItem({
+        t,
+        currentRowSize: songRowSize,
+        currentViewMode: songViewMode,
+        onRowSizeChange: (newSize) => {
+          handleViewModeChange(newSize);
+        }
       })
     ],
-    [alphabetScrubberPosition, navigate, sortingOrder, t]
+    [
+      alphabetScrubberPosition,
+      handleViewModeChange,
+      navigate,
+      songRowSize,
+      songViewMode,
+      sortingOrder,
+      t
+    ]
   );
 
   const normalizedKeyword = keyword?.trim();
@@ -938,8 +997,13 @@ function SongsPage() {
                   fixedItemHeight={fixedItemHeight}
                   scrollKey={scrollKey}
                   itemContent={renderSong}
+                  components={virtuosoComponents}
                   onChange={handleListRangeChange}
                   computeItemKey={computeSongItemKey}
+                  // TRIPWIRE: DO NOT disable scrollSeekConfiguration (setting to false causes 25.4% jank >33ms
+                  // during rapid flings on 50k libraries; see docs/perf-decisions.md & PERFORMANCE_WORKLOG.md L105).
+                  // Enter threshold must stay >=2500 px/s (800 px/s caused normal wheel scrolling to blank; see perf-decisions.md).
+                  // Calm slot placeholders eliminate the double-swap visual defect without frame drops.
                   scrollSeekConfiguration={DEFAULT_SCROLL_SEEK_CONFIG}
                 />
               </div>

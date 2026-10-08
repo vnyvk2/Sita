@@ -12,6 +12,7 @@ import {
   getSongListIdentity,
   songCacheKeys,
   songQuery,
+  type SongIdsParams,
   type SongIdsResult
 } from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
@@ -20,6 +21,7 @@ import { useEffect, useRef } from 'react';
 export type InvalidationTargetKey =
   | 'songs:all'
   | 'songs:ids'
+  | 'songs:ids:likes'
   | 'songs:facets'
   | 'songs:windows'
   | 'songs:favorites'
@@ -57,6 +59,9 @@ export type InvalidationTargetKey =
  *   scroll disturbance).
  * - Structural song changes (add/delete/blacklist/tag edits affecting order or filters) bump the ID
  *   lists instead; new versions orphan old windows which gc naturally.
+ * - 'songs:ids:likes' is the like-scoped variant: a like changes no ids/order/counts except under
+ *   favorites/nonFavorites filters, so only those lists refetch. A blanket ids invalidation here
+ *   would bump the window-cache version and flash full-list skeletons for unchanged data.
  */
 export function getInvalidationTargetsForEvent(
   dataType: DataUpdateEventTypes
@@ -99,7 +104,7 @@ export function getInvalidationTargetsForEvent(
 
     case 'songs/likes':
       return [
-        'songs:ids',
+        'songs:ids:likes',
         'songs:facets',
         'songs:favorites',
         'home:mostLovedSongs',
@@ -202,6 +207,24 @@ export function invalidateTarget(target: InvalidationTargetKey, client = queryCl
     case 'songs:ids':
       client.invalidateQueries({ queryKey: songQuery.ids._def });
       break;
+    case 'songs:ids:likes': {
+      // A like mutates isAFavorite only: ids, order and counts are unaffected,
+      // EXCEPT under favorites/nonFavorites filters where list membership itself
+      // depends on the flag. Blindly invalidating every ids query would bump the
+      // window-cache version (derived from dataUpdatedAt) and flash full-list
+      // skeletons for data that never changed — so only like-sensitive lists
+      // are refetched. Window row data is already patched optimistically by
+      // applyFavoriteToCaches (including rollback), needing no refetch at all.
+      const likeSensitiveFilters = new Set(['favorites', 'nonFavorites']);
+      const idQueries = client.getQueryCache().findAll({ queryKey: songQuery.ids._def });
+      for (const listQuery of idQueries) {
+        const params = listQuery.queryKey?.[2] as SongIdsParams | undefined;
+        if (params && likeSensitiveFilters.has(params.filterType ?? '')) {
+          client.invalidateQueries({ queryKey: listQuery.queryKey });
+        }
+      }
+      break;
+    }
     case 'songs:facets':
       client.invalidateQueries({ queryKey: songQuery.facets._def });
       break;
