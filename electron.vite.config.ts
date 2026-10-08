@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { resolve } from 'path';
+
 import type { Plugin } from 'vite';
 
 const rootDir = fs.realpathSync(import.meta.dirname);
@@ -13,8 +14,8 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 
 /**
- * Injects a hardened CSP into production HTML bundles (SEC-02).
- * In development, Vite serves raw HTML permitting 'unsafe-inline' for HMR / React Refresh.
+ * Injects a hardened CSP into production HTML bundles (SEC-02). In development, Vite serves raw
+ * HTML permitting 'unsafe-inline' for HMR / React Refresh.
  */
 function hardenedCspPlugin(): Plugin {
   return {
@@ -23,8 +24,8 @@ function hardenedCspPlugin(): Plugin {
     transformIndexHtml(html, ctx) {
       const isFloating = ctx.path.includes('floatingLyrics');
       const csp = isFloating
-        ? "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: nora:; media-src 'self' blob: nora:; font-src 'self' data:; connect-src 'self' blob: nora:; worker-src 'self' blob:;"
-        : "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: nora:; media-src 'self' blob: nora:; font-src 'self' data:; connect-src 'self' blob: nora: https://raw.githubusercontent.com; worker-src 'self' blob:;";
+        ? "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: nora: https: http:; media-src 'self' blob: nora:; font-src 'self' data:; connect-src 'self' blob: nora:; worker-src 'self' blob:;"
+        : "default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: nora: https: http:; media-src 'self' blob: nora:; font-src 'self' data:; connect-src 'self' blob: nora: https://raw.githubusercontent.com; worker-src 'self' blob:;";
 
       return html.replace(
         /<meta[\s\S]*?http-equiv=["']Content-Security-Policy["'][\s\S]*?\/?>/i,

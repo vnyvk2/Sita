@@ -22,6 +22,12 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
   onToggleReplaceArtwork
 }) => {
   const artworkUrl = preview.album.artwork?.primaryPath || preview.album.artwork?.onlineUrls?.[0];
+  const [imageError, setImageError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageError(false);
+  }, [artworkUrl]);
+
   const mbid =
     preview.resolvedRelease?.releaseGroupId || preview.providerReleaseId || 'mbid-canonical-id';
   const confidencePercent = Math.round(preview.overallConfidence * 100);
@@ -31,14 +37,12 @@ export const SelectedReleasePanel: React.FC<SelectedReleasePanelProps> = ({
       {/* Left: Artwork & Source Selector */}
       <div className="flex flex-col items-center gap-1.5">
         <div className="bg-background-color-2 dark:bg-dark-background-color-2 border-background-color-3/40 dark:border-dark-background-color-3/40 relative flex h-[134px] w-[134px] items-center justify-center overflow-hidden rounded-lg border shadow-sm">
-          {artworkUrl && replaceArtwork && artworkSource !== 'local' ? (
+          {artworkUrl && replaceArtwork && artworkSource !== 'local' && !imageError ? (
             <img
               src={artworkUrl}
               alt="Cover Art"
               className="h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-              }}
+              onError={() => setImageError(true)}
             />
           ) : (
             <div className="text-font-color-dimmed dark:text-dark-font-color-dimmed flex flex-col items-center gap-1">
