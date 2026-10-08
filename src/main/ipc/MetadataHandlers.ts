@@ -14,6 +14,7 @@ import type { MetadataProviderId } from '../metadata/models/RecordingMetadata';
 import type { MetadataProviderRuntime } from '../metadata/runtime/MetadataProviderRuntime';
 import type { AlbumAutoTagService } from '../metadata/services/AlbumAutoTagService';
 import type { LocalSongInput } from '../metadata/services/AlbumMetadataService';
+import type { GapFillService } from '../metadata/services/GapFillService';
 import type { MetadataPreferencesService } from '../metadata/services/MetadataPreferencesService';
 import type { MetadataWorkflowService } from '../metadata/services/MetadataWorkflowService';
 import type { WorkflowPreview, WorkflowType } from '../metadata/workflows/MetadataWorkflow';
@@ -25,7 +26,8 @@ export function registerMetadataHandlers(
   workflowService?: MetadataWorkflowService,
   preferencesService?: MetadataPreferencesService,
   mainWindow?: BrowserWindow,
-  providerRuntime?: MetadataProviderRuntime
+  providerRuntime?: MetadataProviderRuntime,
+  gapFillService?: GapFillService
 ): void {
   // Listen for progress events from AlbumAutoTagService and send over IPC to renderer
   if (!activeProgressListeners.has(autoTagService)) {
@@ -187,5 +189,17 @@ export function registerMetadataHandlers(
       workflowService.cancel(operationId);
       return { cancelled: true };
     });
+
+    // Gap-fill: fills only empty genre/artwork fields per album group.
+    ipcMain.handle(
+      'metadata/fillGaps',
+      async (_, localSongs: LocalSongInput[], operationId = 'default') => {
+        if (!gapFillService) {
+          throw new Error('Gap fill service is not initialized');
+        }
+        const signal = workflowService.createAbortSignal(operationId);
+        return gapFillService.fillGaps(localSongs, operationId, signal);
+      }
+    );
   }
 }

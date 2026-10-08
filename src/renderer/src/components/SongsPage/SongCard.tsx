@@ -10,6 +10,13 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import { getQueuesManager } from '../../other/queuesManager';
 import { store } from '../../store/store';
+import {
+  fillMetadataGaps,
+  resolveAutoTagSongs,
+  updateMissingArtworkForSongs,
+  updateMissingLyricsForSongs,
+  type SongDataForAutoTag
+} from '../../utils/autoTagUtils';
 import Button from '../Button';
 import Img from '../Img';
 import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
@@ -17,12 +24,6 @@ import NavLink from '../NavLink';
 import SongArtist from './SongArtist';
 import { getSongCardBackground } from './songCardBackground';
 import { buildSongPlaylistMenuItem } from './songPlaylistMenu';
-import {
-  resolveAutoTagSongs,
-  updateMissingArtworkForSongs,
-  updateMissingLyricsForSongs,
-  type SongDataForAutoTag
-} from '../../utils/autoTagUtils';
 
 const BlacklistSongConfrimPrompt = lazy(() => import('./BlacklistSongConfirmPrompt'));
 const DeleteSongsFromSystemConfrimPrompt = lazy(
@@ -509,6 +510,43 @@ const SongCard = (props: SongCardProp) => {
             }
           },
           {
+            label: 'Fill Metadata Gaps',
+            iconName: 'auto_fix_high',
+            handlerFunction: async () => {
+              let targetSongs: SongDataForAutoTag[] = [
+                {
+                  songId,
+                  title,
+                  artists,
+                  album,
+                  path,
+                  artworkPath
+                }
+              ];
+              if (isMultipleSelectionsEnabled) {
+                const resolved = await resolveAutoTagSongs(songIds);
+                if (resolved.length > 0) targetSongs = resolved;
+              }
+              addNewNotifications([
+                {
+                  id: `gapfill-start-${Date.now()}`,
+                  content: `Filling empty genre/artwork for ${targetSongs.length} track${targetSongs.length > 1 ? 's' : ''}...`,
+                  iconName: 'auto_fix_high',
+                  duration: 4000
+                }
+              ]);
+              const stats = await fillMetadataGaps(targetSongs);
+              addNewNotifications([
+                {
+                  id: `gapfill-done-${Date.now()}`,
+                  content: `Gap fill complete: ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed.`,
+                  iconName: stats.updated > 0 ? 'check_circle' : 'info',
+                  duration: 5000
+                }
+              ]);
+            }
+          },
+          {
             label: 'Infer Tags from Filename',
             iconName: 'description',
             handlerFunction: () => {
@@ -649,9 +687,7 @@ const SongCard = (props: SongCardProp) => {
         isSongPlaying && 'playing'
       } group/songCard relative mr-2 mb-2 aspect-2/1 max-w-[24rem] min-w-[15rem] overflow-hidden rounded-2xl border-[transparent] shadow-xl transition-[border-color,translate] duration-200 ease-out hover:-translate-y-0.5 ${
         className || ''
-      } ${
-        isMultipleSelectionEnabled && 'border-4'
-      } ${
+      } ${isMultipleSelectionEnabled && 'border-4'} ${
         isAMultipleSelection &&
         'border-font-color-highlight! dark:border-dark-font-color-highlight!'
       }`}

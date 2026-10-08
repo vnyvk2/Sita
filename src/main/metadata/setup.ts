@@ -70,6 +70,7 @@ import { MetadataSearchGateway } from './search/MetadataSearchGateway';
 import { AlbumAutoTagService } from './services/AlbumAutoTagService';
 import { AlbumMetadataService } from './services/AlbumMetadataService';
 import { CoverArtBufferService } from './services/CoverArtBufferService';
+import { GapFillService } from './services/GapFillService';
 import { MetadataApplyService } from './services/MetadataApplyService';
 import { MetadataPreferencesService } from './services/MetadataPreferencesService';
 import { MetadataWorkflowService } from './services/MetadataWorkflowService';
@@ -128,6 +129,7 @@ export interface MetadataContainer {
     applyService: MetadataApplyService;
     preferencesService: MetadataPreferencesService;
     providerRuntime: MetadataProviderRuntime;
+    gapFillService: GapFillService;
   };
   resolution: {
     resolutionManager: MetadataResolutionManager;
@@ -360,6 +362,8 @@ export class MetadataBootstrap {
       applyService
     });
 
+    const gapFillService = new GapFillService({ workflowService, coverArtBufferService });
+
     workflowService.registerWorkflow(new AlbumWorkflow(albumMetadataService));
     if (discogsAdapter) {
       workflowService.registerWorkflow(new GenreWorkflow(discogsAdapter));
@@ -453,7 +457,8 @@ export class MetadataBootstrap {
         workflowService,
         applyService,
         preferencesService,
-        providerRuntime
+        providerRuntime,
+        gapFillService
       },
       resolution: {
         resolutionManager,

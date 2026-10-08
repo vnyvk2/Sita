@@ -83,6 +83,28 @@ export const metadataApi = {
     if (api) api.cancelAutoTag(operationId);
   },
 
+  fillGaps: async (
+    localSongs: unknown[],
+    operationId?: string
+  ): Promise<{
+    updated: number;
+    skipped: number;
+    failed: number;
+    albumsProcessed: number;
+    errors: string[];
+  }> => {
+    const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
+    if (!api || typeof api.fillGaps !== 'function')
+      return {
+        updated: 0,
+        skipped: 0,
+        failed: 0,
+        albumsProcessed: 0,
+        errors: ['Metadata API unavailable']
+      };
+    return api.fillGaps(localSongs, operationId);
+  },
+
   onProgress: (callback: (payload: ProgressEventPayload) => void): (() => void) => {
     const api = window.api?.metadataAutoTag as MetadataAutoTagApi | undefined;
     if (!api || typeof api.onProgress !== 'function') return () => {};
