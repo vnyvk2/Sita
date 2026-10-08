@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import {
   REWIND_REVEAL_EDGE_S,
   REWIND_REVEAL_EVENT,
+  setRewindRevealState,
   shouldRevealRewind,
+  toggleRewindReveal,
   useRewindReveal
 } from '../useRewindReveal';
 
@@ -53,6 +55,31 @@ describe('useRewindReveal', () => {
     const { result } = renderHook(() => useRewindReveal(1));
     act(() => {
       document.dispatchEvent(new CustomEvent(REWIND_REVEAL_EVENT, { detail: { active: 'yes' } }));
+    });
+    expect(result.current).toBe(false);
+  });
+
+  it('supports toggleRewindReveal and setRewindRevealState', () => {
+    const { result } = renderHook(() => useRewindReveal(1));
+    expect(result.current).toBe(false);
+
+    act(() => {
+      toggleRewindReveal();
+    });
+    expect(result.current).toBe(true);
+
+    act(() => {
+      toggleRewindReveal();
+    });
+    expect(result.current).toBe(false);
+
+    act(() => {
+      setRewindRevealState(true);
+    });
+    expect(result.current).toBe(true);
+
+    act(() => {
+      setRewindRevealState(false);
     });
     expect(result.current).toBe(false);
   });

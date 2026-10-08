@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
-import { useRewindReveal } from '../../hooks/useRewindReveal';
+import { toggleRewindReveal, useRewindReveal } from '../../hooks/useRewindReveal';
 import calculateTime from '../../utils/calculateTime';
 import Img from '../Img';
 import NavLink from '../NavLink';
@@ -254,13 +254,15 @@ const CurrentlyPlayingSongInfoContainer = () => {
   return (
     <div className="current-playing-song-info-container grid w-full max-w-full grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 lg:grid-cols-[minmax(0,1fr)]">
       <div
-        className="song-cover-container relative flex aspect-square h-full items-center justify-center overflow-hidden p-2 lg:hidden"
+        className="song-cover-container group relative flex aspect-square h-full cursor-pointer items-center justify-center p-2 [perspective:1000px] lg:hidden"
         id="currentSongCover"
+        onClick={toggleRewindReveal}
+        title={
+          isCreditsRevealed
+            ? t('player.flipToFront', 'Click to flip cover')
+            : t('player.flipToCredits', 'Click to reveal liner notes')
+        }
       >
-        {/* ${
-               !currentSongData.artworkPath &&
-               `before:absolute before:h-[85%] before:w-[85%] before:rounded-md before:bg-background-color-2 before:bg-dark-background-color-2 before:content-[''] after:absolute after:h-5 after:w-5 after:animate-spin-ease after:rounded-full after:border-2 after:border-[transparent] after:border-t-font-color-black after:content-[''] dark:after:border-t-font-color-white`
-             } */}
         <div className={`fx-flip-inner h-full w-full ${isCreditsRevealed ? 'fx-flipped' : ''}`}>
           <div className="fx-flip-face h-full w-full">
             <Img
@@ -281,25 +283,42 @@ const CurrentlyPlayingSongInfoContainer = () => {
                 );
               }}
             />
+            {/* Subtle flip indicator on hover */}
+            <div className="pointer-events-none absolute right-1 bottom-1 flex items-center gap-0.5 rounded bg-black/60 px-1 py-0.5 text-[9px] text-white/90 opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100">
+              <span className="material-icons-round text-[11px]">flip</span>
+            </div>
           </div>
           <div
-            className="fx-flip-face fx-flip-back bg-background-color-2 dark:bg-dark-background-color-2 absolute inset-0 flex flex-col justify-center gap-1 overflow-hidden rounded-lg p-3 shadow-xl"
+            className="fx-flip-face fx-flip-back absolute inset-0 flex flex-col justify-between overflow-hidden rounded-lg border border-blue-500/50 bg-slate-900/95 p-2.5 text-slate-200 shadow-2xl select-none dark:bg-slate-900/95"
             aria-hidden={!isCreditsRevealed}
           >
-            <span className="text-font-color-black dark:text-font-color-white truncate text-sm font-semibold">
-              {currentSongData.title}
-            </span>
-            <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed truncate text-xs">
-              {currentSongData.artists?.map((a) => a.name).join(', ') || t('common.unknownArtist')}
-            </span>
-            {currentSongData.album?.name && (
-              <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed truncate text-xs">
-                {currentSongData.album.name}
+            <div className="flex items-center justify-between border-b border-slate-700/60 pb-1">
+              <span className="text-[9px] font-bold tracking-widest text-blue-400 uppercase">
+                Liner Notes
               </span>
-            )}
-            <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 font-mono text-xs">
-              {songDurationLabel}
-            </span>
+              <span className="font-mono text-[9px] text-slate-400">{songDurationLabel}</span>
+            </div>
+            <div className="flex flex-col justify-center gap-0.5 overflow-hidden py-1">
+              <span
+                className="truncate text-xs font-semibold text-white"
+                title={currentSongData.title}
+              >
+                {currentSongData.title}
+              </span>
+              <span className="truncate text-[11px] text-slate-300">
+                {currentSongData.artists?.map((a) => a.name).join(', ') ||
+                  t('common.unknownArtist')}
+              </span>
+              {currentSongData.album?.name && (
+                <span className="truncate text-[10px] text-slate-400 italic">
+                  {currentSongData.album.name}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-700/60 pt-1 font-mono text-[9px] text-emerald-400">
+              <span>{currentSongData.year ? `Year: ${currentSongData.year}` : 'Stereo'}</span>
+              <span className="text-slate-400">Flip ↻</span>
+            </div>
           </div>
         </div>
       </div>

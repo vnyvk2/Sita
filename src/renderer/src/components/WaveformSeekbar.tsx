@@ -450,7 +450,7 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
 
     // 3. Normal seek scrub
     isDraggingRef.current = true;
-    waveGrabPosRef.current = targetPos;
+    waveGrabPosRef.current = songPos > 0 ? songPos : targetPos;
     try {
       (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
     } catch {}
@@ -573,7 +573,8 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     // 3. Normal seek release
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
-      if (waveRevealSignalledRef.current) {
+      const finalPos = calculateSeekFromEvent(e.clientX);
+      if (waveRevealSignalledRef.current && finalPos > 0.5) {
         waveRevealSignalledRef.current = false;
         document.dispatchEvent(new CustomEvent(REWIND_REVEAL_EVENT, { detail: { active: false } }));
       }

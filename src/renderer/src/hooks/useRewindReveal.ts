@@ -18,10 +18,25 @@ export function shouldRevealRewind(grabPos: number, dragPos: number): boolean {
  * Subscribes to seekbar drag-back reveal signals. Resets whenever the track changes so a flipped
  * cover never leaks into the next song.
  */
+let currentRevealState = false;
+
+export function toggleRewindReveal(): void {
+  currentRevealState = !currentRevealState;
+  document.dispatchEvent(
+    new CustomEvent(REWIND_REVEAL_EVENT, { detail: { active: currentRevealState } })
+  );
+}
+
+export function setRewindRevealState(active: boolean): void {
+  currentRevealState = active;
+  document.dispatchEvent(new CustomEvent(REWIND_REVEAL_EVENT, { detail: { active } }));
+}
+
 export function useRewindReveal(songId?: number): boolean {
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
+    currentRevealState = false;
     setRevealed(false);
   }, [songId]);
 
@@ -32,7 +47,8 @@ export function useRewindReveal(songId?: number): boolean {
         e.detail &&
         typeof (e.detail as { active?: unknown }).active === 'boolean'
       ) {
-        setRevealed((e.detail as { active: boolean }).active);
+        currentRevealState = (e.detail as { active: boolean }).active;
+        setRevealed(currentRevealState);
       }
     };
     document.addEventListener(REWIND_REVEAL_EVENT, handler);
