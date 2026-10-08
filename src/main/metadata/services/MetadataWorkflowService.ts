@@ -23,6 +23,15 @@ export interface MetadataWorkflowServiceOptions {
   operationManager?: MetadataOperationManager;
   orchestrator?: MetadataApplyOrchestrator;
   coverArtBufferService?: CoverArtBufferService;
+  /**
+   * DEF-TAG-06: workflow applies journal through the orchestrator into the shared
+   * MetadataHistoryService. Undo must read that same journal, so the shared apply service (which
+   * owns the undo path) is injected here instead of consulting the transaction manager's untouched
+   * stack.
+   */
+  applyService?: {
+    undoLastAutoTag: () => Promise<{ success: boolean; restoredCount: number; errors?: string[] }>;
+  };
 }
 
 export class MetadataWorkflowService extends EventEmitter {
@@ -31,12 +40,14 @@ export class MetadataWorkflowService extends EventEmitter {
   private readonly activeOperations: Map<string, AbortController> = new Map();
   private readonly orchestrator?: MetadataApplyOrchestrator;
   private readonly coverArtBufferService?: CoverArtBufferService;
+  private readonly applyService?: MetadataWorkflowServiceOptions['applyService'];
 
   constructor(options: MetadataWorkflowServiceOptions) {
     super();
     this.transactionManager = options.transactionManager;
     this.orchestrator = options.orchestrator;
     this.coverArtBufferService = options.coverArtBufferService;
+    this.applyService = options.applyService;
   }
 
   public registerWorkflow(workflow: MetadataWorkflow): void {
@@ -158,8 +169,7 @@ export class MetadataWorkflowService extends EventEmitter {
               fm.newValue.startsWith('http')
           );
           const targetUrl =
-            (artField?.newValue as string | undefined) ??
-            preview.primaryCandidate?.coverArtUrl;
+            (artField?.newValue as string | undefined) ?? preview.primaryCandidate?.coverArtUrl;
           if (targetUrl) {
             const buf = await this.coverArtBufferService.fetchBuffer(targetUrl);
             if (buf) {
@@ -182,8 +192,12 @@ export class MetadataWorkflowService extends EventEmitter {
         operationId,
         songId: Number(rm.resourceId),
         filePath: rm.filePath ?? '',
+        // DEF-TAG-11/12: mirror the album-path contract - empty values never travel
+        // as field mutations (Number('') === 0 would write track 0/year 0). The
+        // normalized contract carries no explicit clear sentinel, so empties mean
+        // "leave untouched" on every path.
         fields: rm.fieldMutations
-          .filter((fm) => fm.newValue !== undefined)
+          .filter((fm) => fm.newValue !== undefined && String(fm.newValue).trim() !== '')
           .map((fm) => ({
             fieldId: fm.fieldId as ApplyFieldId,
             oldValue: fm.oldValue ?? null,
@@ -225,6 +239,14 @@ export class MetadataWorkflowService extends EventEmitter {
   public async undoLastAutoTag(
     _operationId = 'default'
   ): Promise<{ success: boolean; revertedCount: number; errors: string[] }> {
+    // DEF-TAG-06: applyPreview journals via the orchestrator into the shared
+    // history service, so undo delegates to the shared apply service (same
+    // journal). The transaction manager's stack is only a fallback for legacy
+    // direct-transaction callers.
+    if (this.applyService) {
+      const res = await this.applyService.undoLastAutoTag();
+      return { success: res.success, revertedCount: res.restoredCount, errors: res.errors ?? [] };
+    }
     return this.transactionManager.rollbackLastTransaction();
   }
 

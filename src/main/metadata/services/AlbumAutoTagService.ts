@@ -378,8 +378,43 @@ export class AlbumAutoTagService extends EventEmitter {
           })
         );
 
+      // DEF-TAG-03: retain local songs with no confident remote match instead of
+      // silently dropping them. They carry no track-level diffs (applyTrack false)
+      // but stay in the preview so album-level mutations still reunite them with
+      // the rest of the album instead of isolating them under stale metadata.
+      const matchedLocalSongIds = new Set(albumPreview.trackList.map((p) => p.localSong.songId));
+      const unmatchedLocalPreviews: TrackMatchPreview[] = hydratedSongs
+        .filter((s) => !matchedLocalSongIds.has(s.songId))
+        .map((s) => ({
+          localSongId: s.songId,
+          remoteTrackId: undefined,
+          discNumber: s.discNumber ?? 1,
+          trackNumber: s.trackNumber ?? 1,
+          remoteTitle: undefined,
+          remoteArtist: undefined,
+          songPath: s.path,
+          oldTitle: s.title,
+          oldArtist: s.artist,
+          oldAlbum: s.album,
+          oldYear: s.year,
+          oldTrackNumber: s.trackNumber,
+          oldDiscNumber: s.discNumber,
+          oldGenre: s.genre,
+          oldIsrc: s.isrc,
+          oldMbid: s.musicBrainzRecordingId,
+          confidence: 0,
+          confidenceLevel: 'Poor' as const,
+          why: 'No confident match found - excluded from automatic track updates',
+          reasons: ['unmatched_local_track'],
+          fieldDiffs: [],
+          applyTrack: false,
+          hasWarnings: true,
+          warningCount: 1
+        }));
+
       const allTrackPreviews: TrackMatchPreview[] = [
         ...trackPreviews,
+        ...unmatchedLocalPreviews,
         ...missingTrackPreviews
       ].sort((a, b) => {
         const discA = a.discNumber ?? a.oldDiscNumber ?? 1;
@@ -393,10 +428,17 @@ export class AlbumAutoTagService extends EventEmitter {
 
       const overallConfidenceLevel = getConfidenceLevel(albumPreview.confidence);
 
+      const warnings = [...albumPreview.warnings];
+      if (unmatchedLocalPreviews.length > 0) {
+        warnings.push(
+          `${unmatchedLocalPreviews.length} local track(s) had no confident match and were excluded from automatic track updates. Review them manually.`
+        );
+      }
+
       const preview: AlbumTagPreview = {
         album: albumPreview.album,
         matches: allTrackPreviews,
-        warnings: albumPreview.warnings,
+        warnings,
         overallConfidence: albumPreview.confidence,
         confidenceLevel: overallConfidenceLevel,
         provider: resolved.provider,
@@ -526,12 +568,12 @@ export class AlbumAutoTagService extends EventEmitter {
       return result;
     } catch (err: unknown) {
       if (this.isAbortError(err)) {
-        this.operationManager.updateState(operationId, 'Cancelled', 'Apply cancelled.', 0);
-        this.emitProgress('cancelled', 'Apply cancelled.', 0, operationId);
+        this.operationManager.updateState(resolvedOpId, 'Cancelled', 'Apply cancelled.', 0);
+        this.emitProgress('cancelled', 'Apply cancelled.', 0, resolvedOpId);
         throw err;
       }
       this.operationManager.updateState(
-        operationId,
+        resolvedOpId,
         'Failed',
         `Apply failed: ${err instanceof Error ? err.message : String(err)}`,
         0
@@ -540,12 +582,12 @@ export class AlbumAutoTagService extends EventEmitter {
         'failed',
         `Apply failed: ${err instanceof Error ? err.message : String(err)}`,
         0,
-        operationId
+        resolvedOpId
       );
       throw err;
     } finally {
-      this.activeOperations.delete(operationId);
-      this.operationStages.delete(operationId);
+      this.activeOperations.delete(resolvedOpId);
+      this.operationStages.delete(resolvedOpId);
     }
   }
 

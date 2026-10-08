@@ -188,19 +188,24 @@ export class MetadataApplyService {
           'isrc',
           'musicBrainzRecordingId'
         ]);
-        const fields: import('../apply/contract').NormalizedFieldMutation[] = (
-          match.fieldDiffs ?? []
-        )
-          .filter((d) => d.applyField && KNOWN_APPLY_FIELDS.has(d.fieldId))
-          .map((d) => {
-            const val = d.userValue !== undefined ? d.userValue : d.suggestedValue;
-            return {
-              fieldId: d.fieldId as never,
-              oldValue: d.oldValue ?? null,
-              newValue: val as string | number
-            };
-          })
-          .filter((f) => f.newValue !== undefined && String(f.newValue).trim() !== '');
+        // DEF-TAG-01: track-level diffs apply ONLY to selected tracks. Deselected
+        // tracks (match.applyTrack === false) still receive album-level global
+        // mutations + artwork below, but their title/trackNumber/artist/etc. must
+        // never be overwritten when album-level changes pull them into targetMatches.
+        const trackFields: import('../apply/contract').NormalizedFieldMutation[] = match.applyTrack
+          ? (match.fieldDiffs ?? [])
+              .filter((d) => d.applyField && KNOWN_APPLY_FIELDS.has(d.fieldId))
+              .map((d) => {
+                const val = d.userValue !== undefined ? d.userValue : d.suggestedValue;
+                return {
+                  fieldId: d.fieldId as never,
+                  oldValue: d.oldValue ?? null,
+                  newValue: val as string | number
+                };
+              })
+              .filter((f) => f.newValue !== undefined && String(f.newValue).trim() !== '')
+          : [];
+        const fields: import('../apply/contract').NormalizedFieldMutation[] = [...trackFields];
 
         if (globalMutations?.applyAlbumTitle && globalMutations.albumTitle) {
           fields.push({
@@ -320,14 +325,19 @@ export class MetadataApplyService {
     try {
       if (urlOrPath.startsWith('http://') || urlOrPath.startsWith('https://')) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 25000);
 
         if (signal) {
           if (signal.aborted) controller.abort();
           else signal.addEventListener('abort', () => controller.abort(), { once: true });
         }
 
-        const res = await fetch(urlOrPath, { signal: controller.signal });
+        const res = await fetch(urlOrPath, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'NoraMusicPlayer/1.0.0 (https://github.com/vnyvk2/MyNora)'
+          }
+        });
         clearTimeout(timeoutId);
 
         const contentType = res.headers?.get ? res.headers.get('content-type') || '' : '';
@@ -378,6 +388,18 @@ export class MetadataApplyService {
         isrc: match.oldIsrc,
         musicBrainzRecordingId: match.oldMbid
       };
+      // DEF-TAG-05: capture the pre-apply embedded picture when this chunk
+      // replaces artwork, so undo can restore it (best-effort; text undo
+      // proceeds regardless).
+      if (artworkBuffer && artworkBuffer.length > 0 && match.songPath) {
+        try {
+          const existing = await this.tagWriter.readEmbeddedArtworkBuffer(match.songPath);
+          previousSnapshot.artworkBase64 =
+            existing && existing.length > 0 ? existing.toString('base64') : null;
+        } catch {
+          // keep text-only baseline
+        }
+      }
       previousSongs.push(previousSnapshot);
 
       const payloadTags: Partial<TagWritePayload> = {
@@ -698,21 +720,47 @@ export class MetadataApplyService {
     // Value-complete restore payloads: absent fields become explicit clears so
     // the file returns to its exact pre-AutoTag state (including isrc/mbid,
     // which reParseSong would otherwise re-import from polluted tags).
-    const restorePayloads: TagWritePayload[] = snapshot.previousSongs.map((s) => ({
-      filePath: s.path,
-      title: s.title ?? '',
-      artist: s.artist ?? null,
-      albumArtist: s.albumArtist ?? null,
-      album: s.album ?? null,
-      year: s.year ?? null,
-      trackNumber: s.trackNumber ?? null,
-      discNumber: s.discNumber ?? null,
-      genre: s.genre ?? null,
-      isrc: s.isrc ?? null,
-      musicBrainzRecordingId: s.musicBrainzRecordingId ?? null
-    }));
+    // DEF-TAG-05: artwork is restored too - snapshots captured at apply time
+    // carry the previous embedded picture (base64) or null when the file
+    // verifiably had none (then the added picture is cleared). Snapshots with
+    // artworkBase64 undefined predate artwork capture and keep text-only undo.
+    let touchesArtwork = false;
+    const restorePayloads: TagWritePayload[] = snapshot.previousSongs.map((s) => {
+      if (s.artworkBase64 !== undefined) touchesArtwork = true;
+      return {
+        filePath: s.path,
+        title: s.title ?? '',
+        artist: s.artist ?? null,
+        albumArtist: s.albumArtist ?? null,
+        album: s.album ?? null,
+        year: s.year ?? null,
+        trackNumber: s.trackNumber ?? null,
+        discNumber: s.discNumber ?? null,
+        genre: s.genre ?? null,
+        isrc: s.isrc ?? null,
+        musicBrainzRecordingId: s.musicBrainzRecordingId ?? null,
+        ...(s.artworkBase64
+          ? { artworkBuffer: Buffer.from(s.artworkBase64, 'base64') }
+          : s.artworkBase64 === null
+            ? { clearArtwork: true }
+            : {})
+      };
+    });
 
     const tagWriteResults = await this.tagWriter.writeBatch(restorePayloads);
+
+    // DEF-TAG-05: restored (or cleared) pictures change artwork URLs - bust the
+    // artwork caches so the UI refreshes immediately instead of showing the
+    // reverted text tags alongside the new cover.
+    if (touchesArtwork) {
+      try {
+        const { resetArtworkCache } = await import('../../fs/resolveFilePaths');
+        resetArtworkCache('songArtworks');
+        resetArtworkCache('albumArtworks');
+      } catch {
+        // cache reset is best-effort; the file/DB restore above still stands
+      }
+    }
 
     // Audit P1 #5: partition by per-file outcome. Tracks whose physical
     // restore SUCCEEDED must get their DB restore too (otherwise disk=old /

@@ -146,7 +146,9 @@ export class TrackMatcher {
         continue;
       }
 
-      const trackKey = pair.track.trackId ?? pair.track.trackNumber ?? pair.track.title;
+      const discNo = pair.track.discNumber ?? pair.localSong.discNumber ?? 1;
+      const trackNo = pair.track.trackNumber ?? pair.track.title;
+      const trackKey = pair.track.trackId ?? `${discNo}:${String(trackNo)}`;
       if (claimedSongIds.has(pair.localSong.songId) || claimedTrackIds.has(trackKey)) {
         continue;
       }
@@ -213,8 +215,11 @@ export class TrackMatcher {
       });
     }
 
-    // Sort assigned pairs sequentially by official track number for album sequence ordering
+    // Sort assigned pairs sequentially by disc then official track number for album sequence ordering
     assignedPairs.sort((a, b) => {
+      const discA = a.remoteTrack.recording.discNumber ?? 1;
+      const discB = b.remoteTrack.recording.discNumber ?? 1;
+      if (discA !== discB) return discA - discB;
       const trackA = a.remoteTrack.recording.trackNumber ?? 0;
       const trackB = b.remoteTrack.recording.trackNumber ?? 0;
       return trackA - trackB;

@@ -91,15 +91,23 @@ export const syncSongRelationalData = async ({
     const artistsWithoutIds = tags.artists.filter((artist) => !artist.artistId);
     const artistsWithIds = tags.artists.filter((artist) => artist.artistId);
 
+    // DEF-TAG-02: track every artist ID meant to stay linked (resolved or newly
+    // created below) so the unlink pass never removes an artist just linked by name
+    // in the same call (callers such as MetadataApplyOrchestrator supply name-only
+    // tags without IDs).
+    const activeArtistIds = new Set<number>(artistsWithIds.map((a) => Number(a.artistId)));
+
     // Create new artists
     for (const artistData of artistsWithoutIds) {
       const existingArtist = await getArtistWithName(artistData.name, trx);
 
       if (existingArtist) {
         await linkSongToArtist(existingArtist.id, songId, trx);
+        activeArtistIds.add(existingArtist.id);
       } else {
         const newArtist = await createArtist({ name: artistData.name }, trx);
         await linkSongToArtist(newArtist.id, songId, trx);
+        activeArtistIds.add(newArtist.id);
       }
     }
 
@@ -112,10 +120,8 @@ export const syncSongRelationalData = async ({
       await linkSongToArtist(artistId, songId, trx);
     }
 
-    // Unlink removed artists
-    const unlinkedArtistIds = currentArtistIds.filter(
-      (id: number) => !artistsWithIds.some((a) => Number(a.artistId) === id)
-    );
+    // Unlink removed artists (only those absent from the resolved active set)
+    const unlinkedArtistIds = currentArtistIds.filter((id: number) => !activeArtistIds.has(id));
 
     for (const artistId of unlinkedArtistIds) {
       await unlinkSongFromArtist(artistId, songId, trx);
@@ -262,15 +268,21 @@ export const syncSongRelationalData = async ({
     const genresWithoutIds = normalizedGenreItems.filter((genre) => !genre.genreId);
     const genresWithIds = normalizedGenreItems.filter((genre) => genre.genreId);
 
+    // DEF-TAG-02: same active-set guard as artists above - name-only genre tags
+    // must not cause the just-linked genre to be unlinked and deleted.
+    const activeGenreIds = new Set<number>(genresWithIds.map((g) => Number(g.genreId)));
+
     // Create new genres
     for (const genreData of genresWithoutIds) {
       const existingGenre = await getGenreByName(genreData.name, trx);
 
       if (existingGenre) {
         await linkSongToGenre(existingGenre.id, songId, trx);
+        activeGenreIds.add(existingGenre.id);
       } else {
         const newGenre = await createGenre({ name: genreData.name }, trx);
         await linkSongToGenre(newGenre.id, songId, trx);
+        activeGenreIds.add(newGenre.id);
       }
     }
 
@@ -283,10 +295,8 @@ export const syncSongRelationalData = async ({
       await linkSongToGenre(genreId, songId, trx);
     }
 
-    // Unlink removed genres
-    const unlinkedGenreIds = currentGenreIds.filter(
-      (id: number) => !genresWithIds.some((g) => Number(g.genreId) === id)
-    );
+    // Unlink removed genres (only those absent from the resolved active set)
+    const unlinkedGenreIds = currentGenreIds.filter((id: number) => !activeGenreIds.has(id));
 
     for (const genreId of unlinkedGenreIds) {
       await unlinkSongFromGenre(genreId, songId, trx);

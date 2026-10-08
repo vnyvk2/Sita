@@ -38,4 +38,12 @@ describe('AlbumSuffixPreserver Unit Test Suite', () => {
     const res = AlbumSuffixPreserver.preserveAlbumSuffix('SOUR', 'SOUR');
     expect(res).toBe('SOUR');
   });
+
+  it('DEF-TAG-08: does NOT concatenate when remote carries its own distinct edition', () => {
+    const res = AlbumSuffixPreserver.preserveAlbumSuffix(
+      'Abbey Road (Deluxe Edition)',
+      'Abbey Road (Remastered 2009)'
+    );
+    expect(res).toBe('Abbey Road (Remastered 2009)');
+  });
 });
