@@ -146,7 +146,12 @@ export async function updateMissingArtworkForSongs(
           applyOpId
         );
         if (res.success) {
-          updated += groupSongs.length;
+          // Honor per-song counts when the result reports them; a group apply
+          // can partially succeed.
+          const groupUpdated =
+            typeof res.updatedCount === 'number' ? res.updatedCount : groupSongs.length;
+          updated += groupUpdated;
+          failed += Math.max(0, groupSongs.length - groupUpdated);
         } else {
           failed += groupSongs.length;
         }

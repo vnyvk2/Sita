@@ -75,4 +75,23 @@ describe('DEF-TAG-10: background artwork uses one cycle per album with unique op
     ];
     expect(new Set(opIds).size).toBe(opIds.length);
   });
+
+  it('honors per-song counts on partially successful group applies', async () => {
+    vi.mocked(metadataApi.workflowApplyPreview).mockImplementation(
+      async () =>
+        ({
+          success: true,
+          updatedCount: 1
+        }) as any
+    );
+
+    const res = await updateMissingArtworkForSongs([
+      song({ songId: 1 }) as any,
+      song({ songId: 2, title: 'Track Two', path: '/tmp/b.mp3' }) as any,
+      song({ songId: 3, album: { name: 'LP-B' }, path: '/tmp/c.mp3' }) as any
+    ]);
+
+    // LP-A reports 1 of 2 updated, LP-B 1 of 1.
+    expect(res).toEqual({ updated: 2, skipped: 0, failed: 1 });
+  });
 });
