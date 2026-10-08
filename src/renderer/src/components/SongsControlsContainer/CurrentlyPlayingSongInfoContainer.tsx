@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
+import { useRewindReveal } from '../../hooks/useRewindReveal';
+import calculateTime from '../../utils/calculateTime';
 import Img from '../Img';
 import NavLink from '../NavLink';
 import SongArtist from '../SongsPage/SongArtist';
@@ -32,6 +34,11 @@ const CurrentlyPlayingSongInfoContainer = () => {
   const { t } = useTranslation();
 
   const [isNextSongPopupVisible, setIsNextSongPopupVisible] = useState(false);
+  const isCreditsRevealed = useRewindReveal(currentSongData.songId);
+  const songDurationLabel = useMemo(() => {
+    const time = calculateTime(currentSongData.duration || 0);
+    return `${time.minutes}:${time.seconds}`;
+  }, [currentSongData.duration]);
 
   const songArtistsImages = useMemo(() => {
     if (
@@ -254,24 +261,47 @@ const CurrentlyPlayingSongInfoContainer = () => {
                !currentSongData.artworkPath &&
                `before:absolute before:h-[85%] before:w-[85%] before:rounded-md before:bg-background-color-2 before:bg-dark-background-color-2 before:content-[''] after:absolute after:h-5 after:w-5 after:animate-spin-ease after:rounded-full after:border-2 after:border-[transparent] after:border-t-font-color-black after:content-[''] dark:after:border-t-font-color-white`
              } */}
-        <Img
-          className={`aspect-square h-full max-w-full rounded-lg object-cover object-center shadow-xl transition-transform duration-500 ${
-            isCurrentSongPlaying ? 'fx-art-pulse' : 'fx-art-pulse--paused'
-          }`}
-          src={currentSongData.artworkPath}
-          fallbackSrc={DefaultSongCover}
-          alt="Default song cover"
-          onContextMenu={(e) => {
-            e.stopPropagation();
-            updateContextMenuData(
-              true,
-              contextMenuItems,
-              e.pageX,
-              e.pageY,
-              contextMenuCurrentSongData
-            );
-          }}
-        />
+        <div className={`fx-flip-inner h-full w-full ${isCreditsRevealed ? 'fx-flipped' : ''}`}>
+          <div className="fx-flip-face h-full w-full">
+            <Img
+              className={`aspect-square h-full max-w-full rounded-lg object-cover object-center shadow-xl transition-transform duration-500 ${
+                isCurrentSongPlaying ? 'fx-art-pulse' : 'fx-art-pulse--paused'
+              }`}
+              src={currentSongData.artworkPath}
+              fallbackSrc={DefaultSongCover}
+              alt="Default song cover"
+              onContextMenu={(e) => {
+                e.stopPropagation();
+                updateContextMenuData(
+                  true,
+                  contextMenuItems,
+                  e.pageX,
+                  e.pageY,
+                  contextMenuCurrentSongData
+                );
+              }}
+            />
+          </div>
+          <div
+            className="fx-flip-face fx-flip-back bg-background-color-2 dark:bg-dark-background-color-2 absolute inset-0 flex flex-col justify-center gap-1 overflow-hidden rounded-lg p-3 shadow-xl"
+            aria-hidden={!isCreditsRevealed}
+          >
+            <span className="text-font-color-black dark:text-font-color-white truncate text-sm font-semibold">
+              {currentSongData.title}
+            </span>
+            <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed truncate text-xs">
+              {currentSongData.artists?.map((a) => a.name).join(', ') || t('common.unknownArtist')}
+            </span>
+            {currentSongData.album?.name && (
+              <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed truncate text-xs">
+                {currentSongData.album.name}
+              </span>
+            )}
+            <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 font-mono text-xs">
+              {songDurationLabel}
+            </span>
+          </div>
+        </div>
       </div>
       <div className="song-info-container relative flex h-full w-full flex-col items-start justify-center drop-shadow-lg lg:ml-4 lg:w-full">
         {currentSongData.title && (
