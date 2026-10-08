@@ -253,14 +253,6 @@ const CurrentlyPlayingSongInfoContainer = () => {
 
   return (
     <div className="current-playing-song-info-container grid w-full max-w-full grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 lg:grid-cols-[minmax(0,1fr)]">
-      {/* Spotlight scrim while the credits card is popped out. The player bar
-          (z-20) stays lit above it; pointer-transparent so scrubbing works. */}
-      {isCreditsRevealed && (
-        <div
-          className="fx-flip-scrim pointer-events-none fixed inset-0 z-10 bg-black/40"
-          aria-hidden
-        />
-      )}
       <div
         className="song-cover-container relative flex aspect-square h-full items-center justify-center overflow-hidden p-2 lg:hidden"
         id="currentSongCover"
@@ -291,24 +283,21 @@ const CurrentlyPlayingSongInfoContainer = () => {
             />
           </div>
           <div
-            className="fx-flip-face fx-flip-back bg-background-color-2 dark:bg-dark-background-color-2 absolute inset-0 flex flex-col justify-center gap-0.5 overflow-hidden rounded-lg p-2 shadow-2xl"
+            className="fx-flip-face fx-flip-back bg-background-color-2 dark:bg-dark-background-color-2 absolute inset-0 flex flex-col justify-center gap-1 overflow-hidden rounded-lg p-3 shadow-xl"
             aria-hidden={!isCreditsRevealed}
           >
-            <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-[9px] font-bold tracking-[0.18em]">
-              CREDITS
-            </span>
-            <span className="text-font-color-black dark:text-font-color-white truncate text-xs font-semibold">
+            <span className="text-font-color-black dark:text-font-color-white truncate text-sm font-semibold">
               {currentSongData.title}
             </span>
-            <span className="text-font-color-black dark:text-font-color-white line-clamp-2 text-[11px] leading-snug">
+            <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed truncate text-xs">
               {currentSongData.artists?.map((a) => a.name).join(', ') || t('common.unknownArtist')}
             </span>
             {currentSongData.album?.name && (
-              <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed truncate text-[10px]">
+              <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed truncate text-xs">
                 {currentSongData.album.name}
               </span>
             )}
-            <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5 font-mono text-[10px]">
+            <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 font-mono text-xs">
               {songDurationLabel}
             </span>
           </div>
