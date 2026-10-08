@@ -125,6 +125,28 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
   // Scroller element ref & event listener with lifecycle cleanup
   const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
 
+  // View-entrance stagger (fx-view-enter): one-shot mount animation for rows.
+  // The class is removed after the longest stagger settles (~650ms), so rows
+  // mounted later by scrolling never replay the entrance.
+  useEffect(() => {
+    if (!scrollerElement) return;
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return;
+    }
+    scrollerElement.classList.add('fx-view-enter');
+    const timer = setTimeout(() => {
+      scrollerElement.classList.remove('fx-view-enter');
+    }, 700);
+    return () => {
+      clearTimeout(timer);
+      scrollerElement.classList.remove('fx-view-enter');
+    };
+  }, [scrollerElement]);
+
   // Keep latest onScrollingStateChange in a ref to avoid recreating listener
   const onScrollingStateChangeRef = useRef(onScrollingStateChange);
   onScrollingStateChangeRef.current = onScrollingStateChange;

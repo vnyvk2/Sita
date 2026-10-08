@@ -423,6 +423,82 @@
   }
 }
 
+/* ? VIEW ENTRANCE: staggered row reveal ------------------------------------
+   Mount-only: VirtualizedList adds .fx-view-enter to the scroller on mount and
+   removes it after ~700ms, so rows mounted later by scrolling never replay.
+   Transform/opacity only (compositor thread). Stagger capped at 15 rows so
+   long lists settle fast. */
+.fx-view-enter [data-item-index] {
+  animation: fx-row-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes fx-row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fx-view-enter [data-item-index]:nth-child(2) {
+  animation-delay: 22ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(3) {
+  animation-delay: 44ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(4) {
+  animation-delay: 66ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(5) {
+  animation-delay: 88ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(6) {
+  animation-delay: 110ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(7) {
+  animation-delay: 132ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(8) {
+  animation-delay: 154ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(9) {
+  animation-delay: 176ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(10) {
+  animation-delay: 198ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(11) {
+  animation-delay: 220ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(12) {
+  animation-delay: 242ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(13) {
+  animation-delay: 264ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(14) {
+  animation-delay: 286ms;
+}
+
+.fx-view-enter [data-item-index]:nth-child(n + 15) {
+  animation-delay: 308ms;
+}
+
 /* ? TRANSPORT CONTROLS & TACTILE FEEDBACK ---------------------------------
    Compositor-only spring pops and directional nudges for playback controls. */
 
@@ -532,6 +608,7 @@
 @media (prefers-reduced-motion: reduce) {
   .fx-rise,
   .fx-row-play-appear,
+  .fx-view-enter [data-item-index],
   .fx-play-pop,
   .fx-art-pulse,
   .fx-submenu-appear,
