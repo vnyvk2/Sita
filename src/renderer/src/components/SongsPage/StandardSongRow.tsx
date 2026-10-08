@@ -21,6 +21,7 @@ import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import { useSongPreferences } from '../../contexts/SongPreferencesContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
 import { store } from '../../store/store';
+import { resolveAutoTagSongs, type SongDataForAutoTag } from '../../utils/autoTagUtils';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
 import Img from '../Img';
@@ -29,6 +30,8 @@ import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
 import SoundBarsIndicator from '../SoundBarsIndicator';
 import { artSlotColor } from './artSlotColor';
+import MetadataGapBadge from './MetadataGapBadge';
+import { getMetadataGaps } from './metadataGaps';
 import SongArtist from './SongArtist';
 import useSongContextMenu from './useSongContextMenu';
 import { useSongFavoriteToggle } from './useSongFavoriteToggle';
@@ -140,7 +143,7 @@ export const StandardSongRow = memo(
     const showArtworkSlotColor = preferences.showArtworkSlotColor ?? true;
     const artSlot = showArtworkSlotColor ? artSlotColor(songId) : undefined;
 
-    const { playSong, toggleMultipleSelections, updateMultipleSelections } =
+    const { playSong, toggleMultipleSelections, updateMultipleSelections, openAutoTagDialog } =
       useContext(AppUpdateContext);
     const { t } = useTranslation();
 
@@ -162,6 +165,45 @@ export const StandardSongRow = memo(
       if (onPlayClick) return onPlayClick(songId);
       return playSong(songId);
     }, [onPlayClick, playSong, songId]);
+
+    // Incomplete-metadata badge: pure derivation over row props (no new
+    // subscriptions), click resolves the song and opens the album autotag flow.
+    const metadataGaps = useMemo(
+      () => getMetadataGaps({ genres, year, artworkPaths, artists }),
+      [genres, year, artworkPaths, artists]
+    );
+
+    const handleGapFix = useCallback(async () => {
+      if (!openAutoTagDialog) return;
+      const resolved = await resolveAutoTagSongs([songId]);
+      const target: SongDataForAutoTag = resolved[0] ?? {
+        songId,
+        title,
+        artists,
+        album,
+        genres,
+        trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+        discNo,
+        year,
+        path,
+        duration,
+        artworkPath: artworkPaths?.artworkPath ?? undefined
+      };
+      openAutoTagDialog([target], album?.name, artists?.[0]?.name, 'album');
+    }, [
+      openAutoTagDialog,
+      songId,
+      title,
+      artists,
+      album,
+      genres,
+      trackNo,
+      discNo,
+      year,
+      path,
+      duration,
+      artworkPaths
+    ]);
 
     const { minutes, seconds } = useMemo(() => {
       const addZero = (num: number) => {
@@ -451,8 +493,13 @@ export const StandardSongRow = memo(
               />
               <HeartBurst isBursting={isBursting} />
             </div>
-            <span className="">
-              {minutes ?? '--'}:{seconds ?? '--'}
+            <span className="flex items-center gap-1.5">
+              {metadataGaps.length > 0 && (
+                <MetadataGapBadge gaps={metadataGaps} onFix={handleGapFix} />
+              )}
+              <span>
+                {minutes ?? '--'}:{seconds ?? '--'}
+              </span>
             </span>
           </div>
         </div>

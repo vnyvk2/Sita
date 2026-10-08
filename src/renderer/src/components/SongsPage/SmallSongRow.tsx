@@ -17,6 +17,7 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useSongSelection } from '../../contexts/MultipleSelectionContext';
 import useHeartBurst from '../../hooks/useHeartBurst';
 import { store } from '../../store/store';
+import { resolveAutoTagSongs, type SongDataForAutoTag } from '../../utils/autoTagUtils';
 import Button from '../Button';
 import HeartBurst from '../HeartBurst';
 import Img from '../Img';
@@ -24,6 +25,8 @@ import MultipleSelectionCheckbox from '../MultipleSelectionCheckbox';
 import NavLink from '../NavLink';
 import HighlightedText from '../SearchPage/HighlightedText';
 import { artSlotColor } from './artSlotColor';
+import MetadataGapBadge from './MetadataGapBadge';
+import { getMetadataGaps } from './metadataGaps';
 import SongArtist from './SongArtist';
 import type { SongProp } from './StandardSongRow';
 import useSongContextMenu from './useSongContextMenu';
@@ -84,7 +87,7 @@ export const SmallSongRow = memo(
     const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
       useSongSelection(songId);
 
-    const { playSong, toggleMultipleSelections, updateMultipleSelections } =
+    const { playSong, toggleMultipleSelections, updateMultipleSelections, openAutoTagDialog } =
       useContext(AppUpdateContext);
     const { t } = useTranslation();
 
@@ -106,6 +109,45 @@ export const SmallSongRow = memo(
       if (onPlayClick) return onPlayClick(songId);
       return playSong(songId);
     }, [onPlayClick, playSong, songId]);
+
+    // Incomplete-metadata badge: pure derivation over row props (no new
+    // subscriptions), click resolves the song and opens the album autotag flow.
+    const metadataGaps = useMemo(
+      () => getMetadataGaps({ genres, year, artworkPaths, artists }),
+      [genres, year, artworkPaths, artists]
+    );
+
+    const handleGapFix = useCallback(async () => {
+      if (!openAutoTagDialog) return;
+      const resolved = await resolveAutoTagSongs([songId]);
+      const target: SongDataForAutoTag = resolved[0] ?? {
+        songId,
+        title,
+        artists,
+        album,
+        genres,
+        trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+        discNo,
+        year,
+        path,
+        duration,
+        artworkPath: artworkPaths?.artworkPath ?? undefined
+      };
+      openAutoTagDialog([target], album?.name, artists?.[0]?.name, 'album');
+    }, [
+      openAutoTagDialog,
+      songId,
+      title,
+      artists,
+      album,
+      genres,
+      trackNo,
+      discNo,
+      year,
+      path,
+      duration,
+      artworkPaths
+    ]);
 
     // Local context menu fallback for isolated testing or non-delegated contexts
     const fallbackContextMenu = useSongContextMenu({
@@ -309,8 +351,11 @@ export const SmallSongRow = memo(
         </div>
 
         {/* Duration column */}
-        <div className="song-duration text-font-color-dimmed min-w-[3.5rem] pr-3 text-right font-mono text-xs opacity-75">
-          {minutes}:{seconds}
+        <div className="song-duration text-font-color-dimmed flex min-w-[3.5rem] items-center justify-end gap-1.5 pr-3 text-right font-mono text-xs opacity-75">
+          {metadataGaps.length > 0 && <MetadataGapBadge gaps={metadataGaps} onFix={handleGapFix} />}
+          <span>
+            {minutes}:{seconds}
+          </span>
         </div>
 
         {/* Actions column */}

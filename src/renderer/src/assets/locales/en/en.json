@@ -251,7 +251,13 @@
     "playingNow": "Playing now",
     "blacklisted": "Blacklisted",
     "likedThisSong": "You liked this song",
-    "dislikedThisSong": "You didn't like this song"
+    "dislikedThisSong": "You didn't like this song",
+    "metadataGapsHint": "Missing {{gaps}} — click to auto-tag",
+    "metadataGapsLabel": "Incomplete metadata",
+    "gapGenre": "genre",
+    "gapYear": "year",
+    "gapArtwork": "artwork",
+    "gapArtist": "artist"
   },
 
   "artist": {
