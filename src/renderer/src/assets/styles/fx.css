@@ -476,7 +476,6 @@
 /* Currently playing cover art ambient breathing pulse */
 .fx-art-pulse {
   animation: fx-art-pulse 4.8s ease-in-out infinite;
-  will-change: transform;
 }
 
 .fx-art-pulse--paused {
