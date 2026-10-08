@@ -293,3 +293,23 @@ export async function fillMetadataGaps(
 
   return res;
 }
+
+/**
+ * Rolls back the most recent gap-fill checkpoint (checkpoints are journaled per album, so one undo
+ * reverts one album) and refreshes library queries.
+ */
+export async function undoFillGaps(): Promise<{ success: boolean; restoredCount: number }> {
+  const { metadataApi } = await import('../services/metadataApi');
+  const { queryClient } = await import('../queryClient');
+  const { songQuery } = await import('../queries/songs');
+  const { albumQuery } = await import('../queries/albums');
+  const { genreQuery } = await import('../queries/genres');
+
+  const res = await metadataApi.undoLastAutoTag(`gapfill-undo-${Date.now()}`);
+  if (res.success && res.restoredCount > 0) {
+    queryClient.invalidateQueries({ queryKey: songQuery._def });
+    queryClient.invalidateQueries({ queryKey: albumQuery._def });
+    queryClient.invalidateQueries({ queryKey: genreQuery._def });
+  }
+  return { success: res.success, restoredCount: res.restoredCount };
+}

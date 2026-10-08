@@ -127,9 +127,13 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
 
   // View-entrance stagger (fx-view-enter): one-shot mount animation for rows.
   // The class is removed after the longest stagger settles (~650ms), so rows
-  // mounted later by scrolling never replay the entrance.
+  // mounted later by scrolling never replay the entrance. The timer only
+  // starts once rows actually exist: on slow first loads the entrance waits
+  // for data instead of being stripped before anything renders.
+  const hasRowData = (data?.length ?? 0) > 0;
+  const enterFiredRef = useRef(false);
   useEffect(() => {
-    if (!scrollerElement) return;
+    if (!scrollerElement || !hasRowData || enterFiredRef.current) return;
     if (
       typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
@@ -137,6 +141,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
     ) {
       return;
     }
+    enterFiredRef.current = true;
     scrollerElement.classList.add('fx-view-enter');
     const timer = setTimeout(() => {
       scrollerElement.classList.remove('fx-view-enter');
@@ -145,7 +150,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
       clearTimeout(timer);
       scrollerElement.classList.remove('fx-view-enter');
     };
-  }, [scrollerElement]);
+  }, [scrollerElement, hasRowData]);
 
   // Keep latest onScrollingStateChange in a ref to avoid recreating listener
   const onScrollingStateChangeRef = useRef(onScrollingStateChange);

@@ -87,11 +87,17 @@ export const SmallSongRow = memo(
     const { isSelected: isAMultipleSelection, isEnabled: isMultipleSelectionEnabled } =
       useSongSelection(songId);
 
-    const { playSong, toggleMultipleSelections, updateMultipleSelections, openAutoTagDialog } =
-      useContext(AppUpdateContext);
+    const {
+      playSong,
+      toggleMultipleSelections,
+      updateMultipleSelections,
+      openAutoTagDialog,
+      openTrackIdentifyDialog
+    } = useContext(AppUpdateContext);
     const { t } = useTranslation();
 
     const clickTimeoutRef = useRef<NodeJS.Timeout>(undefined);
+    const gapFixInFlightRef = useRef(false);
     const { isBursting, triggerBurst } = useHeartBurst();
 
     const initialFavorite =
@@ -118,24 +124,37 @@ export const SmallSongRow = memo(
     );
 
     const handleGapFix = useCallback(async () => {
-      if (!openAutoTagDialog) return;
-      const resolved = await resolveAutoTagSongs([songId]);
-      const target: SongDataForAutoTag = resolved[0] ?? {
-        songId,
-        title,
-        artists,
-        album,
-        genres,
-        trackNo: typeof trackNo === 'number' ? trackNo : undefined,
-        discNo,
-        year,
-        path,
-        duration,
-        artworkPath: artworkPaths?.artworkPath ?? undefined
-      };
-      openAutoTagDialog([target], album?.name, artists?.[0]?.name, 'album');
+      // Guard against double-clicks firing duplicate resolve IPC + dialogs.
+      if (gapFixInFlightRef.current) return;
+      gapFixInFlightRef.current = true;
+      try {
+        const resolved = await resolveAutoTagSongs([songId]);
+        const target: SongDataForAutoTag = resolved[0] ?? {
+          songId,
+          title,
+          artists,
+          album,
+          genres,
+          trackNo: typeof trackNo === 'number' ? trackNo : undefined,
+          discNo,
+          year,
+          path,
+          duration,
+          artworkPath: artworkPaths?.artworkPath ?? undefined
+        };
+        // Album-less singles go to track identification instead of the album flow.
+        if (!album?.name && openTrackIdentifyDialog) {
+          openTrackIdentifyDialog([target]);
+          return;
+        }
+        if (!openAutoTagDialog) return;
+        openAutoTagDialog([target], album?.name, artists?.[0]?.name, 'album');
+      } finally {
+        gapFixInFlightRef.current = false;
+      }
     }, [
       openAutoTagDialog,
+      openTrackIdentifyDialog,
       songId,
       title,
       artists,

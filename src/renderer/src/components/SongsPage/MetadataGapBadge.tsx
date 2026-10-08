@@ -42,8 +42,11 @@ const MetadataGapBadge = memo(({ gaps, onFix }: MetadataGapBadgeProps) => {
         e.stopPropagation();
         onFix();
       }}
-      className="bg-font-color-highlight/70 hover:bg-font-color-highlight inline-flex h-1.5 w-1.5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 p-0 transition-transform duration-150 hover:scale-150"
-    />
+      // 20px transparent hit area around the 6px dot for pointer comfort.
+      className="inline-flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 transition-transform duration-150 hover:scale-110 active:scale-95"
+    >
+      <span className="bg-font-color-highlight/70 block h-1.5 w-1.5 rounded-full" />
+    </button>
   );
 });
 

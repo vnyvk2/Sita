@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { GapFillService } from '../GapFillService';
 
+vi.mock('../../../db/queries/songs', () => ({
+  getSongsByIds: vi.fn().mockResolvedValue([])
+}));
+
 const song = (overrides: Record<string, unknown> = {}) => ({
   songId: 1,
   title: 'Track One',
@@ -126,5 +130,21 @@ describe('GapFillService', () => {
     expect(res.albumsProcessed).toBe(2);
     expect(res.skipped).toBe(2);
     expect(workflowService.executeMutations).not.toHaveBeenCalled();
+  });
+
+  it('backfills caller-empty genre from the database instead of overwriting it', async () => {
+    const { getSongsByIds } = await import('../../../db/queries/songs');
+    vi.mocked(getSongsByIds).mockResolvedValueOnce([
+      { id: 9, genres: [{ genre: { name: 'Existing' } }] }
+    ] as any);
+    const { service, workflowService } = harness({
+      genreMutations: [genreMutation(9, 'Overwritten')]
+    });
+    const res = await service.fillGaps([
+      song({ songId: 9, genre: '', artworkPath: 'nora://a', path: '/tmp/z.mp3' })
+    ]);
+    // Database says the song already has a genre: no genre mutation may fire.
+    expect(workflowService.executeMutations).not.toHaveBeenCalled();
+    expect(res.skipped).toBe(1);
   });
 });

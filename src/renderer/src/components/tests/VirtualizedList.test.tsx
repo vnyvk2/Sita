@@ -624,5 +624,38 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
         vi.unstubAllGlobals();
       }
     });
+
+    it('waits for rows before starting the entrance window', () => {
+      vi.useFakeTimers();
+      try {
+        const { container, rerender, unmount } = render(
+          <VirtualizedList
+            data={[]}
+            fixedItemHeight={60}
+            itemContent={(idx) => <div>Item {idx}</div>}
+          />
+        );
+
+        const scroller = container.querySelector('[data-testid="mock-virtuoso"]')!;
+        expect(scroller.classList.contains('fx-view-enter')).toBe(false);
+
+        rerender(
+          <VirtualizedList
+            data={Array.from({ length: 20 }, (_, i) => ({ id: i }))}
+            fixedItemHeight={60}
+            itemContent={(idx) => <div>Item {idx}</div>}
+          />
+        );
+        expect(scroller.classList.contains('fx-view-enter')).toBe(true);
+
+        act(() => {
+          vi.advanceTimersByTime(700);
+        });
+        expect(scroller.classList.contains('fx-view-enter')).toBe(false);
+        unmount();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

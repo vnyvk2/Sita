@@ -3,26 +3,23 @@ import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import {
+  REWIND_REVEAL_EDGE_S,
   REWIND_REVEAL_EVENT,
-  rewindRevealThreshold,
   shouldRevealRewind,
   useRewindReveal
 } from '../useRewindReveal';
 
-describe('rewindRevealThreshold', () => {
-  it('scales with duration within floor/ceiling bounds', () => {
-    expect(rewindRevealThreshold(0)).toBe(10);
-    expect(rewindRevealThreshold(30)).toBe(5);
-    expect(rewindRevealThreshold(200)).toBe(15);
-    expect(rewindRevealThreshold(100)).toBeCloseTo(8, 5);
-  });
-});
-
 describe('shouldRevealRewind', () => {
-  it('reveals only once dragged back past the threshold', () => {
-    expect(shouldRevealRewind(120, 100, 200)).toBe(true);
-    expect(shouldRevealRewind(120, 110, 200)).toBe(false);
-    expect(shouldRevealRewind(100, 120, 200)).toBe(false);
+  it('reveals only when parked at the very start after coming from further in', () => {
+    expect(shouldRevealRewind(120, 0)).toBe(true);
+    expect(shouldRevealRewind(3, 0)).toBe(true);
+    expect(shouldRevealRewind(0.2, 0)).toBe(false);
+  });
+
+  it('never reveals on mid-song scrubbing, however far back', () => {
+    expect(shouldRevealRewind(150, 130)).toBe(false);
+    expect(shouldRevealRewind(150, REWIND_REVEAL_EDGE_S + 0.1)).toBe(false);
+    expect(shouldRevealRewind(100, 50)).toBe(false);
   });
 });
 

@@ -9,6 +9,7 @@ import { store } from '../../store/store';
 import {
   fillMetadataGaps,
   resolveAutoTagSongs,
+  undoFillGaps,
   updateMissingArtworkForSongs,
   updateMissingLyricsForSongs,
   type SongDataForAutoTag
@@ -631,7 +632,28 @@ export async function buildSongContextMenuItems(
                 id: `gapfill-done-${Date.now()}`,
                 content: `Gap fill complete: ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed.`,
                 iconName: stats.updated > 0 ? 'check_circle' : 'info',
-                duration: 5000
+                duration: 8000,
+                buttons:
+                  stats.updated > 0
+                    ? [
+                        {
+                          label: 'Undo',
+                          clickHandler: async () => {
+                            const undo = await undoFillGaps();
+                            if (undo.success && undo.restoredCount > 0) {
+                              addNewNotifications([
+                                {
+                                  id: `gapfill-undone-${Date.now()}`,
+                                  content: `Reverted gap fill for ${undo.restoredCount} track${undo.restoredCount > 1 ? 's' : ''}.`,
+                                  iconName: 'check_circle',
+                                  duration: 5000
+                                }
+                              ]);
+                            }
+                          }
+                        }
+                      ]
+                    : []
               }
             ]);
           }

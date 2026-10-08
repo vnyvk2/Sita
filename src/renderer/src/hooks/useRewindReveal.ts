@@ -1,23 +1,17 @@
 import { useEffect, useState } from 'react';
 
 export const REWIND_REVEAL_EVENT = 'player/rewindReveal';
-export const REWIND_REVEAL_MIN_THRESHOLD_S = 5;
-export const REWIND_REVEAL_MAX_THRESHOLD_S = 15;
+/** Drag position at or below this is treated as "rewound to the start". */
+export const REWIND_REVEAL_EDGE_S = 0.5;
 
 /**
- * Drag-back distance (seconds) that flips the now-playing cover to its credits back. Scales with
- * track length so short songs stay reachable while long ones still require deliberate intent.
+ * True only when a drag parks the thumb at the very start of the track after coming from further
+ * in. Edge-gated (not distance-gated) by design: ordinary mid-song scrubbing - however far back -
+ * must never flip the cover, while a deliberate rewind-to-zero always works, even seconds into a
+ * song.
  */
-export function rewindRevealThreshold(duration: number): number {
-  if (!duration || duration <= 0) return 10;
-  return Math.min(
-    REWIND_REVEAL_MAX_THRESHOLD_S,
-    Math.max(REWIND_REVEAL_MIN_THRESHOLD_S, duration * 0.08)
-  );
-}
-
-export function shouldRevealRewind(grabPos: number, dragPos: number, duration: number): boolean {
-  return grabPos - dragPos >= rewindRevealThreshold(duration);
+export function shouldRevealRewind(grabPos: number, dragPos: number): boolean {
+  return grabPos > REWIND_REVEAL_EDGE_S && dragPos <= REWIND_REVEAL_EDGE_S;
 }
 
 /**

@@ -1,5 +1,7 @@
+import { getSongsByIds } from '../../db/queries/songs';
 import type { ApplyFieldId, NormalizedMutation } from '../apply/contract';
 import type { ResourceMutationPayload } from '../domain/MetadataTransaction';
+import { LocalSongNormalizer } from '../matching/LocalSongNormalizer';
 import type { LocalSongInput } from './AlbumMetadataService';
 import type { CoverArtBufferService } from './CoverArtBufferService';
 import type { MetadataWorkflowService } from './MetadataWorkflowService';
@@ -67,8 +69,13 @@ export class GapFillService {
     const locals = songs.filter((s) => s && s.songId > 0 && !isEmptyVal(s.path));
     if (locals.length === 0) return result;
 
+    // Authoritative baseline: a caller that omits genre (partial literal,
+    // failed resolve) must not read as "empty" when the database has a value.
+    // Backfill caller-empty genres from SQLite; failures fall back to input.
+    const baselined = await this.backfillGenres(locals);
+
     const groups = new Map<string, LocalSongInput[]>();
-    for (const s of locals) {
+    for (const s of baselined) {
       const key = groupKey(s);
       const group = groups.get(key) ?? [];
       group.push(s);
@@ -199,6 +206,26 @@ export class GapFillService {
       throw new Error(orchRes.errors.join('; '));
     }
     return { updated, skipped, failed };
+  }
+
+  private async backfillGenres(locals: LocalSongInput[]): Promise<LocalSongInput[]> {
+    const ids = [...new Set(locals.filter((s) => isEmptyVal(s.genre)).map((s) => s.songId))];
+    if (ids.length === 0) return locals;
+    try {
+      const rows = await getSongsByIds(ids);
+      const byId = new Map(
+        (rows ?? [])
+          .filter((r) => r && r.id)
+          .map((r) => [r.id, LocalSongNormalizer.fromDbSong(r)] as const)
+      );
+      return locals.map((s) => {
+        if (!isEmptyVal(s.genre)) return s;
+        const dbGenre = byId.get(s.songId)?.genre;
+        return dbGenre ? { ...s, genre: dbGenre } : s;
+      });
+    } catch {
+      return locals;
+    }
   }
 
   private toMutation(

@@ -39,7 +39,6 @@ const SeekBarSlider = (props: Props) => {
   // Rewind-reveal gesture state: position where the drag started and whether
   // the credits flip is currently signalled (to dispatch only on transitions).
   const grabPosRef = useRef(0);
-  const grabDurationRef = useRef(0);
   const revealSignalledRef = useRef(false);
 
   const duration = currentSongData.duration || 0;
@@ -104,12 +103,10 @@ const SeekBarSlider = (props: Props) => {
       const handleSeekbarMouseDown = () => {
         isMouseDownRef.current = true;
         grabPosRef.current = seekBar.valueAsNumber || 0;
-        grabDurationRef.current = store.state.currentSongData?.duration || 0;
       };
       const handleTouchStart = () => {
         isMouseDownRef.current = true;
         grabPosRef.current = seekBar.valueAsNumber || 0;
-        grabDurationRef.current = store.state.currentSongData?.duration || 0;
       };
       const handleSeekbarEnd = () => {
         if (isMouseDownRef.current) {
@@ -147,9 +144,10 @@ const SeekBarSlider = (props: Props) => {
     }
     if (onSeek) onSeek(pos);
 
-    // Drag-back gesture: flipping past the threshold reveals the credits back.
+    // Drag-back gesture: parking the thumb at the very start reveals the
+    // credits back. Mid-song scrubbing never triggers, by design.
     if (isMouseDownRef.current) {
-      setRevealSignalled(shouldRevealRewind(grabPosRef.current, pos, grabDurationRef.current));
+      setRevealSignalled(shouldRevealRewind(grabPosRef.current, pos));
     }
 
     // If change triggered by keyboard without mousedown, commit seek after debounce

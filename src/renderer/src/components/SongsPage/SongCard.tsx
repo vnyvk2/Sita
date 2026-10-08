@@ -13,6 +13,7 @@ import { store } from '../../store/store';
 import {
   fillMetadataGaps,
   resolveAutoTagSongs,
+  undoFillGaps,
   updateMissingArtworkForSongs,
   updateMissingLyricsForSongs,
   type SongDataForAutoTag
@@ -513,20 +514,25 @@ const SongCard = (props: SongCardProp) => {
             label: 'Fill Metadata Gaps',
             iconName: 'auto_fix_high',
             handlerFunction: async () => {
-              let targetSongs: SongDataForAutoTag[] = [
-                {
-                  songId,
-                  title,
-                  artists,
-                  album,
-                  path,
-                  artworkPath
-                }
-              ];
-              if (isMultipleSelectionsEnabled) {
-                const resolved = await resolveAutoTagSongs(songIds);
-                if (resolved.length > 0) targetSongs = resolved;
-              }
+              // Always resolve full song data: the gap-fill service treats
+              // missing fields as gaps, so a partial literal could overwrite
+              // real tags with fetched values.
+              const resolved = await resolveAutoTagSongs(
+                isMultipleSelectionsEnabled ? songIds : [songId]
+              );
+              const targetSongs: SongDataForAutoTag[] =
+                resolved.length > 0
+                  ? resolved
+                  : [
+                      {
+                        songId,
+                        title,
+                        artists,
+                        album,
+                        path,
+                        artworkPath
+                      }
+                    ];
               addNewNotifications([
                 {
                   id: `gapfill-start-${Date.now()}`,
@@ -541,7 +547,28 @@ const SongCard = (props: SongCardProp) => {
                   id: `gapfill-done-${Date.now()}`,
                   content: `Gap fill complete: ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed.`,
                   iconName: stats.updated > 0 ? 'check_circle' : 'info',
-                  duration: 5000
+                  duration: 8000,
+                  buttons:
+                    stats.updated > 0
+                      ? [
+                          {
+                            label: 'Undo',
+                            clickHandler: async () => {
+                              const undo = await undoFillGaps();
+                              if (undo.success && undo.restoredCount > 0) {
+                                addNewNotifications([
+                                  {
+                                    id: `gapfill-undone-${Date.now()}`,
+                                    content: `Reverted gap fill for ${undo.restoredCount} track${undo.restoredCount > 1 ? 's' : ''}.`,
+                                    iconName: 'check_circle',
+                                    duration: 5000
+                                  }
+                                ]);
+                              }
+                            }
+                          }
+                        ]
+                      : []
                 }
               ]);
             }
