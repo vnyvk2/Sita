@@ -12,11 +12,6 @@ import {
 } from 'react';
 
 import { AppUpdateContext } from '../contexts/AppUpdateContext';
-import {
-  REWIND_REVEAL_EDGE_S,
-  REWIND_REVEAL_EVENT,
-  shouldRevealRewind
-} from '../hooks/useRewindReveal';
 import calculateTime from '../utils/calculateTime';
 import debounce from '../utils/debounce';
 
@@ -40,10 +35,6 @@ const SeekBarSlider = (props: Props) => {
   const isMouseDownRef = useRef(false);
   const isMouseScrollRef = useRef(false);
   const seekbarRef = useRef<HTMLInputElement | null>(null);
-  // Rewind-reveal gesture state: position where the drag started and whether
-  // the credits flip is currently signalled (to dispatch only on transitions).
-  const grabPosRef = useRef(0);
-  const revealSignalledRef = useRef(false);
 
   const duration = currentSongData.duration || 0;
 
@@ -81,24 +72,16 @@ const SeekBarSlider = (props: Props) => {
 
   const prevSongIdRef = useRef(currentSongData.songId);
 
-  // Reset progress on track change
-  const setRevealSignalled = useCallback((active: boolean) => {
-    if (revealSignalledRef.current === active) return;
-    revealSignalledRef.current = active;
-    document.dispatchEvent(new CustomEvent(REWIND_REVEAL_EVENT, { detail: { active } }));
-  }, []);
-
   useEffect(() => {
     if (prevSongIdRef.current !== currentSongData.songId) {
       prevSongIdRef.current = currentSongData.songId;
       setSongPos(0);
-      setRevealSignalled(false);
       if (seekbarRef.current) {
         seekbarRef.current.style.setProperty('--seek-before-width', '0%');
         seekbarRef.current.value = '0';
       }
     }
-  }, [currentSongData.songId, setRevealSignalled]);
+  }, [currentSongData.songId]);
 
   useEffect(() => {
     const seekBar = seekbarRef.current;
@@ -106,19 +89,14 @@ const SeekBarSlider = (props: Props) => {
     if (seekBar) {
       const handleSeekbarMouseDown = () => {
         isMouseDownRef.current = true;
-        grabPosRef.current = songPos > 0 ? songPos : seekBar.valueAsNumber || 0;
       };
       const handleTouchStart = () => {
         isMouseDownRef.current = true;
-        grabPosRef.current = songPos > 0 ? songPos : seekBar.valueAsNumber || 0;
       };
       const handleSeekbarEnd = () => {
         if (isMouseDownRef.current) {
           isMouseDownRef.current = false;
           const finalPos = seekBar.valueAsNumber || 0;
-          if (finalPos > REWIND_REVEAL_EDGE_S) {
-            setRevealSignalled(false);
-          }
           updateSongPosition(finalPos);
           if (onSeek) onSeek(finalPos);
         }
@@ -137,7 +115,7 @@ const SeekBarSlider = (props: Props) => {
       };
     }
     return undefined;
-  }, [onSeek, updateSongPosition, setRevealSignalled]);
+  }, [onSeek, updateSongPosition]);
 
   const handleOnChange = (e: ChangeEvent<HTMLInputElement>) => {
     const pos = e.currentTarget.valueAsNumber;
@@ -149,13 +127,6 @@ const SeekBarSlider = (props: Props) => {
       seekbarRef.current.value = String(pos);
     }
     if (onSeek) onSeek(pos);
-
-    // Drag-back gesture: parking the thumb at the very start reveals the
-    // credits back. Mid-song scrubbing never triggers, by design. The current
-    // signalled state feeds hysteresis so the edge doesn't chatter.
-    if (isMouseDownRef.current) {
-      setRevealSignalled(shouldRevealRewind(grabPosRef.current, pos, revealSignalledRef.current));
-    }
 
     // If change triggered by keyboard without mousedown, commit seek after debounce
     if (!isMouseDownRef.current) {

@@ -6,8 +6,6 @@ import { useTranslation } from 'react-i18next';
 
 import DefaultSongCover from '../../assets/images/webp/song_cover_default.webp';
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
-import { toggleRewindReveal, useRewindReveal } from '../../hooks/useRewindReveal';
-import calculateTime from '../../utils/calculateTime';
 import Img from '../Img';
 import NavLink from '../NavLink';
 import SongArtist from '../SongsPage/SongArtist';
@@ -34,11 +32,6 @@ const CurrentlyPlayingSongInfoContainer = () => {
   const { t } = useTranslation();
 
   const [isNextSongPopupVisible, setIsNextSongPopupVisible] = useState(false);
-  const isCreditsRevealed = useRewindReveal(currentSongData.songId);
-  const songDurationLabel = useMemo(() => {
-    const time = calculateTime(currentSongData.duration || 0);
-    return `${time.minutes}:${time.seconds}`;
-  }, [currentSongData.duration]);
 
   const songArtistsImages = useMemo(() => {
     if (
@@ -254,73 +247,27 @@ const CurrentlyPlayingSongInfoContainer = () => {
   return (
     <div className="current-playing-song-info-container grid w-full max-w-full grid-cols-[6rem_minmax(0,1fr)] items-center gap-2 lg:grid-cols-[minmax(0,1fr)]">
       <div
-        className="song-cover-container group relative flex aspect-square h-full cursor-pointer items-center justify-center p-2 [perspective:1000px] lg:hidden"
+        className="song-cover-container relative flex aspect-square h-full items-center justify-center overflow-hidden p-2 lg:hidden"
         id="currentSongCover"
-        onClick={toggleRewindReveal}
-        title={
-          isCreditsRevealed
-            ? t('player.flipToFront', 'Click to flip cover')
-            : t('player.flipToCredits', 'Click to reveal liner notes')
-        }
       >
-        <div className={`fx-flip-inner h-full w-full ${isCreditsRevealed ? 'fx-flipped' : ''}`}>
-          <div className="fx-flip-face h-full w-full">
-            <Img
-              className={`aspect-square h-full max-w-full rounded-lg object-cover object-center shadow-xl transition-transform duration-500 ${
-                isCurrentSongPlaying ? 'fx-art-pulse' : 'fx-art-pulse--paused'
-              }`}
-              src={currentSongData.artworkPath}
-              fallbackSrc={DefaultSongCover}
-              alt="Default song cover"
-              onContextMenu={(e) => {
-                e.stopPropagation();
-                updateContextMenuData(
-                  true,
-                  contextMenuItems,
-                  e.pageX,
-                  e.pageY,
-                  contextMenuCurrentSongData
-                );
-              }}
-            />
-            {/* Subtle flip indicator on hover */}
-            <div className="pointer-events-none absolute right-1 bottom-1 flex items-center gap-0.5 rounded bg-black/60 px-1 py-0.5 text-[9px] text-white/90 opacity-0 backdrop-blur-xs transition-opacity group-hover:opacity-100">
-              <span className="material-icons-round text-[11px]">flip</span>
-            </div>
-          </div>
-          <div
-            className="fx-flip-face fx-flip-back absolute inset-0 flex flex-col justify-between overflow-hidden rounded-lg border border-blue-500/50 bg-slate-900/95 p-2.5 text-slate-200 shadow-2xl select-none dark:bg-slate-900/95"
-            aria-hidden={!isCreditsRevealed}
-          >
-            <div className="flex items-center justify-between border-b border-slate-700/60 pb-1">
-              <span className="text-[9px] font-bold tracking-widest text-blue-400 uppercase">
-                Liner Notes
-              </span>
-              <span className="font-mono text-[9px] text-slate-400">{songDurationLabel}</span>
-            </div>
-            <div className="flex flex-col justify-center gap-0.5 overflow-hidden py-1">
-              <span
-                className="truncate text-xs font-semibold text-white"
-                title={currentSongData.title}
-              >
-                {currentSongData.title}
-              </span>
-              <span className="truncate text-[11px] text-slate-300">
-                {currentSongData.artists?.map((a) => a.name).join(', ') ||
-                  t('common.unknownArtist')}
-              </span>
-              {currentSongData.album?.name && (
-                <span className="truncate text-[10px] text-slate-400 italic">
-                  {currentSongData.album.name}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center justify-between border-t border-slate-700/60 pt-1 font-mono text-[9px] text-emerald-400">
-              <span>{currentSongData.year ? `Year: ${currentSongData.year}` : 'Stereo'}</span>
-              <span className="text-slate-400">Flip ↻</span>
-            </div>
-          </div>
-        </div>
+        <Img
+          className={`aspect-square h-full max-w-full rounded-lg object-cover object-center shadow-xl transition-transform duration-500 ${
+            isCurrentSongPlaying ? 'fx-art-pulse' : 'fx-art-pulse--paused'
+          }`}
+          src={currentSongData.artworkPath}
+          fallbackSrc={DefaultSongCover}
+          alt="Default song cover"
+          onContextMenu={(e) => {
+            e.stopPropagation();
+            updateContextMenuData(
+              true,
+              contextMenuItems,
+              e.pageX,
+              e.pageY,
+              contextMenuCurrentSongData
+            );
+          }}
+        />
       </div>
       <div className="song-info-container relative flex h-full w-full flex-col items-start justify-center drop-shadow-lg lg:ml-4 lg:w-full">
         {currentSongData.title && (

@@ -60,7 +60,9 @@ describe('WaveformSeekbar Component', () => {
       }
     );
 
-    (window as unknown as { api: { getSongWaveform: (songId: number) => Promise<Float32Array> } }).api = {
+    (
+      window as unknown as { api: { getSongWaveform: (songId: number) => Promise<Float32Array> } }
+    ).api = {
       getSongWaveform: vi.fn().mockResolvedValue(new Float32Array(200).fill(0.5))
     };
 
@@ -102,7 +104,7 @@ describe('WaveformSeekbar Component', () => {
       );
     });
 
-    const container = document.querySelector('.relative.w-full.cursor-pointer') as HTMLDivElement;
+    const container = document.querySelector('.waveform-seekbar-container') as HTMLDivElement;
     expect(container).not.toBeNull();
 
     // Container width is 200px, duration is 200s (so 1px = 1s)
@@ -132,7 +134,7 @@ describe('WaveformSeekbar Component', () => {
       );
     });
 
-    const container = document.querySelector('.relative.w-full.cursor-pointer') as HTMLDivElement;
+    const container = document.querySelector('.waveform-seekbar-container') as HTMLDivElement;
 
     fakeCtx.stroke.mockClear();
 
@@ -149,7 +151,7 @@ describe('WaveformSeekbar Component', () => {
       render(<WaveformSeekbar id="test-waveform" name="test-waveform" />);
     });
 
-    const container = document.querySelector('.relative.w-full.cursor-pointer') as HTMLDivElement;
+    const container = document.querySelector('.waveform-seekbar-container') as HTMLDivElement;
 
     // Playhead starts at 0. Hover at 100px (50%)
     fakeCtx.setLineDash.mockClear();
@@ -191,7 +193,7 @@ describe('WaveformSeekbar Component', () => {
       );
     });
 
-    const container = document.querySelector('.relative.w-full.cursor-pointer') as HTMLDivElement;
+    const container = document.querySelector('.waveform-seekbar-container') as HTMLDivElement;
 
     // Start drag at x = 160px (80% = 160s)
     fireEvent.pointerDown(container, { clientX: 160, pointerId: 1 });
@@ -242,4 +244,3 @@ describe('WaveformSeekbar Component', () => {
     vi.useRealTimers();
   });
 });
-

@@ -12,7 +12,6 @@ import {
 
 import { AppUpdateContext } from '../contexts/AppUpdateContext';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
-import { REWIND_REVEAL_EVENT, shouldRevealRewind } from '../hooks/useRewindReveal';
 import calculateTime from '../utils/calculateTime';
 
 type Props = {
@@ -79,9 +78,6 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
 
   const progressPercentRef = useRef(0); // 0.0 to 1.0
   const isDraggingRef = useRef(false);
-  // Rewind-to-reveal gesture state (mirrors SeekBarSlider behavior).
-  const waveGrabPosRef = useRef(0);
-  const waveRevealSignalledRef = useRef(false);
   const isHoveredRef = useRef(false);
   const hoverPercentRef = useRef<number | null>(null);
 
@@ -450,7 +446,6 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
 
     // 3. Normal seek scrub
     isDraggingRef.current = true;
-    waveGrabPosRef.current = songPos > 0 ? songPos : targetPos;
     try {
       (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
     } catch {}
@@ -498,15 +493,6 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
 
     if (isDraggingRef.current) {
       progressPercentRef.current = pct;
-      // Rewind-to-reveal: parking at the very start flips the cover credits.
-      const dragPos = pct * totalDuration;
-      const reveal = shouldRevealRewind(waveGrabPosRef.current, dragPos);
-      if (waveRevealSignalledRef.current !== reveal) {
-        waveRevealSignalledRef.current = reveal;
-        document.dispatchEvent(
-          new CustomEvent(REWIND_REVEAL_EVENT, { detail: { active: reveal } })
-        );
-      }
     }
 
     // Update cursor if hovering near marker
@@ -574,10 +560,6 @@ const WaveformSeekbar = ({ id, name, className = '', onSeek }: Props) => {
     if (isDraggingRef.current) {
       isDraggingRef.current = false;
       const finalPos = calculateSeekFromEvent(e.clientX);
-      if (waveRevealSignalledRef.current && finalPos > 0.5) {
-        waveRevealSignalledRef.current = false;
-        document.dispatchEvent(new CustomEvent(REWIND_REVEAL_EVENT, { detail: { active: false } }));
-      }
       try {
         (e.target as HTMLElement)?.releasePointerCapture?.(e.pointerId);
       } catch {}

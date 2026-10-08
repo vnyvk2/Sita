@@ -1,9 +1,7 @@
 import DefaultSongCover from '@renderer/assets/images/webp/song_cover_default.webp';
 import Img from '@renderer/components/Img';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
-import { toggleRewindReveal, useRewindReveal } from '@renderer/hooks/useRewindReveal';
 import { store } from '@renderer/store/store';
-import calculateTime from '@renderer/utils/calculateTime';
 import { useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { memo, useCallback, useContext, type FC } from 'react';
@@ -17,7 +15,6 @@ export const NowPlayingPanel: FC<PanelProps> = memo(() => {
 
   const currentSongData = useStore(store, (state) => state.currentSongData);
   const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
-  const isCreditsRevealed = useRewindReveal(currentSongData.songId);
 
   const { toggleSongPlayback, handleSkipBackwardClick, handleSkipForwardClick, toggleIsFavorite } =
     useContext(AppUpdateContext);
@@ -65,91 +62,22 @@ export const NowPlayingPanel: FC<PanelProps> = memo(() => {
 
   return (
     <div className="now-playing-panel bg-background-color-1 dark:bg-dark-background-color-1 text-font-color-black dark:text-font-color-white flex h-full w-full flex-col items-center justify-between overflow-x-hidden overflow-y-auto p-5">
-      {/* Artwork Section with 3D Vinyl Sleeve Flip */}
-      <div className="flex max-h-[340px] min-h-[160px] w-full flex-1 items-center justify-center [perspective:1200px]">
-        <div
-          className="group relative aspect-square w-full max-w-[280px] cursor-pointer transition-transform duration-300 hover:scale-[1.02]"
-          onClick={toggleRewindReveal}
-          title={
-            isCreditsRevealed
-              ? t('player.flipToFront', 'Click to flip cover')
-              : t('player.flipToCredits', 'Click to view vinyl liner notes')
-          }
-        >
-          <div
-            className={`fx-flip-inner h-full w-full ${isCreditsRevealed ? 'fx-flipped-showcase' : ''}`}
-          >
-            {/* Front Face: Hero Artwork */}
-            <div className="fx-flip-face h-full w-full overflow-hidden rounded-2xl shadow-xl">
-              <Img
-                src={artworkSrc}
-                fallbackSrc={DefaultSongCover}
-                loading="eager"
-                className="h-full w-full object-cover"
-                alt=""
-              />
+      {/* Artwork Section */}
+      <div className="flex max-h-[340px] min-h-[160px] w-full flex-1 items-center justify-center">
+        <div className="group relative aspect-square w-full max-w-[280px] overflow-hidden rounded-2xl shadow-xl transition-transform hover:scale-[1.02]">
+          <Img
+            src={artworkSrc}
+            fallbackSrc={DefaultSongCover}
+            loading="eager"
+            className="h-full w-full object-cover"
+            alt=""
+          />
 
-              {fileExt && (
-                <div className="absolute top-2 right-2 rounded-md bg-stone-900/80 px-2 py-0.5 text-[10px] font-bold text-white shadow-md backdrop-blur-sm">
-                  {fileExt}
-                </div>
-              )}
-
-              {/* Hover flip hint */}
-              <div className="pointer-events-none absolute right-2 bottom-2 flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-[10px] font-medium text-white/90 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
-                <span className="material-icons-round text-xs">flip</span>
-                <span>Liner Notes</span>
-              </div>
+          {fileExt && (
+            <div className="absolute top-2 right-2 rounded-md bg-stone-900/80 px-2 py-0.5 text-[10px] font-bold text-white shadow-md backdrop-blur-sm">
+              {fileExt}
             </div>
-
-            {/* Back Face: Physical Vinyl Liner Notes */}
-            <div
-              className="fx-flip-face fx-flip-back absolute inset-0 flex flex-col justify-between overflow-hidden rounded-2xl border border-blue-500/50 bg-slate-900/95 p-5 text-slate-200 shadow-2xl backdrop-blur-xl select-none"
-              aria-hidden={!isCreditsRevealed}
-            >
-              <div>
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                  <span className="text-[10px] font-bold tracking-widest text-blue-400 uppercase">
-                    Vinyl Liner Notes
-                  </span>
-                  <span className="font-mono text-[10px] text-emerald-400">
-                    {currentSongData.year || 'Stereo'}
-                  </span>
-                </div>
-                <div className="mt-3 space-y-1">
-                  <h3 className="line-clamp-2 text-sm font-bold text-white">
-                    {currentSongData.title}
-                  </h3>
-                  <p className="text-xs text-blue-300">
-                    {currentSongData.artists?.map((a) => a.name).join(', ') ||
-                      t('common.unknownArtist')}
-                  </p>
-                  {currentSongData.album?.name && (
-                    <p className="text-[11px] text-slate-400 italic">
-                      Album: {currentSongData.album.name}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1 border-t border-slate-800 pt-3 font-mono text-[10px] text-slate-400">
-                <div className="flex justify-between">
-                  <span>Format:</span>
-                  <span className="text-slate-200">{fileExt || 'Audio'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Duration:</span>
-                  <span className="text-slate-200">
-                    {calculateTime(currentSongData.duration || 0).minutes}:
-                    {calculateTime(currentSongData.duration || 0).seconds}
-                  </span>
-                </div>
-                <div className="flex justify-center pt-2 text-[10px] text-blue-400">
-                  <span>Click to flip back ↻</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
