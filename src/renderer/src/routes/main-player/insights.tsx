@@ -1,6 +1,7 @@
 import {
   AudiophileVaultCard,
   CircadianRadarCard,
+  CircadianRhythmCard,
   DacSnobCard,
   HeroListeningTimeCard,
   HolographicPassportCard,
@@ -37,13 +38,22 @@ const PERIOD_TABS: Array<{ id: HistoryPeriod; label: string }> = [
   { id: 'all', label: 'All Time' }
 ];
 
+type ViewMode = 'standard' | 'lab' | 'all';
 type StyleMode = 'aurora' | 'vfd' | 'cyberpunk' | 'classic';
 
 export function InsightsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<HistoryPeriod>('30');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('nora.insights.viewMode') as ViewMode) || 'standard';
+  });
   const [styleMode, setStyleMode] = useState<StyleMode>(() => {
     return (localStorage.getItem('nora.insights.style') as StyleMode) || 'aurora';
   });
+
+  const handleViewChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem('nora.insights.viewMode', mode);
+  };
 
   const handleStyleChange = (mode: StyleMode) => {
     setStyleMode(mode);
@@ -111,23 +121,65 @@ export function InsightsPage() {
       <div className="relative z-10 mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <TitleContainer
-            title="Insights & Audio Forensics"
+            title="Insights & Audio Stats"
             className="text-font-color-black dark:text-font-color-white text-2xl font-bold tracking-tight"
           />
           <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 text-xs">
-            Listening trends, circadian chronotypes, DAC audio quality, and skip forensics
+            {viewMode === 'standard'
+              ? 'Listening trends, format breakdown, and circadian rhythm analysis'
+              : 'Listening trends, circadian chronotypes, DAC audio quality, and skip forensics'}
           </p>
         </div>
 
-        {/* Controls: Style Switcher + Period Tabs + Refresh */}
+        {/* Controls: View Mode Switcher + Style Switcher + Period Tabs + Refresh */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* View Mode Toggle: Standard (Original Simpler) vs Forensics Lab vs All */}
+          <div className="border-background-color-2/70 bg-background-color-1/90 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90 flex items-center rounded-xl border p-1 shadow-sm backdrop-blur-md">
+            <button
+              type="button"
+              title="Standard Simple Overview"
+              onClick={() => handleViewChange('standard')}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                viewMode === 'standard'
+                  ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white shadow-sm dark:text-black'
+                  : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
+              }`}
+            >
+              📊 Standard
+            </button>
+            <button
+              type="button"
+              title="Forensics & Lab Cards"
+              onClick={() => handleViewChange('lab')}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                viewMode === 'lab'
+                  ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white shadow-sm dark:text-black'
+                  : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
+              }`}
+            >
+              🔬 Forensics Lab
+            </button>
+            <button
+              type="button"
+              title="Complete Combined Bento"
+              onClick={() => handleViewChange('all')}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                viewMode === 'all'
+                  ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white shadow-sm dark:text-black'
+                  : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-font-color-black dark:hover:text-font-color-white'
+              }`}
+            >
+              🌐 All
+            </button>
+          </div>
+
           {/* Aesthetic Style Mode Switcher */}
           <div className="border-background-color-2/70 bg-background-color-1/90 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90 flex items-center rounded-xl border p-1 shadow-sm backdrop-blur-md">
             <button
               type="button"
               title="Aurora Glass Style"
               onClick={() => handleStyleChange('aurora')}
-              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+              className={`rounded-lg px-2 py-1 text-xs font-semibold transition-all ${
                 styleMode === 'aurora'
                   ? 'bg-cyan-500 text-black shadow-sm'
                   : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-cyan-500'
@@ -139,7 +191,7 @@ export function InsightsPage() {
               type="button"
               title="Retro Hi-Fi VFD Rack"
               onClick={() => handleStyleChange('vfd')}
-              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+              className={`rounded-lg px-2 py-1 text-xs font-semibold transition-all ${
                 styleMode === 'vfd'
                   ? 'bg-emerald-500 text-black shadow-sm'
                   : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-emerald-500'
@@ -151,7 +203,7 @@ export function InsightsPage() {
               type="button"
               title="Cyber Neon Glow"
               onClick={() => handleStyleChange('cyberpunk')}
-              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+              className={`rounded-lg px-2 py-1 text-xs font-semibold transition-all ${
                 styleMode === 'cyberpunk'
                   ? 'bg-fuchsia-500 text-white shadow-sm'
                   : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-fuchsia-500'
@@ -163,7 +215,7 @@ export function InsightsPage() {
               type="button"
               title="Clean Classic Style"
               onClick={() => handleStyleChange('classic')}
-              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+              className={`rounded-lg px-2 py-1 text-xs font-semibold transition-all ${
                 styleMode === 'classic'
                   ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white shadow-sm dark:text-black'
                   : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'
@@ -209,61 +261,131 @@ export function InsightsPage() {
         </div>
       </div>
 
-      {/* Main Content / Bento Grid */}
-      <div className="relative z-10 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {/* Row 1: Hero Listening Time (Span 2) + Holographic Shareable Passport (Span 1) */}
-        <div className="md:col-span-2">
-          <HeroListeningTimeCard
-            summary={listeningData.summary}
-            dailyActivity={listeningData.dailyActivity}
-          />
-        </div>
-        <div className="col-span-1">
-          <HolographicPassportCard
-            summary={listeningData.summary}
-            chronotype={listeningData.chronotype}
-            metrics={listeningData.audiophileMetrics}
-          />
-        </div>
+      {/* ================= STANDARD VIEW: ORIGINAL CLEAN SIMPLER LAYOUT ================= */}
+      {viewMode === 'standard' && (
+        <div className="relative z-10 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {/* Row 1: Hero Listening Time (Span 2) + Audiophile Vault (Span 1) */}
+          <div className="md:col-span-2">
+            <HeroListeningTimeCard
+              summary={listeningData.summary}
+              dailyActivity={listeningData.dailyActivity}
+            />
+          </div>
+          <div className="col-span-1">
+            <AudiophileVaultCard stats={libraryStats} />
+          </div>
 
-        {/* Row 2: The DAC Snob (Span 1) + The Skip Crime Scene (Span 1) + Loop Addiction (Span 1) */}
-        <div className="col-span-1">
-          <DacSnobCard metrics={listeningData.audiophileMetrics} stats={libraryStats} />
-        </div>
-        <div className="col-span-1">
-          <SkipCrimeSceneCard skipForensics={listeningData.skipForensics} />
-        </div>
-        <div className="col-span-1">
-          <LoopAddictionCard loopAddiction={listeningData.loopAddiction} />
-        </div>
+          {/* Row 2: Top Tracks (Span 1) + Top Artists (Span 1) + Top Genres (Span 1) */}
+          <div className="col-span-1">
+            <TopTracksLeaderboardCard topTracks={listeningData.topTracks} />
+          </div>
+          <div className="col-span-1">
+            <TopArtistsPodiumCard topArtists={listeningData.topArtists} />
+          </div>
+          <div className="col-span-1">
+            <TopGenresCard topGenres={listeningData.topGenres} />
+          </div>
 
-        {/* Row 3: Circadian 2.0 Polar Radar (Span 2) + Sonic Constellation (Span 1) */}
-        <div className="md:col-span-2">
-          <CircadianRadarCard
-            hourlyDistribution={listeningData.hourlyDistribution}
-            chronotype={listeningData.chronotype}
-          />
+          {/* Row 3: Original Clean Circadian Rhythm Bar Chart (Span 3) */}
+          <div className="col-span-1 md:col-span-2 xl:col-span-3">
+            <CircadianRhythmCard hourlyDistribution={listeningData.hourlyDistribution} />
+          </div>
         </div>
-        <div className="col-span-1">
-          <SonicConstellationCard topArtists={listeningData.topArtists} />
-        </div>
+      )}
 
-        {/* Row 4: Top Tracks (Span 1) + Top Artists (Span 1) + Top Genres (Span 1) */}
-        <div className="col-span-1">
-          <TopTracksLeaderboardCard topTracks={listeningData.topTracks} />
-        </div>
-        <div className="col-span-1">
-          <TopArtistsPodiumCard topArtists={listeningData.topArtists} />
-        </div>
-        <div className="col-span-1">
-          <TopGenresCard topGenres={listeningData.topGenres} />
-        </div>
+      {/* ================= LAB VIEW: DEDICATED CRAZY FORENSICS CARDS ================= */}
+      {viewMode === 'lab' && (
+        <div className="relative z-10 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {/* Row 1: Circadian 2.0 Polar Radar (Span 2) + Holographic Passport (Span 1) */}
+          <div className="md:col-span-2">
+            <CircadianRadarCard
+              hourlyDistribution={listeningData.hourlyDistribution}
+              chronotype={listeningData.chronotype}
+            />
+          </div>
+          <div className="col-span-1">
+            <HolographicPassportCard
+              summary={listeningData.summary}
+              chronotype={listeningData.chronotype}
+              metrics={listeningData.audiophileMetrics}
+            />
+          </div>
 
-        {/* Row 5: Audiophile Library Vault (Span Full / 3) */}
-        <div className="col-span-1 md:col-span-2 xl:col-span-3">
-          <AudiophileVaultCard stats={libraryStats} />
+          {/* Row 2: DAC Snob (Span 1) + Skip Crime Scene (Span 1) + Loop Addiction (Span 1) */}
+          <div className="col-span-1">
+            <DacSnobCard metrics={listeningData.audiophileMetrics} stats={libraryStats} />
+          </div>
+          <div className="col-span-1">
+            <SkipCrimeSceneCard skipForensics={listeningData.skipForensics} />
+          </div>
+          <div className="col-span-1">
+            <LoopAddictionCard loopAddiction={listeningData.loopAddiction} />
+          </div>
+
+          {/* Row 3: Sonic Constellation (Span 3) */}
+          <div className="col-span-1 md:col-span-2 xl:col-span-3">
+            <SonicConstellationCard topArtists={listeningData.topArtists} />
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ================= ALL VIEW: COMBINED COMPREHENSIVE BENTO GRID ================= */}
+      {viewMode === 'all' && (
+        <div className="relative z-10 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {/* Row 1: Hero Listening Time (Span 2) + Holographic Passport (Span 1) */}
+          <div className="md:col-span-2">
+            <HeroListeningTimeCard
+              summary={listeningData.summary}
+              dailyActivity={listeningData.dailyActivity}
+            />
+          </div>
+          <div className="col-span-1">
+            <HolographicPassportCard
+              summary={listeningData.summary}
+              chronotype={listeningData.chronotype}
+              metrics={listeningData.audiophileMetrics}
+            />
+          </div>
+
+          {/* Row 2: DAC Snob (Span 1) + Skip Crime Scene (Span 1) + Loop Addiction (Span 1) */}
+          <div className="col-span-1">
+            <DacSnobCard metrics={listeningData.audiophileMetrics} stats={libraryStats} />
+          </div>
+          <div className="col-span-1">
+            <SkipCrimeSceneCard skipForensics={listeningData.skipForensics} />
+          </div>
+          <div className="col-span-1">
+            <LoopAddictionCard loopAddiction={listeningData.loopAddiction} />
+          </div>
+
+          {/* Row 3: Circadian 2.0 Polar Radar (Span 2) + Sonic Constellation (Span 1) */}
+          <div className="md:col-span-2">
+            <CircadianRadarCard
+              hourlyDistribution={listeningData.hourlyDistribution}
+              chronotype={listeningData.chronotype}
+            />
+          </div>
+          <div className="col-span-1">
+            <SonicConstellationCard topArtists={listeningData.topArtists} />
+          </div>
+
+          {/* Row 4: Top Tracks (Span 1) + Top Artists (Span 1) + Top Genres (Span 1) */}
+          <div className="col-span-1">
+            <TopTracksLeaderboardCard topTracks={listeningData.topTracks} />
+          </div>
+          <div className="col-span-1">
+            <TopArtistsPodiumCard topArtists={listeningData.topArtists} />
+          </div>
+          <div className="col-span-1">
+            <TopGenresCard topGenres={listeningData.topGenres} />
+          </div>
+
+          {/* Row 5: Audiophile Vault (Span 3) */}
+          <div className="col-span-1 md:col-span-2 xl:col-span-3">
+            <AudiophileVaultCard stats={libraryStats} />
+          </div>
+        </div>
+      )}
     </MainContainer>
   );
 }
