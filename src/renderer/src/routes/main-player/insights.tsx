@@ -1,11 +1,16 @@
 import {
+  AudiophileVaultCard,
+  CircadianRadarCard,
+  DacSnobCard,
   HeroListeningTimeCard,
-  TopTracksLeaderboardCard,
+  HolographicPassportCard,
+  InsightsSkeleton,
+  LoopAddictionCard,
+  SkipCrimeSceneCard,
+  SonicConstellationCard,
   TopArtistsPodiumCard,
   TopGenresCard,
-  AudiophileVaultCard,
-  CircadianRhythmCard,
-  InsightsSkeleton
+  TopTracksLeaderboardCard
 } from '@renderer/components/Insights';
 import MainContainer from '@renderer/components/MainContainer';
 import TitleContainer from '@renderer/components/TitleContainer';
@@ -13,7 +18,7 @@ import { analyticsQuery, type HistoryPeriod } from '@renderer/queries/analytics'
 import { queryClient } from '@renderer/queryClient';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 export const Route = createFileRoute('/main-player/insights')({
   component: InsightsPage,
@@ -32,8 +37,18 @@ const PERIOD_TABS: Array<{ id: HistoryPeriod; label: string }> = [
   { id: 'all', label: 'All Time' }
 ];
 
+type StyleMode = 'aurora' | 'vfd' | 'cyberpunk' | 'classic';
+
 export function InsightsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<HistoryPeriod>('30');
+  const [styleMode, setStyleMode] = useState<StyleMode>(() => {
+    return (localStorage.getItem('nora.insights.style') as StyleMode) || 'aurora';
+  });
+
+  const handleStyleChange = (mode: StyleMode) => {
+    setStyleMode(mode);
+    localStorage.setItem('nora.insights.style', mode);
+  };
 
   const {
     data: listeningData,
@@ -55,21 +70,109 @@ export function InsightsPage() {
   const isRefetching = isListeningRefetching || isStatsRefetching;
 
   return (
-    <MainContainer className="insights-container relative flex h-full flex-col overflow-y-auto px-8 pt-6 pb-12">
+    <MainContainer className="insights-container relative flex h-full flex-col overflow-y-auto px-8 pt-6 pb-16">
+      {/* Dynamic Aurora Mesh Background */}
+      {styleMode === 'aurora' && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed -top-24 -left-24 h-[140%] w-[140%] opacity-20 blur-3xl transition-all duration-1000 dark:opacity-35"
+          style={{
+            background:
+              'radial-gradient(circle at 25% 25%, #06b6d4 0%, transparent 40%), radial-gradient(circle at 75% 35%, #ec4899 0%, transparent 45%), radial-gradient(circle at 50% 80%, #8b5cf6 0%, transparent 45%)'
+          }}
+        />
+      )}
+
+      {/* Cyberpunk Glow Background */}
+      {styleMode === 'cyberpunk' && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed -top-24 -left-24 h-[140%] w-[140%] opacity-25 blur-3xl transition-all duration-1000 dark:opacity-40"
+          style={{
+            background:
+              'radial-gradient(circle at 20% 20%, #ff007f 0%, transparent 40%), radial-gradient(circle at 80% 80%, #00ffff 0%, transparent 40%)'
+          }}
+        />
+      )}
+
+      {/* Retro VFD Scanline Overlay */}
+      {styleMode === 'vfd' && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-50 opacity-20"
+          style={{
+            background:
+              'repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0px, rgba(0, 0, 0, 0.4) 1px, transparent 1px, transparent 3px)'
+          }}
+        />
+      )}
+
       {/* Header Bar */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="relative z-10 mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <TitleContainer
-            title="Insights & Audio Stats"
+            title="Insights & Audio Forensics"
             className="text-font-color-black dark:text-font-color-white text-2xl font-bold tracking-tight"
           />
           <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-1 text-xs">
-            Listening trends, format breakdown, and circadian rhythm analysis
+            Listening trends, circadian chronotypes, DAC audio quality, and skip forensics
           </p>
         </div>
 
-        {/* Controls: Period Tabs + Action Buttons */}
+        {/* Controls: Style Switcher + Period Tabs + Refresh */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* Aesthetic Style Mode Switcher */}
+          <div className="border-background-color-2/70 bg-background-color-1/90 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90 flex items-center rounded-xl border p-1 shadow-sm backdrop-blur-md">
+            <button
+              type="button"
+              title="Aurora Glass Style"
+              onClick={() => handleStyleChange('aurora')}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                styleMode === 'aurora'
+                  ? 'bg-cyan-500 text-black shadow-sm'
+                  : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-cyan-500'
+              }`}
+            >
+              🌌 Aurora
+            </button>
+            <button
+              type="button"
+              title="Retro Hi-Fi VFD Rack"
+              onClick={() => handleStyleChange('vfd')}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                styleMode === 'vfd'
+                  ? 'bg-emerald-500 text-black shadow-sm'
+                  : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-emerald-500'
+              }`}
+            >
+              📼 VFD
+            </button>
+            <button
+              type="button"
+              title="Cyber Neon Glow"
+              onClick={() => handleStyleChange('cyberpunk')}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                styleMode === 'cyberpunk'
+                  ? 'bg-fuchsia-500 text-white shadow-sm'
+                  : 'text-font-color-dimmed dark:text-dark-font-color-dimmed hover:text-fuchsia-500'
+              }`}
+            >
+              ⚡ Neon
+            </button>
+            <button
+              type="button"
+              title="Clean Classic Style"
+              onClick={() => handleStyleChange('classic')}
+              className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                styleMode === 'classic'
+                  ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight text-white shadow-sm dark:text-black'
+                  : 'text-font-color-dimmed dark:text-dark-font-color-dimmed'
+              }`}
+            >
+              Classic
+            </button>
+          </div>
+
           {/* Period Selector Tabs */}
           <div className="border-background-color-2/70 bg-background-color-1/90 dark:border-dark-background-color-2/70 dark:bg-dark-background-color-1/90 flex items-center rounded-xl border p-1 shadow-sm backdrop-blur-md">
             {PERIOD_TABS.map((tab) => {
@@ -107,8 +210,8 @@ export function InsightsPage() {
       </div>
 
       {/* Main Content / Bento Grid */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {/* Row 1: Hero Listening Time (Span 2) + Audiophile Vault (Span 1) */}
+      <div className="relative z-10 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {/* Row 1: Hero Listening Time (Span 2) + Holographic Shareable Passport (Span 1) */}
         <div className="md:col-span-2">
           <HeroListeningTimeCard
             summary={listeningData.summary}
@@ -116,23 +219,49 @@ export function InsightsPage() {
           />
         </div>
         <div className="col-span-1">
-          <AudiophileVaultCard stats={libraryStats} />
+          <HolographicPassportCard
+            summary={listeningData.summary}
+            chronotype={listeningData.chronotype}
+            metrics={listeningData.audiophileMetrics}
+          />
         </div>
 
-        {/* Row 2: Top Tracks (Span 1) + Top Artists (Span 1) + Top Genres (Span 1) */}
-        <div className="col-span-1 md:col-span-1 xl:col-span-1">
+        {/* Row 2: The DAC Snob (Span 1) + The Skip Crime Scene (Span 1) + Loop Addiction (Span 1) */}
+        <div className="col-span-1">
+          <DacSnobCard metrics={listeningData.audiophileMetrics} stats={libraryStats} />
+        </div>
+        <div className="col-span-1">
+          <SkipCrimeSceneCard skipForensics={listeningData.skipForensics} />
+        </div>
+        <div className="col-span-1">
+          <LoopAddictionCard loopAddiction={listeningData.loopAddiction} />
+        </div>
+
+        {/* Row 3: Circadian 2.0 Polar Radar (Span 2) + Sonic Constellation (Span 1) */}
+        <div className="md:col-span-2">
+          <CircadianRadarCard
+            hourlyDistribution={listeningData.hourlyDistribution}
+            chronotype={listeningData.chronotype}
+          />
+        </div>
+        <div className="col-span-1">
+          <SonicConstellationCard topArtists={listeningData.topArtists} />
+        </div>
+
+        {/* Row 4: Top Tracks (Span 1) + Top Artists (Span 1) + Top Genres (Span 1) */}
+        <div className="col-span-1">
           <TopTracksLeaderboardCard topTracks={listeningData.topTracks} />
         </div>
-        <div className="col-span-1 md:col-span-1 xl:col-span-1">
+        <div className="col-span-1">
           <TopArtistsPodiumCard topArtists={listeningData.topArtists} />
         </div>
-        <div className="col-span-1 md:col-span-1 xl:col-span-1">
+        <div className="col-span-1">
           <TopGenresCard topGenres={listeningData.topGenres} />
         </div>
 
-        {/* Row 3: Circadian Rhythm (Span Full / 3) */}
+        {/* Row 5: Audiophile Library Vault (Span Full / 3) */}
         <div className="col-span-1 md:col-span-2 xl:col-span-3">
-          <CircadianRhythmCard hourlyDistribution={listeningData.hourlyDistribution} />
+          <AudiophileVaultCard stats={libraryStats} />
         </div>
       </div>
     </MainContainer>

@@ -4,13 +4,19 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { AppUpdateContext, type AppUpdateContextType } from '../../../contexts/AppUpdateContext';
 import {
+  AudiophileVaultCard,
+  CircadianRadarCard,
+  CircadianRhythmCard,
+  DacSnobCard,
   HeroListeningTimeCard,
-  TopTracksLeaderboardCard,
+  HolographicPassportCard,
+  InsightsSkeleton,
+  LoopAddictionCard,
+  SkipCrimeSceneCard,
+  SonicConstellationCard,
   TopArtistsPodiumCard,
   TopGenresCard,
-  AudiophileVaultCard,
-  CircadianRhythmCard,
-  InsightsSkeleton
+  TopTracksLeaderboardCard
 } from '../index';
 
 describe('Insights Bento Cards Component Suite', () => {
@@ -167,5 +173,161 @@ describe('Insights Bento Cards Component Suite', () => {
   it('InsightsSkeleton renders skeleton loader state', () => {
     const { container } = render(<InsightsSkeleton />);
     expect(container.querySelectorAll('.animate-pulse').length).toBe(6);
+  });
+
+  it('SkipCrimeSceneCard renders attention cliff histogram and awards', () => {
+    const skipForensics = {
+      totalSkips: 14,
+      patienceScore: 78,
+      archetype: 'Patient Listener',
+      attentionCliff: [
+        { label: '0-5s', count: 8, percentage: 57 },
+        { label: '6-15s', count: 3, percentage: 21 },
+        { label: '16-30s', count: 2, percentage: 14 },
+        { label: '31-60s', count: 1, percentage: 7 },
+        { label: 'Outro (>85%)', count: 0, percentage: 0 }
+      ],
+      coldShoulder: {
+        songId: 10,
+        title: 'Instant Skip',
+        positionSecs: 2.4
+      },
+      theTragedy: {
+        songId: 11,
+        title: 'Almost Made It',
+        completionPercentage: 97.5
+      }
+    };
+
+    render(<SkipCrimeSceneCard skipForensics={skipForensics} />);
+
+    expect(screen.getByText('The Skip Crime Scene')).toBeDefined();
+    expect(screen.getByText('78% Patience')).toBeDefined();
+    expect(screen.getByText('Skipped in 2.4s')).toBeDefined();
+    expect(screen.getByText('Skipped at 97.5%')).toBeDefined();
+    expect(screen.getByText('Patient Listener')).toBeDefined();
+  });
+
+  it('DacSnobCard renders lossless purity, raw gigabytes pumped, and resolution spectrum', () => {
+    const metrics = {
+      rawPcmGigabytes: 42.5,
+      losslessPercentage: 88,
+      peakSampleRate: 192000,
+      resolutionTier: 'Master Class' as const,
+      dominantResolution: '24-bit / 96kHz+ Hi-Res',
+      spectrum: {
+        hiResPercent: 45,
+        cdQualityPercent: 43,
+        mp3HighPercent: 10,
+        lossyOtherPercent: 2
+      }
+    };
+
+    render(<DacSnobCard metrics={metrics} />);
+
+    expect(screen.getByText('The DAC Snob Quotient')).toBeDefined();
+    expect(screen.getByText('88% Lossless')).toBeDefined();
+    expect(screen.getByText('42.5')).toBeDefined();
+    expect(screen.getByText('GIGABYTES')).toBeDefined();
+    expect(screen.getByText('Tier: Master Class')).toBeDefined();
+  });
+
+  it('CircadianRadarCard renders polar radar with chronotype badge and supports toggle', () => {
+    const hourlyDistribution = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      playCount: hour === 2 ? 20 : 2,
+      percentage: hour === 2 ? 30 : 3
+    }));
+
+    const chronotype = {
+      name: 'Vampiric Night Owl',
+      icon: 'bedtime',
+      peakHour: 2,
+      peakSegment: 'night' as const,
+      segmentPercentages: {
+        night: 55,
+        morning: 10,
+        afternoon: 15,
+        evening: 20
+      }
+    };
+
+    render(<CircadianRadarCard hourlyDistribution={hourlyDistribution} chronotype={chronotype} />);
+
+    expect(screen.getByText('Circadian 2.0: Polar Radar')).toBeDefined();
+    expect(screen.getAllByText('Vampiric Night Owl').length).toBeGreaterThan(0);
+
+    const barsButton = screen.getByText('Bars');
+    fireEvent.click(barsButton);
+    expect(screen.getByText('12 AM')).toBeDefined();
+  });
+
+  it('LoopAddictionCard renders consecutive binge streak and obsession score', () => {
+    const loopAddiction = {
+      hasAddiction: true,
+      streakCount: 6,
+      songId: 44,
+      title: 'Midnight City Loop',
+      totalLoopMinutes: 38,
+      lastPlayedAt: '2026-10-09'
+    };
+
+    render(<LoopAddictionCard loopAddiction={loopAddiction} />);
+
+    expect(screen.getByText('Obsessive Loop Addiction')).toBeDefined();
+    expect(screen.getByText('6x Consecutive')).toBeDefined();
+    expect(screen.getByText('Midnight City Loop')).toBeDefined();
+    expect(screen.getByText('Severe Loopitis')).toBeDefined();
+  });
+
+  it('SonicConstellationCard renders orbital canvas and central star', () => {
+    const topArtists = [
+      { artistId: 1, name: 'Daft Punk', playCount: 50, totalSeconds: 15000 },
+      { artistId: 2, name: 'Justice', playCount: 30, totalSeconds: 9000 },
+      { artistId: 3, name: 'Kavinsky', playCount: 20, totalSeconds: 6000 }
+    ];
+
+    render(<SonicConstellationCard topArtists={topArtists} />);
+
+    expect(screen.getByText('Sonic Constellation')).toBeDefined();
+    expect(screen.getByText('Daft Punk')).toBeDefined();
+    expect(screen.getByText('3 Systems')).toBeDefined();
+  });
+
+  it('HolographicPassportCard renders persona badge and copies story text', () => {
+    const summary = {
+      totalListeningSeconds: 36000,
+      totalPlaysCount: 150,
+      totalSkipsCount: 10,
+      completionRate: 0.93,
+      uniqueSongsPlayed: 80,
+      uniqueArtistsPlayed: 40
+    };
+
+    const chronotype = {
+      name: 'Vampiric Night Owl',
+      icon: 'bedtime',
+      peakHour: 2,
+      peakSegment: 'night' as const,
+      segmentPercentages: { night: 50, morning: 10, afternoon: 20, evening: 20 }
+    };
+
+    const metrics = {
+      rawPcmGigabytes: 15.2,
+      losslessPercentage: 92,
+      peakSampleRate: 96000,
+      resolutionTier: 'Master Class' as const,
+      dominantResolution: '24-bit / 96kHz FLAC',
+      spectrum: { hiResPercent: 50, cdQualityPercent: 42, mp3HighPercent: 8, lossyOtherPercent: 0 }
+    };
+
+    render(<HolographicPassportCard summary={summary} chronotype={chronotype} metrics={metrics} />);
+
+    expect(screen.getByText('Holographic Persona Card')).toBeDefined();
+    expect(screen.getByText('10.0h')).toBeDefined();
+    expect(screen.getByText('92%')).toBeDefined();
+
+    const shareButton = screen.getByText('Share Story');
+    expect(shareButton).toBeDefined();
   });
 });

@@ -1,5 +1,12 @@
-import { eq, gte, inArray, sql } from 'drizzle-orm';
+import { desc, eq, gte, inArray, sql } from 'drizzle-orm';
 
+import type {
+  AttentionCliffBucket,
+  AudiophileListeningMetrics,
+  ChronotypeData,
+  LoopAddictionItem,
+  SkipForensicsData
+} from '../../../common/analytics';
 import { parseArtistArtworks, parseSongArtworks } from '../../fs/resolveFilePaths';
 import logger from '../../logger';
 import { db, type DB, type DBTransaction } from '../db';
@@ -91,6 +98,10 @@ export interface ListeningAnalyticsData {
   topArtists: TopArtistItem[];
   topGenres: TopGenreItem[];
   topTracks: TopTrackItem[];
+  skipForensics?: SkipForensicsData;
+  audiophileMetrics?: AudiophileListeningMetrics;
+  loopAddiction?: LoopAddictionItem;
+  chronotype?: ChronotypeData;
 }
 
 export interface LibraryAudioStatsData {
@@ -396,6 +407,303 @@ export const getListeningAnalytics = async (
       };
     });
 
+    // 7. Chronotype Engine
+    let peakHour = 0;
+    let maxHourPlays = -1;
+    let nightPlays = 0;
+    let morningPlays = 0;
+    let afternoonPlays = 0;
+    let eveningPlays = 0;
+
+    for (const h of hourlyDistribution) {
+      if (h.playCount > maxHourPlays) {
+        maxHourPlays = h.playCount;
+        peakHour = h.hour;
+      }
+      if (h.hour < 6) nightPlays += h.playCount;
+      else if (h.hour < 12) morningPlays += h.playCount;
+      else if (h.hour < 18) afternoonPlays += h.playCount;
+      else eveningPlays += h.playCount;
+    }
+
+    const totalPeriodPlays = nightPlays + morningPlays + afternoonPlays + eveningPlays || 1;
+    const segmentPercentages = {
+      night: Math.round((nightPlays / totalPeriodPlays) * 100),
+      morning: Math.round((morningPlays / totalPeriodPlays) * 100),
+      afternoon: Math.round((afternoonPlays / totalPeriodPlays) * 100),
+      evening: Math.round((eveningPlays / totalPeriodPlays) * 100)
+    };
+
+    let peakSegment: 'night' | 'morning' | 'afternoon' | 'evening' = 'night';
+    let maxSegPlays = nightPlays;
+    if (morningPlays > maxSegPlays) {
+      peakSegment = 'morning';
+      maxSegPlays = morningPlays;
+    }
+    if (afternoonPlays > maxSegPlays) {
+      peakSegment = 'afternoon';
+      maxSegPlays = afternoonPlays;
+    }
+    if (eveningPlays > maxSegPlays) {
+      peakSegment = 'evening';
+      maxSegPlays = eveningPlays;
+    }
+
+    const chronotypeProfiles = {
+      night: { name: 'Vampiric Night Owl', icon: 'bedtime' },
+      morning: { name: 'Dawn Chaser', icon: 'wb_sunny' },
+      afternoon: { name: 'Daytime Velocity', icon: 'bolt' },
+      evening: { name: 'Twilight Dreamer', icon: 'nightlight' }
+    };
+
+    const chronotype: ChronotypeData = {
+      name: chronotypeProfiles[peakSegment].name,
+      icon: chronotypeProfiles[peakSegment].icon,
+      peakHour,
+      peakSegment,
+      segmentPercentages
+    };
+
+    // 8. Skip Forensics (Attention Cliff & Awards)
+    const rawSkips = await trx
+      .select({
+        position: skipEvents.position,
+        songId: skipEvents.songId,
+        songTitle: songs.title,
+        duration: songs.duration
+      })
+      .from(skipEvents)
+      .innerJoin(songs, eq(skipEvents.songId, songs.id))
+      .where(skipEventsWhere)
+      .orderBy(desc(skipEvents.createdAt))
+      .limit(500);
+
+    let cliff0_5 = 0;
+    let cliff6_15 = 0;
+    let cliff16_30 = 0;
+    let cliff31_60 = 0;
+    let cliffOutro = 0;
+
+    let coldShoulder: SkipForensicsData['coldShoulder'] = undefined;
+    let minSkipPos = Infinity;
+
+    let theTragedy: SkipForensicsData['theTragedy'] = undefined;
+    let maxCompletionPct = 0;
+
+    for (const s of rawSkips) {
+      const pos = s.position || 0;
+      const dur = s.duration || 1;
+      const completionRatio = Math.min(1, pos / dur);
+
+      if (pos <= 5) cliff0_5++;
+      else if (pos <= 15) cliff6_15++;
+      else if (pos <= 30) cliff16_30++;
+      else if (pos <= 60) cliff31_60++;
+      else if (completionRatio >= 0.85) cliffOutro++;
+
+      if (pos < minSkipPos && pos >= 0.5) {
+        minSkipPos = pos;
+        coldShoulder = {
+          songId: s.songId,
+          title: s.songTitle,
+          positionSecs: Math.round(pos * 10) / 10
+        };
+      }
+
+      if (completionRatio >= 0.85 && completionRatio > maxCompletionPct && dur - pos <= 20) {
+        maxCompletionPct = completionRatio;
+        theTragedy = {
+          songId: s.songId,
+          title: s.songTitle,
+          completionPercentage: Math.round(completionRatio * 1000) / 10
+        };
+      }
+    }
+
+    const totalCliffSkips = rawSkips.length || 1;
+    const attentionCliff: AttentionCliffBucket[] = [
+      {
+        label: '0-5s',
+        count: cliff0_5,
+        percentage: Math.round((cliff0_5 / totalCliffSkips) * 100)
+      },
+      {
+        label: '6-15s',
+        count: cliff6_15,
+        percentage: Math.round((cliff6_15 / totalCliffSkips) * 100)
+      },
+      {
+        label: '16-30s',
+        count: cliff16_30,
+        percentage: Math.round((cliff16_30 / totalCliffSkips) * 100)
+      },
+      {
+        label: '31-60s',
+        count: cliff31_60,
+        percentage: Math.round((cliff31_60 / totalCliffSkips) * 100)
+      },
+      {
+        label: 'Outro (>85%)',
+        count: cliffOutro,
+        percentage: Math.round((cliffOutro / totalCliffSkips) * 100)
+      }
+    ];
+
+    const patienceScore = Math.round(completionRate * 100);
+    let skipArchetype = 'Zen Monk';
+    if (patienceScore < 45) skipArchetype = 'TikTok Attention Span';
+    else if (patienceScore < 70) skipArchetype = 'Ruthless Filter';
+    else if (patienceScore < 85) skipArchetype = 'Patient Listener';
+
+    const skipForensics: SkipForensicsData = {
+      totalSkips: totalSkipsCount,
+      patienceScore,
+      archetype: skipArchetype,
+      attentionCliff,
+      coldShoulder,
+      theTragedy
+    };
+
+    // 9. Audiophile Listening Metrics
+    const playedSongsQuality = await trx
+      .select({
+        duration: songs.duration,
+        path: songs.path,
+        sampleRate: songs.sampleRate,
+        bitRate: songs.bitRate
+      })
+      .from(playHistory)
+      .innerJoin(songs, eq(playHistory.songId, songs.id))
+      .where(playHistoryWhere)
+      .limit(1000);
+
+    let losslessPlays = 0;
+    let hiResPlays = 0;
+    let cdQualityPlays = 0;
+    let mp3HighPlays = 0;
+    let lossyOtherPlays = 0;
+    let peakSampleRate = 44100;
+
+    const LOSSLESS_EXTENSIONS = new Set([
+      '.flac',
+      '.alac',
+      '.wav',
+      '.aiff',
+      '.dsf',
+      '.dff',
+      '.ape'
+    ]);
+
+    for (const ps of playedSongsQuality) {
+      const extMatch = ps.path?.match(/\.([a-zA-Z0-9]+)$/);
+      const ext = extMatch ? `.${extMatch[1].toLowerCase()}` : '';
+      const sr = ps.sampleRate || 44100;
+      if (sr > peakSampleRate) peakSampleRate = sr;
+
+      const isLossless = LOSSLESS_EXTENSIONS.has(ext);
+      if (isLossless) losslessPlays++;
+
+      if (sr >= 88200 || (ps.bitRate && ps.bitRate >= 1411)) {
+        hiResPlays++;
+      } else if (isLossless) {
+        cdQualityPlays++;
+      } else if (ps.bitRate && ps.bitRate >= 320) {
+        mp3HighPlays++;
+      } else {
+        lossyOtherPlays++;
+      }
+    }
+
+    const totalQualityPlays = playedSongsQuality.length || 1;
+    const losslessPercentage = Math.round((losslessPlays / totalQualityPlays) * 100);
+    const rawPcmGigabytes =
+      Math.round(((totalListeningSeconds * 44100 * 4) / (1024 * 1024 * 1024)) * 100) / 100;
+
+    let resolutionTier: AudiophileListeningMetrics['resolutionTier'] = 'Compressed';
+    if (losslessPercentage >= 80)
+      resolutionTier = hiResPlays > cdQualityPlays ? 'Master Class' : 'Hi-Fi Grade';
+    else if (losslessPercentage >= 40) resolutionTier = 'Standard Lossless';
+
+    const audiophileMetrics: AudiophileListeningMetrics = {
+      rawPcmGigabytes,
+      losslessPercentage,
+      peakSampleRate,
+      resolutionTier,
+      dominantResolution:
+        hiResPlays > cdQualityPlays
+          ? '24-bit / 96kHz+ Hi-Res'
+          : losslessPlays > 0
+            ? '16-bit / 44.1kHz FLAC'
+            : '320kbps MP3',
+      spectrum: {
+        hiResPercent: Math.round((hiResPlays / totalQualityPlays) * 100),
+        cdQualityPercent: Math.round((cdQualityPlays / totalQualityPlays) * 100),
+        mp3HighPercent: Math.round((mp3HighPlays / totalQualityPlays) * 100),
+        lossyOtherPercent: Math.round((lossyOtherPlays / totalQualityPlays) * 100)
+      }
+    };
+
+    // 10. Loop Addiction Detector (consecutive streak of same song)
+    const recentPlayRuns = await trx
+      .select({
+        songId: playHistory.songId,
+        title: songs.title,
+        duration: songs.duration,
+        createdAt: playHistory.createdAt
+      })
+      .from(playHistory)
+      .innerJoin(songs, eq(playHistory.songId, songs.id))
+      .where(playHistoryWhere)
+      .orderBy(desc(playHistory.createdAt))
+      .limit(300);
+
+    let maxStreak = 0;
+    let streakSongId: number | undefined;
+    let streakSongTitle: string | undefined;
+    let streakSongDuration = 0;
+    let streakLastPlayed: string | undefined;
+
+    let currentStreak = 0;
+    let currentSongId: number | undefined;
+
+    for (const r of recentPlayRuns) {
+      if (r.songId === currentSongId) {
+        currentStreak++;
+      } else {
+        if (currentStreak > maxStreak) {
+          maxStreak = currentStreak;
+          streakSongId = currentSongId;
+          const matched = recentPlayRuns.find((item) => item.songId === currentSongId);
+          streakSongTitle = matched?.title;
+          streakSongDuration = matched?.duration || 0;
+          streakLastPlayed = matched?.createdAt
+            ? new Date(matched.createdAt).toLocaleDateString()
+            : undefined;
+        }
+        currentSongId = r.songId;
+        currentStreak = 1;
+      }
+    }
+    if (currentStreak > maxStreak) {
+      maxStreak = currentStreak;
+      streakSongId = currentSongId;
+      const matched = recentPlayRuns.find((item) => item.songId === currentSongId);
+      streakSongTitle = matched?.title;
+      streakSongDuration = matched?.duration || 0;
+      streakLastPlayed = matched?.createdAt
+        ? new Date(matched.createdAt).toLocaleDateString()
+        : undefined;
+    }
+
+    const loopAddiction: LoopAddictionItem = {
+      hasAddiction: maxStreak >= 3,
+      streakCount: maxStreak,
+      songId: streakSongId,
+      title: streakSongTitle,
+      totalLoopMinutes: Math.round((maxStreak * streakSongDuration) / 60),
+      lastPlayedAt: streakLastPlayed
+    };
+
     return {
       period,
       summary: {
@@ -410,7 +718,11 @@ export const getListeningAnalytics = async (
       hourlyDistribution,
       topArtists,
       topGenres,
-      topTracks
+      topTracks,
+      skipForensics,
+      audiophileMetrics,
+      loopAddiction,
+      chronotype
     };
   } catch (error) {
     logger.error('[MAIN] getListeningAnalytics ERROR', { error, period });

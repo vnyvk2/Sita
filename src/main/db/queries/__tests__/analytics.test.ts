@@ -92,4 +92,73 @@ describe('Analytics Database Queries - Logic & Period Validation', () => {
     expect(dayBucket!.playCount).toBe(1);
     expect(dayBucket!.seconds).toBe(200);
   });
+
+  it('computes chronotype, skip forensics, audiophile metrics, and loop addiction accurately', async () => {
+    const { db } = await import('../../db');
+    const { songs, playHistory, skipEvents } = await import('../../schema');
+    const { getListeningAnalytics } = await import('../analytics');
+
+    await db.delete(skipEvents);
+    await db.delete(playHistory);
+    await db.delete(songs);
+
+    const now = new Date();
+    const [song1] = await db
+      .insert(songs)
+      .values({
+        title: 'Masterpiece FLAC',
+        duration: 300,
+        sampleRate: 96000,
+        bitRate: 2400,
+        path: 'C:\\Music\\masterpiece.flac',
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    // 3 consecutive plays (triggers loop addiction)
+    for (let i = 0; i < 3; i++) {
+      await db.insert(playHistory).values({
+        songId: song1.id,
+        createdAt: new Date(now.getTime() - i * 1000),
+        updatedAt: new Date(now.getTime() - i * 1000)
+      });
+    }
+
+    // Skip at 3.2 seconds (triggers cold shoulder)
+    await db.insert(skipEvents).values({
+      songId: song1.id,
+      position: 3.2,
+      createdAt: now,
+      updatedAt: now
+    });
+
+    const analytics = await getListeningAnalytics('7');
+    expect(analytics).toBeDefined();
+
+    // 1. Chronotype
+    expect(analytics.chronotype).toBeDefined();
+    expect(analytics.chronotype!.name).toBeTruthy();
+    expect(analytics.chronotype!.segmentPercentages).toBeDefined();
+
+    // 2. Skip Forensics
+    expect(analytics.skipForensics).toBeDefined();
+    expect(analytics.skipForensics!.totalSkips).toBeGreaterThanOrEqual(1);
+    expect(analytics.skipForensics!.attentionCliff.length).toBe(5);
+    expect(analytics.skipForensics!.coldShoulder).toBeDefined();
+    expect(analytics.skipForensics!.coldShoulder!.title).toBe('Masterpiece FLAC');
+    expect(analytics.skipForensics!.coldShoulder!.positionSecs).toBeCloseTo(3.2, 0.1);
+
+    // 3. Audiophile Metrics
+    expect(analytics.audiophileMetrics).toBeDefined();
+    expect(analytics.audiophileMetrics!.losslessPercentage).toBe(100);
+    expect(analytics.audiophileMetrics!.peakSampleRate).toBe(96000);
+    expect(analytics.audiophileMetrics!.resolutionTier).toBe('Master Class');
+
+    // 4. Loop Addiction
+    expect(analytics.loopAddiction).toBeDefined();
+    expect(analytics.loopAddiction!.hasAddiction).toBe(true);
+    expect(analytics.loopAddiction!.streakCount).toBe(3);
+    expect(analytics.loopAddiction!.title).toBe('Masterpiece FLAC');
+  });
 });

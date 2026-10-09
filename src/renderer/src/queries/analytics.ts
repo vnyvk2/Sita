@@ -1,24 +1,33 @@
-import { createQueryKeys } from '@lukemorales/query-key-factory';
-
 import type {
+  AttentionCliffBucket,
+  AudiophileListeningMetrics,
+  ChronotypeData,
   DailyActivityItem,
   HistoryPeriod,
   HourlyDistributionItem,
   LibraryAudioStatsData,
   ListeningAnalyticsData,
   ListeningAnalyticsSummary,
+  LoopAddictionItem,
+  SkipForensicsData,
   TopArtistItem,
   TopGenreItem,
   TopTrackItem
 } from '@common/analytics';
+import { createQueryKeys } from '@lukemorales/query-key-factory';
 
 export type {
+  AttentionCliffBucket,
+  AudiophileListeningMetrics,
+  ChronotypeData,
   DailyActivityItem,
   HistoryPeriod,
   HourlyDistributionItem,
   LibraryAudioStatsData,
   ListeningAnalyticsData,
   ListeningAnalyticsSummary,
+  LoopAddictionItem,
+  SkipForensicsData,
   TopArtistItem,
   TopGenreItem,
   TopTrackItem
