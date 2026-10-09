@@ -441,6 +441,89 @@ describe('PlaylistRepository.getPlaylistSongCatalog', () => {
       });
       expect(genreSearch.entries.map((e) => e.songId)).toEqual([song4.id]);
     });
+
+    it('escapes literal % and _ wildcards in keyword search', async () => {
+      const [playlist] = await db
+        .insert(playlists)
+        .values({ name: `Wildcard Playlist ${randomUUID()}` })
+        .returning();
+
+      const now = new Date();
+      const [pctSong, normalSong, underscoreSong] = await db
+        .insert(songs)
+        .values([
+          {
+            title: '100% Hits',
+            duration: 100,
+            path: `C:\\music\\pct-${randomUUID()}.mp3`,
+            fileCreatedAt: now,
+            fileModifiedAt: now
+          },
+          {
+            title: '1000 Hits',
+            duration: 100,
+            path: `C:\\music\\norm-${randomUUID()}.mp3`,
+            fileCreatedAt: now,
+            fileModifiedAt: now
+          },
+          {
+            title: 'Track_One',
+            duration: 100,
+            path: `C:\\music\\under-${randomUUID()}.mp3`,
+            fileCreatedAt: now,
+            fileModifiedAt: now
+          }
+        ])
+        .returning();
+
+      await db.insert(playlistEntries).values([
+        { playlistId: playlist.id, songId: pctSong.id, position: 0 },
+        { playlistId: playlist.id, songId: normalSong.id, position: 1 },
+        { playlistId: playlist.id, songId: underscoreSong.id, position: 2 }
+      ]);
+
+      // Searching for literal '%' should ONLY match '100% Hits', NOT '1000 Hits'
+      const pctSearch = await repository.getPlaylistSongCatalog(playlist.id, {
+        keyword: '100%'
+      });
+      expect(pctSearch.entries.map((e) => e.songId)).toEqual([pctSong.id]);
+
+      // Searching for literal '_' should ONLY match 'Track_One'
+      const underSearch = await repository.getPlaylistSongCatalog(playlist.id, {
+        keyword: 'Track_'
+      });
+      expect(underSearch.entries.map((e) => e.songId)).toEqual([underscoreSong.id]);
+    });
+
+    it('deduplicates blacklistedIds when duplicate entries of a blacklisted song exist', async () => {
+      const [playlist] = await db
+        .insert(playlists)
+        .values({ name: `Blacklist Dupe ${randomUUID()}` })
+        .returning();
+
+      const now = new Date();
+      const [blSong] = await db
+        .insert(songs)
+        .values({
+          title: 'Blacklisted Song',
+          duration: 100,
+          isBlacklisted: true,
+          path: `C:\\music\\bl-dupe-${randomUUID()}.mp3`,
+          fileCreatedAt: now,
+          fileModifiedAt: now
+        })
+        .returning();
+
+      // Add same blacklisted song twice to playlist (different entries/positions)
+      await db.insert(playlistEntries).values([
+        { playlistId: playlist.id, songId: blSong.id, position: 0 },
+        { playlistId: playlist.id, songId: blSong.id, position: 1 }
+      ]);
+
+      const catalog = await repository.getPlaylistSongCatalog(playlist.id);
+      expect(catalog.entries).toHaveLength(2);
+      expect(catalog.blacklistedIds).toEqual([blSong.id]); // Must be unique, length 1
+    });
   });
 
   describe('language filter and alphabetMap', () => {

@@ -110,6 +110,7 @@ const checkLocalStorage = () => {
           candidate = stripQueuePayload(normalizedStore);
         }
         finalStore = candidate;
+        setTimeout(() => dispatchQueueDegradedToast(), 0);
       }
 
       localStorage.setItem('localStorage', JSON.stringify(finalStore));
@@ -117,6 +118,27 @@ const checkLocalStorage = () => {
     }
   }
   return console.log('local storage check successful.');
+};
+
+const dispatchQueueDegradedToast = () => {
+  try {
+    const currentNotifications = store?.state?.notificationPanelData?.notifications ?? [];
+    if (currentNotifications.some((n) => n.id === 'queue-storage-degraded')) {
+      return;
+    }
+    const newNotification: AppNotification = {
+      id: 'queue-storage-degraded',
+      duration: 10000,
+      content: 'Storage quota exceeded. Large queues were trimmed to preserve app settings.',
+      iconName: 'warning'
+    };
+    dispatch({
+      type: 'ADD_NEW_NOTIFICATIONS',
+      data: [newNotification, ...currentNotifications]
+    });
+  } catch {
+    // Silently continue if store or dispatch is not initialized yet
+  }
 };
 
 export const stripSelectiveQueuePayload = (
@@ -135,6 +157,7 @@ export const stripSelectiveQueuePayload = (
           return {
             ...q,
             songIds: [],
+            position: 0,
             queueBeforeShuffle: undefined
           };
         }
@@ -155,6 +178,7 @@ export const stripQueuePayload = (storage: LocalStorage): LocalStorage => {
       queues: storage.queue.queues.map((q) => ({
         ...q,
         songIds: [],
+        position: 0,
         queueBeforeShuffle: undefined
       }))
     }
@@ -240,6 +264,7 @@ const setLocalStorage = (storage: LocalStorage) => {
           { error },
           'WARN'
         );
+        dispatchQueueDegradedToast();
       }
       try {
         // Selective strip first

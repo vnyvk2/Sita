@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { db } from '../../../../../src/main/db/db';
 import { getHistorySongIds } from '../../../../../src/main/db/queries/history';
-import { musicFolders, playHistory, songs } from '../../../../../src/main/db/schema';
+import { metadataOverrides, musicFolders, playHistory, songs } from '../../../../../src/main/db/schema';
 
 describe('getHistorySongIds (ID-First Windowed Query with Event Preservation)', () => {
   let folderId: number;
@@ -222,5 +222,98 @@ describe('getHistorySongIds (ID-First Windowed Query with Event Preservation)', 
     expect(result.ids).toContain(normalSong.id);
     expect(result.ids).toContain(blacklistedSong.id);
     expect(result.blacklistedIds).toEqual([blacklistedSong.id]);
+  });
+
+  it('monthlyMostListened without period defaults to 30-day cutoff', async () => {
+    const now = new Date();
+    const [recentSong] = await db
+      .insert(songs)
+      .values({
+        title: 'Recent Hit',
+        duration: 120,
+        path: 'C:\\recent-hit.mp3',
+        folderId,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    const [oldSong] = await db
+      .insert(songs)
+      .values({
+        title: 'Old Hit',
+        duration: 120,
+        path: 'C:\\old-hit.mp3',
+        folderId,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    // recentSong played 5 times within 10 days
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    for (let i = 0; i < 5; i++) {
+      await db.insert(playHistory).values({ songId: recentSong.id, createdAt: tenDaysAgo });
+    }
+
+    // oldSong played 20 times 45 days ago (outside 30-day window)
+    const fortyFiveDaysAgo = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+    for (let i = 0; i < 20; i++) {
+      await db.insert(playHistory).values({ songId: oldSong.id, createdAt: fortyFiveDaysAgo });
+    }
+
+    // Calling monthlyMostListened WITHOUT passing period must default to 30-day window
+    const result = await getHistorySongIds({ sortType: 'monthlyMostListened' });
+    expect(result.ids).toEqual([recentSong.id]);
+    expect(result.ids).not.toContain(oldSong.id);
+    expect(result.entries[0].playCount).toBe(5);
+  });
+
+  it('language filtering and facet calculation honors metadataOverrides', async () => {
+    const now = new Date();
+    const [song1] = await db
+      .insert(songs)
+      .values({
+        title: 'Song 1',
+        duration: 100,
+        language: 'English',
+        path: 'C:\\song1-override.mp3',
+        folderId,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    const [song2] = await db
+      .insert(songs)
+      .values({
+        title: 'Song 2',
+        duration: 100,
+        language: 'French',
+        path: 'C:\\song2-override.mp3',
+        folderId,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    // Override song2 language to Japanese
+    await db.insert(metadataOverrides).values({
+      entityKind: 'song',
+      entityId: String(song2.id),
+      fieldId: 'language',
+      stringValue: 'Japanese'
+    });
+
+    await db.insert(playHistory).values({ songId: song1.id });
+    await db.insert(playHistory).values({ songId: song2.id });
+
+    // Filter by overridden language
+    const jpResult = await getHistorySongIds({ language: 'Japanese' });
+    expect(jpResult.ids).toEqual([song2.id]);
+
+    // Distinct languages facets must include override and exclude overridden value
+    const allResult = await getHistorySongIds({ period: 'all' });
+    expect(allResult.languages).toEqual(['English', 'Japanese']);
   });
 });

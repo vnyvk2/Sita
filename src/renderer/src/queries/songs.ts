@@ -69,6 +69,11 @@ export const getSongListIdentity = (params: SongIdsParams | unknown): string => 
     return params.startsWith('ids=') ? params : `ids=${params}`;
   }
   if (params && typeof params === 'object') {
+    const obj = params as Record<string, unknown>;
+    if (Array.isArray(obj.restrictToIds) && obj.restrictToIds.length > 0) {
+      const { restrictToIds, ...rest } = obj;
+      return `ids=${JSON.stringify(rest)}:restricted=${hashSongIds(restrictToIds as number[])}:${(restrictToIds as number[]).length}`;
+    }
     return `ids=${JSON.stringify(params)}`;
   }
   return 'ids=default';

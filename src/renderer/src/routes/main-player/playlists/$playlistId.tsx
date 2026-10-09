@@ -1157,6 +1157,8 @@ function PlaylistInfoPage() {
                         fixedItemHeight={isCompactSongView ? 38 : getSongRowHeight(songViewMode)}
                         scrollerRef={droppableProvided.innerRef}
                         scrollKey={scrollKey}
+                        // scrollSeekConfiguration={false} is necessary during drag-and-drop auto-scrolling
+                        // to prevent placeholder rendering from detaching the hello-pangea drag handle.
                         scrollSeekConfiguration={false}
                         increaseViewportBy={{ top: 800, bottom: 800 }}
                         context={virtuosoContext}

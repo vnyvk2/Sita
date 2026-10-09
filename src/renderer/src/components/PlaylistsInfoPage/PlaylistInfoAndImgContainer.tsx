@@ -5,6 +5,7 @@ import { useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CollectionClient } from '@renderer/api/CollectionClient';
+import storage from '@renderer/utils/localStorage';
 import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
 import PlaylistCover from '../PlaylistsPage/PlaylistCover';
 import PlaylistCoverSettingsPrompt from '../PlaylistsPage/PlaylistCoverSettingsPrompt';
@@ -47,10 +48,18 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
     let coverSongs = songs;
     if (!coverSongs || coverSongs.length === 0) {
       try {
+        const settings = storage.playlistCoverSettings.getSettings(playlist.id);
+        const hasCustomCollage = settings?.type === 'collage';
+        const entryLimit = hasCustomCollage ? 10 : 5;
         const catalog = await CollectionClient.getPlaylistSongCatalog(playlist.id);
-        const songIds = (catalog.entries ?? []).map((e) => e.songId);
-        if (songIds.length > 0) {
-          coverSongs = await window.api.audioLibraryControls.getSongInfo(songIds, 'addedOrder');
+        const configuredIds = hasCustomCollage
+          ? (settings?.collage?.songIds ?? []).filter((id) => id > 0)
+          : [];
+        const catalogIds = (catalog.entries ?? []).slice(0, entryLimit).map((e) => e.songId);
+        const targetIds = Array.from(new Set([...configuredIds, ...catalogIds]));
+
+        if (targetIds.length > 0) {
+          coverSongs = await window.api.audioLibraryControls.getSongInfo(targetIds, 'addedOrder');
         } else {
           coverSongs = [];
         }

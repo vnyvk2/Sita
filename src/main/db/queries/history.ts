@@ -2,7 +2,8 @@ import { db } from '@db/db';
 import { and, asc, desc, eq, gte, sql, type SQL } from 'drizzle-orm';
 
 import logger from '../../logger';
-import { albums, albumsSongs, artists, artistsSongs, playHistory, songs } from '../schema';
+import { rawAll } from '@db/sqlite/raw';
+import { albums, albumsSongs, artists, artistsSongs, metadataOverrides, playHistory, songs } from '../schema';
 import { getAllSongs } from './songs';
 
 export type { HistoryQueryOptions, HistoryPeriod };
@@ -173,7 +174,7 @@ export const getHistorySongIds = async (
   options: HistorySongIdsParams = {},
   trx: DB | DBTransaction = db
 ): Promise<HistorySongIdsResult> => {
-  const { sortType = 'addedOrder', period = 'all', limit, language } = options;
+  const { sortType = 'addedOrder', period, limit, language } = options;
 
   const isMostPlayed = sortType === 'allTimeMostListened' || sortType === 'monthlyMostListened';
   const effectivePeriod = period ?? (sortType === 'monthlyMostListened' ? '30' : 'all');
@@ -184,11 +185,35 @@ export const getHistorySongIds = async (
     filters.push(gte(playHistory.createdAt, cutoffDate));
   }
 
+  const hasTruthyLanguageOverride = sql`EXISTS (
+    SELECT 1 FROM ${metadataOverrides}
+    WHERE ${metadataOverrides.entityKind} = 'song'
+      AND ${metadataOverrides.fieldId} = 'language'
+      AND ${metadataOverrides.entityId} = ${songs.id}
+      AND ${metadataOverrides.stringValue} IS NOT NULL
+      AND trim(${metadataOverrides.stringValue}) <> ''
+  )`;
+
   if (language && language !== 'all') {
     if (language === 'unspecified') {
-      filters.push(sql`(${songs.language} IS NULL OR trim(${songs.language}) = '')`);
+      filters.push(
+        sql`(NOT ${hasTruthyLanguageOverride} AND (${songs.language} IS NULL OR trim(${songs.language}) = ''))`
+      );
     } else {
-      filters.push(sql`lower(${songs.language}) = ${language.toLowerCase()}`);
+      const targetLang = language.toLowerCase();
+      filters.push(sql`(
+        (EXISTS (
+          SELECT 1 FROM ${metadataOverrides}
+          WHERE ${metadataOverrides.entityKind} = 'song'
+            AND ${metadataOverrides.fieldId} = 'language'
+            AND ${metadataOverrides.entityId} = ${songs.id}
+            AND lower(${metadataOverrides.stringValue}) = ${targetLang}
+        ))
+        OR (
+          NOT ${hasTruthyLanguageOverride}
+          AND lower(${songs.language}) = ${targetLang}
+        )
+      )`);
     }
   }
 
@@ -243,25 +268,37 @@ export const getHistorySongIds = async (
   const topNLimit = isMostPlayed ? Math.min(Math.max(1, limit ?? 25), 1000) : limit;
   const rows = topNLimit ? await query.limit(topNLimit) : await query;
 
-  // Languages query for distinct languages present in history within this period
-  const langFilters: SQL[] = [];
-  if (cutoffDate) {
-    langFilters.push(gte(playHistory.createdAt, cutoffDate));
-  }
-  const langRows = await trx
-    .selectDistinct({ language: songs.language })
-    .from(playHistory)
-    .innerJoin(songs, eq(playHistory.songId, songs.id))
-    .where(
-      and(
-        ...(langFilters.length > 0 ? langFilters : []),
-        sql`${songs.language} IS NOT NULL AND trim(${songs.language}) <> ''`
-      )
-    );
+  // Languages query for distinct languages present in history within this period (including overrides)
+  const langQuery = sql`
+    SELECT DISTINCT val FROM (
+      SELECT ${songs.language} AS val
+      FROM ${playHistory}
+      INNER JOIN ${songs} ON ${playHistory.songId} = ${songs.id}
+      WHERE ${songs.language} IS NOT NULL AND trim(${songs.language}) <> ''
+        AND NOT EXISTS (
+          SELECT 1 FROM ${metadataOverrides}
+          WHERE ${metadataOverrides.entityKind} = 'song'
+            AND ${metadataOverrides.fieldId} = 'language'
+            AND ${metadataOverrides.entityId} = ${songs.id}
+            AND ${metadataOverrides.stringValue} IS NOT NULL
+            AND trim(${metadataOverrides.stringValue}) <> ''
+        )
+        ${cutoffDate ? sql`AND ${playHistory.createdAt} >= ${cutoffDate.getTime()}` : sql``}
+      UNION
+      SELECT ${metadataOverrides.stringValue} AS val
+      FROM ${playHistory}
+      INNER JOIN ${metadataOverrides} ON ${metadataOverrides.entityId} = cast(${playHistory.songId} as text)
+        AND ${metadataOverrides.entityKind} = 'song'
+        AND ${metadataOverrides.fieldId} = 'language'
+      WHERE ${metadataOverrides.stringValue} IS NOT NULL
+        AND trim(${metadataOverrides.stringValue}) <> ''
+        ${cutoffDate ? sql`AND ${playHistory.createdAt} >= ${cutoffDate.getTime()}` : sql``}
+    ) t ORDER BY val ASC
+  `;
+  const langRows = await rawAll<{ val: string }>(langQuery, trx);
   const languages = langRows
-    .map((r) => r.language?.trim())
-    .filter((l): l is string => Boolean(l))
-    .sort();
+    .map((r) => r.val?.trim())
+    .filter((l): l is string => Boolean(l));
 
   const entries: Array<{ songId: number; playedAt?: number; playCount?: number }> = [];
   const ids: number[] = [];

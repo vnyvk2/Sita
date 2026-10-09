@@ -22,10 +22,7 @@ import type {
   SmartPlaylistPreviewResult,
   SmartPlaylistRuleDto
 } from '@common/collections/smartPlaylist';
-import type {
-  PlaylistCatalogOptions,
-  PlaylistCatalogResult
-} from '@common/collections/dtos';
+import type { PlaylistCatalogOptions } from '@common/collections/dtos';
 import type {
   PlaylistViewMode,
   PlaylistExportOptions,

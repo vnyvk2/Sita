@@ -543,26 +543,32 @@ export class PlaylistRepository {
     }
 
     if (keyword?.trim()) {
-      const kw = `%${keyword.trim().toLowerCase()}%`;
+      const escaped = keyword
+        .trim()
+        .toLowerCase()
+        .replaceAll('\\', '\\\\')
+        .replaceAll('%', '\\%')
+        .replaceAll('_', '\\_');
+      const kw = `%${escaped}%`;
       filters.push(sql`(
-        lower(${songs.title}) LIKE ${kw}
+        lower(${songs.title}) LIKE ${kw} ESCAPE '\\'
         OR EXISTS (
           SELECT 1 FROM ${artistsSongs}
           INNER JOIN ${artists} ON ${artists.id} = ${artistsSongs.artistId}
           WHERE ${artistsSongs.songId} = ${songs.id}
-            AND lower(${artists.name}) LIKE ${kw}
+            AND lower(${artists.name}) LIKE ${kw} ESCAPE '\\'
         )
         OR EXISTS (
           SELECT 1 FROM ${albumsSongs}
           INNER JOIN ${albums} ON ${albums.id} = ${albumsSongs.albumId}
           WHERE ${albumsSongs.songId} = ${songs.id}
-            AND lower(${albums.title}) LIKE ${kw}
+            AND lower(${albums.title}) LIKE ${kw} ESCAPE '\\'
         )
         OR EXISTS (
           SELECT 1 FROM ${genresSongs}
           INNER JOIN ${genres} ON ${genres.id} = ${genresSongs.genreId}
           WHERE ${genresSongs.songId} = ${songs.id}
-            AND lower(${genres.name}) LIKE ${kw}
+            AND lower(${genres.name}) LIKE ${kw} ESCAPE '\\'
         )
       )`);
     }
@@ -602,6 +608,11 @@ export class PlaylistRepository {
         asc(playlistEntries.position)
       ];
     } else {
+      if (sortType) {
+        logger.warn(
+          `[PlaylistRepository] Unhandled sortType "${sortType}" in getPlaylistSongCatalog; defaulting to customOrder`
+        );
+      }
       orderClauses = [asc(playlistEntries.position), asc(playlistEntries.id)];
     }
 
@@ -635,7 +646,7 @@ export class PlaylistRepository {
 
     const isAlphaSort = sortType === 'aToZ' || sortType === 'zToA';
     const entries: PlaylistCatalogEntry[] = [];
-    const blacklistedIds: number[] = [];
+    const blacklistedSet = new Set<number>();
     const alphabetMap: Record<string, number> = {};
     const letterCounts: Record<string, number> = {};
     let totalDuration = 0;
@@ -644,7 +655,7 @@ export class PlaylistRepository {
       const row = rows[i];
       entries.push({ entryId: row.entryId, songId: row.songId });
       totalDuration += Number(row.duration ?? 0);
-      if (row.isBlacklisted) blacklistedIds.push(row.songId);
+      if (row.isBlacklisted) blacklistedSet.add(row.songId);
       if (isAlphaSort) {
         const bucket = titleToBucket(row.title);
         if (alphabetMap[bucket] === undefined) {
@@ -658,7 +669,7 @@ export class PlaylistRepository {
       entries,
       total: entries.length,
       totalDuration,
-      blacklistedIds,
+      blacklistedIds: Array.from(blacklistedSet),
       languages,
       alphabetMap: isAlphaSort ? alphabetMap : undefined,
       letterCounts: isAlphaSort ? letterCounts : undefined

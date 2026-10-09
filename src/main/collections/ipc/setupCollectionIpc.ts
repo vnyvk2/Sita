@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { parseCollectionUri } from '../../../common/collections/id';
 import type { PlaylistViewMode } from '../../../common/collections/types';
 import logger from '../../logger';
+import memProfiler from '../../utils/memProfiler';
 import type { HierarchyService } from '../engine/HierarchyService';
 import type { PlaylistEngine } from '../engine/PlaylistEngine';
 import type { UndoEngine } from '../engine/UndoEngine';
@@ -88,7 +89,9 @@ export function setupCollectionIpc(
     'collections/read/getPlaylistSongCatalog',
     async (_, id: number, options?: PlaylistCatalogOptions) => {
       const safeId = parse(idParamSchema, id);
-      return await repository.getPlaylistSongCatalog(safeId, options);
+      return await memProfiler.wrapHandler('collections/read/getPlaylistSongCatalog', () =>
+        repository.getPlaylistSongCatalog(safeId, options)
+      );
     }
   );
 

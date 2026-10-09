@@ -138,6 +138,53 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
     expect(res.data[1199].id).toBe(s2.id);
   });
 
+  it('safely handles > 500 unique song IDs across SQL chunk boundaries', async () => {
+    const now = new Date('2026-01-01T12:00:00Z');
+    const [folder] = await db
+      .insert(musicFolders)
+      .values({
+        name: 'Music',
+        path: 'C:\\Music',
+        parentId: null,
+        folderCreatedAt: now,
+        lastModifiedAt: now,
+        lastChangedAt: now,
+        lastParsedAt: now
+      })
+      .returning();
+
+    // Insert 550 unique songs into the database
+    const songInserts = Array.from({ length: 550 }, (_, i) => ({
+      title: `Track ${i + 1}`,
+      duration: 100 + i,
+      path: `C:\\Music\\track_${i + 1}.mp3`,
+      folderId: folder.id,
+      fileCreatedAt: now,
+      fileModifiedAt: now
+    }));
+
+    // Insert in batches of 100 to avoid sqlite parameter limits on bulk insert
+    const insertedSongs: (typeof songs.$inferSelect)[] = [];
+    for (let i = 0; i < songInserts.length; i += 100) {
+      const batch = songInserts.slice(i, i + 100);
+      const inserted = await db.insert(songs).values(batch).returning();
+      insertedSongs.push(...inserted);
+    }
+
+    expect(insertedSongs).toHaveLength(550);
+    const requestedIds = insertedSongs.map((s) => s.id);
+
+    const res = await getAllSongs({
+      songIds: requestedIds,
+      preserveIdOrder: true
+    });
+
+    expect(res.data).toHaveLength(550);
+    expect(res.data.map((s) => s.id)).toEqual(requestedIds);
+    expect(res.data[0].title).toBe('Track 1');
+    expect(res.data[549].title).toBe('Track 550');
+  });
+
   it('correctly applies sortType and pagination (start/end) when songIds > 500 without preserveIdOrder', async () => {
     const now = new Date('2026-01-01T12:00:00Z');
     const [folder] = await db

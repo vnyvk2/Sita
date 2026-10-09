@@ -59,5 +59,10 @@ describe('songs query layer & cache invariants', () => {
     expect(getSongListIdentity({ sortType: 'aToZ' })).toBe('ids={"sortType":"aToZ"}');
     expect(getSongListIdentity('ids=test')).toBe('ids=test');
     expect(getSongListIdentity(null)).toBe('ids=default');
+
+    const idWithRestricted = getSongListIdentity({ sortType: 'aToZ', restrictToIds: [1, 2, 3] });
+    expect(idWithRestricted).toContain(':restricted=');
+    expect(idWithRestricted).toContain(':3');
+    expect(idWithRestricted).not.toContain('[1,2,3]');
   });
 });

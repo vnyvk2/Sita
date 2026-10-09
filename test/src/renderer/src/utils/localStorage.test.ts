@@ -145,7 +145,7 @@ describe('localStorage Quota Fallback & Queue Stripping', () => {
     const stripped = stripQueuePayload(sampleStorage as never);
     expect(stripped.queue.queues[0].songIds).toEqual([]);
     expect(stripped.queue.queues[0].queueBeforeShuffle).toBeUndefined();
-    expect(stripped.queue.queues[0].position).toBe(2);
+    expect(stripped.queue.queues[0].position).toBe(0);
     expect(stripped.queue.queues[0].metadata?.title).toBe('Main Queue');
     expect(stripped.queue.queues[0].metadata?.isLocked).toBe(true);
   });
@@ -174,7 +174,7 @@ describe('localStorage Quota Fallback & Queue Stripping', () => {
     expect(stripped.queue.queues[0].songIds).toEqual([1, 2, 3]);
     expect(stripped.queue.queues[0].position).toBe(1);
     expect(stripped.queue.queues[1].songIds).toEqual([]);
-    expect(stripped.queue.queues[1].position).toBe(50);
+    expect(stripped.queue.queues[1].position).toBe(0);
   });
 
   it('isQuotaExceededError detects standard and synthetic quota errors', () => {
@@ -216,7 +216,7 @@ describe('localStorage Quota Fallback & Queue Stripping', () => {
     expect(callCount).toBe(2);
     const lastWrite = JSON.parse(setItemSpy.mock.calls[1][1]);
     expect(lastWrite.queue.queues[0].songIds).toEqual([]);
-    expect(lastWrite.queue.queues[0].position).toBe(5);
+    expect(lastWrite.queue.queues[0].position).toBe(0);
 
     // Now test recovery: user shrinks queue to < 1000 songs
     const smallStorage = {
@@ -269,6 +269,6 @@ describe('localStorage Quota Fallback & Queue Stripping', () => {
     expect(getIsQueueStorageDegraded()).toBe(true);
     const stored = JSON.parse(localStorage.getItem('localStorage')!);
     expect(stored.queue.queues[0].songIds).toEqual([]);
-    expect(stored.queue.queues[0].position).toBe(10);
+    expect(stored.queue.queues[0].position).toBe(0);
   });
 });

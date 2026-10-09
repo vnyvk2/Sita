@@ -1082,9 +1082,16 @@ class PlayerQueue {
     queueBeforeShuffle?: number[];
     metadata?: PlayerQueueMetadata;
   }): PlayerQueue {
+    const songIds = json.songIds || [];
+    const clampedPos =
+      songIds.length === 0
+        ? json.position === -1
+          ? -1
+          : 0
+        : Math.max(0, Math.min(json.position || 0, songIds.length - 1));
     return new PlayerQueue(
-      json.songIds || [],
-      json.position || 0,
+      songIds,
+      clampedPos,
       json.queueBeforeShuffle,
       json.metadata,
       json.id
