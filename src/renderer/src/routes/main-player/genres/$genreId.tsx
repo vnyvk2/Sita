@@ -2,13 +2,21 @@ import GenreImgAndInfoContainer from '@renderer/components/GenreInfoPage/GenreIm
 import MainContainer from '@renderer/components/MainContainer';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
+import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
 import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { genreQuery } from '@renderer/queries/genres';
-import { songQuery } from '@renderer/queries/songs';
+import {
+  getSongListIdentity,
+  songCacheKeys,
+  songIdsVersionFromState,
+  songQuery,
+  type SongIdsParams
+} from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
@@ -22,20 +30,52 @@ import { useTranslation } from 'react-i18next';
 export const Route = createFileRoute('/main-player/genres/$genreId')({
   validateSearch: songSearchSchema,
   component: GenreInfoPage,
-  loader: async ({ params }) => {
-    await queryClient.ensureQueryData(genreQuery.single({ genreId: Number(params.genreId) }));
+  loaderDeps: ({ search }) => ({
+    sortingOrder: search.sortingOrder,
+    filteringOrder: search.filteringOrder
+  }),
+  loader: async ({ params, deps }) => {
+    if (typeof window === 'undefined') return;
+    const genre = await queryClient.ensureQueryData(
+      genreQuery.single({ genreId: Number(params.genreId) })
+    );
+    const genreItem = genre?.data?.[0];
+    if (
+      genreItem &&
+      genreItem.songs &&
+      genreItem.songs.length > 0 &&
+      window.api?.audioLibraryControls
+    ) {
+      const sortingState = storage.sortingStates.getSortingStates('genreDetailPage');
+      const idsParams: SongIdsParams = {
+        restrictToIds: genreItem.songs.map((s) => s.songId),
+        sortType: deps?.sortingOrder ?? sortingState ?? 'aToZ',
+        filterType: deps?.filteringOrder ?? 'notSelected'
+      };
+      const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
+      if (idsData.ids.length === 0) return;
+      const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
+      const version = songIdsVersionFromState(state?.dataUpdatedAt);
+      const listIdentity = getSongListIdentity(idsParams);
+      await queryClient.ensureQueryData({
+        queryKey: songCacheKeys.window(listIdentity, version, 0),
+        queryFn: () =>
+          window.api.audioLibraryControls.getSongInfo(
+            idsData.ids.slice(0, Math.min(200, idsData.ids.length)),
+            undefined,
+            undefined,
+            undefined,
+            true
+          ),
+        staleTime: 5 * 60 * 1000
+      });
+    }
   }
 });
 
 /**
  * Renders the Genre Info page for the main player, showing genre details, a virtualized list of
- * songs, and controls for playback, queueing, sorting, and filtering.
- *
- * The component persists and initializes the sort order from local storage, provides keyboard
- * selection (Ctrl+A), and exposes actions to play, shuffle, and add genre songs to the queue.
- *
- * @returns The page element containing the genre header, action buttons and dropdowns, and a
- *   virtualized list of songs for the current genre.
+ * songs using ID-first windowed hydration, and controls for playback, queueing, sorting, and filtering.
  */
 function GenreInfoPage() {
   const preferences = useStore(store, (state) => state.localStorage.preferences);
@@ -67,25 +107,90 @@ function GenreInfoPage() {
     ...genreQuery.single({ genreId }),
     select: (data) => data.data[0]
   });
-  const { data: genreSongs = [] } = useQuery(
-    songQuery.allSongInfo({
-      songIds: genreData?.songs.map((song) => song.songId) ?? [],
-      sortType: sortingOrder,
-      filterType: filteringOrder
-    })
+
+  const genreSongIds = useMemo(
+    () => genreData?.songs.map((song) => song.songId) ?? [],
+    [genreData?.songs]
   );
 
-  const selectAllHandler = useSelectAllHandler(genreSongs, 'songs', 'songId');
+  const songIdsParams: SongIdsParams = useMemo(
+    () => ({
+      restrictToIds: genreSongIds,
+      sortType: sortingOrder,
+      filterType: filteringOrder
+    }),
+    [genreSongIds, sortingOrder, filteringOrder]
+  );
+
+  const idsQuery = useQuery({
+    ...songQuery.ids(songIdsParams),
+    enabled: genreSongIds.length > 0
+  });
+
+  const sortedSongIds = idsQuery.data?.ids ?? [];
+  const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
+  const listIdentity = useMemo(() => getSongListIdentity(songIdsParams), [songIdsParams]);
+
+  const blacklistedSet = useMemo(
+    () => new Set(idsQuery.data?.blacklistedIds ?? []),
+    [idsQuery.data?.blacklistedIds]
+  );
+
+  const playableSongIds = useMemo(
+    () => sortedSongIds.filter((id) => !blacklistedSet.has(id)),
+    [sortedSongIds, blacklistedSet]
+  );
+
+  const { getItem, onRangeChange } = useWindowHydration(sortedSongIds, idsVersion, {
+    enabled: Boolean(idsQuery.data && sortedSongIds.length > 0),
+    listIdentity,
+    isCompactView: preferences?.isCompactSongView,
+    rowHeight: 60
+  });
+
+  const selectAllHandler = useSelectAllHandler(playableSongIds, 'songs');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = genreSongs
-        .filter((song) => !song.isBlacklisted)
-        .map((song) => song.songId);
-      createQueue(queueSongIds, 'genre', false, genreData?.genreId, false, genreData?.name);
-      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
+      createQueue(playableSongIds, 'genre', false, genreData?.genreId, false, genreData?.name);
+      updateQueueData(playableSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, genreData?.genreId, genreData?.name, genreSongs]
+    [createQueue, updateQueueData, genreData?.genreId, genreData?.name, playableSongIds]
+  );
+
+  const renderSong = useCallback(
+    (index: number) => {
+      const song = getItem(index);
+      if (song) {
+        return (
+          <Song
+            key={song.songId}
+            index={index}
+            isIndexingSongs={preferences?.isSongIndexingEnabled}
+            onPlayClick={handleSongPlayBtnClick}
+            selectAllHandler={selectAllHandler}
+            isCompact={preferences?.isCompactSongView}
+            isDelegated={true}
+            {...song}
+            trackNo={undefined}
+          />
+        );
+      }
+      return (
+        <SongRowSkeleton
+          index={index}
+          isCompact={preferences?.isCompactSongView}
+          rowSize={preferences?.isCompactSongView ? 'small' : 'normal'}
+        />
+      );
+    },
+    [
+      getItem,
+      handleSongPlayBtnClick,
+      preferences?.isCompactSongView,
+      preferences?.isSongIndexingEnabled,
+      selectAllHandler
+    ]
   );
 
   return (
@@ -108,44 +213,43 @@ function GenreInfoPage() {
             iconName: 'play_arrow',
             clickHandler: () =>
               createQueue(
-                genreSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+                playableSongIds,
                 'genre',
                 false,
                 genreData?.genreId,
                 true
               ),
-            isDisabled: !(genreData && genreSongs.length > 0)
+            isDisabled: !(genreData && sortedSongIds.length > 0)
           },
           {
             tooltipLabel: t('common.shuffleAndPlay'),
             iconName: 'shuffle',
             clickHandler: () =>
               createQueue(
-                genreSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+                playableSongIds,
                 'genre',
                 true,
                 genreData?.genreId,
                 true
               ),
-            isDisabled: !(genreData && genreSongs.length > 0)
+            isDisabled: !(genreData && sortedSongIds.length > 0)
           },
           {
             tooltipLabel: t('common.addToQueue'),
             iconName: 'add',
             clickHandler: () => {
-              const songIdsToAdd = genreSongs.map((song) => song.songId);
-              getQueuesManager().getActiveQueue().addSongIdsToEnd(songIdsToAdd);
+              getQueuesManager().getActiveQueue().addSongIdsToEnd(playableSongIds);
               addNewNotifications([
                 {
                   id: String(genreData?.genreId || ''),
                   duration: 5000,
                   content: t('notifications.addedToQueue', {
-                    count: genreSongs.length
+                    count: playableSongIds.length
                   })
                 }
               ]);
             },
-            isDisabled: !(genreData && genreSongs.length > 0)
+            isDisabled: !(genreData && sortedSongIds.length > 0)
           }
         ]}
         dropdowns={[
@@ -172,32 +276,24 @@ function GenreInfoPage() {
               const order = e.currentTarget.value as SongSortTypes;
               navigate({ search: (prev) => ({ ...prev, sortingOrder: order }) });
             },
-            isDisabled: !(genreData && genreSongs.length > 0)
+            isDisabled: !(genreData && sortedSongIds.length > 0)
           }
         ]}
       />
 
       <VirtualizedList
-        data={genreSongs}
+        data={sortedSongIds}
         fixedItemHeight={60}
         scrollKey={scrollKey}
+        computeItemKey={(_index, id) => id}
+        onChange={onRangeChange}
         components={{
-          Header: () => <GenreImgAndInfoContainer genreData={genreData} genreSongs={genreSongs} />
+          Header: () => <GenreImgAndInfoContainer genreData={genreData} genreSongs={[]} />
         }}
-        itemContent={(index, item) => {
-          return (
-            <Song
-              key={index}
-              index={index}
-              isIndexingSongs={preferences?.isSongIndexingEnabled}
-              onPlayClick={handleSongPlayBtnClick}
-              selectAllHandler={selectAllHandler}
-              {...item}
-              trackNo={undefined}
-            />
-          );
-        }}
+        itemContent={renderSong}
       />
     </MainContainer>
   );
 }
+
+export default GenreInfoPage;

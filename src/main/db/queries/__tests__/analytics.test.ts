@@ -47,4 +47,49 @@ describe('Analytics Database Queries - Logic & Period Validation', () => {
     expect(stats).toBeDefined();
     expect(typeof stats.totalTracks).toBe('number');
   });
+
+  it('accurately buckets circadian rhythm hours and daily activity in local time', async () => {
+    const { db } = await import('../../db');
+    const { songs, playHistory } = await import('../../schema');
+    const { getListeningAnalytics } = await import('../analytics');
+
+    await db.delete(playHistory);
+    await db.delete(songs);
+
+    const now = new Date();
+    const localHour = now.getHours();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const localDateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+    const [song] = await db
+      .insert(songs)
+      .values({
+        title: 'Circadian Test Track',
+        duration: 200,
+        path: 'C:\\Music\\circadian_track.mp3',
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    await db.insert(playHistory).values({
+      songId: song.id,
+      createdAt: now,
+      updatedAt: now
+    });
+
+    const analytics = await getListeningAnalytics('7');
+    expect(analytics).toBeDefined();
+
+    // Verify hourly distribution reflects local hour
+    const hourBucket = analytics.hourlyDistribution.find((h) => h.hour === localHour);
+    expect(hourBucket).toBeDefined();
+    expect(hourBucket!.playCount).toBe(1);
+
+    // Verify daily activity reflects local date string
+    const dayBucket = analytics.dailyActivity.find((d) => d.date === localDateStr);
+    expect(dayBucket).toBeDefined();
+    expect(dayBucket!.playCount).toBe(1);
+    expect(dayBucket!.seconds).toBe(200);
+  });
 });

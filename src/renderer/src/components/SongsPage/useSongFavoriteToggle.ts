@@ -1,10 +1,11 @@
+import { type QueryClient, QueryClientContext } from '@tanstack/react-query';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useNotifications } from '../../hooks/useNotifications';
-import { songCacheKeys, songQuery } from '../../queries/songs';
-import { queryClient } from '../../queryClient';
+import { songQuery } from '../../queries/songs';
+import { queryClient as defaultQueryClient } from '../../queryClient';
 
 export interface UseSongFavoriteToggleProps {
   songId: number;
@@ -19,23 +20,34 @@ export interface UseSongFavoriteToggleReturn {
   toggleFavorite: () => void;
 }
 
-export function applyFavoriteToCaches(songId: number, isFav: boolean): void {
-  // 1. Optimistically update all windowed query caches in React Query
-  queryClient.setQueriesData<SongData[]>({ queryKey: songCacheKeys.windowsRoot }, (old) => {
-    if (!Array.isArray(old)) return old;
-    let changed = false;
-    const updated = old.map((s) => {
-      if (s && s.songId === songId) {
-        changed = true;
-        return { ...s, isAFavorite: isFav };
-      }
-      return s;
-    });
-    return changed ? updated : old;
+export function applyFavoriteToCaches(
+  songId: number,
+  isFav: boolean,
+  client: QueryClient = defaultQueryClient
+): void {
+  // 1. Optimistically update all active windowed query caches across all keyPrefixes
+  const windowQueries = client.getQueryCache().findAll({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) && query.queryKey.length >= 2 && query.queryKey[1] === 'window'
   });
 
+  for (const wQuery of windowQueries) {
+    client.setQueryData<SongData[]>(wQuery.queryKey, (old) => {
+      if (!Array.isArray(old)) return old;
+      let changed = false;
+      const updated = old.map((s) => {
+        if (s && s.songId === songId) {
+          changed = true;
+          return { ...s, isAFavorite: isFav };
+        }
+        return s;
+      });
+      return changed ? updated : old;
+    });
+  }
+
   // 2. Optimistically update legacy/non-windowed song queries
-  queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
+  client.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
     { queryKey: songQuery.all._def },
     (old) => {
       if (!old?.data) return old;
@@ -47,10 +59,21 @@ export function applyFavoriteToCaches(songId: number, isFav: boolean): void {
   );
 }
 
+export function invalidateLikeSensitiveQueries(client: QueryClient = defaultQueryClient): void {
+  client.invalidateQueries({ queryKey: songQuery.favorites._def });
+  const likeSensitiveFilters = new Set(['favorites', 'nonFavorites']);
+  const idQueries = client.getQueryCache().findAll({ queryKey: songQuery.ids._def });
+  for (const listQuery of idQueries) {
+    const params = listQuery.queryKey?.[2] as { filterType?: string } | undefined;
+    if (params && likeSensitiveFilters.has(params.filterType ?? '')) {
+      client.invalidateQueries({ queryKey: listQuery.queryKey });
+    }
+  }
+}
+
 /**
- * Shared favorite toggle hook with deduplicated cache synchronization,
- * optimistic updates, sequence-guarded async rollback, player bar heart sync,
- * and error notification handling.
+ * Shared favorite toggle hook with deduplicated cache synchronization, optimistic updates,
+ * sequence-guarded async rollback, player bar heart sync, and error notification handling.
  */
 export function useSongFavoriteToggle({
   songId,
@@ -60,6 +83,8 @@ export function useSongFavoriteToggle({
   toggleIsFavorite: directToggleIsFavorite
 }: UseSongFavoriteToggleProps): UseSongFavoriteToggleReturn {
   const { t } = useTranslation();
+  const clientContext = useContext(QueryClientContext);
+  const client = clientContext ?? defaultQueryClient;
   const context = useContext(AppUpdateContext);
   const { addNewNotifications: hookNotifications } = useNotifications();
 
@@ -90,7 +115,7 @@ export function useSongFavoriteToggle({
     }
 
     // 2. Optimistically update query caches
-    applyFavoriteToCaches(songId, nextFav);
+    applyFavoriteToCaches(songId, nextFav, client);
 
     // 3. Audio player heart sync
     if (isCurrentSong && toggleIsFavorite) {
@@ -106,15 +131,15 @@ export function useSongFavoriteToggle({
         if (res && res.likes.length + res.dislikes.length === 0) {
           // DB did not change any rows — rollback
           setOptimisticFavorite({ songId, isFavorite: !nextFav });
-          applyFavoriteToCaches(songId, !nextFav);
+          applyFavoriteToCaches(songId, !nextFav, client);
           if (isCurrentSong && toggleIsFavorite) {
             toggleIsFavorite(!nextFav, true);
           }
+          invalidateLikeSensitiveQueries(client);
         } else {
-          // songCacheKeys has no favorites() factory (it only holds window
-          // keys); the favorites list key lives on songQuery — same key the
-          // data-sync layer invalidates for 'songs:favorites'.
-          queryClient.invalidateQueries({ queryKey: songQuery.favorites._def });
+          // Success: Invalidate both legacy favorites query and like-sensitive ID lists
+          // (such as the Favorites page) so favorited / unfavorited tracks reflect immediately.
+          invalidateLikeSensitiveQueries(client);
         }
       })
       .catch((err) => {
@@ -122,10 +147,11 @@ export function useSongFavoriteToggle({
 
         console.error('[useSongFavoriteToggle] Failed to toggle like:', err);
         setOptimisticFavorite({ songId, isFavorite: !nextFav });
-        applyFavoriteToCaches(songId, !nextFav);
+        applyFavoriteToCaches(songId, !nextFav, client);
         if (isCurrentSong && toggleIsFavorite) {
           toggleIsFavorite(!nextFav, true);
         }
+        invalidateLikeSensitiveQueries(client);
         addNewNotifications([
           {
             id: `toggleLikeError-${songId}`,

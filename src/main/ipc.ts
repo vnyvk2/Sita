@@ -71,7 +71,11 @@ import {
 } from './db/queries/analytics';
 import { getArtistSummaries, getArtistSongIds } from './db/queries/artists';
 import { getGenreSummaries, getGenreSongIds } from './db/queries/genres';
-import type { HistoryQueryOptions } from './db/queries/history';
+import {
+  getHistorySongIds,
+  type HistoryQueryOptions,
+  type HistorySongIdsParams
+} from './db/queries/history';
 import {
   addIgnoredArtist,
   addIgnoredDuplicate,
@@ -827,6 +831,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
           onlyFavoriteArtists?: boolean;
           onlyFavoriteAlbums?: boolean;
           restrictToIds?: number[];
+          recentlyAddedPeriod?: RecentlyAddedPeriod;
         }
       ) =>
         memProfiler.wrapHandler('app/getFilteredSongLibraryIds', () =>
@@ -840,6 +845,10 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
 
     ipcMain.handle('app/getSongDurations', (_, songIds: number[]) =>
       memProfiler.wrapHandler('app/getSongDurations', () => getSongDurationsByIds(songIds))
+    );
+
+    ipcMain.handle('app/getHistorySongIds', (_, options?: HistorySongIdsParams) =>
+      memProfiler.wrapHandler('app/getHistorySongIds', () => getHistorySongIds(options ?? {}))
     );
 
     ipcMain.handle('library/getChangeState', () => libraryChangeTracker.getState());

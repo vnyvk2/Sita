@@ -11,7 +11,7 @@ describe('songs query layer & cache invariants', () => {
     expect(SONG_WINDOW_GC_TIME).toBeGreaterThanOrEqual(SONG_WINDOW_STALE_TIME);
   });
 
-  it('generates deterministic and order-independent cache keys for allSongInfo', () => {
+  it('generates deterministic and order-sensitive cache keys reflecting song ID sequence', () => {
     const queryA = songQuery.allSongInfo({
       songIds: [100, 25, 42, 8],
       sortType: 'aToZ',
@@ -24,7 +24,9 @@ describe('songs query layer & cache invariants', () => {
       filterType: 'notSelected'
     });
 
-    expect(queryA.queryKey).toEqual(queryB.queryKey);
+    // Order-sensitive: different ID sequence MUST produce distinct cache keys
+    // to prevent serving stale windows upon drag-and-drop reorder or shuffle
+    expect(queryA.queryKey).not.toEqual(queryB.queryKey);
   });
 
   it('generates compact cache keys even for large song arrays', () => {
@@ -55,9 +57,19 @@ describe('songs query layer & cache invariants', () => {
     expect(query1.queryKey[2]).not.toEqual(query2.queryKey[2]);
   });
 
-  it('maintains stable list identity generation', () => {
+  it('maintains stable list identity generation and changes on ID reorder', () => {
     expect(getSongListIdentity({ sortType: 'aToZ' })).toBe('ids={"sortType":"aToZ"}');
     expect(getSongListIdentity('ids=test')).toBe('ids=test');
     expect(getSongListIdentity(null)).toBe('ids=default');
+
+    const idWithRestrictedA = getSongListIdentity({ sortType: 'aToZ', restrictToIds: [1, 2, 3] });
+    const idWithRestrictedB = getSongListIdentity({ sortType: 'aToZ', restrictToIds: [3, 2, 1] });
+
+    expect(idWithRestrictedA).toContain(':restricted=');
+    expect(idWithRestrictedA).toContain(':3');
+    expect(idWithRestrictedA).not.toContain('[1,2,3]');
+
+    // Proves reorder mutation -> identity changes -> windows refetch
+    expect(idWithRestrictedA).not.toEqual(idWithRestrictedB);
   });
 });

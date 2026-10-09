@@ -90,7 +90,6 @@ export function getInvalidationTargetsForEvent(
         'songs:all',
         'songs:allInfo',
         'songs:singleInfo',
-        'songs:windows',
         'songs:ids',
         'songs:facets',
         'songs:recentlyAdded',
@@ -131,7 +130,7 @@ export function getInvalidationTargetsForEvent(
     case 'songs/listeningData/skips':
     case 'songs/listeningData/listens':
     case 'songs/listeningData/inNoOfPlaylists':
-      return ['home:recentlyPlayedSongs', 'analytics:listening'];
+      return ['home:recentlyPlayedSongs', 'analytics:listening', 'songs:history'];
 
     // 5. Artists
     case 'artists':
@@ -233,6 +232,7 @@ export function invalidateTarget(target: InvalidationTargetKey, client = queryCl
       break;
     case 'songs:history':
       client.invalidateQueries({ queryKey: songQuery.history._def });
+      client.invalidateQueries({ queryKey: songQuery.historyIds._def });
       break;
     case 'songs:recentlyAdded':
       client.invalidateQueries({ queryKey: songQuery.recentlyAdded._def });

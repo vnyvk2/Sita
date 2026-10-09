@@ -1,4 +1,4 @@
-import type { PlaylistDto } from '@common/collections/dtos';
+import type { PlaylistDto, PlaylistCatalogOptions } from '@common/collections/dtos';
 import type { PlaylistViewMode } from '@common/collections/types';
 import { useQuery, queryOptions } from '@tanstack/react-query';
 
@@ -83,3 +83,22 @@ export const collectionBreadcrumbsOptions = (id: number) => {
     queryFn: () => CollectionClient.getBreadcrumbs(id)
   });
 };
+
+export const playlistCatalogOptions = (
+  id: number,
+  options?: PlaylistCatalogOptions
+) => {
+  return queryOptions({
+    queryKey: collectionKeys.catalog(id, options),
+    queryFn: () => CollectionClient.getPlaylistSongCatalog(id, options),
+    staleTime: 5 * 60 * 1000
+  });
+};
+
+export const usePlaylistCatalog = (
+  id: number,
+  options?: PlaylistCatalogOptions
+) => {
+  return useQuery({ ...playlistCatalogOptions(id, options), enabled: !!id });
+};
+

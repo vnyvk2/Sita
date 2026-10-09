@@ -658,4 +658,22 @@ describe('VirtualizedList - Restoration State Machine & Hardening', () => {
       }
     });
   });
+
+  describe('customScrollParent support', () => {
+    it('passes customScrollParent to Virtuoso and omits 100% height from style', () => {
+      const scrollParent = document.createElement('div');
+      render(
+        <VirtualizedList
+          data={[{ id: 1 }, { id: 2 }]}
+          fixedItemHeight={60}
+          customScrollParent={scrollParent}
+          itemContent={(idx) => <div>Item {idx}</div>}
+        />
+      );
+
+      expect(lastVirtuosoProps.customScrollParent).toBe(scrollParent);
+      const style = lastVirtuosoProps.style as React.CSSProperties | undefined;
+      expect(style?.height).toBeUndefined();
+    });
+  });
 });

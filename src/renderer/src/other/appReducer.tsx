@@ -29,6 +29,7 @@ export interface AppReducer {
   playerType: PlayerTypes;
   isLibraryDiagnosticsPanelOpen: boolean;
   isLyricsDrawerOpen: boolean;
+  queueUpdateKind?: 'position' | 'structure';
 }
 
 export type AppReducerStateActions =

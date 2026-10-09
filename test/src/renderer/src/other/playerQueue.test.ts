@@ -976,7 +976,7 @@ describe('PlayerQueue', () => {
         expect(queue.isEmpty).toBe(true);
       });
 
-      test('should handle missing songIds with empty array', () => {
+      test('should handle missing songIds with empty array and clamp position to 0', () => {
         const json = {
           songIds: undefined as any,
           position: 5
@@ -984,7 +984,7 @@ describe('PlayerQueue', () => {
         const queue = PlayerQueue.fromJSON(json);
 
         expect(queue.songIds).toEqual([]);
-        expect(queue.position).toBe(5);
+        expect(queue.position).toBe(0);
       });
 
       test('should handle missing position with 0', () => {
@@ -996,6 +996,29 @@ describe('PlayerQueue', () => {
 
         expect(queue.songIds).toEqual(['song1', 'song2']);
         expect(queue.position).toBe(0);
+      });
+
+      test('should clamp out-of-bounds position to valid range in fromJSON', () => {
+        const jsonNegative = {
+          songIds: ['song1', 'song2'],
+          position: -5
+        };
+        const queueNegative = PlayerQueue.fromJSON(jsonNegative);
+        expect(queueNegative.position).toBe(0);
+
+        const jsonExceeding = {
+          songIds: ['song1', 'song2'],
+          position: 99
+        };
+        const queueExceeding = PlayerQueue.fromJSON(jsonExceeding);
+        expect(queueExceeding.position).toBe(1);
+
+        const jsonEmpty = {
+          songIds: [],
+          position: 10
+        };
+        const queueEmpty = PlayerQueue.fromJSON(jsonEmpty);
+        expect(queueEmpty.position).toBe(0);
       });
 
       test('should restore complete queue state', () => {

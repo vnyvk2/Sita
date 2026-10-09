@@ -5,12 +5,25 @@ import {
   smartPlaylistRules,
   songs,
   artists,
-  artistsSongs
+  artistsSongs,
+  albums,
+  albumsSongs,
+  genres,
+  genresSongs,
+  metadataOverrides,
+  playHistory
 } from '@db/schema';
 import { rawRun } from '@db/sqlite/raw';
-import { eq, and, gte, inArray, sql, asc, desc, lte } from 'drizzle-orm';
+import { eq, and, gte, inArray, sql, asc, desc, lte, type SQL } from 'drizzle-orm';
 
+import type {
+  PlaylistCatalogOptions,
+  PlaylistCatalogEntry,
+  PlaylistCatalogResult
+} from '../../../common/collections/dtos';
+export type { PlaylistCatalogOptions, PlaylistCatalogEntry, PlaylistCatalogResult };
 import type { PlaylistViewMode } from '../../../common/collections/types';
+import { titleToBucket } from '../../../common/titleToBucket';
 import logger from '../../logger';
 import { MembershipBootstrap } from '../../membership/bootstrap/MembershipBootstrap';
 import type { ExportEntry } from '../../playlistExport/formatters/PlaylistFormatter';
@@ -470,6 +483,196 @@ export class PlaylistRepository {
     return {
       itemCountDelta: songIds.length,
       durationDelta
+    };
+  }
+
+  public async getPlaylistSongCatalog(
+    playlistId: number,
+    options: PlaylistCatalogOptions = {},
+    trx: DB | DBTransaction = db
+  ): Promise<PlaylistCatalogResult> {
+    const {
+      sortType = 'customOrder',
+      filterType = 'notSelected',
+      keyword,
+      language
+    } = options;
+
+    const filters: SQL[] = [eq(playlistEntries.playlistId, playlistId)];
+
+    if (filterType === 'favorites') {
+      filters.push(eq(songs.isFavorite, true));
+    } else if (filterType === 'nonFavorites') {
+      filters.push(eq(songs.isFavorite, false));
+    } else if (filterType === 'blacklistedSongs') {
+      filters.push(eq(songs.isBlacklisted, true));
+    } else if (filterType === 'whitelistedSongs') {
+      filters.push(eq(songs.isBlacklisted, false));
+    }
+
+    const hasTruthyLanguageOverride = sql`EXISTS (
+      SELECT 1 FROM ${metadataOverrides}
+      WHERE ${metadataOverrides.entityKind} = 'song'
+        AND ${metadataOverrides.fieldId} = 'language'
+        AND ${metadataOverrides.entityId} = ${songs.id}
+        AND ${metadataOverrides.stringValue} IS NOT NULL
+        AND trim(${metadataOverrides.stringValue}) <> ''
+    )`;
+
+    if (language && language !== 'all') {
+      if (language === 'unspecified') {
+        filters.push(
+          sql`(NOT ${hasTruthyLanguageOverride} AND (${songs.language} IS NULL OR trim(${songs.language}) = ''))`
+        );
+      } else {
+        const targetLang = language.toLowerCase();
+        filters.push(sql`(
+          (EXISTS (
+            SELECT 1 FROM ${metadataOverrides}
+            WHERE ${metadataOverrides.entityKind} = 'song'
+              AND ${metadataOverrides.fieldId} = 'language'
+              AND ${metadataOverrides.entityId} = ${songs.id}
+              AND lower(${metadataOverrides.stringValue}) = ${targetLang}
+          ))
+          OR (
+            NOT ${hasTruthyLanguageOverride}
+            AND lower(${songs.language}) = ${targetLang}
+          )
+        )`);
+      }
+    }
+
+    if (keyword?.trim()) {
+      const escaped = keyword
+        .trim()
+        .toLowerCase()
+        .replaceAll('\\', '\\\\')
+        .replaceAll('%', '\\%')
+        .replaceAll('_', '\\_');
+      const kw = `%${escaped}%`;
+      filters.push(sql`(
+        lower(${songs.title}) LIKE ${kw} ESCAPE '\\'
+        OR EXISTS (
+          SELECT 1 FROM ${artistsSongs}
+          INNER JOIN ${artists} ON ${artists.id} = ${artistsSongs.artistId}
+          WHERE ${artistsSongs.songId} = ${songs.id}
+            AND lower(${artists.name}) LIKE ${kw} ESCAPE '\\'
+        )
+        OR EXISTS (
+          SELECT 1 FROM ${albumsSongs}
+          INNER JOIN ${albums} ON ${albums.id} = ${albumsSongs.albumId}
+          WHERE ${albumsSongs.songId} = ${songs.id}
+            AND lower(${albums.title}) LIKE ${kw} ESCAPE '\\'
+        )
+        OR EXISTS (
+          SELECT 1 FROM ${genresSongs}
+          INNER JOIN ${genres} ON ${genres.id} = ${genresSongs.genreId}
+          WHERE ${genresSongs.songId} = ${songs.id}
+            AND lower(${genres.name}) LIKE ${kw} ESCAPE '\\'
+        )
+      )`);
+    }
+
+    let orderClauses: SQL[] = [];
+    if (sortType === 'customOrder' || !sortType) {
+      orderClauses = [asc(playlistEntries.position), asc(playlistEntries.id)];
+    } else if (sortType === 'originalOrder') {
+      orderClauses = [asc(playlistEntries.id)];
+    } else if (sortType === 'aToZ') {
+      orderClauses = [asc(songs.title), asc(playlistEntries.position)];
+    } else if (sortType === 'zToA') {
+      orderClauses = [desc(songs.title), asc(playlistEntries.position)];
+    } else if (sortType === 'dateAddedAscending') {
+      orderClauses = [asc(playlistEntries.addedAt), asc(playlistEntries.position)];
+    } else if (sortType === 'dateAddedDescending') {
+      orderClauses = [desc(playlistEntries.addedAt), asc(playlistEntries.position)];
+    } else if (sortType === 'releasedYearAscending') {
+      orderClauses = [asc(songs.year), asc(songs.title), asc(playlistEntries.position)];
+    } else if (sortType === 'releasedYearDescending') {
+      orderClauses = [desc(songs.year), asc(songs.title), asc(playlistEntries.position)];
+    } else if (sortType === 'artistNameAscending') {
+      orderClauses = [
+        sql`(SELECT min(lower(${artists.name})) FROM ${artistsSongs} JOIN ${artists} ON ${artists.id} = ${artistsSongs.artistId} WHERE ${artistsSongs.songId} = ${songs.id}) ASC`,
+        asc(songs.title),
+        asc(playlistEntries.position)
+      ];
+    } else if (sortType === 'albumNameAscending') {
+      orderClauses = [
+        sql`(SELECT min(lower(${albums.title})) FROM ${albumsSongs} JOIN ${albums} ON ${albums.id} = ${albumsSongs.albumId} WHERE ${albumsSongs.songId} = ${songs.id}) ASC`,
+        asc(songs.title),
+        asc(playlistEntries.position)
+      ];
+    } else if (sortType === 'allTimeMostListened') {
+      orderClauses = [
+        sql`(SELECT count(*) FROM ${playHistory} WHERE ${playHistory.songId} = ${songs.id}) DESC`,
+        asc(playlistEntries.position)
+      ];
+    } else {
+      if (sortType) {
+        logger.warn(
+          `[PlaylistRepository] Unhandled sortType "${sortType}" in getPlaylistSongCatalog; defaulting to customOrder`
+        );
+      }
+      orderClauses = [asc(playlistEntries.position), asc(playlistEntries.id)];
+    }
+
+    const rows = await trx
+      .select({
+        entryId: playlistEntries.id,
+        songId: playlistEntries.songId,
+        isBlacklisted: songs.isBlacklisted,
+        title: songs.title,
+        duration: songs.duration
+      })
+      .from(playlistEntries)
+      .innerJoin(songs, eq(playlistEntries.songId, songs.id))
+      .where(and(...filters))
+      .orderBy(...orderClauses);
+
+    const langRows = await trx
+      .selectDistinct({ language: songs.language })
+      .from(playlistEntries)
+      .innerJoin(songs, eq(playlistEntries.songId, songs.id))
+      .where(
+        and(
+          eq(playlistEntries.playlistId, playlistId),
+          sql`${songs.language} IS NOT NULL AND trim(${songs.language}) <> ''`
+        )
+      );
+    const languages = langRows
+      .map((r) => r.language?.trim())
+      .filter((l): l is string => Boolean(l))
+      .sort();
+
+    const isAlphaSort = sortType === 'aToZ' || sortType === 'zToA';
+    const entries: PlaylistCatalogEntry[] = [];
+    const blacklistedSet = new Set<number>();
+    const alphabetMap: Record<string, number> = {};
+    const letterCounts: Record<string, number> = {};
+    let totalDuration = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      entries.push({ entryId: row.entryId, songId: row.songId });
+      totalDuration += Number(row.duration ?? 0);
+      if (row.isBlacklisted) blacklistedSet.add(row.songId);
+      if (isAlphaSort) {
+        const bucket = titleToBucket(row.title);
+        if (alphabetMap[bucket] === undefined) {
+          alphabetMap[bucket] = i;
+        }
+        letterCounts[bucket] = (letterCounts[bucket] || 0) + 1;
+      }
+    }
+
+    return {
+      entries,
+      total: entries.length,
+      totalDuration,
+      blacklistedIds: Array.from(blacklistedSet),
+      languages,
+      alphabetMap: isAlphaSort ? alphabetMap : undefined,
+      letterCounts: isAlphaSort ? letterCounts : undefined
     };
   }
 }

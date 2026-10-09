@@ -3,9 +3,19 @@ import Dropdown from '@renderer/components/Dropdown';
 import MainContainer from '@renderer/components/MainContainer';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
+import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
+import {
+  getSongListIdentity,
+  songCacheKeys,
+  songIdsVersionFromState,
+  songQuery,
+  type SongIdsParams
+} from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import {
   computeFolderMetricsMap,
@@ -14,6 +24,7 @@ import {
 } from '@renderer/utils/folderMetrics';
 import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
+import { useQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -21,6 +32,40 @@ import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/folders/$folderPath')({
   validateSearch: songSearchSchema,
+  loaderDeps: ({ search }) => ({
+    sortingOrder: search.sortingOrder,
+    filteringOrder: search.filteringOrder
+  }),
+  loader: async ({ params, deps }) => {
+    if (typeof window === 'undefined' || !window.api?.folderData) return;
+    if (params.folderPath) {
+      const res = await window.api.folderData.getFolderData([params.folderPath]);
+      if (res && res.length > 0 && res[0].songIds.length > 0) {
+        const idsParams: SongIdsParams = {
+          restrictToIds: res[0].songIds,
+          sortType: deps?.sortingOrder ?? 'aToZ',
+          filterType: deps?.filteringOrder ?? 'notSelected'
+        };
+        const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
+        if (idsData.ids.length === 0) return;
+        const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
+        const version = songIdsVersionFromState(state?.dataUpdatedAt);
+        const listIdentity = getSongListIdentity(idsParams);
+        await queryClient.ensureQueryData({
+          queryKey: songCacheKeys.window(listIdentity, version, 0),
+          queryFn: () =>
+            window.api.audioLibraryControls.getSongInfo(
+              idsData.ids.slice(0, Math.min(200, idsData.ids.length)),
+              undefined,
+              undefined,
+              undefined,
+              true
+            ),
+          staleTime: 5 * 60 * 1000
+        });
+      }
+    }
+  },
   component: MusicFolderInfoPage
 });
 
@@ -45,7 +90,6 @@ function MusicFolderInfoPage() {
   );
 
   const [folderInfo, setFolderInfo] = useState<MusicFolder>();
-  const [folderSongs, setFolderSongs] = useState<SongData[]>([]);
 
   const { folderName } = useMemo(() => {
     if (folderInfo) {
@@ -71,8 +115,48 @@ function MusicFolderInfoPage() {
 
   const subFolders = useMemo(() => folderInfo?.subFolders || [], [folderInfo]);
 
-  const totalSongsDisplay = currentMetrics?.totalSongCount ?? folderSongs.length;
-  const directSongsDisplay = currentMetrics?.directSongCount ?? folderSongs.length;
+  const folderSongIds = useMemo(() => folderInfo?.songIds ?? [], [folderInfo?.songIds]);
+
+  const folderSongIdsParams: SongIdsParams = useMemo(
+    () => ({
+      restrictToIds: folderSongIds,
+      sortType: sortingOrder,
+      filterType: filteringOrder
+    }),
+    [folderSongIds, sortingOrder, filteringOrder]
+  );
+
+  const idsQuery = useQuery({
+    ...songQuery.ids(folderSongIdsParams),
+    enabled: folderSongIds.length > 0
+  });
+
+  const filteredFolderSongIds = idsQuery.data?.ids ?? [];
+  const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
+  const listIdentity = useMemo(
+    () => getSongListIdentity(folderSongIdsParams),
+    [folderSongIdsParams]
+  );
+
+  const blacklistedSet = useMemo(
+    () => new Set(idsQuery.data?.blacklistedIds ?? []),
+    [idsQuery.data?.blacklistedIds]
+  );
+
+  const playableSongIds = useMemo(
+    () => filteredFolderSongIds.filter((id) => !blacklistedSet.has(id)),
+    [filteredFolderSongIds, blacklistedSet]
+  );
+
+  const { getItem, onRangeChange } = useWindowHydration(filteredFolderSongIds, idsVersion, {
+    enabled: Boolean(idsQuery.data && filteredFolderSongIds.length > 0),
+    listIdentity,
+    isCompactView: preferences.isCompactSongView,
+    rowHeight: 60
+  });
+
+  const totalSongsDisplay = currentMetrics?.totalSongCount ?? filteredFolderSongIds.length;
+  const directSongsDisplay = currentMetrics?.directSongCount ?? filteredFolderSongIds.length;
   const subFoldersDisplay = currentMetrics?.directFolderCount ?? subFolders.length;
   const hasPlayableSongs = totalSongsDisplay > 0;
 
@@ -88,19 +172,6 @@ function MusicFolderInfoPage() {
     }
     return undefined;
   }, [folderPath]);
-
-  const fetchFolderSongs = useCallback(() => {
-    if (folderInfo && folderInfo.songIds.length > 0) {
-      window.api.audioLibraryControls
-        .getSongInfo(folderInfo.songIds, sortingOrder, filteringOrder)
-        .then((res) => {
-          if (res && res.length > 0) return setFolderSongs(res);
-          return undefined;
-        })
-        .catch((err) => console.error(err));
-    }
-    return setFolderSongs([]);
-  }, [filteringOrder, folderInfo, sortingOrder]);
 
   useEffect(() => {
     fetchFolderInfo();
@@ -120,45 +191,18 @@ function MusicFolderInfoPage() {
   }, [fetchFolderInfo]);
 
   useEffect(() => {
-    fetchFolderSongs();
-    const manageSongUpdatesInMusicFolderInfoPage = (e: Event) => {
-      if ('detail' in e) {
-        const dataEvents = (e as DetailAvailableEvent<DataUpdateEvent[]>).detail;
-        for (let i = 0; i < dataEvents.length; i += 1) {
-          const event = dataEvents[i];
-          if (
-            event.dataType === 'songs/artworks' ||
-            event.dataType === 'songs/deletedSong' ||
-            event.dataType === 'songs/newSong' ||
-            event.dataType === 'songs/updatedSong' ||
-            (event.dataType === 'songs/likes' && event.eventData.length > 1)
-          )
-            fetchFolderSongs();
-        }
-      }
-    };
-    document.addEventListener('app/dataUpdates', manageSongUpdatesInMusicFolderInfoPage);
-    return () => {
-      document.removeEventListener('app/dataUpdates', manageSongUpdatesInMusicFolderInfoPage);
-    };
-  }, [fetchFolderSongs]);
-
-  useEffect(() => {
     storage.sortingStates.setSortingStates('songsPage', sortingOrder);
   }, [sortingOrder]);
 
-  const selectAllHandler = useSelectAllHandler(folderSongs, 'songs', 'songId');
+  const selectAllHandler = useSelectAllHandler(playableSongIds, 'songs');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId?: number, shuffleQueue = false, startPlaying = false) => {
-      const queueSongIds = folderSongs
-        .filter((song) => !song.isBlacklisted)
-        .map((song) => song.songId);
-      createQueue(queueSongIds, 'folder', shuffleQueue, folderInfo?.path, startPlaying, folderName);
+      createQueue(playableSongIds, 'folder', shuffleQueue, folderInfo?.path, startPlaying, folderName);
 
-      if (currSongId) updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
+      if (currSongId) updateQueueData(playableSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, folderInfo?.path, folderName, folderSongs]
+    [createQueue, updateQueueData, folderInfo?.path, folderName, playableSongIds]
   );
 
   const handlePlayAllBranch = useCallback(
@@ -194,8 +238,8 @@ function MusicFolderInfoPage() {
       }}
     >
       <>
-        {/* Breadcrumbs Navigation Bar */}
-        <div className="breadcrumbs-container text-font-color-highlight/80 dark:text-dark-font-color-highlight/80 mt-1 mb-3 flex flex-wrap items-center text-sm font-normal">
+        {/* Breadcrumb Navigation */}
+        <div className="breadcrumbs-container text-font-color-black/70 dark:text-font-color-white/70 mb-2 flex flex-wrap items-center text-xs">
           <button
             type="button"
             className="hover:text-font-color-highlight dark:hover:text-dark-font-color-highlight flex cursor-pointer items-center transition-colors"
@@ -283,7 +327,7 @@ function MusicFolderInfoPage() {
                   tooltipLabel={t('common.selectAll')}
                 />
               )}
-              {folderSongs.length > 0 && (
+              {filteredFolderSongIds.length > 0 && (
                 <Button
                   key={1}
                   className="select-btn text-sm md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
@@ -314,7 +358,7 @@ function MusicFolderInfoPage() {
                   />
                 </>
               )}
-              {folderSongs.length > 0 && (
+              {filteredFolderSongIds.length > 0 && (
                 <>
                   <Dropdown
                     name="songsPageFilterDropdown"
@@ -350,32 +394,35 @@ function MusicFolderInfoPage() {
           )}
         </div>
 
-        {/* Subfolders Section */}
+        {/* Sub-Folders Section */}
         {subFolders.length > 0 && (
-          <div className="subfolders-section mb-6">
+          <div className="sub-folders-section mb-6">
             <div className="text-font-color-highlight dark:text-dark-font-color-highlight mb-3 flex items-center justify-between text-xs font-semibold tracking-wider uppercase">
-              <span>{t('common.subFolderWithCount', { count: subFolders.length })}</span>
+              <span>
+                {t('foldersPage.subFolders', { defaultValue: 'Sub-folders' })} ({subFolders.length})
+              </span>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
               {subFolders.map((sub) => {
                 const subMetrics = metricsMap.get(sub.path);
                 const subTotalSongs = subMetrics?.totalSongCount ?? sub.songIds.length;
-                const subDirectFolders = sub.subFolders?.length ?? 0;
+                const subDirectFolders = subMetrics?.directFolderCount ?? sub.subFolders.length;
                 const subName = sub.path.split(/[\\/]/).pop() || sub.path;
 
                 return (
                   <div
                     key={sub.path}
-                    role="button"
                     tabIndex={0}
-                    onClick={() =>
+                    role="button"
+                    onClick={() => {
                       navigate({
                         to: '/main-player/folders/$folderPath',
                         params: { folderPath: sub.path }
-                      })
-                    }
+                      });
+                    }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
                         navigate({
                           to: '/main-player/folders/$folderPath',
                           params: { folderPath: sub.path }
@@ -421,33 +468,44 @@ function MusicFolderInfoPage() {
 
         {/* Direct Songs Section */}
         <div className="direct-songs-section min-h-0 flex-1 pb-2">
-          {subFolders.length > 0 && folderSongs.length > 0 && (
+          {subFolders.length > 0 && filteredFolderSongIds.length > 0 && (
             <div className="text-font-color-highlight dark:text-dark-font-color-highlight mb-3 flex items-center justify-between text-xs font-semibold tracking-wider uppercase">
               <span>
                 {t('foldersPage.songsInThisFolder', { defaultValue: 'Songs in this folder' })} (
-                {folderSongs.length})
+                {filteredFolderSongIds.length})
               </span>
             </div>
           )}
-          {folderSongs.length > 0 ? (
+          {filteredFolderSongIds.length > 0 ? (
             <div className="songs-container h-full min-h-0 flex-1">
               <VirtualizedList
-                data={folderSongs}
+                data={filteredFolderSongIds}
                 fixedItemHeight={60}
                 scrollKey={scrollKey}
-                itemContent={(index, song) => {
+                computeItemKey={(_index, id) => id}
+                onChange={onRangeChange}
+                itemContent={(index) => {
+                  const song = getItem(index);
                   if (song)
                     return (
                       <Song
-                        key={index}
+                        key={song.songId}
                         index={index}
                         isIndexingSongs={preferences.isSongIndexingEnabled}
                         onPlayClick={handleSongPlayBtnClick}
                         selectAllHandler={selectAllHandler}
+                        isCompact={preferences.isCompactSongView}
+                        isDelegated={true}
                         {...song}
                       />
                     );
-                  return <div>Bad Index</div>;
+                  return (
+                    <SongRowSkeleton
+                      index={index}
+                      isCompact={preferences.isCompactSongView}
+                      rowSize={preferences.isCompactSongView ? 'small' : 'normal'}
+                    />
+                  );
                 }}
               />
             </div>

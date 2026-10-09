@@ -100,6 +100,42 @@ export class QueuesManager {
       this.activeQueueIndex = 0;
     }
 
+    // Restore lightweight playback queue position if available
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const posRaw = localStorage.getItem('nora:playback-queue-position');
+        if (posRaw) {
+          const { queueId, index, songId } = JSON.parse(posRaw);
+          const targetQueue = this.queues.find((q) => q.id === queueId);
+          if (!targetQueue) {
+            // Queue no longer exists; discard stale position key (no cross-queue contamination)
+            localStorage.removeItem('nora:playback-queue-position');
+          } else if (
+            typeof index === 'number' &&
+            index >= 0 &&
+            targetQueue.songIds.length > 0
+          ) {
+            if (typeof songId === 'number') {
+              if (targetQueue.songIds[index] === songId) {
+                targetQueue.position = index;
+              } else {
+                const reconciledIndex = targetQueue.songIds.indexOf(songId);
+                if (reconciledIndex !== -1) {
+                  targetQueue.position = reconciledIndex;
+                } else if (index < targetQueue.songIds.length) {
+                  targetQueue.position = index;
+                }
+              }
+            } else if (index < targetQueue.songIds.length) {
+              targetQueue.position = index;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to parse nora:playback-queue-position:', e);
+      }
+    }
+
     this.queues.forEach((q) => this.bindQueueEvents(q));
 
     this.enforceSingleCanonicalQueue();
@@ -341,6 +377,7 @@ export class QueuesManager {
       }
       const [removed] = this.queues.splice(index, 1);
       this.unbindQueueEvents(removed);
+      this.clearPlaybackPositionStorage(removed.id);
 
       if (this.queues.length === 0) {
         const newQueue = new PlayerQueue();
@@ -394,6 +431,7 @@ export class QueuesManager {
         return true;
       }
       this.unbindQueueEvents(q);
+      this.clearPlaybackPositionStorage(q.id);
       deletedCount++;
       return false;
     });
@@ -490,7 +528,30 @@ export class QueuesManager {
       queue.on('shuffled', () => this.markShuffleSideEffect(queue.id)),
       queue.on('restored', () => this.markShuffleSideEffect(queue.id)),
       queue.on('positionChange', () => {
-        this.triggerStoreSync();
+        if (typeof localStorage !== 'undefined') {
+          try {
+            if (
+              queue.songIds.length > 0 &&
+              queue.position >= 0 &&
+              queue.position < queue.songIds.length
+            ) {
+              localStorage.setItem(
+                'nora:playback-queue-position',
+                JSON.stringify({
+                  queueId: queue.id,
+                  index: queue.position,
+                  songId: queue.songIds[queue.position],
+                  timestamp: Date.now()
+                })
+              );
+            } else {
+              this.clearPlaybackPositionStorage(queue.id);
+            }
+          } catch (e) {
+            console.error('Failed to persist playback queue position:', e);
+          }
+        }
+        this.syncQueuePositionOnly(queue);
       }),
       queue.on('metadataChange', () => {
         this.triggerStoreSync();
@@ -498,6 +559,61 @@ export class QueuesManager {
     ];
 
     this.queueListeners.set(queue.id, unsubs);
+  }
+
+  private clearPlaybackPositionStorage(queueId?: string) {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      if (!queueId) {
+        localStorage.removeItem('nora:playback-queue-position');
+        return;
+      }
+      const posRaw = localStorage.getItem('nora:playback-queue-position');
+      if (posRaw) {
+        const parsed = JSON.parse(posRaw);
+        if (parsed.queueId === queueId) {
+          localStorage.removeItem('nora:playback-queue-position');
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private syncQueuePositionOnly(queue: PlayerQueue) {
+    if (this.isSyncingFromStore || this.isSyncingToStore) return;
+    this.isSyncingToStore = true;
+    try {
+      store.setState((state) => {
+        const queueState = state.localStorage?.queue;
+        if (!queueState?.queues) return state;
+
+        const queueIndex = queueState.queues.findIndex((q) => q.id === queue.id);
+        if (queueIndex === -1 || queueState.queues[queueIndex].position === queue.position) {
+          return state;
+        }
+
+        const updatedQueues = [...queueState.queues];
+        updatedQueues[queueIndex] = {
+          ...updatedQueues[queueIndex],
+          position: queue.position
+        };
+
+        return {
+          ...state,
+          localStorage: {
+            ...state.localStorage,
+            queue: {
+              ...queueState,
+              queues: updatedQueues
+            }
+          },
+          queueUpdateKind: 'position' as const
+        };
+      });
+    } finally {
+      this.isSyncingToStore = false;
+    }
   }
 
   private markShuffleSideEffect(queueId: string): void {
@@ -536,7 +652,8 @@ export class QueuesManager {
             queues: this.queues.map((q) => q.toJSON()),
             currentQueueIndex: this.activeQueueIndex
           }
-        }
+        },
+        queueUpdateKind: 'structure' as const
       }));
     } finally {
       this.isSyncingToStore = false;

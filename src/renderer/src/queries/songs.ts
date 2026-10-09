@@ -9,16 +9,16 @@ export const SONG_IDS_STALE_TIME = 5 * 60 * 1000;
 export const SONG_IDS_GC_TIME = 30 * 60 * 1000;
 
 /**
- * Fast numeric hash for generating compact, stable cache keys from song ID arrays.
- * Produces a deterministic hex string from sorted IDs, replacing the O(n) join
- * that generated proportionally-growing key strings for large playlists/albums.
+ * Fast numeric hash for generating compact, stable cache keys from ordered song ID arrays. Computes
+ * an order-sensitive 32-bit FNV-1a hash over the sequence of song IDs, ensuring that reorders (e.g.
+ * drag-and-drop, shuffle) produce distinct identities and invalidate windowed caches.
  */
-function hashSongIds(ids: readonly number[]): string {
-  const sorted = [...ids].sort((a, b) => a - b);
-  // FNV-1a inspired hash with good distribution for integer sequences
+export function hashSongIds(ids: readonly number[]): string {
+  if (ids.length === 0) return '';
+  // Order-sensitive FNV-1a hash over the sequence of IDs
   let h = 0x811c9dc5 | 0;
-  for (let i = 0; i < sorted.length; i++) {
-    h ^= sorted[i];
+  for (let i = 0; i < ids.length; i++) {
+    h ^= ids[i];
     h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0).toString(36);
@@ -32,6 +32,8 @@ export interface SongIdsParams {
   genre?: string;
   onlyFavoriteArtists?: boolean;
   onlyFavoriteAlbums?: boolean;
+  restrictToIds?: number[];
+  recentlyAddedPeriod?: RecentlyAddedPeriod;
 }
 
 export interface SongIdsResult {
@@ -42,11 +44,36 @@ export interface SongIdsResult {
   letterCounts?: Record<string, number>;
 }
 
+export interface HistorySongIdsParams {
+  sortType?: SongSortTypes;
+  period?: HistoryPeriod;
+  limit?: number;
+  language?: string;
+}
+
+export interface HistorySongIdsResult {
+  entries: Array<{
+    songId: number;
+    playedAt?: number;
+    playCount?: number;
+  }>;
+  ids: number[];
+  total: number;
+  totalDuration?: number;
+  blacklistedIds: number[];
+  languages: string[];
+}
+
 export const getSongListIdentity = (params: SongIdsParams | unknown): string => {
   if (typeof params === 'string') {
     return params.startsWith('ids=') ? params : `ids=${params}`;
   }
   if (params && typeof params === 'object') {
+    const obj = params as Record<string, unknown>;
+    if (Array.isArray(obj.restrictToIds) && obj.restrictToIds.length > 0) {
+      const { restrictToIds, ...rest } = obj;
+      return `ids=${JSON.stringify(rest)}:restricted=${hashSongIds(restrictToIds as number[])}:${(restrictToIds as number[]).length}`;
+    }
     return `ids=${JSON.stringify(params)}`;
   }
   return 'ids=default';
@@ -67,6 +94,17 @@ export const songQuery = createQueryKeys('songs', {
       queryKey: [params],
       queryFn: async (): Promise<SongIdsResult> => {
         if (params.keyword?.trim()) {
+          // TRIPWIRE: window.api.search.query is a capped whole-library search (SEARCH_LIMITS.PAGE)
+          // and does NOT respect restrictToIds. If filtering an isolated subset (e.g. playlist
+          // catalog or folder), do not compose keyword with restrictToIds via this global search path;
+          // use dedicated SQL-level catalog queries (e.g. getPlaylistSongCatalog in Batch 3).
+          if (params.restrictToIds && params.restrictToIds.length > 0) {
+            console.warn(
+              '[songQuery.ids] INCOMPATIBILITY TRIPWIRE: keyword search delegates to global search.query ' +
+                'which searches the whole library up to SEARCH_LIMITS.PAGE and ignores restrictToIds. ' +
+                'Scoped collections must use dedicated SQL-side catalog filtering.'
+            );
+          }
           const res = await window.api.search.query({
             filter: 'Songs',
             keyword: params.keyword,
@@ -84,6 +122,12 @@ export const songQuery = createQueryKeys('songs', {
         }
         return window.api.audioLibraryControls.getFilteredSongLibraryIds(params);
       }
+    };
+  },
+  historyIds: (params: HistorySongIdsParams) => {
+    return {
+      queryKey: [params],
+      queryFn: () => window.api.audioLibraryControls.getHistorySongIds(params)
     };
   },
   facets: () => ({

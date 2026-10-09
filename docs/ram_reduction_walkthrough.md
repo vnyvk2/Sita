@@ -3,7 +3,7 @@
 ## 1. Executive Summary
 - Forensic validation across dev and packaged production environments has been completed.
 - **Master branch remains 100% untouched**.
-- Dedicated test branch `test/ram-optimization-pilot` created in `c:\Users\VINAY\intellije-workspace\Nora` containing the vetted, production-verified optimizations.
+- Dedicated test branch `test/ram-optimization-pilot` created in `.` containing the vetted, production-verified optimizations.
 - The v1 report claims were audited: ~65% of claimed savings was harness artifact (uncollected Oilpan garbage due to missing GC on Control).
 - The genuine, defensible net win is **−155 MB Total Working Set (−17.7%)** and **−80 MB Private Memory (−13.5%)** in dev, achieving **685.97 MB Total WS / 552.64 MB Private Memory** and **57.8 FPS scrolling** in the packaged production build.
 

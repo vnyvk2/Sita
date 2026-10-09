@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { parseCollectionUri } from '../../../common/collections/id';
 import type { PlaylistViewMode } from '../../../common/collections/types';
 import logger from '../../logger';
+import memProfiler from '../../utils/memProfiler';
 import type { HierarchyService } from '../engine/HierarchyService';
 import type { PlaylistEngine } from '../engine/PlaylistEngine';
 import type { UndoEngine } from '../engine/UndoEngine';
@@ -12,7 +13,7 @@ import { collectionEventBus } from '../events/CollectionEventBus';
 import type { BulkRestoreInput } from '../operations/BulkDeleteOp';
 import type { SetArtworkInput } from '../operations/SetArtworkOp';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
-import type { PlaylistRepository } from '../repositories/PlaylistRepository';
+import type { PlaylistRepository, PlaylistCatalogOptions } from '../repositories/PlaylistRepository';
 import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import {
   addSongsInputSchema,
@@ -81,6 +82,16 @@ export function setupCollectionIpc(
         sortType
       });
       return entries.map(mapEntryToDto);
+    }
+  );
+
+  ipcMain.handle(
+    'collections/read/getPlaylistSongCatalog',
+    async (_, id: number, options?: PlaylistCatalogOptions) => {
+      const safeId = parse(idParamSchema, id);
+      return await memProfiler.wrapHandler('collections/read/getPlaylistSongCatalog', () =>
+        repository.getPlaylistSongCatalog(safeId, options)
+      );
     }
   );
 

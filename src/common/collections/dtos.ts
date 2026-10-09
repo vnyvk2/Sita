@@ -31,3 +31,28 @@ export interface CollectionEventDto {
   type: string;
   payload: any;
 }
+
+import type { PlaylistViewMode } from './types';
+
+export interface PlaylistCatalogOptions {
+  sortType?: PlaylistViewMode;
+  filterType?: SongFilterTypes;
+  keyword?: string;
+  language?: string;
+}
+
+export interface PlaylistCatalogEntry {
+  entryId: number;
+  songId: number;
+}
+
+export interface PlaylistCatalogResult {
+  entries: PlaylistCatalogEntry[];
+  total: number;
+  totalDuration?: number;
+  blacklistedIds: number[];
+  languages: string[];
+  alphabetMap?: Record<string, number>;
+  letterCounts?: Record<string, number>;
+}
+

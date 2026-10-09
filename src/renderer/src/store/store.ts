@@ -77,6 +77,31 @@ if (typeof document !== 'undefined') {
   });
 }
 
+// Position-only updates MUST preserve songIds/queueBeforeShuffle array references
+// (spread the queue object, never clone the arrays). Cloning fails closed —
+// a full write is scheduled, which is safe but reintroduces the serialization stall.
+const isStructuralQueueEqual = (
+  curr?: LocalStorage['queue'],
+  prev?: LocalStorage['queue']
+): boolean => {
+  if (!curr || !prev) return curr === prev;
+  if (curr.currentQueueIndex !== prev.currentQueueIndex) return false;
+  if (!Array.isArray(curr.queues) || !Array.isArray(prev.queues)) return curr.queues === prev.queues;
+  if (curr.queues.length !== prev.queues.length) return false;
+  for (let i = 0; i < curr.queues.length; i++) {
+    const qCurr = curr.queues[i];
+    const qPrev = prev.queues[i];
+    if (
+      qCurr.id !== qPrev.id ||
+      qCurr.songIds !== qPrev.songIds ||
+      qCurr.queueBeforeShuffle !== qPrev.queueBeforeShuffle
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
 store.subscribe((state) => {
   const currentState = getCurrentStoreState(state as StoreSubscriptionState);
 
@@ -89,19 +114,37 @@ store.subscribe((state) => {
     return;
   }
 
-  const queueChanged = currentLocal.queue !== prevLocalStorage?.queue;
+  const prevQueue = prevLocalStorage?.queue;
+  const queueChanged = currentLocal.queue !== prevQueue;
   prevLocalStorage = currentLocal;
 
   if (queueChanged) {
-    // Immediate persist on critical queue updates to ensure restart/crash recovery.
-    // Discard any debounced prefs snapshot: currentLocal already supersedes it
-    // (state is cumulative), so writing both would be a redundant double-write.
+    if (
+      currentState.queueUpdateKind === 'position' &&
+      isStructuralQueueEqual(currentLocal.queue, prevQueue)
+    ) {
+      // Position is persisted via 'nora:playback-queue-position'.
+      // Structural arrays (songIds, queueBeforeShuffle) are unchanged,
+      // so skip full serialization safely even if unknown writers touch state.
+      return;
+    }
+    // Crash-recovery contract:
+    // - Playback position: ALWAYS recovered (immediate tiny-key write per positionChange).
+    // - Structural queue edits: best-effort. Debounced 500ms, flushed on
+    //   beforeunload/visibilitychange. A hard kill inside the window can lose
+    //   ≤500ms of structural edits.
+    pendingLocalStorage = currentLocal;
     if (debounceTimer) {
       clearTimeout(debounceTimer);
-      debounceTimer = null;
     }
-    pendingLocalStorage = null;
-    storage.setLocalStorage(currentLocal);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      if (pendingLocalStorage) {
+        const toWrite = pendingLocalStorage;
+        pendingLocalStorage = null;
+        storage.setLocalStorage(toWrite);
+      }
+    }, 500);
   } else {
     // Debounce non-critical preferences, appearance, sorting changes (250ms)
     pendingLocalStorage = currentLocal;

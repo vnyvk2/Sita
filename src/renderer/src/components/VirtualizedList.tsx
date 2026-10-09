@@ -59,6 +59,7 @@ type Props<T, C = unknown> = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scrollerRef?: any;
   useWindowScroll?: boolean;
+  customScrollParent?: HTMLElement;
   style?: CSSProperties;
   onChange?: (range: ListRange) => void;
   onDebouncedScroll?: (range: ListRange) => void;
@@ -95,6 +96,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
     components = EMPTY_COMPONENTS as Components<T, C>,
     scrollerRef,
     useWindowScroll = false,
+    customScrollParent,
     style,
     onChange,
     onDebouncedScroll,
@@ -124,6 +126,11 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
 
   // Scroller element ref & event listener with lifecycle cleanup
   const [scrollerElement, setScrollerElement] = useState<HTMLElement | null>(null);
+  // When customScrollParent is provided, scroll listeners, .fx-view-enter, and
+  // .is-scrolling attach to that parent. This is intentional: CSS rules for .is-scrolling
+  // are scoped to row elements (.list-row, .song-item, [data-index]), safely suppressing
+  // row hover animations and transitions across the entire scroll gesture.
+  const activeScrollerElement = customScrollParent ?? scrollerElement;
 
   // View-entrance stagger (fx-view-enter): one-shot mount animation for rows.
   // The class is removed after the longest stagger settles (~650ms), so rows
@@ -133,7 +140,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
   const hasRowData = (data?.length ?? 0) > 0;
   const enterFiredRef = useRef(false);
   useEffect(() => {
-    if (!scrollerElement || !hasRowData || enterFiredRef.current) return;
+    if (!activeScrollerElement || !hasRowData || enterFiredRef.current) return;
     if (
       typeof window !== 'undefined' &&
       typeof window.matchMedia === 'function' &&
@@ -142,22 +149,22 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
       return;
     }
     enterFiredRef.current = true;
-    scrollerElement.classList.add('fx-view-enter');
+    activeScrollerElement.classList.add('fx-view-enter');
     const timer = setTimeout(() => {
-      scrollerElement.classList.remove('fx-view-enter');
+      activeScrollerElement.classList.remove('fx-view-enter');
     }, 700);
     return () => {
       clearTimeout(timer);
-      scrollerElement.classList.remove('fx-view-enter');
+      activeScrollerElement.classList.remove('fx-view-enter');
     };
-  }, [scrollerElement, hasRowData]);
+  }, [activeScrollerElement, hasRowData]);
 
   // Keep latest onScrollingStateChange in a ref to avoid recreating listener
   const onScrollingStateChangeRef = useRef(onScrollingStateChange);
   onScrollingStateChangeRef.current = onScrollingStateChange;
 
   useEffect(() => {
-    if (!scrollerElement) return;
+    if (!activeScrollerElement) return;
 
     const ac = new AbortController();
     let addedAt = 0;
@@ -175,8 +182,8 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
     };
 
     const removeClass = () => {
-      if (scrollerElement.classList.contains('is-scrolling')) {
-        scrollerElement.classList.remove('is-scrolling');
+      if (activeScrollerElement.classList.contains('is-scrolling')) {
+        activeScrollerElement.classList.remove('is-scrolling');
         onScrollingStateChangeRef.current?.(false);
         scrollTrace.onScrollStop(latestRangeRef.current);
         // Persist once per scroll gesture instead of on every rangeChanged frame
@@ -185,15 +192,15 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
     };
 
     const handleScroll = () => {
-      currentScrollTopRef.current = scrollerElement.scrollTop;
+      currentScrollTopRef.current = activeScrollerElement.scrollTop;
 
       // Guard: do not mark as active scrolling during programmatic restoration layout on initial mount
       if (restorationStateRef.current === 'RESTORING') {
         return;
       }
 
-      if (!scrollerElement.classList.contains('is-scrolling')) {
-        scrollerElement.classList.add('is-scrolling');
+      if (!activeScrollerElement.classList.contains('is-scrolling')) {
+        activeScrollerElement.classList.add('is-scrolling');
         addedAt = performance.now();
         onScrollingStateChangeRef.current?.(true);
       }
@@ -210,23 +217,23 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
       }, SCROLL_IDLE_MS);
     };
 
-    scrollerElement.addEventListener('scroll', handleScroll, {
+    activeScrollerElement.addEventListener('scroll', handleScroll, {
       passive: true,
       signal: ac.signal
     });
 
     return () => {
       ac.abort();
-      scrollerElement.removeEventListener('scroll', handleScroll);
+      activeScrollerElement.removeEventListener('scroll', handleScroll);
       if (idleTimer) clearTimeout(idleTimer);
-      if (scrollerElement.classList.contains('is-scrolling')) {
-        scrollerElement.classList.remove('is-scrolling');
+      if (activeScrollerElement.classList.contains('is-scrolling')) {
+        activeScrollerElement.classList.remove('is-scrolling');
         onScrollingStateChangeRef.current?.(false);
       }
       // Persist on unmount too, so a mid-gesture route change keeps position
       persistScrollPosition();
     };
-  }, [scrollerElement]);
+  }, [activeScrollerElement]);
 
   // Imperative restoration when scrollKey changes on an already-mounted list
   useEffect(() => {
@@ -317,7 +324,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
     <Virtuoso
       key={`virtuoso-h-${fixedItemHeight}`}
       style={
-        useWindowScroll
+        useWindowScroll || customScrollParent
           ? { ...style }
           : {
               width: '100%',
@@ -328,6 +335,7 @@ const List = <T, C = unknown>(props: Props<T, C>, ref: React.ForwardedRef<Virtuo
       data={data}
       overscan={DEFAULT_LIST_OVERSCAN}
       useWindowScroll={useWindowScroll}
+      customScrollParent={customScrollParent}
       fixedItemHeight={fixedItemHeight}
       components={resolvedComponents}
       ref={setCombinedVirtuosoRef}

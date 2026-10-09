@@ -5,12 +5,21 @@ import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/
 import NewPlaylistPrompt from '@renderer/components/PlaylistsPage/NewPlaylistPrompt';
 import Song from '@renderer/components/SongsPage/Song';
 import { songSortOptions } from '@renderer/components/SongsPage/SongOptions';
+import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
 import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
-import { songQuery } from '@renderer/queries/songs';
+import {
+  getSongListIdentity,
+  songCacheKeys,
+  songIdsVersionFromState,
+  songQuery,
+  type SongIdsParams
+} from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
@@ -25,6 +34,37 @@ import playlistCoverDefaultImage from '../../../assets/images/webp/playlist_cove
 
 export const Route = createFileRoute('/main-player/playlists/recently-added')({
   validateSearch: recentlyAddedSongSearchSchema,
+  loaderDeps: ({ search }) => ({
+    sortingOrder: search.sortingOrder,
+    period: search.period,
+    language: search.language
+  }),
+  loader: async ({ deps }) => {
+    if (typeof window === 'undefined' || !window.api?.audioLibraryControls) return;
+    const sortingState = storage.sortingStates.getSortingStates('recentlyAddedPage');
+    const storedPeriod = storage.sortingStates.getSortingStates('recentlyAddedPagePeriod');
+    const idsParams: SongIdsParams = {
+      sortType: deps?.sortingOrder ?? sortingState ?? 'addedOrder',
+      recentlyAddedPeriod: (deps?.period as RecentlyAddedPeriod) ?? storedPeriod ?? 'today',
+      language: deps?.language && deps.language !== 'all' ? deps.language : undefined
+    };
+    const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
+    const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
+    const version = songIdsVersionFromState(state?.dataUpdatedAt);
+    const listIdentity = getSongListIdentity(idsParams);
+    await queryClient.ensureQueryData({
+      queryKey: songCacheKeys.window(listIdentity, version, 0),
+      queryFn: () =>
+        window.api.audioLibraryControls.getSongInfo(
+          idsData.ids.slice(0, Math.min(200, idsData.ids.length)),
+          undefined,
+          undefined,
+          undefined,
+          true
+        ),
+      staleTime: 5 * 60 * 1000
+    });
+  },
   component: RecentlyAddedPlaylistInfoPage
 });
 
@@ -71,21 +111,39 @@ function RecentlyAddedPlaylistInfoPage() {
     storage.sortingStates.setSortingStates('recentlyAddedPage', sortingOrder);
   }, [sortingOrder]);
 
-  const { data: recentlyAddedSongs = [] } = useSuspenseQuery({
-    ...songQuery.recentlyAdded({ sortType: sortingOrder, period }),
-    select: (data) => data.data
+  const songIdsParams: SongIdsParams = useMemo(
+    () => ({
+      sortType: sortingOrder,
+      recentlyAddedPeriod: period,
+      language: language && language !== 'all' ? language : undefined
+    }),
+    [sortingOrder, period, language]
+  );
+
+  const idsQuery = useSuspenseQuery(songQuery.ids(songIdsParams));
+  const filteredSongIds = idsQuery.data.ids;
+  const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
+  const listIdentity = useMemo(() => getSongListIdentity(songIdsParams), [songIdsParams]);
+  const blacklistedSet = useMemo(
+    () => new Set(idsQuery.data.blacklistedIds),
+    [idsQuery.data.blacklistedIds]
+  );
+
+  const playableSongIds = useMemo(
+    () => filteredSongIds.filter((id) => !blacklistedSet.has(id)),
+    [filteredSongIds, blacklistedSet]
+  );
+
+  const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
+    enabled: filteredSongIds.length > 0,
+    listIdentity,
+    isCompactView: preferences.isCompactSongView,
+    rowHeight: 60
   });
 
-  const availableLanguages = useMemo(() => {
-    if (!recentlyAddedSongs || recentlyAddedSongs.length === 0) return [];
-    const langs = new Set<string>();
-    for (const song of recentlyAddedSongs) {
-      if (song.language && song.language.trim() !== '') {
-        langs.add(song.language.trim());
-      }
-    }
-    return Array.from(langs).sort();
-  }, [recentlyAddedSongs]);
+  const {
+    data: { languages: availableLanguages }
+  } = useSuspenseQuery(songQuery.facets());
 
   const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
     const options: DropdownOption<string>[] = [
@@ -101,81 +159,66 @@ function RecentlyAddedPlaylistInfoPage() {
     return options;
   }, [availableLanguages, t]);
 
-  const filteredSongs = useMemo(() => {
-    if (!language || language === 'all') return recentlyAddedSongs;
-    return recentlyAddedSongs.filter((song) => {
-      if (language === 'unspecified') {
-        return !song.language || song.language.trim() === '';
-      }
-      return song.language?.toLowerCase() === language.toLowerCase();
-    });
-  }, [recentlyAddedSongs, language]);
-
-  const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
+  const selectAllHandler = useSelectAllHandler(playableSongIds, 'songs');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = filteredSongs
-        .filter((song) => !song.isBlacklisted)
-        .map((song) => song.songId);
       createQueue(
-        queueSongIds,
+        playableSongIds,
         'recentlyAdded',
         false,
         'recentlyAdded',
         false,
         t('common.recentlyAdded', 'Recently Added')
       );
-      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
+      updateQueueData(playableSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, filteredSongs, t]
+    [createQueue, updateQueueData, playableSongIds, t]
   );
 
   const addSongsToQueue = useCallback(() => {
-    const validSongIds = filteredSongs
-      .filter((song) => !song.isBlacklisted)
-      .map((song) => song.songId);
-    getQueuesManager().getActiveQueue().addSongIdsToEnd(validSongIds);
+    getQueuesManager().getActiveQueue().addSongIdsToEnd(playableSongIds);
     addNewNotifications([
       {
         id: `addedToQueue`,
         duration: 5000,
         content: t('notifications.addedToQueue', {
-          count: validSongIds.length
+          count: playableSongIds.length
         })
       }
     ]);
-  }, [addNewNotifications, filteredSongs, t]);
+  }, [addNewNotifications, playableSongIds, t]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
       createQueue(
-        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        playableSongIds,
         'recentlyAdded',
         true,
         'recentlyAdded',
-        true
+        true,
+        t('common.recentlyAdded', 'Recently Added')
       ),
-    [createQueue, filteredSongs]
+    [createQueue, playableSongIds, t]
   );
 
   const playAllSongs = useCallback(
     () =>
       createQueue(
-        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        playableSongIds,
         'recentlyAdded',
         false,
         'recentlyAdded',
-        true
+        true,
+        t('common.recentlyAdded', 'Recently Added')
       ),
-    [createQueue, filteredSongs]
+    [createQueue, playableSongIds, t]
   );
 
   const createPlaylistFromRecentlyAdded = useCallback(() => {
-    if (filteredSongs.length === 0) return;
-    const songIds = filteredSongs.map((song) => song.songId);
-    changePromptMenuData(true, <NewPlaylistPrompt songIds={songIds} />);
-  }, [changePromptMenuData, filteredSongs]);
+    if (playableSongIds.length === 0) return;
+    changePromptMenuData(true, <NewPlaylistPrompt songIds={playableSongIds} />);
+  }, [changePromptMenuData, playableSongIds]);
 
   const dropdowns = useMemo(() => {
     const list: DropdownProp<string>[] = [
@@ -193,42 +236,91 @@ function RecentlyAddedPlaylistInfoPage() {
             }),
             replace: true
           });
-        }
+        },
+        isDisabled: !(filteredSongIds.length > 0)
       },
       {
         name: 'RecentlyAddedPeriodDropdown',
-        type: `${t('playlistsPage.period', 'Period')} :`,
+        type: `${t('recentlyAddedPage.period', 'Period')} :`,
         value: period,
         options: [
-          { label: t('playlistsPage.addedToday', 'Added Today'), value: 'today' },
-          { label: t('playlistsPage.last24Hours', 'Last 24 Hours'), value: '24h' },
-          { label: t('playlistsPage.last7Days', 'Last 7 Days'), value: '7d' },
-          { label: t('playlistsPage.last30Days', 'Last 30 Days'), value: '30d' },
-          { label: t('playlistsPage.last90Days', 'Last 90 Days'), value: '90d' },
-          { label: t('playlistsPage.last365Days', 'Last 365 Days'), value: '365d' },
-          { label: t('playlistsPage.allTime', 'All Time'), value: 'all' }
+          { label: t('recentlyAddedPage.today', 'Today'), value: 'today' },
+          { label: t('recentlyAddedPage.last24Hours', 'Last 24 Hours'), value: '24h' },
+          { label: t('recentlyAddedPage.last7Days', 'Last 7 Days'), value: '7d' },
+          { label: t('recentlyAddedPage.last30Days', 'Last 30 Days'), value: '30d' },
+          { label: t('recentlyAddedPage.last90Days', 'Last 90 Days'), value: '90d' },
+          { label: t('recentlyAddedPage.lastYear', 'Last Year'), value: '365d' },
+          { label: t('recentlyAddedPage.allTime', 'All Time'), value: 'all' }
         ],
         onChange: (e: ChangeEvent<HTMLSelectElement>) => {
           const newPeriod = e.currentTarget.value as RecentlyAddedPeriod;
           storage.sortingStates.setSortingStates('recentlyAddedPagePeriod', newPeriod);
-          navigate({ search: (prev) => ({ ...prev, period: newPeriod }), replace: true });
+          navigate({
+            search: (prev) => ({
+              ...prev,
+              period: newPeriod
+            }),
+            replace: true
+          });
         }
       },
       {
         name: 'PlaylistPageSortDropdown',
-        type: `${t('common.sortBy', 'Sort By')} :`,
+        type: `${t('common.sortBy')} :`,
         value: sortingOrder,
         options: songSortOptions,
         onChange: (e: ChangeEvent<HTMLSelectElement>) => {
           const order = e.currentTarget.value as SongSortTypes;
-          storage.sortingStates.setSortingStates('recentlyAddedPage', order);
           navigate({ search: (prev) => ({ ...prev, sortingOrder: order }), replace: true });
-        }
+        },
+        isDisabled: !(filteredSongIds.length > 0)
       }
     ];
-
     return list;
-  }, [language, languageDropdownOptions, navigate, period, sortingOrder, t]);
+  }, [
+    language,
+    languageDropdownOptions,
+    navigate,
+    period,
+    filteredSongIds.length,
+    sortingOrder,
+    t
+  ]);
+
+  const renderSong = useCallback(
+    (index: number) => {
+      const song = getItem(index);
+      if (song) {
+        return (
+          <Song
+            key={song.songId}
+            index={index}
+            isIndexingSongs={preferences.isSongIndexingEnabled}
+            onPlayClick={handleSongPlayBtnClick}
+            selectAllHandler={selectAllHandler}
+            isCompact={preferences.isCompactSongView}
+            isDelegated={true}
+            {...song}
+            trackNo={undefined}
+          />
+        );
+      }
+      return (
+        <SongRowSkeleton
+          index={index}
+          isCompact={preferences.isCompactSongView}
+          rowSize={preferences.isCompactSongView ? 'small' : 'normal'}
+        />
+      );
+    },
+    [
+      getItem,
+      handleSongPlayBtnClick,
+      preferences.isCompactSongView,
+      preferences.isSongIndexingEnabled,
+      selectAllHandler
+    ]
+  );
 
   return (
     <MainContainer
@@ -249,63 +341,52 @@ function RecentlyAddedPlaylistInfoPage() {
             tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
             clickHandler: playAllSongs,
-            isDisabled: !(recentlyAddedSongs.length > 0)
+            isDisabled: !(filteredSongIds.length > 0)
           },
           {
             tooltipLabel: t('common.shuffleAndPlay'),
             iconName: 'shuffle',
             clickHandler: shuffleAndPlaySongs,
-            isDisabled: !(recentlyAddedSongs.length > 0)
+            isDisabled: !(filteredSongIds.length > 0)
           },
           {
             tooltipLabel: t('common.addToQueue'),
             iconName: 'add',
             clickHandler: addSongsToQueue,
-            isDisabled: !(recentlyAddedSongs.length > 0)
+            isDisabled: !(filteredSongIds.length > 0)
           },
           {
             tooltipLabel: t('playlist.createPlaylistFromRecentlyAdded', 'Create Playlist'),
             iconName: 'playlist_add',
             clickHandler: createPlaylistFromRecentlyAdded,
-            isDisabled: !(recentlyAddedSongs.length > 0)
+            isDisabled: !(filteredSongIds.length > 0)
           }
         ]}
         dropdowns={dropdowns}
       />
       <VirtualizedList
-        data={filteredSongs}
+        data={filteredSongIds}
         fixedItemHeight={60}
         scrollKey={scrollKey}
+        computeItemKey={(_index, id) => id}
+        onChange={onRangeChange}
         components={{
           Header: () => (
             <PlaylistInfoAndImgContainer
               playlist={{
                 ...mapLegacyPlaylistToDto({
                   ...playlistData,
-                  songs: recentlyAddedSongs.map((s) => s.songId)
+                  songs: filteredSongIds
                 }),
                 name: t('common.recentlyAdded', 'Recently Added')
               }}
-              songs={recentlyAddedSongs}
-              filteredSongs={filteredSongs}
+              songs={[]}
             />
           )
         }}
-        itemContent={(index, item) => {
-          return (
-            <Song
-              key={index}
-              index={index}
-              isIndexingSongs={preferences.isSongIndexingEnabled}
-              onPlayClick={handleSongPlayBtnClick}
-              selectAllHandler={selectAllHandler}
-              {...item}
-              trackNo={undefined}
-            />
-          );
-        }}
+        itemContent={renderSong}
       />
-      {filteredSongs.length === 0 && (
+      {filteredSongIds.length === 0 && (
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
           <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
           {t('playlist.empty')}
@@ -314,3 +395,5 @@ function RecentlyAddedPlaylistInfoPage() {
     </MainContainer>
   );
 }
+
+export default RecentlyAddedPlaylistInfoPage;

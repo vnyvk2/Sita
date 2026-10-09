@@ -15,7 +15,7 @@ import {
 describe('useDataSync - Query Invalidation & Batching', () => {
   describe('getInvalidationTargetsForEvent mapping', () => {
     it('should map structural song events to song lists, history, and search without touching artists or albums', () => {
-      const targets = getInvalidationTargetsForEvent('songs/updatedSong');
+      const targets = getInvalidationTargetsForEvent('songs/newSong');
 
       expect(targets).toContain('songs:all');
       expect(targets).toContain('songs:recentlyAdded');
@@ -27,6 +27,15 @@ describe('useDataSync - Query Invalidation & Batching', () => {
       expect(targets).not.toContain('artists:all');
       expect(targets).not.toContain('albums:all');
       expect(targets).not.toContain('genres:all');
+    });
+
+    it('should map listeningData events to history and analytics targets', () => {
+      const targets = getInvalidationTargetsForEvent('songs/listeningData');
+
+      expect(targets).toContain('home:recentlyPlayedSongs');
+      expect(targets).toContain('analytics:listening');
+      expect(targets).toContain('songs:history');
+      expect(targets).not.toContain('songs:all');
     });
 
     it('should map songs/artworks to songQuery.all and albums because getAllSongs returns artworkPaths', () => {
@@ -338,8 +347,8 @@ describe('useDataSync - Query Invalidation & Batching', () => {
 
       invalidateWindowsContainingIds(mockClient, changed);
 
-      // Invalidation is called per ID in changedIds matching an index
-      expect(invalidateQueries).toHaveBeenCalledTimes(35);
+      // Invalidation is deduped per affected window (3 windows: 0, 200, 400)
+      expect(invalidateQueries).toHaveBeenCalledTimes(3);
       const invalidatedKeys = invalidateQueries.mock.calls.map((c) => c[0]?.queryKey);
       expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1234, 0]);
       expect(invalidatedKeys).toContainEqual(['songs', 'window', 'ids=default', 1234, 200]);

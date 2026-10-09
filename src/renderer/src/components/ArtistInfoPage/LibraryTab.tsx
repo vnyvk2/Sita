@@ -6,16 +6,23 @@ import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import Song from '@renderer/components/SongsPage/Song';
 import { songSortOptions } from '@renderer/components/SongsPage/SongOptions';
+import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
 import TitleContainer from '@renderer/components/TitleContainer';
+import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useResizeObserver from '@renderer/hooks/useResizeObserver';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { albumQuery } from '@renderer/queries/albums';
 import { artistQuery } from '@renderer/queries/artists';
-import { songQuery } from '@renderer/queries/songs';
+import {
+  getSongListIdentity,
+  songIdsVersionFromState,
+  songQuery,
+  type SongIdsParams
+} from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
-import calculateTimeFromSeconds from '@renderer/utils/calculateTimeFromSeconds';
 import storage from '@renderer/utils/localStorage';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useStore } from '@tanstack/react-store';
@@ -51,17 +58,63 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
   const songsContainerRef = useRef<HTMLDivElement>(null);
   const { width } = useResizeObserver(songsContainerRef);
 
+  const [scrollParent, setScrollParent] = useState<HTMLElement | undefined>(undefined);
+
+  useEffect(() => {
+    if (songsContainerRef.current) {
+      const parent = songsContainerRef.current.closest<HTMLElement>('.artist-info-page-container');
+      if (parent) {
+        setScrollParent(parent);
+      } else if (import.meta.env.DEV) {
+        console.warn(
+          'LibraryTab: .artist-info-page-container ancestor not found for VirtualizedList customScrollParent. Virtualized list may collapse to zero height.'
+        );
+      }
+    }
+  }, [isAllSongsVisible]);
+
   const CONTAINER_PADDING = 30;
   const relevantWidth = useMemo(() => width - CONTAINER_PADDING, [width]);
   const noOfVisibleAlbums = useMemo(() => Math.floor(relevantWidth / 250) || 4, [relevantWidth]);
 
-  const { data: songs = [] } = useQuery({
-    ...songQuery.allSongInfo({
-      songIds: artistData.songs.map((song) => song.songId) || [],
+  const rawArtistSongIds = useMemo(
+    () => artistData?.songs.map((song) => song.songId) ?? [],
+    [artistData?.songs]
+  );
+
+  const songIdsParams: SongIdsParams = useMemo(
+    () => ({
+      restrictToIds: rawArtistSongIds,
       sortType: sortingOrder,
       filterType: 'notSelected'
     }),
-    enabled: !!artistData?.songs && artistData.songs.length > 0
+    [rawArtistSongIds, sortingOrder]
+  );
+
+  const idsQuery = useQuery({
+    ...songQuery.ids(songIdsParams),
+    enabled: rawArtistSongIds.length > 0
+  });
+
+  const sortedSongIds = idsQuery.data?.ids ?? [];
+  const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
+  const listIdentity = useMemo(() => getSongListIdentity(songIdsParams), [songIdsParams]);
+
+  const blacklistedSet = useMemo(
+    () => new Set(idsQuery.data?.blacklistedIds ?? []),
+    [idsQuery.data?.blacklistedIds]
+  );
+
+  const playableSongIds = useMemo(
+    () => sortedSongIds.filter((id) => !blacklistedSet.has(id)),
+    [sortedSongIds, blacklistedSet]
+  );
+
+  const { getItem, onRangeChange } = useWindowHydration(sortedSongIds, idsVersion, {
+    enabled: Boolean(idsQuery.data && sortedSongIds.length > 0),
+    listIdentity,
+    isCompactView: preferences?.isCompactSongView,
+    rowHeight: 60
   });
 
   const { data: albums = [] } = useQuery({
@@ -79,13 +132,6 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
       queryClient.invalidateQueries({ queryKey: artistQuery._def });
     }
   });
-
-  const artistSongsDuration = useMemo(
-    () =>
-      calculateTimeFromSeconds(songs.reduce((prev, current) => prev + current.duration, 0))
-        .timeString,
-    [songs]
-  );
 
   const selectAllHandlerForAlbums = useSelectAllHandler(albums, 'album', 'albumId');
 
@@ -112,29 +158,27 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
     [albums, bodyBackgroundImage, isAllAlbumsVisible, noOfVisibleAlbums, selectAllHandlerForAlbums]
   );
 
-  const selectAllHandlerForSongs = useSelectAllHandler(songs, 'songs', 'songId');
+  const selectAllHandlerForSongs = useSelectAllHandler(playableSongIds, 'songs');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = songs.filter((song) => !song.isBlacklisted).map((song) => song.songId);
-      createQueue(queueSongIds, 'artist', false, artistData?.artistId, false, artistData?.name);
-      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
+      createQueue(playableSongIds, 'artist', false, artistData?.artistId, false, artistData?.name);
+      updateQueueData(playableSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [artistData?.artistId, artistData?.name, createQueue, updateQueueData, songs]
+    [artistData?.artistId, artistData?.name, createQueue, updateQueueData, playableSongIds]
   );
 
   const handlePlayAllArtistSongs = useCallback(() => {
-    const queueSongIds = songs.filter((song) => !song.isBlacklisted).map((song) => song.songId);
-    if (queueSongIds.length > 0) {
-      createQueue(queueSongIds, 'artist', false, artistData?.artistId, true, artistData?.name);
+    if (playableSongIds.length > 0) {
+      createQueue(playableSongIds, 'artist', false, artistData?.artistId, true, artistData?.name);
     }
-  }, [artistData?.artistId, artistData?.name, createQueue, songs]);
+  }, [artistData?.artistId, artistData?.name, createQueue, playableSongIds]);
 
-  const songComponents = useMemo(
+  const topFiveSongComponents = useMemo(
     () =>
-      songs
-        .filter((_, i) => (isAllSongsVisible ? true : i < 5))
-        .map((song, index) => {
+      sortedSongIds.slice(0, 5).map((songId, index) => {
+        const song = getItem(index);
+        if (song) {
           return (
             <Song
               key={song.songId}
@@ -154,13 +198,64 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
               onPlayClick={handleSongPlayBtnClick}
             />
           );
-        }),
+        }
+        return (
+          <SongRowSkeleton
+            key={songId}
+            index={index}
+            isCompact={preferences?.isCompactSongView}
+            rowSize={preferences?.isCompactSongView ? 'small' : 'normal'}
+          />
+        );
+      }),
     [
+      getItem,
       handleSongPlayBtnClick,
-      isAllSongsVisible,
+      preferences?.isCompactSongView,
       preferences?.isSongIndexingEnabled,
       selectAllHandlerForSongs,
-      songs
+      sortedSongIds
+    ]
+  );
+
+  const renderSong = useCallback(
+    (index: number) => {
+      const song = getItem(index);
+      if (song) {
+        return (
+          <Song
+            key={song.songId}
+            index={index}
+            isIndexingSongs={preferences?.isSongIndexingEnabled}
+            title={song.title}
+            artists={song.artists}
+            album={song.album}
+            duration={song.duration}
+            songId={song.songId}
+            artworkPaths={song.artworkPaths}
+            path={song.path}
+            isAFavorite={song.isAFavorite}
+            year={song.year}
+            isBlacklisted={song.isBlacklisted}
+            selectAllHandler={selectAllHandlerForSongs}
+            onPlayClick={handleSongPlayBtnClick}
+          />
+        );
+      }
+      return (
+        <SongRowSkeleton
+          index={index}
+          isCompact={preferences?.isCompactSongView}
+          rowSize={preferences?.isCompactSongView ? 'small' : 'normal'}
+        />
+      );
+    },
+    [
+      getItem,
+      handleSongPlayBtnClick,
+      preferences?.isCompactSongView,
+      preferences?.isSongIndexingEnabled,
+      selectAllHandlerForSongs
     ]
   );
 
@@ -237,18 +332,13 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
               &bull; {t('common.songWithCount', { count: artistData.songs.length })}
             </div>
           )}
-          {songs.length > 0 && (
-            <div className="artist-total-songs-duration text-sm opacity-80">
-              {artistSongsDuration}
-            </div>
-          )}
           <div className="artist-actions-container mt-4 flex items-center">
             <Button
               className="play-all-btn text-sm font-normal"
               label={t('common.playAll')}
               iconName="play_arrow"
               clickHandler={handlePlayAllArtistSongs}
-              isDisabled={songs.length === 0}
+              isDisabled={playableSongIds.length === 0}
             />
           </div>
         </div>
@@ -323,7 +413,7 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
         </MainContainer>
       )}
 
-      {songs && songs.length > 0 && (
+      {sortedSongIds && sortedSongIds.length > 0 && (
         <MainContainer
           className="main-container songs-list-container relative h-full pb-4 *:z-10"
           focusable
@@ -353,8 +443,8 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
                     ? t('common.selectionWithCount', {
                         count: multipleSelectionsData.multipleSelections.length
                       })
-                    : `${t('common.songWithCount', { count: songs.length })} ${
-                        songs.length > 5 && !isAllSongsVisible
+                    : `${t('common.songWithCount', { count: sortedSongIds.length })} ${
+                        sortedSongIds.length > 5 && !isAllSongsVisible
                           ? `(${t('common.shownWithCount', { count: 5 })})`
                           : ''
                       }`}
@@ -378,9 +468,7 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
                           iconName: 'shuffle',
                           handlerFunction: () =>
                             createQueue(
-                              songs
-                                .filter((song) => !song.isBlacklisted)
-                                .map((song) => song.songId),
+                              playableSongIds,
                               'artist',
                               true,
                               artistData?.artistId,
@@ -393,9 +481,7 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
                           iconName: 'play_arrow',
                           handlerFunction: () =>
                             createQueue(
-                              songs
-                                .filter((song) => !song.isBlacklisted)
-                                .map((song) => song.songId),
+                              playableSongIds,
                               'artist',
                               false,
                               artistData?.artistId,
@@ -433,7 +519,7 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
                   className:
                     'show-all-btn text-sm font-normal bg-background-color-1/40! dark:bg-dark-background-color-1/40!',
                   clickHandler: () => setIsAllSongsVisible(true),
-                  isVisible: songs.length > 5 && !isAllSongsVisible
+                  isVisible: sortedSongIds.length > 5 && !isAllSongsVisible
                 }
               ]}
               dropdowns={[
@@ -448,7 +534,20 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
                 }
               ]}
             />
-            <div className="songs-container">{songComponents}</div>
+            <div className="songs-container">
+              {isAllSongsVisible ? (
+                <VirtualizedList
+                  data={sortedSongIds}
+                  fixedItemHeight={60}
+                  customScrollParent={scrollParent}
+                  computeItemKey={(_index, id) => id}
+                  onChange={onRangeChange}
+                  itemContent={renderSong}
+                />
+              ) : (
+                topFiveSongComponents
+              )}
+            </div>
           </>
         </MainContainer>
       )}

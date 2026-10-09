@@ -4,6 +4,8 @@ import { useNavigate } from '@tanstack/react-router';
 import { useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { CollectionClient } from '@renderer/api/CollectionClient';
+import storage from '@renderer/utils/localStorage';
 import calculateTimeFromSeconds from '../../utils/calculateTimeFromSeconds';
 import PlaylistCover from '../PlaylistsPage/PlaylistCover';
 import PlaylistCoverSettingsPrompt from '../PlaylistsPage/PlaylistCoverSettingsPrompt';
@@ -11,8 +13,10 @@ import ScrollableTitle from '../ScrollableTitle';
 
 type Props = {
   playlist: PlaylistDto;
-  songs: SongData[];
+  songs?: SongData[];
   filteredSongs?: SongData[];
+  filteredCount?: number;
+  totalDuration?: number;
 };
 
 const PlaylistInfoAndImgContainer = (props: Props) => {
@@ -20,22 +24,53 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  const { playlist, songs, filteredSongs } = props;
+  const { playlist, songs, filteredSongs, filteredCount, totalDuration } = props;
 
-  const displaySongs = filteredSongs ?? songs;
-  const isFiltered = Boolean(filteredSongs && filteredSongs.length !== songs.length);
+  const displaySongs = filteredSongs ?? songs ?? [];
+  const isFiltered = Boolean(
+    filteredCount !== undefined
+      ? filteredCount !== playlist.itemCount
+      : filteredSongs && filteredSongs.length !== (songs?.length ?? 0)
+  );
 
   const totalPlaylistDuration = useMemo(() => {
+    if (totalDuration !== undefined) {
+      const { timeString } = calculateTimeFromSeconds(totalDuration);
+      return timeString;
+    }
     const { timeString } = calculateTimeFromSeconds(
       displaySongs.reduce((prev, current) => prev + current.duration, 0)
     );
     return timeString;
-  }, [displaySongs]);
+  }, [totalDuration, displaySongs]);
 
-  const openCoverSettings = () => {
+  const openCoverSettings = async () => {
+    let coverSongs = songs;
+    if (!coverSongs || coverSongs.length === 0) {
+      try {
+        const settings = storage.playlistCoverSettings.getSettings(playlist.id);
+        const hasCustomCollage = settings?.type === 'collage';
+        const entryLimit = hasCustomCollage ? 10 : 5;
+        const catalog = await CollectionClient.getPlaylistSongCatalog(playlist.id);
+        const configuredIds = hasCustomCollage
+          ? (settings?.collage?.songIds ?? []).filter((id) => id > 0)
+          : [];
+        const catalogIds = (catalog.entries ?? []).slice(0, entryLimit).map((e) => e.songId);
+        const targetIds = Array.from(new Set([...configuredIds, ...catalogIds]));
+
+        if (targetIds.length > 0) {
+          coverSongs = await window.api.audioLibraryControls.getSongInfo(targetIds, 'addedOrder');
+        } else {
+          coverSongs = [];
+        }
+      } catch (err) {
+        console.error('Failed to load songs for cover settings prompt:', err);
+        coverSongs = [];
+      }
+    }
     changePromptMenuData(
       true,
-      <PlaylistCoverSettingsPrompt playlist={playlist} playlistSongs={songs} />,
+      <PlaylistCoverSettingsPrompt playlist={playlist} playlistSongs={coverSongs ?? []} />,
       'max-w-5xl w-full min-w-0',
       { mode: 'workspace', scrollBehavior: 'content' }
     );
@@ -80,13 +115,13 @@ const PlaylistInfoAndImgContainer = (props: Props) => {
             <div className="playlist-no-of-songs w-full overflow-hidden text-base text-ellipsis whitespace-nowrap">
               {isFiltered
                 ? t('playlistsPage.filteredSongCount', {
-                    count: displaySongs.length,
+                    count: filteredCount ?? displaySongs.length,
                     total: playlist.itemCount,
                     defaultValue: '{{count}} of {{total}} songs'
                   })
                 : t('common.songWithCount', { count: playlist.itemCount })}
             </div>
-            {displaySongs.length > 0 && (
+            {(totalDuration !== undefined ? totalDuration > 0 : displaySongs.length > 0) && (
               <div className="playlist-total-duration">{totalPlaylistDuration}</div>
             )}
             {playlist.createdAt && (

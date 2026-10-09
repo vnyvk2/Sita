@@ -3,12 +3,20 @@ import MainContainer from '@renderer/components/MainContainer';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import Song from '@renderer/components/SongsPage/Song';
 import { songSortOptions } from '@renderer/components/SongsPage/SongOptions';
+import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
 import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
-import { songQuery } from '@renderer/queries/songs';
+import {
+  getSongListIdentity,
+  songCacheKeys,
+  songIdsVersionFromState,
+  songQuery,
+  type SongIdsParams
+} from '@renderer/queries/songs';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
@@ -25,11 +33,40 @@ import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-p
 
 export const Route = createFileRoute('/main-player/playlists/favorites')({
   validateSearch: songSearchSchema,
+  loaderDeps: ({ search }) => ({
+    sortingOrder: search.sortingOrder,
+    language: search.language
+  }),
+  loader: async ({ deps }) => {
+    if (typeof window === 'undefined' || !window.api?.audioLibraryControls) return;
+    const sortingState = storage.sortingStates.getSortingStates('favoritesPage');
+    const idsParams: SongIdsParams = {
+      sortType: deps?.sortingOrder ?? sortingState ?? 'addedOrder',
+      filterType: 'favorites',
+      language: deps?.language && deps.language !== 'all' ? deps.language : undefined
+    };
+    const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
+    const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
+    const version = songIdsVersionFromState(state?.dataUpdatedAt);
+    const listIdentity = getSongListIdentity(idsParams);
+    await queryClient.ensureQueryData({
+      queryKey: songCacheKeys.window(listIdentity, version, 0),
+      queryFn: () =>
+        window.api.audioLibraryControls.getSongInfo(
+          idsData.ids.slice(0, Math.min(200, idsData.ids.length)),
+          undefined,
+          undefined,
+          undefined,
+          true
+        ),
+      staleTime: 5 * 60 * 1000
+    });
+  },
   component: FavoritesPlaylistInfoPage
 });
 
 const playlistData: Playlist = {
-  playlistId: SpecialPlaylists.Favorites, // Special ID for Favorites playlist
+  playlistId: SpecialPlaylists.Favorites,
   name: 'Favorites',
   artworkPaths: {
     artworkPath: favoritesPlaylistCoverImage,
@@ -43,14 +80,7 @@ const playlistData: Playlist = {
 
 /**
  * Renders the Favorites playlist information and song list UI with controls for playback, queue
- * management, import, and sorting.
- *
- * The component loads the current Favorites songs (respecting the selected sort order), persists
- * the sort order to local storage, and provides actions to play a single song, play all, shuffle
- * and play, add songs to the queue, and import favorites. It also supports Ctrl+A to select all
- * songs and disables controls when there are no favorite songs.
- *
- * @returns The React element representing the Favorites playlist info page.
+ * management, import, and sorting using ID-first windowed hydration.
  */
 function FavoritesPlaylistInfoPage() {
   const favoritesSortingState = useStore(
@@ -72,21 +102,39 @@ function FavoritesPlaylistInfoPage() {
     storage.sortingStates.setSortingStates('favoritesPage', sortingOrder);
   }, [sortingOrder]);
 
-  const { data: favoriteSongs = [] } = useSuspenseQuery({
-    ...songQuery.favorites({ sortType: sortingOrder }),
-    select: (data) => data.data
+  const songIdsParams: SongIdsParams = useMemo(
+    () => ({
+      sortType: sortingOrder,
+      filterType: 'favorites',
+      language: language && language !== 'all' ? language : undefined
+    }),
+    [sortingOrder, language]
+  );
+
+  const idsQuery = useSuspenseQuery(songQuery.ids(songIdsParams));
+  const filteredSongIds = idsQuery.data.ids;
+  const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
+  const listIdentity = useMemo(() => getSongListIdentity(songIdsParams), [songIdsParams]);
+  const blacklistedSet = useMemo(
+    () => new Set(idsQuery.data.blacklistedIds),
+    [idsQuery.data.blacklistedIds]
+  );
+
+  const playableSongIds = useMemo(
+    () => filteredSongIds.filter((id) => !blacklistedSet.has(id)),
+    [filteredSongIds, blacklistedSet]
+  );
+
+  const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
+    enabled: filteredSongIds.length > 0,
+    listIdentity,
+    isCompactView: preferences.isCompactSongView,
+    rowHeight: 60
   });
 
-  const availableLanguages = useMemo(() => {
-    if (!favoriteSongs || favoriteSongs.length === 0) return [];
-    const langs = new Set<string>();
-    for (const song of favoriteSongs) {
-      if (song.language && song.language.trim() !== '') {
-        langs.add(song.language.trim());
-      }
-    }
-    return Array.from(langs).sort();
-  }, [favoriteSongs]);
+  const {
+    data: { languages: availableLanguages }
+  } = useSuspenseQuery(songQuery.facets());
 
   const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
     const options: DropdownOption<string>[] = [
@@ -102,79 +150,98 @@ function FavoritesPlaylistInfoPage() {
     return options;
   }, [availableLanguages, t]);
 
-  const filteredSongs = useMemo(() => {
-    if (!language || language === 'all') return favoriteSongs;
-    return favoriteSongs.filter((song) => {
-      if (language === 'unspecified') {
-        return !song.language || song.language.trim() === '';
-      }
-      return song.language?.toLowerCase() === language.toLowerCase();
-    });
-  }, [favoriteSongs, language]);
-
-  const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
+  const selectAllHandler = useSelectAllHandler(playableSongIds, 'songs');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = filteredSongs
-        .filter((song) => !song.isBlacklisted)
-        .map((song) => song.songId);
-      createQueue(queueSongIds, 'favorites', false, '', false, t('common.favorites', 'Favorites'));
-      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
+      createQueue(playableSongIds, 'favorites', false, '', false, t('common.favorites', 'Favorites'));
+      updateQueueData(playableSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, t, filteredSongs]
+    [createQueue, updateQueueData, t, playableSongIds]
   );
 
   const addSongsToQueue = useCallback(() => {
-    const validSongIds = filteredSongs
-      .filter((song) => !song.isBlacklisted)
-      .map((song) => song.songId);
-    getQueuesManager().getActiveQueue().addSongIdsToEnd(validSongIds);
+    getQueuesManager().getActiveQueue().addSongIdsToEnd(playableSongIds);
     addNewNotifications([
       {
         id: `addedToQueue`,
         duration: 5000,
         content: t('notifications.addedToQueue', {
-          count: validSongIds.length
+          count: playableSongIds.length
         })
       }
     ]);
-  }, [addNewNotifications, filteredSongs, t]);
+  }, [addNewNotifications, playableSongIds, t]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
       createQueue(
-        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        playableSongIds,
         'favorites',
         true,
         '',
-        true
+        true,
+        t('common.favorites', 'Favorites')
       ),
-    [createQueue, filteredSongs]
+    [createQueue, playableSongIds, t]
   );
 
   const playAllSongs = useCallback(
     () =>
       createQueue(
-        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        playableSongIds,
         'favorites',
         false,
         '',
-        true
+        true,
+        t('common.favorites', 'Favorites')
       ),
-    [createQueue, filteredSongs]
+    [createQueue, playableSongIds, t]
   );
 
   const importSongsToFavorites = useCallback(() => {
     window.api.collections
       .import({ targetPlaylistId: SpecialPlaylists.Favorites })
       .then(() => {
-        queryClient.invalidateQueries({
-          queryKey: songQuery.favorites({ sortType: sortingOrder }).queryKey
-        });
+        queryClient.invalidateQueries({ queryKey: songQuery.ids._def });
       })
       .catch((err) => console.error(err));
-  }, [sortingOrder]);
+  }, []);
+
+  const renderSong = useCallback(
+    (index: number) => {
+      const song = getItem(index);
+      if (song) {
+        return (
+          <Song
+            key={song.songId}
+            index={index}
+            isIndexingSongs={preferences.isSongIndexingEnabled}
+            onPlayClick={handleSongPlayBtnClick}
+            selectAllHandler={selectAllHandler}
+            isCompact={preferences.isCompactSongView}
+            isDelegated={true}
+            {...song}
+            trackNo={undefined}
+          />
+        );
+      }
+      return (
+        <SongRowSkeleton
+          index={index}
+          isCompact={preferences.isCompactSongView}
+          rowSize={preferences.isCompactSongView ? 'small' : 'normal'}
+        />
+      );
+    },
+    [
+      getItem,
+      handleSongPlayBtnClick,
+      preferences.isCompactSongView,
+      preferences.isSongIndexingEnabled,
+      selectAllHandler
+    ]
+  );
 
   return (
     <MainContainer
@@ -200,19 +267,19 @@ function FavoritesPlaylistInfoPage() {
             tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
             clickHandler: playAllSongs,
-            isDisabled: !(favoriteSongs.length > 0)
+            isDisabled: !(filteredSongIds.length > 0)
           },
           {
             tooltipLabel: t('common.shuffleAndPlay'),
             iconName: 'shuffle',
             clickHandler: shuffleAndPlaySongs,
-            isDisabled: !(favoriteSongs.length > 0)
+            isDisabled: !(filteredSongIds.length > 0)
           },
           {
             tooltipLabel: t('common.addToQueue'),
             iconName: 'add',
             clickHandler: addSongsToQueue,
-            isDisabled: !(favoriteSongs.length > 0)
+            isDisabled: !(filteredSongIds.length > 0)
           }
         ]}
         dropdowns={[
@@ -231,7 +298,7 @@ function FavoritesPlaylistInfoPage() {
                 replace: true
               });
             },
-            isDisabled: !(favoriteSongs.length > 0)
+            isDisabled: !(filteredSongIds.length > 0)
           },
           {
             name: 'PlaylistPageSortDropdown',
@@ -242,41 +309,30 @@ function FavoritesPlaylistInfoPage() {
               const order = e.currentTarget.value as SongSortTypes;
               navigate({ search: (prev) => ({ ...prev, sortingOrder: order }), replace: true });
             },
-            isDisabled: !(favoriteSongs.length > 0)
+            isDisabled: !(filteredSongIds.length > 0)
           }
         ]}
       />
       <VirtualizedList
-        data={filteredSongs}
+        data={filteredSongIds}
         fixedItemHeight={60}
         scrollKey={scrollKey}
+        computeItemKey={(_index, id) => id}
+        onChange={onRangeChange}
         components={{
           Header: () => (
             <PlaylistInfoAndImgContainer
               playlist={mapLegacyPlaylistToDto({
                 ...playlistData,
-                songs: favoriteSongs.map((s) => s.songId)
+                songs: filteredSongIds
               })}
-              songs={favoriteSongs}
-              filteredSongs={filteredSongs}
+              songs={[]}
             />
           )
         }}
-        itemContent={(index, item) => {
-          return (
-            <Song
-              key={index}
-              index={index - 1}
-              isIndexingSongs={preferences.isSongIndexingEnabled}
-              onPlayClick={handleSongPlayBtnClick}
-              selectAllHandler={selectAllHandler}
-              {...item}
-              trackNo={undefined}
-            />
-          );
-        }}
+        itemContent={renderSong}
       />
-      {filteredSongs.length === 0 && (
+      {filteredSongIds.length === 0 && (
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
           <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
           {t('playlist.empty')}
@@ -285,3 +341,5 @@ function FavoritesPlaylistInfoPage() {
     </MainContainer>
   );
 }
+
+export default FavoritesPlaylistInfoPage;
