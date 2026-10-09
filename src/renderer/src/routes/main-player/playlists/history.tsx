@@ -13,6 +13,7 @@ import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import {
+  hashSongIds,
   songCacheKeys,
   songIdsVersionFromState,
   songQuery,
@@ -175,10 +176,11 @@ function HistoryPlaylistInfoPage() {
   const songIds = historyData.ids;
   const entries = historyData.entries;
   const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
+  const orderHash = useMemo(() => hashSongIds(songIds), [songIds]);
   const listIdentity = useMemo(
     () =>
-      `history:${historyParams.sortType}:${historyParams.period}:${historyParams.limit}:${historyParams.language || 'all'}`,
-    [historyParams]
+      `history:${historyParams.sortType}:${historyParams.period}:${historyParams.limit}:${historyParams.language || 'all'}:${orderHash}`,
+    [historyParams, orderHash]
   );
   const blacklistedSet = useMemo(
     () => new Set(historyData.blacklistedIds),

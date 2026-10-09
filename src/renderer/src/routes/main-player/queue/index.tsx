@@ -9,7 +9,8 @@ import MainContainer from '@renderer/components/MainContainer';
 import QueueTabs from '@renderer/components/QueueTabs';
 import QueueRow from '@renderer/components/SongsPage/QueueRow';
 import Song from '@renderer/components/SongsPage/Song';
-import VirtualizedList from '@renderer/components/VirtualizedList';
+import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
+import VirtualizedList, { DEFAULT_SCROLL_SEEK_CONFIG } from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
@@ -38,6 +39,8 @@ import { useTranslation } from 'react-i18next';
 import { type VirtuosoHandle } from 'react-virtuoso';
 import { z } from 'zod';
 
+const EMPTY_QUEUE_IDS: number[] = [];
+
 const queuePageSearchParamsSchema = baseInfoPageSearchParamsSchema.extend({
   queueIndex: z.coerce.number().optional()
 });
@@ -57,71 +60,83 @@ function RouteComponent() {
     (state) => state.multipleSelectionsData.isEnabled
   );
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
-  const queue = useStore(store, (state) => state.localStorage.queue);
+  const currentQueueIndex = useStore(store, (state) => state.localStorage.queue.currentQueueIndex);
+  const queuesLength = useStore(store, (state) => state.localStorage.queue.queues.length);
   const preferences = useStore(store, (state) => state.localStorage.preferences);
   const manager = getQueuesManager();
 
   const { queueIndex } = Route.useSearch();
-  const [viewingQueueIndex, setViewingQueueIndex] = useState(queueIndex ?? queue.currentQueueIndex);
+  const [viewingQueueIndex, setViewingQueueIndex] = useState(queueIndex ?? currentQueueIndex);
 
   const scrollKey = useMemo(() => `queue-list:${viewingQueueIndex}`, [viewingQueueIndex]);
 
   // Sync viewingQueueIndex if active queue is deleted or changed externally
-  const prevActiveQueueRef = useRef(queue.currentQueueIndex);
+  const prevActiveQueueRef = useRef(currentQueueIndex);
 
   useEffect(() => {
-    if (queueIndex !== undefined && queueIndex < queue.queues.length) {
+    if (queueIndex !== undefined && queueIndex < queuesLength) {
       setViewingQueueIndex(queueIndex);
-    } else if (prevActiveQueueRef.current !== queue.currentQueueIndex) {
-      setViewingQueueIndex(queue.currentQueueIndex);
-      prevActiveQueueRef.current = queue.currentQueueIndex;
-    } else if (viewingQueueIndex >= queue.queues.length) {
-      setViewingQueueIndex(Math.max(0, queue.queues.length - 1));
+    } else if (prevActiveQueueRef.current !== currentQueueIndex) {
+      setViewingQueueIndex(currentQueueIndex);
+      prevActiveQueueRef.current = currentQueueIndex;
+    } else if (viewingQueueIndex >= queuesLength) {
+      setViewingQueueIndex(Math.max(0, queuesLength - 1));
     }
-  }, [queueIndex, queue.currentQueueIndex, queue.queues.length, viewingQueueIndex]);
+  }, [queueIndex, currentQueueIndex, queuesLength, viewingQueueIndex]);
 
-  const songIdsRef = useRef<number[]>([]);
-  const currentQueue = useMemo(() => {
-    const nextIds = queue.queues[viewingQueueIndex]?.songIds;
-    if (!nextIds || nextIds.length === 0) {
-      if (songIdsRef.current.length === 0) return songIdsRef.current;
-      songIdsRef.current = [];
-      return songIdsRef.current;
-    }
-    const prevIds = songIdsRef.current;
-    if (prevIds.length === nextIds.length) {
-      let isSame = true;
-      for (let i = 0; i < nextIds.length; i++) {
-        if (prevIds[i] !== nextIds[i]) {
-          isSame = false;
-          break;
-        }
-      }
-      if (isSame) {
-        return prevIds;
-      }
-    }
-    songIdsRef.current = nextIds;
-    return nextIds;
-  }, [queue.queues, viewingQueueIndex]);
+  const currentQueue = useStore(
+    store,
+    (state) => state.localStorage.queue.queues[viewingQueueIndex]?.songIds ?? EMPTY_QUEUE_IDS
+  );
+  const viewingQueueId = useStore(
+    store,
+    (state) => state.localStorage.queue.queues[viewingQueueIndex]?.id
+  );
+  const viewingQueueMetadata = useStore(
+    store,
+    (state) => state.localStorage.queue.queues[viewingQueueIndex]?.metadata
+  );
+  const activeQueuePosition = useStore(
+    store,
+    (state) =>
+      state.localStorage.queue.queues[state.localStorage.queue.currentQueueIndex]?.position ?? 0
+  );
+  const activeQueueMetadata = useStore(
+    store,
+    (state) => state.localStorage.queue.queues[state.localStorage.queue.currentQueueIndex]?.metadata
+  );
 
   const { addNewNotifications, updateContextMenuData, toggleMultipleSelections, playSong } =
     useContext(AppUpdateContext);
   const { t } = useTranslation();
 
   const viewingQueue = manager?.queues?.[viewingQueueIndex];
-  const queueId = viewingQueue?.id ?? queue.queues[viewingQueueIndex]?.id ?? 'active';
+  const queueId = viewingQueue?.id ?? viewingQueueId ?? 'active';
   const membershipVersion = viewingQueue?.membershipVersion ?? 0;
 
-  const savedPosition = scrollKey ? scrollRegistry.get(scrollKey) : undefined;
-  const { getItem, onRangeChange } = useWindowHydration(
-    currentQueue,
-    `${queueId}:${membershipVersion}`,
-    {
-      keyPrefix: 'queue',
-      initialIndex: savedPosition?.index ?? 0
+  const queueVersion = useMemo(() => {
+    if (
+      viewingQueue?.structureVersion !== undefined &&
+      viewingQueue?.membershipVersion !== undefined
+    ) {
+      return `${queueId}:${viewingQueue.structureVersion}:${viewingQueue.membershipVersion}`;
     }
-  );
+    if (viewingQueue?.membershipVersion !== undefined) {
+      return `${queueId}:${viewingQueue.membershipVersion}`;
+    }
+    let hash = 2166136261;
+    for (let i = 0; i < currentQueue.length; i++) {
+      hash ^= currentQueue[i];
+      hash = Math.imul(hash, 16777619);
+    }
+    return `${queueId}:${currentQueue.length}:${hash >>> 0}`;
+  }, [viewingQueue?.structureVersion, viewingQueue?.membershipVersion, queueId, currentQueue]);
+
+  const savedPosition = scrollKey ? scrollRegistry.get(scrollKey) : undefined;
+  const { getItem, onRangeChange } = useWindowHydration(currentQueue, queueVersion, {
+    keyPrefix: 'queue',
+    initialIndex: savedPosition?.index ?? 0
+  });
 
   const durationsQuery = useQuery({
     queryKey: ['queue', 'durations', queueId, membershipVersion],
@@ -140,25 +155,24 @@ function RouteComponent() {
 
   const { data: queueInfo } = useQuery({
     ...queueQuery.info({
-      queueType: queue.queues[viewingQueueIndex]?.metadata?.queueType ?? 'songs',
-      id: queue.queues[viewingQueueIndex]?.metadata?.queueId ?? ''
+      queueType: viewingQueueMetadata?.queueType ?? 'songs',
+      id: viewingQueueMetadata?.queueId ?? ''
     }),
     select: (data): QueueInfo | undefined => {
       if (data) {
-        if (queue.queues[viewingQueueIndex]?.metadata?.queueType === 'songs')
+        if (viewingQueueMetadata?.queueType === 'songs')
           return { artworkPath: currentSongData.artworkPath!, title: 'All Songs' };
-        if (queue.queues[viewingQueueIndex]?.metadata?.queueType === 'folder')
+        if (viewingQueueMetadata?.queueType === 'folder')
           return {
             ...data,
             title: t(data.title ? 'currentQueuePage.folderWithName' : 'common.unknownFolder', {
               name: data.title
             })
           };
-        if (queue.queues[viewingQueueIndex]?.metadata?.queueType === undefined)
+        if (viewingQueueMetadata?.queueType === undefined)
           return {
             artworkPath: '',
-            title:
-              queue.queues[viewingQueueIndex]?.metadata?.title || `Queue ${viewingQueueIndex + 1}`
+            title: viewingQueueMetadata?.title || `Queue ${viewingQueueIndex + 1}`
           };
         return data;
       }
@@ -266,7 +280,6 @@ function RouteComponent() {
     [currentQueue, durationsMap]
   );
 
-  const activeQueuePosition = queue.queues[queue.currentQueueIndex]?.position ?? 0;
   const completedQueueDuration = useMemo(
     () => getRemainingQueueDuration(suffixDurations, activeQueuePosition),
     [activeQueuePosition, suffixDurations]
@@ -316,6 +329,20 @@ function RouteComponent() {
     [manager, toggleMultipleSelections, viewingQueueIndex]
   );
 
+  const virtuosoComponents = useMemo(
+    () => ({
+      Item: ({ children, ...props }: { children?: ReactNode }) => (
+        <div {...props} className="height-preserving-container">
+          {children}
+        </div>
+      ),
+      ScrollSeekPlaceholder: ({ index, height }: { index: number; height: number }) => (
+        <SongRowSkeleton index={index} height={height ?? 60} isCompact={false} rowSize="normal" />
+      )
+    }),
+    []
+  );
+
   return (
     <MainContainer
       className="current-queue-container appear-from-bottom relative h-full! overflow-hidden pb-0!"
@@ -337,11 +364,11 @@ function RouteComponent() {
           </div>
           <div className="title-container text-font-color-highlight dark:text-dark-font-color-highlight mt-2 mb-4 flex items-center justify-between pr-4 text-3xl font-medium">
             <div className="flex items-center gap-4">
-              {queue.queues[viewingQueueIndex]?.metadata?.title ||
-                (queue.queues[viewingQueueIndex]?.metadata?.queueType === 'songs'
+              {viewingQueueMetadata?.title ||
+                (viewingQueueMetadata?.queueType === 'songs'
                   ? 'All Songs'
                   : `Queue ${viewingQueueIndex + 1}`)}
-              {viewingQueueIndex === queue.currentQueueIndex && (
+              {viewingQueueIndex === currentQueueIndex && (
                 <span
                   className="material-icons-round text-font-color-highlight dark:text-dark-font-color-highlight ml-2 text-sm"
                   title="Currently Playing"
@@ -349,7 +376,7 @@ function RouteComponent() {
                   equalizer
                 </span>
               )}
-              {viewingQueueIndex !== queue.currentQueueIndex && currentQueue.length > 0 && (
+              {viewingQueueIndex !== currentQueueIndex && currentQueue.length > 0 && (
                 <Button
                   className="bg-background-color-3 dark:bg-dark-background-color-3 !m-0 flex h-10 w-10 items-center justify-center rounded-full shadow-md transition-transform hover:scale-105"
                   iconName="play_arrow"
@@ -462,9 +489,9 @@ function RouteComponent() {
               <div className="cover-img-container mr-8">
                 <Img
                   className={`h-20 w-20 rounded-md shadow-lg ${
-                    queue.queues[queue.currentQueueIndex].metadata?.queueType === 'artist'
+                    activeQueueMetadata?.queueType === 'artist'
                       ? 'artist-img rounded-full!'
-                      : `${queue.queues[queue.currentQueueIndex].metadata?.queueType}-img`
+                      : `${activeQueueMetadata?.queueType}-img`
                   }`}
                   src={queueInfo?.onlineArtworkPath}
                   fallbackSrc={queueInfo?.artworkPath}
@@ -474,9 +501,9 @@ function RouteComponent() {
               </div>
               <div className="queue-info">
                 <div className="queue-type text-sm font-semibold uppercase opacity-50 dark:font-medium">
-                  {queue.queues[queue.currentQueueIndex].metadata?.queueType === 'recentlyAdded'
+                  {activeQueueMetadata?.queueType === 'recentlyAdded'
                     ? t('common.recentlyAdded', 'Recently Added')
-                    : queue.queues[queue.currentQueueIndex].metadata?.queueType}
+                    : activeQueueMetadata?.queueType}
                 </div>
                 <div className="queue-title text-3xl">{queueInfo?.title}</div>
                 <div className="other-info flex text-sm font-light">
@@ -540,16 +567,20 @@ function RouteComponent() {
                       scrollerRef={droppableProvided.innerRef}
                       scrollKey={scrollKey}
                       onChange={onRangeChange}
-                      components={{
-                        Item: ({ children, ...props }: { children?: ReactNode }) => (
-                          <div {...props} className="height-preserving-container">
-                            {children}
-                          </div>
-                        )
-                      }}
+                      scrollSeekConfiguration={DEFAULT_SCROLL_SEEK_CONFIG}
+                      components={virtuosoComponents}
                       itemContent={(index, songId) => {
                         const song = getItem(index);
-                        if (!song) return null;
+                        if (!song) {
+                          return (
+                            <SongRowSkeleton
+                              index={index}
+                              height={60}
+                              isCompact={false}
+                              rowSize="normal"
+                            />
+                          );
+                        }
 
                         return (
                           <QueueRow

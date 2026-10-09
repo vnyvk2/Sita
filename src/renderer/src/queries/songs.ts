@@ -9,16 +9,16 @@ export const SONG_IDS_STALE_TIME = 5 * 60 * 1000;
 export const SONG_IDS_GC_TIME = 30 * 60 * 1000;
 
 /**
- * Fast numeric hash for generating compact, stable cache keys from song ID arrays.
- * Produces a deterministic hex string from sorted IDs, replacing the O(n) join
- * that generated proportionally-growing key strings for large playlists/albums.
+ * Fast numeric hash for generating compact, stable cache keys from ordered song ID arrays. Computes
+ * an order-sensitive 32-bit FNV-1a hash over the sequence of song IDs, ensuring that reorders (e.g.
+ * drag-and-drop, shuffle) produce distinct identities and invalidate windowed caches.
  */
-function hashSongIds(ids: readonly number[]): string {
-  const sorted = [...ids].sort((a, b) => a - b);
-  // FNV-1a inspired hash with good distribution for integer sequences
+export function hashSongIds(ids: readonly number[]): string {
+  if (ids.length === 0) return '';
+  // Order-sensitive FNV-1a hash over the sequence of IDs
   let h = 0x811c9dc5 | 0;
-  for (let i = 0; i < sorted.length; i++) {
-    h ^= sorted[i];
+  for (let i = 0; i < ids.length; i++) {
+    h ^= ids[i];
     h = Math.imul(h, 0x01000193);
   }
   return (h >>> 0).toString(36);

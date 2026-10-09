@@ -1,4 +1,4 @@
-import { type QueryClient, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, QueryClientContext } from '@tanstack/react-query';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -28,9 +28,7 @@ export function applyFavoriteToCaches(
   // 1. Optimistically update all active windowed query caches across all keyPrefixes
   const windowQueries = client.getQueryCache().findAll({
     predicate: (query) =>
-      Array.isArray(query.queryKey) &&
-      query.queryKey.length >= 2 &&
-      query.queryKey[1] === 'window'
+      Array.isArray(query.queryKey) && query.queryKey.length >= 2 && query.queryKey[1] === 'window'
   });
 
   for (const wQuery of windowQueries) {
@@ -74,9 +72,8 @@ export function invalidateLikeSensitiveQueries(client: QueryClient = defaultQuer
 }
 
 /**
- * Shared favorite toggle hook with deduplicated cache synchronization,
- * optimistic updates, sequence-guarded async rollback, player bar heart sync,
- * and error notification handling.
+ * Shared favorite toggle hook with deduplicated cache synchronization, optimistic updates,
+ * sequence-guarded async rollback, player bar heart sync, and error notification handling.
  */
 export function useSongFavoriteToggle({
   songId,
@@ -86,7 +83,8 @@ export function useSongFavoriteToggle({
   toggleIsFavorite: directToggleIsFavorite
 }: UseSongFavoriteToggleProps): UseSongFavoriteToggleReturn {
   const { t } = useTranslation();
-  const client = useQueryClient();
+  const clientContext = useContext(QueryClientContext);
+  const client = clientContext ?? defaultQueryClient;
   const context = useContext(AppUpdateContext);
   const { addNewNotifications: hookNotifications } = useNotifications();
 

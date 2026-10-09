@@ -43,7 +43,7 @@ import {
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
-import { SONG_WINDOW_SIZE } from '@renderer/queries/songs';
+import { SONG_WINDOW_SIZE, hashSongIds } from '@renderer/queries/songs';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { queryClient } from '@renderer/queryClient';
 import { scrollRegistry } from '@renderer/utils/scrollStore';
@@ -379,10 +379,11 @@ function PlaylistInfoPage() {
   const entries = catalogData.entries;
   const songIds = useMemo(() => entries.map((e) => e.songId), [entries]);
   const catalogVersion = catalogQuery.dataUpdatedAt;
+  const orderHash = useMemo(() => hashSongIds(songIds), [songIds]);
   const listIdentity = useMemo(
     () =>
-      `playlist:${playlistId}:${sortingOrder}:${filteringOrder}:${language || 'all'}:${keyword || ''}`,
-    [playlistId, sortingOrder, filteringOrder, language, keyword]
+      `playlist:${playlistId}:${sortingOrder}:${filteringOrder}:${language || 'all'}:${keyword || ''}:${orderHash}`,
+    [playlistId, sortingOrder, filteringOrder, language, keyword, orderHash]
   );
 
   const blacklistedSet = useMemo(
