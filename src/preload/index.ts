@@ -5,11 +5,14 @@ import type {
   ListeningAnalyticsData,
   LibraryAudioStatsData
 } from '../common/analytics';
+import type { HistorySongIdsParams, HistorySongIdsResult } from '../main/db/queries/history';
 import type { DaemonCommand, DaemonPushEvent, DaemonResponse } from '../common/audioEngineProtocol';
 import type {
   PlaylistDto as CollectionDto,
   CollectionHierarchyNodeDto as BreadcrumbDto,
-  PlaylistEntryDto
+  PlaylistEntryDto,
+  PlaylistCatalogOptions,
+  PlaylistCatalogResult
 } from '../common/collections/dtos';
 import type {
   CreateFolderInput,
@@ -157,6 +160,8 @@ const audioLibraryControls = {
     restrictToIds?: number[];
     recentlyAddedPeriod?: RecentlyAddedPeriod;
   }): Promise<SongIdsResult> => ipcRenderer.invoke('app/getFilteredSongLibraryIds', options),
+  getHistorySongIds: (options?: HistorySongIdsParams): Promise<HistorySongIdsResult> =>
+    ipcRenderer.invoke('app/getHistorySongIds', options),
   getSongListFacets: (): Promise<{ languages: string[]; genres: string[] }> =>
     ipcRenderer.invoke('app/getSongListFacets'),
   getSongDurations: (songIds: number[]): Promise<{ id: number; duration: number }[]> =>
@@ -891,6 +896,11 @@ const collections = {
       sortType?: PlaylistViewMode
     ): Promise<PlaylistEntryDto[]> =>
       ipcRenderer.invoke('collections/read/getEntries', id, offset, limit, sortType),
+    getPlaylistSongCatalog: (
+      id: number,
+      options?: PlaylistCatalogOptions
+    ): Promise<PlaylistCatalogResult> =>
+      ipcRenderer.invoke('collections/read/getPlaylistSongCatalog', id, options),
     getBreadcrumbs: (id: number): Promise<BreadcrumbDto[]> =>
       ipcRenderer.invoke('collections/read/getBreadcrumbs', id),
     getArtworks: (songIds: number[]): Promise<ArtworkPaths[]> =>

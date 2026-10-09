@@ -51,6 +51,7 @@ export const CollectionEventProvider: React.FC<{ children: React.ReactNode }> = 
             if (collectionId) {
               queryClient.invalidateQueries({ queryKey: collectionKeys.detail(collectionId) });
               queryClient.invalidateQueries({ queryKey: collectionKeys.entries(collectionId) });
+              queryClient.invalidateQueries({ queryKey: collectionKeys.catalogRoot(collectionId) });
             }
             break;
           }
@@ -59,6 +60,7 @@ export const CollectionEventProvider: React.FC<{ children: React.ReactNode }> = 
           if (collectionId) {
             queryClient.invalidateQueries({ queryKey: collectionKeys.detail(collectionId) });
             queryClient.invalidateQueries({ queryKey: collectionKeys.entries(collectionId) });
+            queryClient.invalidateQueries({ queryKey: collectionKeys.catalogRoot(collectionId) });
           }
           break;
         }
@@ -67,6 +69,7 @@ export const CollectionEventProvider: React.FC<{ children: React.ReactNode }> = 
           for (const id of event.payload.collectionIds ?? []) {
             queryClient.removeQueries({ queryKey: collectionKeys.detail(id) });
             queryClient.removeQueries({ queryKey: collectionKeys.entries(id) });
+            queryClient.removeQueries({ queryKey: collectionKeys.catalogRoot(id) });
           }
           break;
         default:

@@ -23,6 +23,10 @@ import type {
   SmartPlaylistRuleDto
 } from '@common/collections/smartPlaylist';
 import type {
+  PlaylistCatalogOptions,
+  PlaylistCatalogResult
+} from '@common/collections/dtos';
+import type {
   PlaylistViewMode,
   PlaylistExportOptions,
   PlaylistImportIpcOptions,
@@ -38,6 +42,8 @@ export const CollectionClient = {
   getChildren: (id: number | null) => window.api.collections.read.getChildren(id),
   getEntries: (id: number, offset?: number, limit?: number, sortType?: PlaylistViewMode) =>
     window.api.collections.read.getEntries(id, offset, limit, sortType),
+  getPlaylistSongCatalog: (id: number, options?: PlaylistCatalogOptions) =>
+    window.api.collections.read.getPlaylistSongCatalog(id, options),
   getBreadcrumbs: (id: number) => window.api.collections.read.getBreadcrumbs(id),
   getArtworks: (songIds: number[]) => window.api.collections.read.getArtworks(songIds),
   getSmartRule: (playlistId: number): Promise<SmartPlaylistRuleDto | undefined> =>

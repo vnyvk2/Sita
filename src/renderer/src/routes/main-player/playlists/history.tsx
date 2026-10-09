@@ -4,13 +4,21 @@ import MainContainer from '@renderer/components/MainContainer';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import NewPlaylistPrompt from '@renderer/components/PlaylistsPage/NewPlaylistPrompt';
 import Song from '@renderer/components/SongsPage/Song';
-import { songSortOptions } from '@renderer/components/SongsPage/SongOptions';
+import { songSortOptions, type SongSortTypes } from '@renderer/components/SongsPage/SongOptions';
+import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
 import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
-import { songQuery } from '@renderer/queries/songs';
+import {
+  songCacheKeys,
+  songIdsVersionFromState,
+  songQuery,
+  type HistorySongIdsParams
+} from '@renderer/queries/songs';
+import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
 import { mapLegacyPlaylistToDto } from '@renderer/utils/playlistAdapter';
@@ -25,6 +33,44 @@ import historyPlaylistCoverImage from '../../../assets/images/webp/history-playl
 
 export const Route = createFileRoute('/main-player/playlists/history')({
   validateSearch: songSearchSchema,
+  loaderDeps: ({ search }) => ({
+    sortingOrder: search.sortingOrder,
+    period: search.period,
+    mostPlayedLimit: search.mostPlayedLimit,
+    language: search.language
+  }),
+  loader: async ({ deps }) => {
+    if (typeof window === 'undefined' || !window.api?.audioLibraryControls) return;
+    const sortingState = storage.sortingStates.getSortingStates('historyPage');
+    const storedPeriod = storage.sortingStates.getSortingStates('historyPagePeriod');
+    const storedLimit = storage.sortingStates.getSortingStates('historyPageMostPlayedLimit');
+    const historyParams: HistorySongIdsParams = {
+      sortType: deps?.sortingOrder ?? sortingState ?? 'addedOrder',
+      period: (deps?.period as HistoryPeriod) ?? storedPeriod ?? 'all',
+      limit: deps?.mostPlayedLimit ?? storedLimit ?? 25,
+      language: deps?.language && deps.language !== 'all' ? deps.language : undefined
+    };
+    const historyData = await queryClient.fetchQuery(songQuery.historyIds(historyParams));
+    if (historyData.ids.length === 0) return;
+    const state = queryClient.getQueryState(songQuery.historyIds(historyParams).queryKey);
+    const version = songIdsVersionFromState(state?.dataUpdatedAt);
+    const listIdentity = `history:${historyParams.sortType}:${historyParams.period}:${historyParams.limit}:${historyParams.language || 'all'}`;
+    const window0Ids = historyData.ids.slice(0, Math.min(200, historyData.ids.length));
+    if (window0Ids.length > 0) {
+      await queryClient.ensureQueryData({
+        queryKey: songCacheKeys.window(listIdentity, version, 0),
+        queryFn: () =>
+          window.api.audioLibraryControls.getSongInfo(
+            window0Ids,
+            undefined,
+            undefined,
+            undefined,
+            true
+          ),
+        staleTime: 5 * 60 * 1000
+      });
+    }
+  },
   component: HistoryPlaylistInfoPage
 });
 
@@ -59,7 +105,7 @@ const mostPlayedLimitOptions = [
 
 /**
  * Render the History playlist details page with controls for playback, queue management, selection,
- * period filtering, Most Played limits, and playlist creation.
+ * period filtering, Most Played limits, and playlist creation using windowed hydration.
  *
  * @returns A React element representing the History playlist information page.
  */
@@ -114,21 +160,44 @@ function HistoryPlaylistInfoPage() {
     }
   }, [searchLimit]);
 
-  const { data: historySongs = [] } = useSuspenseQuery({
-    ...songQuery.history({ sortType: sortingOrder, period, limit: mostPlayedLimit }),
-    select: (data) => data.data
+  const historyParams: HistorySongIdsParams = useMemo(
+    () => ({
+      sortType: sortingOrder,
+      period,
+      limit: mostPlayedLimit,
+      language: language && language !== 'all' ? language : undefined
+    }),
+    [sortingOrder, period, mostPlayedLimit, language]
+  );
+
+  const idsQuery = useSuspenseQuery(songQuery.historyIds(historyParams));
+  const historyData = idsQuery.data;
+  const songIds = historyData.ids;
+  const entries = historyData.entries;
+  const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
+  const listIdentity = useMemo(
+    () =>
+      `history:${historyParams.sortType}:${historyParams.period}:${historyParams.limit}:${historyParams.language || 'all'}`,
+    [historyParams]
+  );
+  const blacklistedSet = useMemo(
+    () => new Set(historyData.blacklistedIds),
+    [historyData.blacklistedIds]
+  );
+
+  const playableSongIds = useMemo(
+    () => songIds.filter((id) => !blacklistedSet.has(id)),
+    [songIds, blacklistedSet]
+  );
+
+  const { getItem, onRangeChange } = useWindowHydration(songIds, idsVersion, {
+    enabled: songIds.length > 0,
+    listIdentity,
+    isCompactView: preferences.isCompactSongView,
+    rowHeight: 60
   });
 
-  const availableLanguages = useMemo(() => {
-    if (!historySongs || historySongs.length === 0) return [];
-    const langs = new Set<string>();
-    for (const song of historySongs) {
-      if (song.language && song.language.trim() !== '') {
-        langs.add(song.language.trim());
-      }
-    }
-    return Array.from(langs).sort();
-  }, [historySongs]);
+  const availableLanguages = historyData.languages ?? [];
 
   const languageDropdownOptions: DropdownOption<string>[] = useMemo(() => {
     const options: DropdownOption<string>[] = [
@@ -144,81 +213,66 @@ function HistoryPlaylistInfoPage() {
     return options;
   }, [availableLanguages, t]);
 
-  const filteredSongs = useMemo(() => {
-    if (!language || language === 'all') return historySongs;
-    return historySongs.filter((song) => {
-      if (language === 'unspecified') {
-        return !song.language || song.language.trim() === '';
-      }
-      return song.language?.toLowerCase() === language.toLowerCase();
-    });
-  }, [historySongs, language]);
-
-  const selectAllHandler = useSelectAllHandler(filteredSongs, 'songs', 'songId');
+  const selectAllHandler = useSelectAllHandler(playableSongIds, 'songs');
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      const queueSongIds = filteredSongs
-        .filter((song) => !song.isBlacklisted)
-        .map((song) => song.songId);
       createQueue(
-        queueSongIds,
+        playableSongIds,
         'playlist',
         false,
         'history',
         false,
         t('common.history', 'History')
       );
-      updateQueueData(queueSongIds.indexOf(currSongId), undefined, false, true);
+      updateQueueData(playableSongIds.indexOf(currSongId), undefined, false, true);
     },
-    [createQueue, updateQueueData, t, filteredSongs]
+    [createQueue, updateQueueData, t, playableSongIds]
   );
 
   const addSongsToQueue = useCallback(() => {
-    const validSongIds = filteredSongs
-      .filter((song) => !song.isBlacklisted)
-      .map((song) => song.songId);
-    getQueuesManager().getActiveQueue().addSongIdsToEnd(validSongIds);
+    getQueuesManager().getActiveQueue().addSongIdsToEnd(playableSongIds);
     addNewNotifications([
       {
         id: `addedToQueue`,
         duration: 5000,
         content: t('notifications.addedToQueue', {
-          count: validSongIds.length
+          count: playableSongIds.length
         })
       }
     ]);
-  }, [addNewNotifications, filteredSongs, t]);
+  }, [addNewNotifications, playableSongIds, t]);
 
   const shuffleAndPlaySongs = useCallback(
     () =>
       createQueue(
-        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        playableSongIds,
         'playlist',
         true,
         'history',
-        true
+        true,
+        t('common.history', 'History')
       ),
-    [createQueue, filteredSongs]
+    [createQueue, playableSongIds, t]
   );
 
   const playAllSongs = useCallback(
     () =>
       createQueue(
-        filteredSongs.filter((song) => !song.isBlacklisted).map((song) => song.songId),
+        playableSongIds,
         'songs',
         false,
         'history',
-        true
+        true,
+        t('common.history', 'History')
       ),
-    [createQueue, filteredSongs]
+    [createQueue, playableSongIds, t]
   );
 
   const createPlaylistFromHistory = useCallback(() => {
-    if (filteredSongs.length === 0) return;
-    const songIds = filteredSongs.map((song) => song.songId);
-    changePromptMenuData(true, <NewPlaylistPrompt songIds={songIds} />);
-  }, [changePromptMenuData, filteredSongs]);
+    if (playableSongIds.length === 0) return;
+    changePromptMenuData(true, <NewPlaylistPrompt songIds={playableSongIds} />);
+  }, [changePromptMenuData, playableSongIds]);
 
   const isMostPlayedMode =
     sortingOrder === 'allTimeMostListened' || sortingOrder === 'monthlyMostListened';
@@ -239,7 +293,8 @@ function HistoryPlaylistInfoPage() {
             }),
             replace: true
           });
-        }
+        },
+        isDisabled: !(songIds.length > 0)
       },
       {
         name: 'HistoryPeriodDropdown',
@@ -287,9 +342,45 @@ function HistoryPlaylistInfoPage() {
     mostPlayedLimit,
     navigate,
     period,
+    songIds.length,
     sortingOrder,
     t
   ]);
+
+  const renderSong = useCallback(
+    (index: number, entry: { songId: number; playedAt?: number; playCount?: number }) => {
+      const song = getItem(index);
+      if (song) {
+        return (
+          <Song
+            key={`${song.songId}-${entry?.playedAt ?? index}`}
+            index={index}
+            isIndexingSongs={preferences.isSongIndexingEnabled}
+            onPlayClick={handleSongPlayBtnClick}
+            selectAllHandler={selectAllHandler}
+            isCompact={preferences.isCompactSongView}
+            isDelegated={true}
+            {...song}
+            trackNo={undefined}
+          />
+        );
+      }
+      return (
+        <SongRowSkeleton
+          index={index}
+          isCompact={preferences.isCompactSongView}
+          rowSize={preferences.isCompactSongView ? 'small' : 'normal'}
+        />
+      );
+    },
+    [
+      getItem,
+      handleSongPlayBtnClick,
+      preferences.isCompactSongView,
+      preferences.isSongIndexingEnabled,
+      selectAllHandler
+    ]
+  );
 
   return (
     <MainContainer
@@ -310,19 +401,19 @@ function HistoryPlaylistInfoPage() {
             tooltipLabel: t('common.playAll'),
             iconName: 'play_arrow',
             clickHandler: playAllSongs,
-            isDisabled: !(historySongs.length > 0)
+            isDisabled: !(playableSongIds.length > 0)
           },
           {
             tooltipLabel: t('common.shuffleAndPlay'),
             iconName: 'shuffle',
             clickHandler: shuffleAndPlaySongs,
-            isDisabled: !(historySongs.length > 0)
+            isDisabled: !(playableSongIds.length > 0)
           },
           {
             tooltipLabel: t('common.addToQueue'),
             iconName: 'add',
             clickHandler: addSongsToQueue,
-            isDisabled: !(historySongs.length > 0)
+            isDisabled: !(playableSongIds.length > 0)
           },
           {
             tooltipLabel: t(
@@ -331,7 +422,7 @@ function HistoryPlaylistInfoPage() {
             ),
             iconName: 'playlist_add',
             clickHandler: createPlaylistFromHistory,
-            isDisabled: !(historySongs.length > 0)
+            isDisabled: !(playableSongIds.length > 0)
           },
           {
             tooltipLabel: t('historyPage.viewInsights', 'View Insights & Stats'),
@@ -342,36 +433,27 @@ function HistoryPlaylistInfoPage() {
         dropdowns={dropdowns}
       />
       <VirtualizedList
-        data={filteredSongs}
+        data={entries}
         fixedItemHeight={60}
         scrollKey={scrollKey}
+        computeItemKey={(index, item) => `${item.songId}-${item.playedAt ?? index}`}
+        onChange={onRangeChange}
         components={{
           Header: () => (
             <PlaylistInfoAndImgContainer
               playlist={mapLegacyPlaylistToDto({
                 ...playlistData,
-                songs: historySongs.map((s) => s.songId)
+                songs: songIds
               })}
-              songs={historySongs}
-              filteredSongs={filteredSongs}
+              songs={[]}
+              filteredCount={songIds.length}
+              totalDuration={historyData.totalDuration}
             />
           )
         }}
-        itemContent={(index, item) => {
-          return (
-            <Song
-              key={index}
-              index={index - 1}
-              isIndexingSongs={preferences.isSongIndexingEnabled}
-              onPlayClick={handleSongPlayBtnClick}
-              selectAllHandler={selectAllHandler}
-              {...item}
-              trackNo={undefined}
-            />
-          );
-        }}
+        itemContent={renderSong}
       />
-      {filteredSongs.length === 0 && (
+      {entries.length === 0 && (
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
           <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
           {t('playlist.empty')}
@@ -380,3 +462,5 @@ function HistoryPlaylistInfoPage() {
     </MainContainer>
   );
 }
+
+export default HistoryPlaylistInfoPage;

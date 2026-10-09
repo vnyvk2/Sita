@@ -1,3 +1,4 @@
+import '@renderer/store/store';
 import { AppUpdateContext, type AppUpdateContextType } from '@renderer/contexts/AppUpdateContext';
 import { artistQuery } from '@renderer/queries/artists';
 import { songQuery } from '@renderer/queries/songs';
@@ -57,6 +58,7 @@ vi.mock('react-i18next', async (importOriginal) => {
 });
 
 vi.mock('@renderer/components/VirtualizedList', () => ({
+  DEFAULT_SCROLL_SEEK_CONFIG: { enter: () => true, exit: () => true },
   default: ({
     data,
     itemContent,
@@ -116,6 +118,10 @@ describe('SongsPage Search & Navigation State Split', () => {
       },
       log: {
         sendLogs: vi.fn()
+      },
+      messages: {
+        getMessageFromMain: vi.fn(),
+        removeMessageToRendererEventListener: vi.fn()
       }
     };
   });

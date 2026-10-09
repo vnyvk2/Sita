@@ -12,7 +12,7 @@ import { collectionEventBus } from '../events/CollectionEventBus';
 import type { BulkRestoreInput } from '../operations/BulkDeleteOp';
 import type { SetArtworkInput } from '../operations/SetArtworkOp';
 import { CollectionArtworkRepository } from '../repositories/CollectionArtworkRepository';
-import type { PlaylistRepository } from '../repositories/PlaylistRepository';
+import type { PlaylistRepository, PlaylistCatalogOptions } from '../repositories/PlaylistRepository';
 import { mapPlaylistToDto, mapEntryToDto } from './dtos';
 import {
   addSongsInputSchema,
@@ -81,6 +81,14 @@ export function setupCollectionIpc(
         sortType
       });
       return entries.map(mapEntryToDto);
+    }
+  );
+
+  ipcMain.handle(
+    'collections/read/getPlaylistSongCatalog',
+    async (_, id: number, options?: PlaylistCatalogOptions) => {
+      const safeId = parse(idParamSchema, id);
+      return await repository.getPlaylistSongCatalog(safeId, options);
     }
   );
 

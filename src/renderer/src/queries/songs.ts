@@ -44,6 +44,26 @@ export interface SongIdsResult {
   letterCounts?: Record<string, number>;
 }
 
+export interface HistorySongIdsParams {
+  sortType?: SongSortTypes;
+  period?: HistoryPeriod;
+  limit?: number;
+  language?: string;
+}
+
+export interface HistorySongIdsResult {
+  entries: Array<{
+    songId: number;
+    playedAt?: number;
+    playCount?: number;
+  }>;
+  ids: number[];
+  total: number;
+  totalDuration?: number;
+  blacklistedIds: number[];
+  languages: string[];
+}
+
 export const getSongListIdentity = (params: SongIdsParams | unknown): string => {
   if (typeof params === 'string') {
     return params.startsWith('ids=') ? params : `ids=${params}`;
@@ -97,6 +117,12 @@ export const songQuery = createQueryKeys('songs', {
         }
         return window.api.audioLibraryControls.getFilteredSongLibraryIds(params);
       }
+    };
+  },
+  historyIds: (params: HistorySongIdsParams) => {
+    return {
+      queryKey: [params],
+      queryFn: () => window.api.audioLibraryControls.getHistorySongIds(params)
     };
   },
   facets: () => ({

@@ -233,6 +233,7 @@ export function invalidateTarget(target: InvalidationTargetKey, client = queryCl
       break;
     case 'songs:history':
       client.invalidateQueries({ queryKey: songQuery.history._def });
+      client.invalidateQueries({ queryKey: songQuery.historyIds._def });
       break;
     case 'songs:recentlyAdded':
       client.invalidateQueries({ queryKey: songQuery.recentlyAdded._def });

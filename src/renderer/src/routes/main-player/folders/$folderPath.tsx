@@ -41,10 +41,9 @@ export const Route = createFileRoute('/main-player/folders/$folderPath')({
     if (params.folderPath) {
       const res = await window.api.folderData.getFolderData([params.folderPath]);
       if (res && res.length > 0 && res[0].songIds.length > 0) {
-        const sortingState = storage.sortingStates.getSortingStates('musicFolderSortDropdown');
         const idsParams: SongIdsParams = {
           restrictToIds: res[0].songIds,
-          sortType: deps?.sortingOrder ?? sortingState ?? 'aToZ',
+          sortType: deps?.sortingOrder ?? 'aToZ',
           filterType: deps?.filteringOrder ?? 'notSelected'
         };
         const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));

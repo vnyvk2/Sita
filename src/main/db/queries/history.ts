@@ -1,11 +1,31 @@
 import { db } from '@db/db';
-import { asc, desc, eq, gte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, sql, type SQL } from 'drizzle-orm';
 
 import logger from '../../logger';
-import { playHistory } from '../schema';
+import { albums, albumsSongs, artists, artistsSongs, playHistory, songs } from '../schema';
 import { getAllSongs } from './songs';
 
 export type { HistoryQueryOptions, HistoryPeriod };
+
+export interface HistorySongIdsParams {
+  sortType?: SongSortTypes;
+  period?: HistoryPeriod;
+  limit?: number;
+  language?: string;
+}
+
+export interface HistorySongIdsResult {
+  entries: Array<{
+    songId: number;
+    playedAt?: number;
+    playCount?: number;
+  }>;
+  ids: number[];
+  total: number;
+  totalDuration?: number;
+  blacklistedIds: number[];
+  languages: string[];
+}
 
 export const getCutoffDate = (period?: HistoryPeriod): Date | undefined => {
   if (!period || period === 'all') return undefined;
@@ -147,4 +167,129 @@ export const getAllSongsInHistory = async (
 export const clearFullSongHistory = async (trx: DB | DBTransaction = db) => {
   const data = await trx.delete(playHistory);
   return data;
+};
+
+export const getHistorySongIds = async (
+  options: HistorySongIdsParams = {},
+  trx: DB | DBTransaction = db
+): Promise<HistorySongIdsResult> => {
+  const { sortType = 'addedOrder', period = 'all', limit, language } = options;
+
+  const isMostPlayed = sortType === 'allTimeMostListened' || sortType === 'monthlyMostListened';
+  const effectivePeriod = period ?? (sortType === 'monthlyMostListened' ? '30' : 'all');
+  const cutoffDate = getCutoffDate(effectivePeriod);
+
+  const filters: SQL[] = [];
+  if (cutoffDate) {
+    filters.push(gte(playHistory.createdAt, cutoffDate));
+  }
+
+  if (language && language !== 'all') {
+    if (language === 'unspecified') {
+      filters.push(sql`(${songs.language} IS NULL OR trim(${songs.language}) = '')`);
+    } else {
+      filters.push(sql`lower(${songs.language}) = ${language.toLowerCase()}`);
+    }
+  }
+
+  let orderClauses: SQL[] = [];
+  if (isMostPlayed) {
+    orderClauses = [
+      sql`count(*) DESC`,
+      sql`max(${playHistory.createdAt}) DESC`,
+      asc(playHistory.songId)
+    ];
+  } else if (sortType === 'addedOrder' || sortType === 'dateAddedDescending' || !sortType) {
+    orderClauses = [sql`max(${playHistory.createdAt}) DESC`];
+  } else if (sortType === 'dateAddedAscending') {
+    orderClauses = [sql`min(${playHistory.createdAt}) ASC`];
+  } else if (sortType === 'aToZ') {
+    orderClauses = [asc(songs.title), sql`max(${playHistory.createdAt}) DESC`];
+  } else if (sortType === 'zToA') {
+    orderClauses = [desc(songs.title), sql`max(${playHistory.createdAt}) DESC`];
+  } else if (sortType === 'releasedYearAscending') {
+    orderClauses = [asc(songs.year), asc(songs.title)];
+  } else if (sortType === 'releasedYearDescending') {
+    orderClauses = [desc(songs.year), asc(songs.title)];
+  } else if (sortType === 'artistNameAscending') {
+    orderClauses = [
+      sql`(SELECT min(lower(${artists.name})) FROM ${artistsSongs} JOIN ${artists} ON ${artists.id} = ${artistsSongs.artistId} WHERE ${artistsSongs.songId} = ${songs.id}) ASC`,
+      asc(songs.title)
+    ];
+  } else if (sortType === 'albumNameAscending') {
+    orderClauses = [
+      sql`(SELECT min(lower(${albums.title})) FROM ${albumsSongs} JOIN ${albums} ON ${albums.id} = ${albumsSongs.albumId} WHERE ${albumsSongs.songId} = ${songs.id}) ASC`,
+      asc(songs.title)
+    ];
+  } else {
+    orderClauses = [sql`max(${playHistory.createdAt}) DESC`];
+  }
+
+  const query = trx
+    .select({
+      songId: playHistory.songId,
+      playCount: sql<number>`count(*)`,
+      lastPlayed: sql<Date>`max(${playHistory.createdAt})`,
+      firstPlayed: sql<Date>`min(${playHistory.createdAt})`,
+      duration: songs.duration,
+      isBlacklisted: songs.isBlacklisted
+    })
+    .from(playHistory)
+    .innerJoin(songs, eq(playHistory.songId, songs.id))
+    .where(filters.length > 0 ? and(...filters) : undefined)
+    .groupBy(playHistory.songId)
+    .orderBy(...orderClauses);
+
+  const topNLimit = isMostPlayed ? Math.min(Math.max(1, limit ?? 25), 1000) : limit;
+  const rows = topNLimit ? await query.limit(topNLimit) : await query;
+
+  // Languages query for distinct languages present in history within this period
+  const langFilters: SQL[] = [];
+  if (cutoffDate) {
+    langFilters.push(gte(playHistory.createdAt, cutoffDate));
+  }
+  const langRows = await trx
+    .selectDistinct({ language: songs.language })
+    .from(playHistory)
+    .innerJoin(songs, eq(playHistory.songId, songs.id))
+    .where(
+      and(
+        ...(langFilters.length > 0 ? langFilters : []),
+        sql`${songs.language} IS NOT NULL AND trim(${songs.language}) <> ''`
+      )
+    );
+  const languages = langRows
+    .map((r) => r.language?.trim())
+    .filter((l): l is string => Boolean(l))
+    .sort();
+
+  const entries: Array<{ songId: number; playedAt?: number; playCount?: number }> = [];
+  const ids: number[] = [];
+  const blacklistedIds: number[] = [];
+  let totalDuration = 0;
+
+  for (const row of rows) {
+    const rawPlayed = sortType === 'dateAddedAscending' ? row.firstPlayed : row.lastPlayed;
+    const playedAt = rawPlayed ? new Date(rawPlayed).getTime() : undefined;
+
+    entries.push({
+      songId: row.songId,
+      playedAt,
+      playCount: row.playCount
+    });
+    ids.push(row.songId);
+    if (row.isBlacklisted) {
+      blacklistedIds.push(row.songId);
+    }
+    totalDuration += Number(row.duration ?? 0);
+  }
+
+  return {
+    entries,
+    ids,
+    total: entries.length,
+    totalDuration,
+    blacklistedIds,
+    languages
+  };
 };
