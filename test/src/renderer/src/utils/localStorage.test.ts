@@ -1,10 +1,18 @@
+import { version } from '../../../../../package.json';
 import { LOCAL_STORAGE_DEFAULT_TEMPLATE } from '@renderer/other/appReducer';
 // Import the store first: utils/localStorage participates in a circular import with it, and the
 // store must be the entry point of that cycle for its default export to be defined.
 import '@renderer/store/store';
-import { normalizeShortcutLabelsToKeys } from '@renderer/utils/localStorage';
+import storage, {
+  __resetDegradedStateForTesting,
+  getIsQueueStorageDegraded,
+  isQuotaExceededError,
+  normalizeShortcutLabelsToKeys,
+  stripQueuePayload,
+  stripSelectiveQueuePayload
+} from '@renderer/utils/localStorage';
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Shortcut labels must be persisted as stable i18n keys ('appShortcutsPrompt.*'), never runtime
@@ -108,5 +116,159 @@ describe('normalizeShortcutLabelsToKeys', () => {
       (s: Shortcut) => s.label === removedShortcutLabel
     );
     expect(reAdded).toBeDefined();
+  });
+});
+
+describe('localStorage Quota Fallback & Queue Stripping', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    __resetDegradedStateForTesting();
+  });
+
+  it('stripQueuePayload strips songIds and queueBeforeShuffle while preserving metadata and positions', () => {
+    const sampleStorage = {
+      ...LOCAL_STORAGE_DEFAULT_TEMPLATE,
+      queue: {
+        currentQueueIndex: 0,
+        queues: [
+          {
+            id: 'q1',
+            songIds: [1, 2, 3, 4, 5],
+            position: 2,
+            queueBeforeShuffle: [5, 4, 3, 2, 1],
+            metadata: { title: 'Main Queue', isLocked: true }
+          }
+        ]
+      }
+    };
+
+    const stripped = stripQueuePayload(sampleStorage as never);
+    expect(stripped.queue.queues[0].songIds).toEqual([]);
+    expect(stripped.queue.queues[0].queueBeforeShuffle).toBeUndefined();
+    expect(stripped.queue.queues[0].position).toBe(2);
+    expect(stripped.queue.queues[0].metadata?.title).toBe('Main Queue');
+    expect(stripped.queue.queues[0].metadata?.isLocked).toBe(true);
+  });
+
+  it('stripSelectiveQueuePayload only strips queues with >1000 songs and preserves smaller queues', () => {
+    const sampleStorage = {
+      ...LOCAL_STORAGE_DEFAULT_TEMPLATE,
+      queue: {
+        currentQueueIndex: 0,
+        queues: [
+          {
+            id: 'q-small',
+            songIds: [1, 2, 3],
+            position: 1
+          },
+          {
+            id: 'q-large',
+            songIds: Array.from({ length: 1500 }, (_, i) => i),
+            position: 50
+          }
+        ]
+      }
+    };
+
+    const stripped = stripSelectiveQueuePayload(sampleStorage as never, 1000);
+    expect(stripped.queue.queues[0].songIds).toEqual([1, 2, 3]);
+    expect(stripped.queue.queues[0].position).toBe(1);
+    expect(stripped.queue.queues[1].songIds).toEqual([]);
+    expect(stripped.queue.queues[1].position).toBe(50);
+  });
+
+  it('isQuotaExceededError detects standard and synthetic quota errors', () => {
+    expect(isQuotaExceededError(new DOMException('quota', 'QuotaExceededError'))).toBe(true);
+    expect(isQuotaExceededError({ name: 'QuotaExceededError' })).toBe(true);
+    expect(isQuotaExceededError({ code: 22 })).toBe(true);
+    expect(isQuotaExceededError(new Error('Generic failure'))).toBe(false);
+  });
+
+  it('setLocalStorage catches QuotaExceededError, degrades storage, and recovers when queue shrinks below 1000 songs', () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    let callCount = 0;
+
+    setItemSpy.mockImplementation((key, val) => {
+      callCount++;
+      if (callCount === 1) {
+        throw new DOMException('Disk full', 'QuotaExceededError');
+      }
+    });
+
+    const largeStorage = {
+      ...LOCAL_STORAGE_DEFAULT_TEMPLATE,
+      queue: {
+        currentQueueIndex: 0,
+        queues: [
+          {
+            id: 'q1',
+            songIds: Array.from({ length: 5000 }, (_, i) => i),
+            position: 5
+          }
+        ]
+      }
+    };
+
+    storage.setLocalStorage(largeStorage as never);
+
+    expect(getIsQueueStorageDegraded()).toBe(true);
+    // Should have attempted first write (which threw) and then wrote stripped fallback
+    expect(callCount).toBe(2);
+    const lastWrite = JSON.parse(setItemSpy.mock.calls[1][1]);
+    expect(lastWrite.queue.queues[0].songIds).toEqual([]);
+    expect(lastWrite.queue.queues[0].position).toBe(5);
+
+    // Now test recovery: user shrinks queue to < 1000 songs
+    const smallStorage = {
+      ...LOCAL_STORAGE_DEFAULT_TEMPLATE,
+      queue: {
+        currentQueueIndex: 0,
+        queues: [
+          {
+            id: 'q1',
+            songIds: [10, 20, 30],
+            position: 1
+          }
+        ]
+      }
+    };
+
+    storage.setLocalStorage(smallStorage as never);
+    // Recovery successful: unstripped payload written, degraded state cleared
+    expect(getIsQueueStorageDegraded()).toBe(false);
+    const recoveredWrite = JSON.parse(setItemSpy.mock.calls[2][1]);
+    expect(recoveredWrite.queue.queues[0].songIds).toEqual([10, 20, 30]);
+
+    setItemSpy.mockRestore();
+  });
+
+  it('checkLocalStorage strips queues when startup payload exceeds 4MB threshold', () => {
+    const hugeQueue = {
+      ...LOCAL_STORAGE_DEFAULT_TEMPLATE,
+      queue: {
+        currentQueueIndex: 0,
+        queues: [
+          {
+            id: 'q-huge',
+            // Create a payload larger than 4MB
+            songIds: Array.from({ length: 700000 }, (_, i) => i),
+            position: 10
+          }
+        ]
+      }
+    };
+
+    const jsonStr = JSON.stringify(hugeQueue);
+    expect(jsonStr.length).toBeGreaterThan(4 * 1024 * 1024);
+
+    localStorage.setItem('version', '4.0.0-alpha.5');
+    localStorage.setItem('localStorage', jsonStr);
+
+    storage.checkLocalStorage();
+
+    expect(getIsQueueStorageDegraded()).toBe(true);
+    const stored = JSON.parse(localStorage.getItem('localStorage')!);
+    expect(stored.queue.queues[0].songIds).toEqual([]);
+    expect(stored.queue.queues[0].position).toBe(10);
   });
 });

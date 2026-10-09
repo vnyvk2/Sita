@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 // Mock localStorage module
 vi.mock('@renderer/utils/localStorage', () => ({
   default: {
+    setLocalStorage: vi.fn(),
     queue: {
       getQueue: vi.fn(() => ({
         queues: [],
@@ -179,6 +180,176 @@ describe('QueuesManager', () => {
 
       expect(queuesChangedCb).toHaveBeenCalledTimes(1);
       expect(activeQueueChangedCb).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Lightweight Position Persistence & Recovery', () => {
+    test('writes nora:playback-queue-position with songId on positionChange and does NOT invoke setLocalStorage', async () => {
+      const q = manager.createQueue('Test Queue', [10, 20, 30]);
+      const setItemSpy = vi.fn();
+      const originalStorage = globalThis.localStorage;
+      globalThis.localStorage = {
+        setItem: setItemSpy,
+        getItem: vi.fn(),
+        removeItem: vi.fn(),
+        clear: vi.fn(),
+        key: vi.fn(),
+        length: 0
+      } as unknown as Storage;
+
+      try {
+        q.moveToPosition(2);
+
+        expect(setItemSpy).toHaveBeenCalledWith(
+          'nora:playback-queue-position',
+          expect.stringContaining(`"queueId":"${q.id}","index":2,"songId":30`)
+        );
+        expect(storage.setLocalStorage).not.toHaveBeenCalled();
+        expect(storage.queue.setQueue).not.toHaveBeenCalled();
+      } finally {
+        globalThis.localStorage = originalStorage;
+      }
+    });
+
+    test('restores position and reconciles drifted index using songId on initialize', () => {
+      const originalStorage = globalThis.localStorage;
+      globalThis.localStorage = {
+        getItem: vi.fn((key: string) => {
+          if (key === 'nora:playback-queue-position') {
+            // Index drifted: saved index was 1, but songId 40 is actually at index 3
+            return JSON.stringify({ queueId: 'saved-queue', index: 1, songId: 40, timestamp: Date.now() });
+          }
+          return null;
+        }),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+        clear: vi.fn(),
+        key: vi.fn(),
+        length: 0
+      } as unknown as Storage;
+
+      try {
+        (storage.queue.getQueue as any).mockReturnValue({
+          queues: [
+            {
+              id: 'saved-queue',
+              songIds: [10, 20, 30, 40, 50],
+              position: 0
+            }
+          ],
+          currentQueueIndex: 0
+        });
+
+        const newManager = new QueuesManager();
+        newManager.initialize();
+
+        expect(newManager.getActiveQueue().position).toBe(3);
+      } finally {
+        globalThis.localStorage = originalStorage;
+      }
+    });
+
+    test('discards position key and avoids cross-queue contamination when queueId no longer exists', () => {
+      const removeItemSpy = vi.fn();
+      const originalStorage = globalThis.localStorage;
+      globalThis.localStorage = {
+        getItem: vi.fn((key: string) => {
+          if (key === 'nora:playback-queue-position') {
+            return JSON.stringify({ queueId: 'deleted-queue', index: 3, songId: 40 });
+          }
+          return null;
+        }),
+        setItem: vi.fn(),
+        removeItem: removeItemSpy,
+        clear: vi.fn(),
+        key: vi.fn(),
+        length: 0
+      } as unknown as Storage;
+
+      try {
+        (storage.queue.getQueue as any).mockReturnValue({
+          queues: [
+            {
+              id: 'surviving-queue',
+              songIds: [10, 20, 30, 40, 50],
+              position: 0
+            }
+          ],
+          currentQueueIndex: 0
+        });
+
+        const newManager = new QueuesManager();
+        newManager.initialize();
+
+        // Must NOT contaminate surviving queue with deleted queue's position
+        expect(newManager.getActiveQueue().position).toBe(0);
+        expect(removeItemSpy).toHaveBeenCalledWith('nora:playback-queue-position');
+      } finally {
+        globalThis.localStorage = originalStorage;
+      }
+    });
+
+    test('does NOT restore position on an empty queue', () => {
+      const originalStorage = globalThis.localStorage;
+      globalThis.localStorage = {
+        getItem: vi.fn((key: string) => {
+          if (key === 'nora:playback-queue-position') {
+            return JSON.stringify({ queueId: 'empty-queue', index: 2, songId: 99 });
+          }
+          return null;
+        }),
+        setItem: vi.fn(),
+        removeItem: vi.fn(),
+        clear: vi.fn(),
+        key: vi.fn(),
+        length: 0
+      } as unknown as Storage;
+
+      try {
+        (storage.queue.getQueue as any).mockReturnValue({
+          queues: [
+            {
+              id: 'empty-queue',
+              songIds: [],
+              position: -1
+            }
+          ],
+          currentQueueIndex: 0
+        });
+
+        const newManager = new QueuesManager();
+        newManager.initialize();
+
+        expect(newManager.getActiveQueue().position).toBe(-1);
+      } finally {
+        globalThis.localStorage = originalStorage;
+      }
+    });
+
+    test('clears nora:playback-queue-position when the matching queue is deleted', () => {
+      const q = manager.createQueue('To Delete', [10, 20]);
+      const removeItemSpy = vi.fn();
+      const originalStorage = globalThis.localStorage;
+      globalThis.localStorage = {
+        getItem: vi.fn((key: string) => {
+          if (key === 'nora:playback-queue-position') {
+            return JSON.stringify({ queueId: q.id, index: 1, songId: 20 });
+          }
+          return null;
+        }),
+        setItem: vi.fn(),
+        removeItem: removeItemSpy,
+        clear: vi.fn(),
+        key: vi.fn(),
+        length: 0
+      } as unknown as Storage;
+
+      try {
+        manager.deleteQueue(q.id);
+        expect(removeItemSpy).toHaveBeenCalledWith('nora:playback-queue-position');
+      } finally {
+        globalThis.localStorage = originalStorage;
+      }
     });
   });
 });

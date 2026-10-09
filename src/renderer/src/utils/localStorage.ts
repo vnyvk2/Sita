@@ -93,11 +93,107 @@ const checkLocalStorage = () => {
 
       const normalizedStore = normalizeShortcutLabelsToKeys(updatedStore);
 
-      localStorage.setItem('localStorage', JSON.stringify(normalizedStore));
+      // Check startup raw store size: if raw stored blob > 4MB (4,194,304 bytes),
+      // strip large queue arrays (>1000 songs) to prevent quota exhaustion.
+      let finalStore = normalizedStore;
+      const rawPayloadLength = store.length;
+      const STARTUP_STRIP_THRESHOLD_BYTES = 4 * 1024 * 1024;
+      if (rawPayloadLength > STARTUP_STRIP_THRESHOLD_BYTES) {
+        log(
+          `Startup localStorage payload size (${(rawPayloadLength / 1024 / 1024).toFixed(2)} MB) exceeds 4MB threshold. Stripping large (>1000 songs) queues to prevent quota exhaustion.`,
+          undefined,
+          'WARN'
+        );
+        isQueueStorageDegraded = true;
+        let candidate = stripSelectiveQueuePayload(normalizedStore, 1000);
+        if (JSON.stringify(candidate).length > STARTUP_STRIP_THRESHOLD_BYTES) {
+          candidate = stripQueuePayload(normalizedStore);
+        }
+        finalStore = candidate;
+      }
+
+      localStorage.setItem('localStorage', JSON.stringify(finalStore));
       localStorage.setItem('version', migratedVersion);
     }
   }
   return console.log('local storage check successful.');
+};
+
+export const stripSelectiveQueuePayload = (
+  storage: LocalStorage,
+  threshold = 1000
+): LocalStorage => {
+  if (!storage || !storage.queue || !Array.isArray(storage.queue.queues)) {
+    return storage;
+  }
+  return {
+    ...storage,
+    queue: {
+      ...storage.queue,
+      queues: storage.queue.queues.map((q) => {
+        if (Array.isArray(q.songIds) && q.songIds.length > threshold) {
+          return {
+            ...q,
+            songIds: [],
+            queueBeforeShuffle: undefined
+          };
+        }
+        return q;
+      })
+    }
+  };
+};
+
+export const stripQueuePayload = (storage: LocalStorage): LocalStorage => {
+  if (!storage || !storage.queue || !Array.isArray(storage.queue.queues)) {
+    return storage;
+  }
+  return {
+    ...storage,
+    queue: {
+      ...storage.queue,
+      queues: storage.queue.queues.map((q) => ({
+        ...q,
+        songIds: [],
+        queueBeforeShuffle: undefined
+      }))
+    }
+  };
+};
+
+export const countTotalQueuedSongs = (storage: LocalStorage): number => {
+  if (!storage?.queue?.queues || !Array.isArray(storage.queue.queues)) return 0;
+  return storage.queue.queues.reduce((sum, q) => sum + (q.songIds?.length ?? 0), 0);
+};
+
+let isQueueStorageDegraded = false;
+let hasLoggedQuotaDegraded = false;
+
+export const getIsQueueStorageDegraded = () => isQueueStorageDegraded;
+
+export const __resetDegradedStateForTesting = () => {
+  isQueueStorageDegraded = false;
+  hasLoggedQuotaDegraded = false;
+};
+
+export const isQuotaExceededError = (error: unknown): boolean => {
+  if (error instanceof DOMException) {
+    return (
+      error.name === 'QuotaExceededError' ||
+      error.code === 22 ||
+      error.code === 1014 ||
+      error.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    );
+  }
+  if (error && typeof error === 'object') {
+    const err = error as { name?: string; code?: number };
+    return (
+      err.name === 'QuotaExceededError' ||
+      err.code === 22 ||
+      err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    );
+  }
+  return false;
 };
 
 const getLocalStorage = (): LocalStorage => {
@@ -114,11 +210,59 @@ const getLocalStorage = (): LocalStorage => {
 };
 
 const setLocalStorage = (storage: LocalStorage) => {
+  // Degraded mode recovery: if queues shrank under 1000 songs, attempt unstripped write
+  if (isQueueStorageDegraded && countTotalQueuedSongs(storage) < 1000) {
+    try {
+      const unstrippedString = JSON.stringify(storage);
+      localStorage.setItem('localStorage', unstrippedString);
+      isQueueStorageDegraded = false;
+      hasLoggedQuotaDegraded = false;
+      return;
+    } catch {
+      // Still exceeds quota or failed; continue with degraded write
+    }
+  }
+
+  const payload = isQueueStorageDegraded
+    ? stripSelectiveQueuePayload(storage, 1000)
+    : storage;
+
   try {
-    const updatedStorageString = JSON.stringify(storage);
+    const updatedStorageString = JSON.stringify(payload);
     localStorage.setItem('localStorage', updatedStorageString);
   } catch (error) {
-    console.error(error);
+    if (isQuotaExceededError(error)) {
+      isQueueStorageDegraded = true;
+      if (!hasLoggedQuotaDegraded) {
+        hasLoggedQuotaDegraded = true;
+        log(
+          'LocalStorage quota exceeded. Degrading queue persistence by stripping large (>1000 songs) queues to protect user preferences.',
+          { error },
+          'WARN'
+        );
+      }
+      try {
+        // Selective strip first
+        const selectiveStripped = stripSelectiveQueuePayload(storage, 1000);
+        localStorage.setItem('localStorage', JSON.stringify(selectiveStripped));
+      } catch (selectiveError) {
+        // Blanket strip fallback as last resort
+        if (isQuotaExceededError(selectiveError)) {
+          try {
+            const blanketStripped = stripQueuePayload(storage);
+            localStorage.setItem('localStorage', JSON.stringify(blanketStripped));
+          } catch (blanketError) {
+            log(
+              'Failed to write stripped localStorage fallback after quota exceeded.',
+              { blanketError },
+              'ERROR'
+            );
+          }
+        }
+      }
+    } else {
+      console.error(error);
+    }
   }
 };
 
