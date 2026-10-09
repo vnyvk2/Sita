@@ -55,6 +55,66 @@ export interface TopTrackItem {
   totalSeconds: number;
 }
 
+export interface AttentionCliffBucket {
+  label: string;
+  count: number;
+  percentage: number;
+}
+
+export interface SkipForensicsData {
+  totalSkips: number;
+  patienceScore: number;
+  archetype: string;
+  attentionCliff: AttentionCliffBucket[];
+  coldShoulder?: {
+    songId: number;
+    title: string;
+    positionSecs: number;
+  };
+  theTragedy?: {
+    songId: number;
+    title: string;
+    completionPercentage: number;
+  };
+}
+
+export interface AudiophileListeningMetrics {
+  rawPcmGigabytes: number;
+  losslessPercentage: number;
+  peakSampleRate: number;
+  resolutionTier: 'Master Class' | 'Hi-Fi Grade' | 'Standard Lossless' | 'Compressed';
+  dominantResolution: string;
+  spectrum: {
+    hiResPercent: number;
+    cdQualityPercent: number;
+    mp3HighPercent: number;
+    lossyOtherPercent: number;
+  };
+}
+
+export interface LoopAddictionItem {
+  hasAddiction: boolean;
+  streakCount: number;
+  songId?: number;
+  title?: string;
+  artistName?: string;
+  totalLoopMinutes?: number;
+  lastPlayedAt?: string;
+}
+
+export interface ChronotypeData {
+  name: string;
+  icon: string;
+  peakHour: number;
+  peakSegment: 'night' | 'morning' | 'afternoon' | 'evening';
+  segmentPercentages: {
+    night: number;
+    morning: number;
+    afternoon: number;
+    evening: number;
+  };
+}
+
 export interface ListeningAnalyticsData {
   period: HistoryPeriod;
   summary: ListeningAnalyticsSummary;
@@ -63,6 +123,10 @@ export interface ListeningAnalyticsData {
   topArtists: TopArtistItem[];
   topGenres: TopGenreItem[];
   topTracks: TopTrackItem[];
+  skipForensics?: SkipForensicsData;
+  audiophileMetrics?: AudiophileListeningMetrics;
+  loopAddiction?: LoopAddictionItem;
+  chronotype?: ChronotypeData;
 }
 
 export interface LibraryAudioStatsData {
