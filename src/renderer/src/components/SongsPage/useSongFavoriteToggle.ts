@@ -110,11 +110,17 @@ export function useSongFavoriteToggle({
           if (isCurrentSong && toggleIsFavorite) {
             toggleIsFavorite(!nextFav, true);
           }
-        } else {
-          // songCacheKeys has no favorites() factory (it only holds window
-          // keys); the favorites list key lives on songQuery — same key the
-          // data-sync layer invalidates for 'songs:favorites'.
+          // Invalidate both legacy favorites query and like-sensitive ID lists
+          // (such as the Favorites page) so unfavorited tracks reflect immediately.
           queryClient.invalidateQueries({ queryKey: songQuery.favorites._def });
+          const likeSensitiveFilters = new Set(['favorites', 'nonFavorites']);
+          const idQueries = queryClient.getQueryCache().findAll({ queryKey: songQuery.ids._def });
+          for (const listQuery of idQueries) {
+            const params = listQuery.queryKey?.[2] as { filterType?: string } | undefined;
+            if (params && likeSensitiveFilters.has(params.filterType ?? '')) {
+              queryClient.invalidateQueries({ queryKey: listQuery.queryKey });
+            }
+          }
         }
       })
       .catch((err) => {

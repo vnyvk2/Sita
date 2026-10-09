@@ -15,7 +15,8 @@ import { isTransactionContext, rawAll } from '@db/sqlite/raw';
 import { parseSongArtworks } from '@main/fs/resolveFilePaths';
 import logger from '@main/logger';
 import { timeEnd, timeStart } from '@main/utils/measureTimeUsage';
-import { and, asc, desc, eq, inArray, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, or, type SQL, sql } from 'drizzle-orm';
+import { getRecentlyAddedCutoffDate } from '@main/db/queries/recentlyAdded';
 
 import { titleToBucket } from '../../../common/titleToBucket';
 
@@ -940,6 +941,7 @@ export interface FilteredSongIdsOptions {
   onlyFavoriteArtists?: boolean;
   onlyFavoriteAlbums?: boolean;
   restrictToIds?: number[];
+  recentlyAddedPeriod?: RecentlyAddedPeriod;
 }
 
 const hasTruthyLanguageOverride = sql`EXISTS (
@@ -1035,6 +1037,13 @@ export const getFilteredSongLibraryIds = async (
       WHERE ${albumsSongs.songId} = ${songs.id}
         AND ${albums.isFavorite} = TRUE
     )`);
+  }
+
+  if (options.recentlyAddedPeriod && options.recentlyAddedPeriod !== 'all') {
+    const cutoffDate = getRecentlyAddedCutoffDate(options.recentlyAddedPeriod);
+    if (cutoffDate) {
+      filters.push(gte(songs.createdAt, cutoffDate));
+    }
   }
 
   let orderClauses: SQL[] = [];

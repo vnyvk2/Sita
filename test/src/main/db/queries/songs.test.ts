@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 
 import { db } from '../../../../../src/main/db/db';
-import { getAllSongs } from '../../../../../src/main/db/queries/songs';
-import { musicFolders, songs } from '../../../../../src/main/db/schema';
+import { getAllSongs, getFilteredSongLibraryIds } from '../../../../../src/main/db/queries/songs';
+import { genres, genresSongs, musicFolders, songs } from '../../../../../src/main/db/schema';
 
 describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
   beforeEach(async () => {
@@ -248,5 +248,221 @@ describe('getAllSongs (Chunking and O(N) Duplicate-Preserving Order)', () => {
     expect(res.data).toHaveLength(5);
     // Index 10 is s1, 11 is s2, 12 is s1, 13 is s2, 14 is s1
     expect(res.data.map((s) => s.id)).toEqual([s1.id, s2.id, s1.id, s2.id, s1.id]);
+  });
+});
+
+describe('getFilteredSongLibraryIds Filter Composition & Extensions', () => {
+  beforeEach(async () => {
+    await db.delete(genresSongs);
+    await db.delete(genres);
+    await db.delete(songs);
+    await db.delete(musicFolders);
+  });
+
+  it('correctly composes restrictToIds with filterType: favorites in a single query', async () => {
+    const now = new Date('2026-01-01T12:00:00Z');
+    const [folder] = await db
+      .insert(musicFolders)
+      .values({
+        name: 'Music',
+        path: 'C:\\Music',
+        folderCreatedAt: now,
+        lastModifiedAt: now,
+        lastChangedAt: now,
+        lastParsedAt: now
+      })
+      .returning();
+
+    const [song1] = await db
+      .insert(songs)
+      .values({
+        title: 'Song 1',
+        duration: 100,
+        path: 'C:\\Music\\s1.mp3',
+        folderId: folder.id,
+        isFavorite: true,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    const [song2] = await db
+      .insert(songs)
+      .values({
+        title: 'Song 2',
+        duration: 120,
+        path: 'C:\\Music\\s2.mp3',
+        folderId: folder.id,
+        isFavorite: false,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    const [song3] = await db
+      .insert(songs)
+      .values({
+        title: 'Song 3',
+        duration: 150,
+        path: 'C:\\Music\\s3.mp3',
+        folderId: folder.id,
+        isFavorite: true,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    // Restricting to song1 and song2, but filtering by favorites
+    const res = await getFilteredSongLibraryIds({
+      restrictToIds: [song1.id, song2.id],
+      filterType: 'favorites'
+    });
+
+    // Only song1 matches both restrictToIds AND isFavorite: true
+    expect(res.ids).toEqual([song1.id]);
+    expect(res.total).toBe(1);
+  });
+
+  it('correctly composes genre with filterType: favorites in a single query', async () => {
+    const now = new Date('2026-01-01T12:00:00Z');
+    const [folder] = await db
+      .insert(musicFolders)
+      .values({
+        name: 'Music',
+        path: 'C:\\Music',
+        folderCreatedAt: now,
+        lastModifiedAt: now,
+        lastChangedAt: now,
+        lastParsedAt: now
+      })
+      .returning();
+
+    const [rock] = await db
+      .insert(genres)
+      .values({
+        name: 'Rock',
+        artworkPaths: { artworkPath: '', optimizedArtworkPath: '', isDefaultArtwork: true }
+      })
+      .returning();
+
+    const [jazz] = await db
+      .insert(genres)
+      .values({
+        name: 'Jazz',
+        artworkPaths: { artworkPath: '', optimizedArtworkPath: '', isDefaultArtwork: true }
+      })
+      .returning();
+
+    const [songA] = await db
+      .insert(songs)
+      .values({
+        title: 'Rock Favorite',
+        duration: 200,
+        path: 'C:\\Music\\rockFav.mp3',
+        folderId: folder.id,
+        isFavorite: true,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    const [songB] = await db
+      .insert(songs)
+      .values({
+        title: 'Rock Non-Favorite',
+        duration: 210,
+        path: 'C:\\Music\\rockNonFav.mp3',
+        folderId: folder.id,
+        isFavorite: false,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    const [songC] = await db
+      .insert(songs)
+      .values({
+        title: 'Jazz Favorite',
+        duration: 180,
+        path: 'C:\\Music\\jazzFav.mp3',
+        folderId: folder.id,
+        isFavorite: true,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    await db.insert(genresSongs).values([
+      { genreId: rock.id, songId: songA.id },
+      { genreId: rock.id, songId: songB.id },
+      { genreId: jazz.id, songId: songC.id }
+    ]);
+
+    // Query genre 'Rock' + filterType 'favorites'
+    const res = await getFilteredSongLibraryIds({
+      genre: 'Rock',
+      filterType: 'favorites'
+    });
+
+    expect(res.ids).toEqual([songA.id]);
+    expect(res.total).toBe(1);
+  });
+
+  it('filters by recentlyAddedPeriod cutoff date and safely handles period: all', async () => {
+    const now = new Date();
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+
+    const [folder] = await db
+      .insert(musicFolders)
+      .values({
+        name: 'Music',
+        path: 'C:\\Music',
+        folderCreatedAt: now,
+        lastModifiedAt: now,
+        lastChangedAt: now,
+        lastParsedAt: now
+      })
+      .returning();
+
+    const [recentSong] = await db
+      .insert(songs)
+      .values({
+        title: 'A Recent Song',
+        duration: 180,
+        path: 'C:\\Music\\recent.mp3',
+        folderId: folder.id,
+        createdAt: now,
+        fileCreatedAt: now,
+        fileModifiedAt: now
+      })
+      .returning();
+
+    const [oldSong] = await db
+      .insert(songs)
+      .values({
+        title: 'Z Old Song',
+        duration: 200,
+        path: 'C:\\Music\\old.mp3',
+        folderId: folder.id,
+        createdAt: tenDaysAgo,
+        fileCreatedAt: tenDaysAgo,
+        fileModifiedAt: tenDaysAgo
+      })
+      .returning();
+
+    // 7-day cutoff should include only recentSong
+    const res7d = await getFilteredSongLibraryIds({
+      recentlyAddedPeriod: '7d'
+    });
+    expect(res7d.ids).toEqual([recentSong.id]);
+    expect(res7d.total).toBe(1);
+
+    // period: 'all' (All Time) should return both without throwing
+    const resAll = await getFilteredSongLibraryIds({
+      recentlyAddedPeriod: 'all',
+      sortType: 'aToZ'
+    });
+    expect(resAll.ids).toEqual([recentSong.id, oldSong.id]);
+    expect(resAll.total).toBe(2);
   });
 });

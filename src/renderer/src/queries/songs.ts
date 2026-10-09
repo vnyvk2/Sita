@@ -32,6 +32,8 @@ export interface SongIdsParams {
   genre?: string;
   onlyFavoriteArtists?: boolean;
   onlyFavoriteAlbums?: boolean;
+  restrictToIds?: number[];
+  recentlyAddedPeriod?: RecentlyAddedPeriod;
 }
 
 export interface SongIdsResult {

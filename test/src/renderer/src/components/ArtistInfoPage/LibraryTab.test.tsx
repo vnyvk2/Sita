@@ -80,15 +80,29 @@ const mockSongs: any[] = Array.from({ length: 25 }, (_, i) => ({
   isBlacklisted: false
 }));
 
+vi.mock('@renderer/hooks/useWindowHydration', () => ({
+  useWindowHydration: () => ({
+    getItem: (index: number) => mockSongs[index],
+    onRangeChange: vi.fn()
+  })
+}));
+
 // Mock TanStack React Query
 vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>();
   return {
     ...actual,
     useQuery: (options: any) => {
-      // If querying songQuery.allSongInfo
+      // If querying songQuery.ids
       if (options?.queryKey?.[0]?.includes('songs')) {
-        return { data: mockSongs };
+        return {
+          data: {
+            ids: mockSongs.map((s) => s.songId),
+            total: mockSongs.length,
+            blacklistedIds: []
+          },
+          dataUpdatedAt: Date.now()
+        };
       }
       // If querying albumQuery.allAlbumInfo
       return { data: [] };
@@ -197,6 +211,6 @@ describe('LibraryTab - Song Virtualization on Show All', () => {
     // Virtuoso must receive the complete dataset array, allowing bounded DOM virtualization
     expect(lastVirtualizedListProps).not.toBeNull();
     expect(lastVirtualizedListProps.data).toHaveLength(mockSongs.length);
-    expect(lastVirtualizedListProps.data).toEqual(mockSongs);
+    expect(lastVirtualizedListProps.data).toEqual(mockSongs.map((s) => s.songId));
   });
 });

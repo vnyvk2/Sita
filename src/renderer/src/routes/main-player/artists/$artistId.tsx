@@ -5,6 +5,14 @@ import MainContainer from '@renderer/components/MainContainer';
 import { artistQuery } from '@renderer/queries/artists';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
+import {
+  getSongListIdentity,
+  songCacheKeys,
+  songIdsVersionFromState,
+  songQuery,
+  type SongIdsParams
+} from '@renderer/queries/songs';
+import storage from '@renderer/utils/localStorage';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -15,9 +23,35 @@ import { useTranslation } from 'react-i18next';
 export const Route = createFileRoute('/main-player/artists/$artistId')({
   validateSearch: songSearchSchema,
   component: ArtistInfoPage,
-  loader: async (route) => {
-    const artistId = Number(route.params.artistId);
-    await queryClient.ensureQueryData(artistQuery.single({ artistId }));
+  loaderDeps: ({ search }) => ({ sortingOrder: search.sortingOrder }),
+  loader: async ({ params, deps }) => {
+    const artistId = Number(params.artistId);
+    const artistData = await queryClient.ensureQueryData(artistQuery.single({ artistId }));
+    if (typeof window === 'undefined' || !window.api?.audioLibraryControls) return;
+    const songIds = artistData?.data?.[0]?.songs?.map((s) => s.songId) ?? [];
+    if (songIds.length === 0) return;
+    const sortingState = storage.sortingStates.getSortingStates('artistDetailPage');
+    const idsParams: SongIdsParams = {
+      restrictToIds: songIds,
+      sortType: deps?.sortingOrder ?? sortingState ?? 'aToZ',
+      filterType: 'notSelected'
+    };
+    const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
+    const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
+    const version = songIdsVersionFromState(state?.dataUpdatedAt);
+    const listIdentity = getSongListIdentity(idsParams);
+    await queryClient.ensureQueryData({
+      queryKey: songCacheKeys.window(listIdentity, version, 0),
+      queryFn: () =>
+        window.api.audioLibraryControls.getSongInfo(
+          idsData.ids.slice(0, Math.min(200, idsData.ids.length)),
+          undefined,
+          undefined,
+          undefined,
+          true
+        ),
+      staleTime: 5 * 60 * 1000
+    });
   }
 });
 

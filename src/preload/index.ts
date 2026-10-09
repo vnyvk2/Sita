@@ -155,6 +155,7 @@ const audioLibraryControls = {
     onlyFavoriteArtists?: boolean;
     onlyFavoriteAlbums?: boolean;
     restrictToIds?: number[];
+    recentlyAddedPeriod?: RecentlyAddedPeriod;
   }): Promise<SongIdsResult> => ipcRenderer.invoke('app/getFilteredSongLibraryIds', options),
   getSongListFacets: (): Promise<{ languages: string[]; genres: string[] }> =>
     ipcRenderer.invoke('app/getSongListFacets'),

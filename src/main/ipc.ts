@@ -827,6 +827,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
           onlyFavoriteArtists?: boolean;
           onlyFavoriteAlbums?: boolean;
           restrictToIds?: number[];
+          recentlyAddedPeriod?: RecentlyAddedPeriod;
         }
       ) =>
         memProfiler.wrapHandler('app/getFilteredSongLibraryIds', () =>
