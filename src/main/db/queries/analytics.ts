@@ -169,16 +169,18 @@ export const getListeningAnalytics = async (
     // 2. Daily Activity (Date Bucketing)
     const dailyRecords = await trx
       .select({
-        // created_at is epoch-ms: strftime over unixepoch seconds (pg: to_char(col,'YYYY-MM-DD'))
-        date: sql<string>`strftime('%Y-%m-%d', ${playHistory.createdAt} / 1000, 'unixepoch')`,
+        // created_at is epoch-ms: strftime over unixepoch seconds in local time (pg: to_char(col,'YYYY-MM-DD'))
+        date: sql<string>`strftime('%Y-%m-%d', ${playHistory.createdAt} / 1000, 'unixepoch', 'localtime')`,
         playCount: sql<number>`count(*)`,
         seconds: sql<number>`coalesce(sum(${songs.duration}), 0)`
       })
       .from(playHistory)
       .innerJoin(songs, eq(playHistory.songId, songs.id))
       .where(playHistoryWhere)
-      .groupBy(sql`strftime('%Y-%m-%d', ${playHistory.createdAt} / 1000, 'unixepoch')`)
-      .orderBy(sql`strftime('%Y-%m-%d', ${playHistory.createdAt} / 1000, 'unixepoch') ASC`);
+      .groupBy(sql`strftime('%Y-%m-%d', ${playHistory.createdAt} / 1000, 'unixepoch', 'localtime')`)
+      .orderBy(
+        sql`strftime('%Y-%m-%d', ${playHistory.createdAt} / 1000, 'unixepoch', 'localtime') ASC`
+      );
 
     const dailyActivity: DailyActivityItem[] = dailyRecords.map((r) => ({
       date: r.date,
@@ -189,12 +191,14 @@ export const getListeningAnalytics = async (
     // 3. Hourly Circadian Distribution (0..23 hours)
     const hourlyRecords = await trx
       .select({
-        hour: sql<number>`cast(strftime('%H', ${playHistory.createdAt} / 1000, 'unixepoch') as integer)`,
+        hour: sql<number>`cast(strftime('%H', ${playHistory.createdAt} / 1000, 'unixepoch', 'localtime') as integer)`,
         playCount: sql<number>`count(*)`
       })
       .from(playHistory)
       .where(playHistoryWhere)
-      .groupBy(sql`cast(strftime('%H', ${playHistory.createdAt} / 1000, 'unixepoch') as integer)`);
+      .groupBy(
+        sql`cast(strftime('%H', ${playHistory.createdAt} / 1000, 'unixepoch', 'localtime') as integer)`
+      );
 
     const hourMap = new Map<number, number>();
     hourlyRecords.forEach((r) => hourMap.set(r.hour, r.playCount));
