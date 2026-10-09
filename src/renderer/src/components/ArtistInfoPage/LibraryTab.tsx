@@ -7,6 +7,7 @@ import MainContainer from '@renderer/components/MainContainer';
 import Song from '@renderer/components/SongsPage/Song';
 import { songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import TitleContainer from '@renderer/components/TitleContainer';
+import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useResizeObserver from '@renderer/hooks/useResizeObserver';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
@@ -50,6 +51,21 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
 
   const songsContainerRef = useRef<HTMLDivElement>(null);
   const { width } = useResizeObserver(songsContainerRef);
+
+  const [scrollParent, setScrollParent] = useState<HTMLElement | undefined>(undefined);
+
+  useEffect(() => {
+    if (songsContainerRef.current) {
+      const parent = songsContainerRef.current.closest<HTMLElement>('.artist-info-page-container');
+      if (parent) {
+        setScrollParent(parent);
+      } else if (import.meta.env.DEV) {
+        console.warn(
+          'LibraryTab: .artist-info-page-container ancestor not found for VirtualizedList customScrollParent. Virtualized list may collapse to zero height.'
+        );
+      }
+    }
+  }, [isAllSongsVisible]);
 
   const CONTAINER_PADDING = 30;
   const relevantWidth = useMemo(() => width - CONTAINER_PADDING, [width]);
@@ -130,10 +146,10 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
     }
   }, [artistData?.artistId, artistData?.name, createQueue, songs]);
 
-  const songComponents = useMemo(
+  const topFiveSongComponents = useMemo(
     () =>
       songs
-        .filter((_, i) => (isAllSongsVisible ? true : i < 5))
+        .slice(0, 5)
         .map((song, index) => {
           return (
             <Song
@@ -157,7 +173,6 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
         }),
     [
       handleSongPlayBtnClick,
-      isAllSongsVisible,
       preferences?.isSongIndexingEnabled,
       selectAllHandlerForSongs,
       songs
@@ -448,7 +463,37 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
                 }
               ]}
             />
-            <div className="songs-container">{songComponents}</div>
+            <div className="songs-container">
+              {isAllSongsVisible ? (
+                <VirtualizedList
+                  data={songs}
+                  fixedItemHeight={60}
+                  customScrollParent={scrollParent}
+                  computeItemKey={(_index, song) => song.songId}
+                  itemContent={(index, song) => (
+                    <Song
+                      key={song.songId}
+                      index={index}
+                      isIndexingSongs={preferences?.isSongIndexingEnabled}
+                      title={song.title}
+                      artists={song.artists}
+                      album={song.album}
+                      duration={song.duration}
+                      songId={song.songId}
+                      artworkPaths={song.artworkPaths}
+                      path={song.path}
+                      isAFavorite={song.isAFavorite}
+                      year={song.year}
+                      isBlacklisted={song.isBlacklisted}
+                      selectAllHandler={selectAllHandlerForSongs}
+                      onPlayClick={handleSongPlayBtnClick}
+                    />
+                  )}
+                />
+              ) : (
+                topFiveSongComponents
+              )}
+            </div>
           </>
         </MainContainer>
       )}

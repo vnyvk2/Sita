@@ -400,7 +400,8 @@ function PlaylistInfoPage() {
       navigate({
         search: (prev) => ({ ...prev, keyword: val || undefined }),
         replace: true
-      })
+      }),
+    debounceMs: 150
   });
 
   const filteredSongs = useMemo(() => {
