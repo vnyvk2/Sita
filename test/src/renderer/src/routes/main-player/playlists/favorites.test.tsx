@@ -1,4 +1,5 @@
 import { AppUpdateContext, type AppUpdateContextType } from '@renderer/contexts/AppUpdateContext';
+import { applyFavoriteToCaches } from '@renderer/components/SongsPage/useSongFavoriteToggle';
 import { songQuery } from '@renderer/queries/songs';
 import { Route } from '@renderer/routes/main-player/playlists/favorites';
 import { invalidateTarget } from '@renderer/hooks/useDataSync';
@@ -189,5 +190,36 @@ describe('Favorites Route - ID-First Windowed Hydration & Invalidation Parity', 
     expect(refreshed.ids).toEqual([102]);
     expect(refreshed.total).toBe(1);
     expect((window as any).api.audioLibraryControls.getFilteredSongLibraryIds).toHaveBeenCalledTimes(2);
+  });
+
+  it('MANDATORY: applyFavoriteToCaches flips heart state across all window query prefixes immediately', () => {
+    // Prime query caches with different window prefixes (e.g. 'songs', 'queue', 'genre')
+    const songWindowKey = ['songs', 'window', 'list1', 1, 0];
+    const queueWindowKey = ['queue', 'window', 'list2', 1, 0];
+    const genreWindowKey = ['genre', 'window', 'list3', 1, 0];
+
+    queryClient.setQueryData(songWindowKey, [
+      { songId: 50, title: 'Song 50', isAFavorite: false }
+    ]);
+    queryClient.setQueryData(queueWindowKey, [
+      { songId: 50, title: 'Song 50', isAFavorite: false }
+    ]);
+    queryClient.setQueryData(genreWindowKey, [
+      { songId: 50, title: 'Song 50', isAFavorite: false }
+    ]);
+
+    // Apply favorite toggle to true
+    applyFavoriteToCaches(50, true, queryClient);
+
+    expect((queryClient.getQueryData(songWindowKey) as any)[0].isAFavorite).toBe(true);
+    expect((queryClient.getQueryData(queueWindowKey) as any)[0].isAFavorite).toBe(true);
+    expect((queryClient.getQueryData(genreWindowKey) as any)[0].isAFavorite).toBe(true);
+
+    // Apply favorite toggle back to false (unfavorite)
+    applyFavoriteToCaches(50, false, queryClient);
+
+    expect((queryClient.getQueryData(songWindowKey) as any)[0].isAFavorite).toBe(false);
+    expect((queryClient.getQueryData(queueWindowKey) as any)[0].isAFavorite).toBe(false);
+    expect((queryClient.getQueryData(genreWindowKey) as any)[0].isAFavorite).toBe(false);
   });
 });

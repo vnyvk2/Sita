@@ -1,9 +1,10 @@
+import type { QueryClient } from '@tanstack/react-query';
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useNotifications } from '../../hooks/useNotifications';
-import { songCacheKeys, songQuery } from '../../queries/songs';
+import { songQuery } from '../../queries/songs';
 import { queryClient } from '../../queryClient';
 
 export interface UseSongFavoriteToggleProps {
@@ -19,23 +20,36 @@ export interface UseSongFavoriteToggleReturn {
   toggleFavorite: () => void;
 }
 
-export function applyFavoriteToCaches(songId: number, isFav: boolean): void {
-  // 1. Optimistically update all windowed query caches in React Query
-  queryClient.setQueriesData<SongData[]>({ queryKey: songCacheKeys.windowsRoot }, (old) => {
-    if (!Array.isArray(old)) return old;
-    let changed = false;
-    const updated = old.map((s) => {
-      if (s && s.songId === songId) {
-        changed = true;
-        return { ...s, isAFavorite: isFav };
-      }
-      return s;
-    });
-    return changed ? updated : old;
+export function applyFavoriteToCaches(
+  songId: number,
+  isFav: boolean,
+  client: QueryClient = queryClient
+): void {
+  // 1. Optimistically update all active windowed query caches across all keyPrefixes
+  const windowQueries = client.getQueryCache().findAll({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey.length >= 2 &&
+      query.queryKey[1] === 'window'
   });
 
+  for (const wQuery of windowQueries) {
+    client.setQueryData<SongData[]>(wQuery.queryKey, (old) => {
+      if (!Array.isArray(old)) return old;
+      let changed = false;
+      const updated = old.map((s) => {
+        if (s && s.songId === songId) {
+          changed = true;
+          return { ...s, isAFavorite: isFav };
+        }
+        return s;
+      });
+      return changed ? updated : old;
+    });
+  }
+
   // 2. Optimistically update legacy/non-windowed song queries
-  queryClient.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
+  client.setQueriesData<PaginatedResult<SongData, SongSortTypes>>(
     { queryKey: songQuery.all._def },
     (old) => {
       if (!old?.data) return old;

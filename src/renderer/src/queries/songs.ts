@@ -69,6 +69,17 @@ export const songQuery = createQueryKeys('songs', {
       queryKey: [params],
       queryFn: async (): Promise<SongIdsResult> => {
         if (params.keyword?.trim()) {
+          // TRIPWIRE: window.api.search.query is a capped whole-library search (SEARCH_LIMITS.PAGE)
+          // and does NOT respect restrictToIds. If filtering an isolated subset (e.g. playlist
+          // catalog or folder), do not compose keyword with restrictToIds via this global search path;
+          // use dedicated SQL-level catalog queries (e.g. getPlaylistSongCatalog in Batch 3).
+          if (params.restrictToIds && params.restrictToIds.length > 0) {
+            console.warn(
+              '[songQuery.ids] INCOMPATIBILITY TRIPWIRE: keyword search delegates to global search.query ' +
+                'which searches the whole library up to SEARCH_LIMITS.PAGE and ignores restrictToIds. ' +
+                'Scoped collections must use dedicated SQL-side catalog filtering.'
+            );
+          }
           const res = await window.api.search.query({
             filter: 'Songs',
             keyword: params.keyword,
