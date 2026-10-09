@@ -22,8 +22,8 @@
 
 ### SOURCE FACT
 - **Entry Points & Fetch Chain**:
-  - [`src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L323-L326`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L323-L326): `useQuery(collectionEntriesOptions(playlistId, ...))` fetches all entry records for the playlist.
-  - [`$playlistId.tsx#L328-L335`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L328-L335): Eagerly fetches full `SongData` objects for **all** songs in the playlist:
+  - [`src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L323-L326`](../src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L323-L326): `useQuery(collectionEntriesOptions(playlistId, ...))` fetches all entry records for the playlist.
+  - [`$playlistId.tsx#L328-L335`](../src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L328-L335): Eagerly fetches full `SongData` objects for **all** songs in the playlist:
     ```typescript
     const { data: rawPlaylistSongs = [] } = useQuery({
       ...songQuery.allSongInfo({
@@ -34,8 +34,8 @@
       enabled: collectionEntries.length > 0
     });
     ```
-  - [`$playlistId.tsx#L406-L439`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L406-L439): Filtering and search occur **synchronously in the renderer** via a `useMemo` on every keystroke (`keyword`) and language selection.
-  - [`$playlistId.tsx#L1168-L1170`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L1168-L1170): The list **is** virtualized via `<VirtualizedList data={filteredSongs} ... />`.
+  - [`$playlistId.tsx#L406-L439`](../src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L406-L439): Filtering and search occur **synchronously in the renderer** via a `useMemo` on every keystroke (`keyword`) and language selection.
+  - [`$playlistId.tsx#L1168-L1170`](../src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L1168-L1170): The list **is** virtualized via `<VirtualizedList data={filteredSongs} ... />`.
 
 ### ACTUAL RUNTIME BEHAVIOR
 1. Navigating to any playlist immediately maps all entry IDs into a single unbounded array.
@@ -71,9 +71,9 @@
 ## 2. Artist "Show All"
 
 ### SOURCE FACT
-- **Component File**: [`src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx)
+- **Component File**: [`src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx`](../src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx)
 - **Eager Hydration**:
-  - [`LibraryTab.tsx#L58-L65`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx#L58-L65):
+  - [`LibraryTab.tsx#L58-L65`](../src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx#L58-L65):
     ```typescript
     const { data: songs = [] } = useQuery({
       ...songQuery.allSongInfo({
@@ -85,7 +85,7 @@
     });
     ```
 - **Unvirtualized DOM Mapping**:
-  - [`LibraryTab.tsx#L133-L157`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx#L133-L157):
+  - [`LibraryTab.tsx#L133-L157`](../src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx#L133-L157):
     ```typescript
     const songComponents = useMemo(
       () =>
@@ -97,8 +97,8 @@
       [..., isAllSongsVisible, songs]
     );
     ```
-  - [`LibraryTab.tsx#L435`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx#L435): Button toggles `setIsAllSongsVisible(true)`.
-  - [`LibraryTab.tsx#L451`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx#L451):
+  - [`LibraryTab.tsx#L435`](../src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx#L435): Button toggles `setIsAllSongsVisible(true)`.
+  - [`LibraryTab.tsx#L451`](../src/renderer/src/components/ArtistInfoPage/LibraryTab.tsx#L451):
     ```tsx
     <div className="songs-container">{songComponents}</div>
     ```
@@ -133,9 +133,9 @@
 ## 3. Genre `allSongInfo`
 
 ### SOURCE FACT
-- **Component File**: [`src/renderer/src/routes/main-player/genres/$genreId.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/genres/$genreId.tsx)
+- **Component File**: [`src/renderer/src/routes/main-player/genres/$genreId.tsx`](../src/renderer/src/routes/main-player/genres/$genreId.tsx)
 - **Eager Hydration**:
-  - [`$genreId.tsx#L70-L76`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/genres/$genreId.tsx#L70-L76):
+  - [`$genreId.tsx#L70-L76`](../src/renderer/src/routes/main-player/genres/$genreId.tsx#L70-L76):
     ```typescript
     const { data: genreSongs = [] } = useQuery(
       songQuery.allSongInfo({
@@ -146,7 +146,7 @@
     );
     ```
 - **Virtualization**:
-  - [`$genreId.tsx#L180-L201`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/genres/$genreId.tsx#L180-L201):
+  - [`$genreId.tsx#L180-L201`](../src/renderer/src/routes/main-player/genres/$genreId.tsx#L180-L201):
     ```tsx
     <VirtualizedList
       data={genreSongs}
@@ -186,11 +186,11 @@
 
 ### SOURCE FACT
 - **Event Flow**:
-  1. [`src/renderer/src/other/queuesManager.ts#L475-L501`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/other/queuesManager.ts#L475-L501): `bindQueueEvents` subscribes to `queueChange`, `positionChange`, and `metadataChange` on each `PlayerQueue`.
-  2. Every event calls `triggerStoreSync()` ([`queuesManager.ts#L524-L544`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/other/queuesManager.ts#L524-L544)).
+  1. [`src/renderer/src/other/queuesManager.ts#L475-L501`](../src/renderer/src/other/queuesManager.ts#L475-L501): `bindQueueEvents` subscribes to `queueChange`, `positionChange`, and `metadataChange` on each `PlayerQueue`.
+  2. Every event calls `triggerStoreSync()` ([`queuesManager.ts#L524-L544`](../src/renderer/src/other/queuesManager.ts#L524-L544)).
   3. `triggerStoreSync()` invokes `store.setState(...)`, creating a new `state.localStorage.queue` reference containing `this.queues.map((q) => q.toJSON())`.
-  4. [`src/renderer/src/other/playerQueue.ts#L1062-L1070`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/other/playerQueue.ts#L1062-L1070): `toJSON()` clones `songIds: [...this.songIds]` and `queueBeforeShuffle: [...this.queueBeforeShuffle]`.
-  5. [`src/renderer/src/store/store.ts#L80-L105`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/store/store.ts#L80-L105):
+  4. [`src/renderer/src/other/playerQueue.ts#L1062-L1070`](../src/renderer/src/other/playerQueue.ts#L1062-L1070): `toJSON()` clones `songIds: [...this.songIds]` and `queueBeforeShuffle: [...this.queueBeforeShuffle]`.
+  5. [`src/renderer/src/store/store.ts#L80-L105`](../src/renderer/src/store/store.ts#L80-L105):
      ```typescript
      const queueChanged = currentLocal.queue !== prevLocalStorage?.queue;
      prevLocalStorage = currentLocal;
@@ -205,7 +205,7 @@
        storage.setLocalStorage(currentLocal);
      }
      ```
-  6. [`src/renderer/src/utils/localStorage.ts#L116-L123`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/utils/localStorage.ts#L116-L123):
+  6. [`src/renderer/src/utils/localStorage.ts#L116-L123`](../src/renderer/src/utils/localStorage.ts#L116-L123):
      ```typescript
      const setLocalStorage = (storage: LocalStorage) => {
        try {
@@ -255,15 +255,15 @@
 ## 5. `DatabaseSync` Event Loop Blocking
 
 ### SOURCE FACT
-- **Database Engine**: [`src/main/db/sqlite/engine.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/sqlite/engine.ts)
-  - Uses Node.js built-in `node:sqlite` `DatabaseSync` ([engine.ts#L5](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/sqlite/engine.ts#L5)).
-  - Pragmas: `WAL` mode, `synchronous = NORMAL`, `cache_size = -4000` (4 MB) ([engine.ts#L20-L28](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/sqlite/engine.ts#L20-L28)).
-  - Statement Cache: Prepared statements cached in `Map<string, StatementSync>` ([engine.ts#L52-L72](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/sqlite/engine.ts#L52-L72)).
-  - `engine.all()` and `engine.get()` call `preparedObj(sql).all(...)` directly via C++ bindings ([engine.ts#L400-L403](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/sqlite/engine.ts#L400-L403)).
-  - `txLock`: Mutex serializes transactions and bare statements ([engine.ts#L108-L128](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/sqlite/engine.ts#L108-L128)).
+- **Database Engine**: [`src/main/db/sqlite/engine.ts`](../src/main/db/sqlite/engine.ts)
+  - Uses Node.js built-in `node:sqlite` `DatabaseSync` ([engine.ts#L5](../src/main/db/sqlite/engine.ts#L5)).
+  - Pragmas: `WAL` mode, `synchronous = NORMAL`, `cache_size = -4000` (4 MB) ([engine.ts#L20-L28](../src/main/db/sqlite/engine.ts#L20-L28)).
+  - Statement Cache: Prepared statements cached in `Map<string, StatementSync>` ([engine.ts#L52-L72](../src/main/db/sqlite/engine.ts#L52-L72)).
+  - `engine.all()` and `engine.get()` call `preparedObj(sql).all(...)` directly via C++ bindings ([engine.ts#L400-L403](../src/main/db/sqlite/engine.ts#L400-L403)).
+  - `txLock`: Mutex serializes transactions and bare statements ([engine.ts#L108-L128](../src/main/db/sqlite/engine.ts#L108-L128)).
   - **Crucial Distinction**: `engine.all()` (used by `getFlatSongsByIds` for window hydration) **does NOT wait for `txLock`**. It runs directly against `DatabaseSync` under SQLite's native WAL reader isolation.
 - **Scanner Ingestion Yielding**:
-  - [`src/main/core/songWorkerPool.ts#L374`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/songWorkerPool.ts#L374): Scanner explicitly yields between 100-track batches via `await new Promise((resolve) => setImmediate(resolve))`.
+  - [`src/main/core/songWorkerPool.ts#L374`](../src/main/core/songWorkerPool.ts#L374): Scanner explicitly yields between 100-track batches via `await new Promise((resolve) => setImmediate(resolve))`.
 
 ### ACTUAL RUNTIME BEHAVIOR
 1. Because `DatabaseSync` is synchronous, every statement execution runs on the Node.js main thread.
@@ -295,9 +295,9 @@
 ## 6. `HydrationCoordinator` Cancellation Semantics
 
 ### SOURCE FACT
-- **Coordinator File**: [`src/main/core/hydrationCoordinator.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/hydrationCoordinator.ts)
+- **Coordinator File**: [`src/main/core/hydrationCoordinator.ts`](../src/main/core/hydrationCoordinator.ts)
 - **Three-Tier Guard Architecture**:
-  1. **Tier 1 (Fast Drop on Entry)** ([hydrationCoordinator.ts#L76-L83](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/hydrationCoordinator.ts#L76-L83)):
+  1. **Tier 1 (Fast Drop on Entry)** ([hydrationCoordinator.ts#L76-L83](../src/main/core/hydrationCoordinator.ts#L76-L83)):
      ```typescript
      this.updateGeneration(listIdentity, generationToken);
      const latest = this.getLatestGeneration(listIdentity);
@@ -305,20 +305,20 @@
        return Promise.resolve({ cancelled: true, generationToken });
      }
      ```
-  2. **Tier 2 (Queue Eviction on Token Update)** ([hydrationCoordinator.ts#L47-L63](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/hydrationCoordinator.ts#L47-L63)):
+  2. **Tier 2 (Queue Eviction on Token Update)** ([hydrationCoordinator.ts#L47-L63](../src/main/core/hydrationCoordinator.ts#L47-L63)):
      When `updateGeneration` sees a higher token, it iterates backwards through `pendingQueues`, splices out every superseded task, and resolves it with `{ cancelled: true }`.
-  3. **Tier 3 (Pre-Execution Dequeue Check)** ([hydrationCoordinator.ts#L134-L141](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/hydrationCoordinator.ts#L134-L141)):
+  3. **Tier 3 (Pre-Execution Dequeue Check)** ([hydrationCoordinator.ts#L134-L141](../src/main/core/hydrationCoordinator.ts#L134-L141)):
      ```typescript
      if (task.generationToken < latest) {
        task.resolve({ cancelled: true, generationToken: task.generationToken });
        continue;
      }
      ```
-  4. **Post-Execution Check** ([hydrationCoordinator.ts#L146-L152](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/hydrationCoordinator.ts#L146-L152)): Drops results if a newer token arrived while awaiting `task.execute()`.
+  4. **Post-Execution Check** ([hydrationCoordinator.ts#L146-L152](../src/main/core/hydrationCoordinator.ts#L146-L152)): Drops results if a newer token arrived while awaiting `task.execute()`.
 - **Renderer Token Flow**:
-  - [`useWindowHydration.ts#L240`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L240): Increments `generationRef.current += 1` on bounds change.
-  - [`useWindowHydration.ts#L304`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L304): Passes `generationToken: token` over IPC.
-  - [`useWindowHydration.ts#L315-L319`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L315-L319): Rejects with `AbortError` if main returns `{ cancelled: true }`.
+  - [`useWindowHydration.ts#L240`](../src/renderer/src/hooks/useWindowHydration.ts#L240): Increments `generationRef.current += 1` on bounds change.
+  - [`useWindowHydration.ts#L304`](../src/renderer/src/hooks/useWindowHydration.ts#L304): Passes `generationToken: token` over IPC.
+  - [`useWindowHydration.ts#L315-L319`](../src/renderer/src/hooks/useWindowHydration.ts#L315-L319): Rejects with `AbortError` if main returns `{ cancelled: true }`.
 
 ### ACTUAL RUNTIME BEHAVIOR
 1. User scrolls rapidly past Windows 0, 1, 2, 3, 4, 5.
@@ -351,13 +351,13 @@
 ## 7. Actual TanStack Cache Worst Case
 
 ### SOURCE FACT
-- **Cache Configuration**: [`src/renderer/src/queries/songs.ts#L5-L9`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/queries/songs.ts#L5-L9)
+- **Cache Configuration**: [`src/renderer/src/queries/songs.ts#L5-L9`](../src/renderer/src/queries/songs.ts#L5-L9)
   - `SONG_WINDOW_SIZE = 200`
   - `SONG_WINDOW_STALE_TIME = 60_000` (1 min)
   - `SONG_WINDOW_GC_TIME = 90_000` (1.5 min)
   - `SONG_IDS_STALE_TIME = 300_000` (5 min)
   - `SONG_IDS_GC_TIME = 1_800_000` (30 min)
-- **Local Lookup LRU**: [`src/renderer/src/hooks/useWindowHydration.ts#L408-L418`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L408-L418)
+- **Local Lookup LRU**: [`src/renderer/src/hooks/useWindowHydration.ts#L408-L418`](../src/renderer/src/hooks/useWindowHydration.ts#L408-L418)
   - Hard cap of 12 windows (2,400 songs).
   - True access-order LRU: on cache hit, deleted and re-inserted at tail.
   - Stores references to `SongData`, not clones.

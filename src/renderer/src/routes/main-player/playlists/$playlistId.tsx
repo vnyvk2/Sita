@@ -43,6 +43,7 @@ import {
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
 import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
+import { SONG_WINDOW_SIZE } from '@renderer/queries/songs';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import { queryClient } from '@renderer/queryClient';
 import { scrollRegistry } from '@renderer/utils/scrollStore';
@@ -109,7 +110,9 @@ export const Route = createFileRoute('/main-player/playlists/$playlistId')({
     const catalog = await queryClient.fetchQuery(
       playlistCatalogOptions(playlistId, catalogOptions)
     );
-    const window0Ids = (catalog.entries ?? []).slice(0, 30).map((e) => e.songId);
+    const window0Ids = (catalog.entries ?? [])
+      .slice(0, Math.min(SONG_WINDOW_SIZE, (catalog.entries ?? []).length))
+      .map((e) => e.songId);
     if (window0Ids.length > 0) {
       const state = queryClient.getQueryState(
         playlistCatalogOptions(playlistId, catalogOptions).queryKey

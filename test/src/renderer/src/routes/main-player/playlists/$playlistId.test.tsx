@@ -2,15 +2,19 @@
 // @vitest-environment jsdom
 import '@renderer/store/store';
 import { AppUpdateContext, type AppUpdateContextType } from '@renderer/contexts/AppUpdateContext';
+import { CollectionEventProvider } from '@renderer/components/providers/CollectionEventProvider';
 import { Route } from '@renderer/routes/main-player/playlists/$playlistId';
 import { collectionKeys } from '@renderer/api/collectionKeys';
+import { SONG_WINDOW_SIZE } from '@renderer/queries/songs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import React, { Suspense } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockNavigate = vi.fn();
 let lastVirtualizedProps: any = null;
+let lastDragDropContextProps: any = null;
+let registeredCollectionEventListener: ((e: unknown, event: any) => void) | null = null;
 let mockSearchState: {
   sortingOrder?: string;
   filteringOrder?: string;
@@ -25,6 +29,31 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
     useNavigate: () => mockNavigate
   };
 });
+
+vi.mock('@hello-pangea/dnd', () => ({
+  DragDropContext: ({ children, ...props }: any) => {
+    lastDragDropContextProps = props;
+    return <div data-testid="drag-drop-context">{children}</div>;
+  },
+  Droppable: ({ children }: any) =>
+    children(
+      {
+        droppableProps: {},
+        innerRef: () => {},
+        placeholder: null
+      },
+      {}
+    ),
+  Draggable: ({ children }: any) =>
+    children(
+      {
+        draggableProps: {},
+        dragHandleProps: {},
+        innerRef: () => {}
+      },
+      {}
+    )
+}));
 
 vi.mock('react-i18next', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-i18next')>();
@@ -92,12 +121,17 @@ describe('Playlist Detail Route ($playlistId) - Catalog-Driven Windowed Hydratio
 
   beforeEach(() => {
     lastVirtualizedProps = null;
+    lastDragDropContextProps = null;
+    registeredCollectionEventListener = null;
     mockSearchState = {
       sortingOrder: 'customOrder',
       language: 'all'
     };
     vi.spyOn(Route, 'useSearch').mockImplementation(() => mockSearchState as any);
-    vi.spyOn(Route, 'useParams').mockReturnValue({ playlistId: '42' } as any);
+    vi.spyOn(Route, 'useParams').mockImplementation((opts?: any) => {
+      const raw = { playlistId: '42' };
+      return opts?.select ? opts.select(raw) : (raw as any);
+    });
 
     queryClient = new QueryClient({
       defaultOptions: {
@@ -132,7 +166,15 @@ describe('Playlist Detail Route ($playlistId) - Catalog-Driven Windowed Hydratio
             languages: ['English', 'German']
           })
         },
-        reorderEntries: vi.fn().mockResolvedValue(true)
+        write: {
+          reorder: vi.fn().mockResolvedValue(true)
+        },
+        events: {
+          onEvent: vi.fn().mockImplementation((cb) => {
+            registeredCollectionEventListener = cb;
+          }),
+          offEvent: vi.fn()
+        }
       },
       audioLibraryControls: {
         getSongInfo: vi.fn().mockImplementation((ids: number[]) => {
@@ -151,6 +193,10 @@ describe('Playlist Detail Route ($playlistId) - Catalog-Driven Windowed Hydratio
             }))
           );
         })
+      },
+      messages: {
+        getMessageFromMain: vi.fn(),
+        removeMessageToRendererEventListener: vi.fn()
       }
     };
   });
@@ -192,7 +238,7 @@ describe('Playlist Detail Route ($playlistId) - Catalog-Driven Windowed Hydratio
     );
   });
 
-  it('route loader prefetches playlist detail, catalog, and window 0 song info', async () => {
+  it('route loader prefetches playlist detail, catalog, and window 0 song info using SONG_WINDOW_SIZE', async () => {
     const loader = Route.options.loader!;
     await loader({
       params: { playlistId: '42' },
@@ -209,6 +255,7 @@ describe('Playlist Detail Route ($playlistId) - Catalog-Driven Windowed Hydratio
       language: undefined,
       keyword: undefined
     });
+    // With 2 entries, it requests all 2 (which is min(SONG_WINDOW_SIZE, entries.length))
     expect(window.api.audioLibraryControls.getSongInfo).toHaveBeenCalledWith(
       [701, 702],
       undefined,
@@ -216,5 +263,117 @@ describe('Playlist Detail Route ($playlistId) - Catalog-Driven Windowed Hydratio
       undefined,
       true
     );
+    expect(SONG_WINDOW_SIZE).toBe(200);
+  });
+
+  it('binds URL search keyword to catalog query options and query key', async () => {
+    mockSearchState = {
+      sortingOrder: 'customOrder',
+      language: 'all',
+      keyword: 'electric'
+    };
+
+    const Component = Route.options.component!;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppUpdateContext.Provider value={mockContextValue as AppUpdateContextType}>
+          <Suspense fallback={<div>Loading suspense...</div>}>
+            <Component />
+          </Suspense>
+        </AppUpdateContext.Provider>
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByTestId('virtualized-list')).toBeDefined();
+    expect(window.api.collections.read.getPlaylistSongCatalog).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        keyword: 'electric'
+      })
+    );
+  });
+
+  it('emits drag-and-drop reorder operation with correct entryId and targetPosition', async () => {
+    const Component = Route.options.component!;
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AppUpdateContext.Provider value={mockContextValue as AppUpdateContextType}>
+          <Suspense fallback={<div>Loading suspense...</div>}>
+            <Component />
+          </Suspense>
+        </AppUpdateContext.Provider>
+      </QueryClientProvider>
+    );
+
+    expect(await screen.findByTestId('virtualized-list')).toBeDefined();
+    expect(lastDragDropContextProps).not.toBeNull();
+
+    // Trigger drag-and-drop reorder: move entry 101 from index 0 to destination index 1
+    await act(async () => {
+      lastDragDropContextProps.onDragEnd({
+        reason: 'DROP',
+        source: { index: 0 },
+        destination: { index: 1 },
+        draggableId: '101'
+      });
+    });
+
+    expect(window.api.collections.write.reorder).toHaveBeenCalledWith({
+      playlistId: 42,
+      entryId: 101,
+      newPosition: 1
+    });
+  });
+
+  it('invalidates catalog cache when CollectionChanged event is received', async () => {
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CollectionEventProvider>
+          <div>Event listener child</div>
+        </CollectionEventProvider>
+      </QueryClientProvider>
+    );
+
+    expect(registeredCollectionEventListener).not.toBeNull();
+
+    act(() => {
+      registeredCollectionEventListener!(null, {
+        type: 'CollectionChanged',
+        payload: { collectionId: 42, action: 'reorder' }
+      });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: collectionKeys.catalogRoot(42)
+    });
+  });
+
+  it('removes catalog cache when CollectionDeleted event is received', async () => {
+    const removeSpy = vi.spyOn(queryClient, 'removeQueries');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <CollectionEventProvider>
+          <div>Event listener child</div>
+        </CollectionEventProvider>
+      </QueryClientProvider>
+    );
+
+    expect(registeredCollectionEventListener).not.toBeNull();
+
+    act(() => {
+      registeredCollectionEventListener!(null, {
+        type: 'CollectionDeleted',
+        payload: { collectionIds: [42] }
+      });
+    });
+
+    expect(removeSpy).toHaveBeenCalledWith({
+      queryKey: collectionKeys.catalogRoot(42)
+    });
   });
 });

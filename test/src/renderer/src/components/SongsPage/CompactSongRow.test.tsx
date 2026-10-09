@@ -102,7 +102,11 @@ describe('CompactSongRow & CompactListHeader', () => {
         toggleLikeSongs: vi.fn().mockResolvedValue({ likes: [101], dislikes: [] })
       },
       audioLibraryControls: {},
-      properties: { isInDevelopment: false }
+      properties: { isInDevelopment: false },
+      messages: {
+        getMessageFromMain: vi.fn(),
+        removeMessageToRendererEventListener: vi.fn()
+      }
     };
   });
 

@@ -99,6 +99,7 @@ import { registerFloatingLyricsGlobalShortcut } from './floatingLyricsWindow';
 import checkForUpdates from './update';
 import { savePendingMetadataUpdates } from './updateSong/updateSongId3Tags';
 import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
+import { initEventLoopMonitor, stopEventLoopMonitor } from './utils/eventLoopMonitor';
 import memProfiler from './utils/memProfiler';
 import safeOpenExternal from './utils/safeOpenExternal';
 import { isAllowedAppNavigation } from './utils/safeNavigation';
@@ -523,6 +524,7 @@ protocol.registerSchemesAsPrivileged([
 app
   .whenReady()
   .then(async () => {
+    initEventLoopMonitor();
     memProfiler.stage('when-ready');
     memProfiler.startSampling(1500);
 
@@ -587,7 +589,10 @@ app
 
     app.on('before-quit', handleBeforeQuit);
 
-    app.on('will-quit', closeDatabaseInstance);
+    app.on('will-quit', () => {
+      stopEventLoopMonitor();
+      closeDatabaseInstance();
+    });
 
     mainWindow.on('close', (e) => {
       if (!isCleanupComplete) {

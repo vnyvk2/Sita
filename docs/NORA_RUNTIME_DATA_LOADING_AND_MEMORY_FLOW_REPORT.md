@@ -20,7 +20,7 @@ This report delivers a deep, source-code-grounded forensic investigation of Nora
    - TanStack Query cache retention for song windows is bounded by `gcTime = 90 seconds`. Visited windows remain in cache for 90 seconds of inactivity before garbage collection.
 
 3. **Coordination & Backpressure**:
-   - In-flight IPC and database queries during scrolling are arbitrated by a custom **Main Process `HydrationCoordinator`** ([`src/main/core/hydrationCoordinator.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/hydrationCoordinator.ts)) with generation tokens, priority scheduling (`target` vs. `lookahead`), and automatic superseded query cancellation.
+   - In-flight IPC and database queries during scrolling are arbitrated by a custom **Main Process `HydrationCoordinator`** ([`src/main/core/hydrationCoordinator.ts`](../src/main/core/hydrationCoordinator.ts)) with generation tokens, priority scheduling (`target` vs. `lookahead`), and automatic superseded query cancellation.
 
 ---
 
@@ -57,12 +57,12 @@ Nora operates across three physical OS processes and one persistent storage laye
 
 | Subsystem | Process / Thread | Technology / File | Primary Data Role |
 |---|---|---|---|
-| **Storage Engine** | Main (Synchronous C bindings) | `node:sqlite` via `DatabaseSync` ([`src/main/db/sqlite/engine.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/sqlite/engine.ts)) | Persistent storage in WAL mode; executes prepared statements with `PRAGMA synchronous = NORMAL`. |
-| **Ingestion Worker** | Utility Process | Electron `utilityProcess` ([`src/main/workers/process/mediaWorker.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/workers/process/mediaWorker.ts)) | Offloads CPU-intensive ID3 tag extraction, audio metadata decoding, and directory walks from Main. |
-| **Hydration Coordinator**| Main | `HydrationCoordinator` ([`src/main/core/hydrationCoordinator.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/hydrationCoordinator.ts)) | Arbitrates competing window hydration requests; drops superseded scroll tasks. |
-| **IPC Bridge** | Preload | Electron `contextBridge` ([`src/preload/index.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/preload/index.ts)) | Type-safe RPC boundary wrapping `ipcRenderer.invoke` and event listeners. |
-| **Client Cache** | Renderer | `@tanstack/react-query` ([`src/renderer/src/queryClient.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/queryClient.ts)) | Client-side memory caching, deduplication, invalidation, and garbage collection. |
-| **Virtualizer** | Renderer | `react-virtuoso` ([`src/renderer/src/components/VirtualizedList.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/VirtualizedList.tsx)) | Windowing engine mapping large ID arrays to a fixed viewport of ~25–45 DOM nodes. |
+| **Storage Engine** | Main (Synchronous C bindings) | `node:sqlite` via `DatabaseSync` ([`src/main/db/sqlite/engine.ts`](../src/main/db/sqlite/engine.ts)) | Persistent storage in WAL mode; executes prepared statements with `PRAGMA synchronous = NORMAL`. |
+| **Ingestion Worker** | Utility Process | Electron `utilityProcess` ([`src/main/workers/process/mediaWorker.ts`](../src/main/workers/process/mediaWorker.ts)) | Offloads CPU-intensive ID3 tag extraction, audio metadata decoding, and directory walks from Main. |
+| **Hydration Coordinator**| Main | `HydrationCoordinator` ([`src/main/core/hydrationCoordinator.ts`](../src/main/core/hydrationCoordinator.ts)) | Arbitrates competing window hydration requests; drops superseded scroll tasks. |
+| **IPC Bridge** | Preload | Electron `contextBridge` ([`src/preload/index.ts`](../src/preload/index.ts)) | Type-safe RPC boundary wrapping `ipcRenderer.invoke` and event listeners. |
+| **Client Cache** | Renderer | `@tanstack/react-query` ([`src/renderer/src/queryClient.ts`](../src/renderer/src/queryClient.ts)) | Client-side memory caching, deduplication, invalidation, and garbage collection. |
+| **Virtualizer** | Renderer | `react-virtuoso` ([`src/renderer/src/components/VirtualizedList.tsx`](../src/renderer/src/components/VirtualizedList.tsx)) | Windowing engine mapping large ID arrays to a fixed viewport of ~25–45 DOM nodes. |
 
 ---
 
@@ -121,9 +121,9 @@ TanStack Router Navigation (/main-player/songs/)
 1. **Immediate Executions**:
    - `songQuery.ids(idsParams)`: Evaluated in route `loader` and hooked via `useSuspenseQuery`.
    - `songCacheKeys.window(..., 0)`: Evaluated in route `loader` for Window 0 (`start = 0`, 200 songs).
-   - `songQuery.facets()`: Evaluated in `SongsPage` via `useSuspenseQuery` to populate language and genre dropdowns ([`src/main/db/queries/songs.ts#L1142`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/queries/songs.ts#L1142)).
+   - `songQuery.facets()`: Evaluated in `SongsPage` via `useSuspenseQuery` to populate language and genre dropdowns ([`src/main/db/queries/songs.ts#L1142`](../src/main/db/queries/songs.ts#L1142)).
 2. **Conditional / Deferred Executions**:
-   - Lookahead Window Prefetch (`bounds.lastWindow + 1`): Deferred by a **100ms debounce timer** ([`src/renderer/src/hooks/useWindowHydration.ts#L229-L232`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L229-L232)).
+   - Lookahead Window Prefetch (`bounds.lastWindow + 1`): Deferred by a **100ms debounce timer** ([`src/renderer/src/hooks/useWindowHydration.ts#L229-L232`](../src/renderer/src/hooks/useWindowHydration.ts#L229-L232)).
    - Subsequent Target Windows (`windows > 0`): Triggered strictly when scroll events change `windowBounds`.
 
 ---
@@ -134,7 +134,7 @@ Nora uses an **ID-First architecture** for large libraries.
 
 ### Step 1: The ID Query (`getFilteredSongLibraryIds`)
 
-- **File & Function**: [`src/main/db/queries/songs.ts#L954-L1135`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/queries/songs.ts#L954-L1135)
+- **File & Function**: [`src/main/db/queries/songs.ts#L954-L1135`](../src/main/db/queries/songs.ts#L954-L1135)
 - **Source SQL Executed**:
   ```sql
   SELECT id, is_blacklisted, title 
@@ -167,8 +167,8 @@ Nora uses an **ID-First architecture** for large libraries.
 ### Step 3: Hydration Execution (`getSongInfo`)
 
 - Full metadata is hydrated only for requested ID ranges via `window.api.audioLibraryControls.getSongInfo`:
-  - **Window Size**: `SONG_WINDOW_SIZE = 200` ([`src/renderer/src/queries/songs.ts#L5`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/queries/songs.ts#L5)).
-  - **Query Key**: `['songs', 'window', listIdentity, idsVersion, windowStart]` ([`src/renderer/src/queries/songs.ts#L57`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/queries/songs.ts#L57)).
+  - **Window Size**: `SONG_WINDOW_SIZE = 200` ([`src/renderer/src/queries/songs.ts#L5`](../src/renderer/src/queries/songs.ts#L5)).
+  - **Query Key**: `['songs', 'window', listIdentity, idsVersion, windowStart]` ([`src/renderer/src/queries/songs.ts#L57`](../src/renderer/src/queries/songs.ts#L57)).
   - **Query Parameters**: Slices the ID array (`ids.slice(start, start + 200)`), passing `generationToken`, `priority: 'target' | 'lookahead'`, `listIdentity`, and `compact: true`.
 
 ---
@@ -177,7 +177,7 @@ Nora uses an **ID-First architecture** for large libraries.
 
 ### Conceptual Line-by-Line Execution (`useWindowHydration.ts`)
 
-Hydration logic is defined in [`src/renderer/src/hooks/useWindowHydration.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts).
+Hydration logic is defined in [`src/renderer/src/hooks/useWindowHydration.ts`](../src/renderer/src/hooks/useWindowHydration.ts).
 
 ```
           Viewport: Indices [100 .. 125] (25 rows)
@@ -202,10 +202,10 @@ Hydration logic is defined in [`src/renderer/src/hooks/useWindowHydration.ts`](f
 ```
 
 1. **Overscan Buffers**:
-   - `defaultExtraBefore = Math.ceil(4500 / effectiveRowHeight)` ([Line 57](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L57)).
+   - `defaultExtraBefore = Math.ceil(4500 / effectiveRowHeight)` ([Line 57](../src/renderer/src/hooks/useWindowHydration.ts#L57)).
      - At standard height (60px): `4500 / 60 = 75` rows.
      - At compact height (38px): `4500 / 38 = 119` rows.
-   - `defaultExtraAfter = Math.ceil(9000 / effectiveRowHeight)` ([Line 58](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L58)).
+   - `defaultExtraAfter = Math.ceil(9000 / effectiveRowHeight)` ([Line 58](../src/renderer/src/hooks/useWindowHydration.ts#L58)).
      - At standard height (60px): `9000 / 60 = 150` rows.
      - At compact height (38px): `9000 / 38 = 237` rows.
 
@@ -220,15 +220,15 @@ Hydration logic is defined in [`src/renderer/src/hooks/useWindowHydration.ts`](f
    Snapping strictly to 200-row multiples prevents React state thrashing on every individual scroll pixel.
 
 3. **Lookahead Prefetching**:
-   - Scheduled via `scheduleLookahead` ([Line 95](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L95)).
+   - Scheduled via `scheduleLookahead` ([Line 95](../src/renderer/src/hooks/useWindowHydration.ts#L95)).
    - **Forward Lookahead**: `bounds.lastWindow + 1`.
    - **Backward Lookahead**: `bounds.firstWindow - 1`.
-   - **Debounce**: Prefetching is debounced by **100ms** (`lookaheadTimerRef.current = setTimeout(..., 100)` at [Line 229](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L229)). Rapid scrolling suppresses intermediate lookaheads.
+   - **Debounce**: Prefetching is debounced by **100ms** (`lookaheadTimerRef.current = setTimeout(..., 100)` at [Line 229](../src/renderer/src/hooks/useWindowHydration.ts#L229)). Rapid scrolling suppresses intermediate lookaheads.
 
 4. **Rapid Scroll & Eviction Handling**:
-   - When the user scrolls rapidly past a window range, `handleRangeChange` increments `generationRef.current += 1` ([Line 240](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L240)).
-   - Queries for windows evicted from the active range are immediately cancelled via `queryClient.cancelQueries()` ([Lines 242-250](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useWindowHydration.ts#L242-L250)).
-   - In the Main Process, `HydrationCoordinator` drops any queued task whose `generationToken` is less than the latest token ([`src/main/core/hydrationCoordinator.ts#L77-L83`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/hydrationCoordinator.ts#L77-L83)).
+   - When the user scrolls rapidly past a window range, `handleRangeChange` increments `generationRef.current += 1` ([Line 240](../src/renderer/src/hooks/useWindowHydration.ts#L240)).
+   - Queries for windows evicted from the active range are immediately cancelled via `queryClient.cancelQueries()` ([Lines 242-250](../src/renderer/src/hooks/useWindowHydration.ts#L242-L250)).
+   - In the Main Process, `HydrationCoordinator` drops any queued task whose `generationToken` is less than the latest token ([`src/main/core/hydrationCoordinator.ts#L77-L83`](../src/main/core/hydrationCoordinator.ts#L77-L83)).
 
 ---
 
@@ -268,14 +268,14 @@ Virtuoso Viewport Calculation (overscan: main 300px, reverse 150px)
 > - **Hydration** bounds the **full object count in memory** (~400 to 800 active objects).
 > - Virtualization prevents rendering offscreen DOM elements; hydration prevents fetching offscreen database rows.
 
-### Key Virtualization Parameters ([`src/renderer/src/components/VirtualizedList.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/VirtualizedList.tsx))
+### Key Virtualization Parameters ([`src/renderer/src/components/VirtualizedList.tsx`](../src/renderer/src/components/VirtualizedList.tsx))
 
 - **Virtualization Engine**: `react-virtuoso` (`<Virtuoso />`).
-- **DOM Overscan**: `DEFAULT_LIST_OVERSCAN = { main: 300, reverse: 150 }` (pixels) ([Line 47](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/VirtualizedList.tsx#L47)).
-- **Viewport Expansion**: `increaseViewportBy = { top: 5 * rowHeight, bottom: 5 * rowHeight }` ([Lines 307-314](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/VirtualizedList.tsx#L307-L314)).
+- **DOM Overscan**: `DEFAULT_LIST_OVERSCAN = { main: 300, reverse: 150 }` (pixels) ([Line 47](../src/renderer/src/components/VirtualizedList.tsx#L47)).
+- **Viewport Expansion**: `increaseViewportBy = { top: 5 * rowHeight, bottom: 5 * rowHeight }` ([Lines 307-314](../src/renderer/src/components/VirtualizedList.tsx#L307-L314)).
 - **Scroll-Seek Threshold**:
-  - Enter: Velocity > 2500 px/s ([Line 32](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/VirtualizedList.tsx#L32)).
-  - Exit: Velocity < 300 px/s ([Line 39](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/VirtualizedList.tsx#L39)).
+  - Enter: Velocity > 2500 px/s ([Line 32](../src/renderer/src/components/VirtualizedList.tsx#L32)).
+  - Exit: Velocity < 300 px/s ([Line 39](../src/renderer/src/components/VirtualizedList.tsx#L39)).
   - *Receipt*: Setting enter velocity to 800 px/s caused normal wheel scrolling to blank; disabling seek placeholders caused 25.4% frame jank >33ms on 50k libraries (`docs/perf-decisions.md` §1).
 - **DOM Node Count**:
   - Standard View (60px/row on a 900px list): ~15 visible rows + ~8 overscan rows + 10 preloaded rows = **~33 DOM elements**.
@@ -285,7 +285,7 @@ Virtuoso Viewport Calculation (overscan: main 300px, reverse 150px)
 
 ## 7. Songs — TanStack Query Cache Analysis
 
-### Cache Parameters ([`src/renderer/src/queries/songs.ts#L5-L10`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/queries/songs.ts#L5-L10))
+### Cache Parameters ([`src/renderer/src/queries/songs.ts#L5-L10`](../src/renderer/src/queries/songs.ts#L5-L10))
 
 - `SONG_WINDOW_SIZE`: 200
 - `SONG_WINDOW_STALE_TIME`: 60,000 ms (1 minute)
@@ -333,12 +333,12 @@ Virtuoso Viewport Calculation (overscan: main 300px, reverse 150px)
 
 | Filter Type | Location Evaluated | Trigger & Mechanism | Cache Impact |
 |---|---|---|---|
-| **Text Search (Keyword)** | Main Process / SQLite | `window.api.search.query` via `songQuery.ids` ([`src/renderer/src/queries/songs.ts#L69`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/queries/songs.ts#L69)) | Caps result to `SEARCH_LIMITS.PAGE = 250` IDs. Produces new `listIdentity`. |
+| **Text Search (Keyword)** | Main Process / SQLite | `window.api.search.query` via `songQuery.ids` ([`src/renderer/src/queries/songs.ts#L69`](../src/renderer/src/queries/songs.ts#L69)) | Caps result to `SEARCH_LIMITS.PAGE = 250` IDs. Produces new `listIdentity`. |
 | **Favorite Filter** (`favorites` / `nonFavorites`) | Database SQL | `WHERE songs.is_favorite = 1` in `getFilteredSongLibraryIds` | Generates a new ID list. Produces new `listIdentity`. |
-| **Language Sub-filter** | Database SQL | `EXISTS (metadata_overrides ... language)` OR `songs.language = ?` ([`src/main/db/queries/songs.ts#L991`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/queries/songs.ts#L991)) | Generates a new ID list. Produces new `listIdentity`. |
-| **Genre Sub-filter** | Database SQL | `EXISTS (genres_songs JOIN genres ...)` ([`src/main/db/queries/songs.ts#L1014`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/queries/songs.ts#L1014)) | Generates a new ID list. Produces new `listIdentity`. |
-| **Favorite Artists / Albums** | Database SQL | `EXISTS (artists_songs JOIN artists WHERE is_favorite = 1)` ([`src/main/db/queries/songs.ts#L1023`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/queries/songs.ts#L1023)) | Generates a new ID list. Produces new `listIdentity`. |
-| **Sorting** | Database SQL | `ORDER BY` clause in `getFilteredSongLibraryIds` ([`src/main/db/queries/songs.ts#L1041-L1061`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/queries/songs.ts#L1041-L1061)) | Re-orders IDs in SQL. Produces new `listIdentity`. |
+| **Language Sub-filter** | Database SQL | `EXISTS (metadata_overrides ... language)` OR `songs.language = ?` ([`src/main/db/queries/songs.ts#L991`](../src/main/db/queries/songs.ts#L991)) | Generates a new ID list. Produces new `listIdentity`. |
+| **Genre Sub-filter** | Database SQL | `EXISTS (genres_songs JOIN genres ...)` ([`src/main/db/queries/songs.ts#L1014`](../src/main/db/queries/songs.ts#L1014)) | Generates a new ID list. Produces new `listIdentity`. |
+| **Favorite Artists / Albums** | Database SQL | `EXISTS (artists_songs JOIN artists WHERE is_favorite = 1)` ([`src/main/db/queries/songs.ts#L1023`](../src/main/db/queries/songs.ts#L1023)) | Generates a new ID list. Produces new `listIdentity`. |
+| **Sorting** | Database SQL | `ORDER BY` clause in `getFilteredSongLibraryIds` ([`src/main/db/queries/songs.ts#L1041-L1061`](../src/main/db/queries/songs.ts#L1041-L1061)) | Re-orders IDs in SQL. Produces new `listIdentity`. |
 
 ### Filter & Sort Transition Flow
 
@@ -377,27 +377,27 @@ useWindowHydration detects version bump:
 
 ## 9. Songs — Mutations & Synchronization
 
-State synchronization is managed by `useDataSync.tsx` ([`src/renderer/src/hooks/useDataSync.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useDataSync.tsx)).
+State synchronization is managed by `useDataSync.tsx` ([`src/renderer/src/hooks/useDataSync.tsx`](../src/renderer/src/hooks/useDataSync.tsx)).
 
 ### A. Favorite Toggled (`songs/likes`)
 
 1. User clicks Heart icon on row `X` (`songId = 1042`).
 2. `useSongFavoriteToggle.ts#L22-L48` executes:
    - **Optimistic Mutation**: Immediately updates `isAFavorite` in all cached windows matching `['songs', 'window']` via `queryClient.setQueriesData`.
-3. IPC call: `window.api.playerControls.toggleLikeSongs([1042], true)` ([`src/main/core/toggleLikeSongs.ts#L199`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/core/toggleLikeSongs.ts#L199)).
+3. IPC call: `window.api.playerControls.toggleLikeSongs([1042], true)` ([`src/main/core/toggleLikeSongs.ts#L199`](../src/main/core/toggleLikeSongs.ts#L199)).
 4. Main updates SQLite `songs.is_favorite = 1` inside a transaction.
 5. Main emits IPC event: `dataUpdateEvent('songs/likes', [1042])`.
 6. Preload delivers event to `useDataSync.tsx`.
-7. `DataSyncBatcher` batches the event via `requestAnimationFrame` ([`src/renderer/src/hooks/useDataSync.tsx#L371-L436`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useDataSync.tsx#L371-L436)).
+7. `DataSyncBatcher` batches the event via `requestAnimationFrame` ([`src/renderer/src/hooks/useDataSync.tsx#L371-L436`](../src/renderer/src/hooks/useDataSync.tsx#L371-L436)).
 8. **Surgical Invalidation**:
-   - `songs:ids:likes`: Only invalidates ID queries that have active filters for `favorites` or `nonFavorites` ([`useDataSync.tsx#L210-L226`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useDataSync.tsx#L210-L226)). Unfiltered All Songs ID lists are **NOT invalidated**.
-   - `invalidateWindowsContainingIds(queryClient, [1042])` ([`useDataSync.tsx#L311-L341`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/hooks/useDataSync.tsx#L311-L341)): Calculates `windowStart = Math.floor(index / 200) * 200` for ID 1042 and invalidates **only that specific 200-song window**.
+   - `songs:ids:likes`: Only invalidates ID queries that have active filters for `favorites` or `nonFavorites` ([`useDataSync.tsx#L210-L226`](../src/renderer/src/hooks/useDataSync.tsx#L210-L226)). Unfiltered All Songs ID lists are **NOT invalidated**.
+   - `invalidateWindowsContainingIds(queryClient, [1042])` ([`useDataSync.tsx#L311-L341`](../src/renderer/src/hooks/useDataSync.tsx#L311-L341)): Calculates `windowStart = Math.floor(index / 200) * 200` for ID 1042 and invalidates **only that specific 200-song window**.
    - Result: No skeleton flash; no list version bump; zero scroll jump.
 
 ### B. Song Metadata Changed (`songs/updatedSong`)
 
 1. User edits ID3 tags via Tag Editor.
-2. Main updates SQLite tables (`songs`, `album_songs`, `artists_songs`, `genres_songs`) in a transaction ([`src/main/updateSong/updateSongId3Tags.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/updateSong/updateSongId3Tags.ts)).
+2. Main updates SQLite tables (`songs`, `album_songs`, `artists_songs`, `genres_songs`) in a transaction ([`src/main/updateSong/updateSongId3Tags.ts`](../src/main/updateSong/updateSongId3Tags.ts)).
 3. Main emits `dataUpdateEvent('songs/updatedSong', [songId])`.
 4. `useDataSync.tsx#L88-L103` targets:
    - `songs:ids`: **Invalidated** (because title, track number, or year edits may change sort position or filter eligibility).
@@ -444,7 +444,7 @@ Data presence across stages for a **51,000 song collection**:
 
 ### Architecture Summary
 
-Unlike Songs, the Albums tab does **NOT** use ID-First window hydration. It uses **Infinite Query Page Accumulation** ([`src/renderer/src/routes/main-player/albums/index.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/albums/index.tsx)).
+Unlike Songs, the Albums tab does **NOT** use ID-First window hydration. It uses **Infinite Query Page Accumulation** ([`src/renderer/src/routes/main-player/albums/index.tsx`](../src/renderer/src/routes/main-player/albums/index.tsx)).
 
 ```
 AlbumsPage Mounts
@@ -479,7 +479,7 @@ useInfiniteQuery(albumSummariesQueryKey)
    - The grid loads `AlbumSummary` (id, title, year, isAFavorite, artists, artworkPaths, songCount). Full song lists are **not** loaded in the grid view.
 3. **Detail Page Navigation** (`/main-player/albums/$albumId`):
    - Loads album detail via `albumQuery.single`.
-   - Loads **ALL songs** belonging to the album in a single query via `songQuery.allSongInfo({ songIds })` ([`src/renderer/src/routes/main-player/albums/$albumId.tsx#L90-L97`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/albums/$albumId.tsx#L90-L97)). Does not use window hydration.
+   - Loads **ALL songs** belonging to the album in a single query via `songQuery.allSongInfo({ songIds })` ([`src/renderer/src/routes/main-player/albums/$albumId.tsx#L90-L97`](../src/renderer/src/routes/main-player/albums/$albumId.tsx#L90-L97)). Does not use window hydration.
 
 ---
 
@@ -487,9 +487,9 @@ useInfiniteQuery(albumSummariesQueryKey)
 
 ### Architecture Summary
 
-The Artists tab mirrors the Albums architecture using **Infinite Query Page Accumulation** ([`src/renderer/src/routes/main-player/artists/index.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/artists/index.tsx)).
+The Artists tab mirrors the Albums architecture using **Infinite Query Page Accumulation** ([`src/renderer/src/routes/main-player/artists/index.tsx`](../src/renderer/src/routes/main-player/artists/index.tsx)).
 
-- **Page Size**: `ARTIST_SUMMARY_PAGE_SIZE = 120` ([`src/renderer/src/queries/artists.ts#L7`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/queries/artists.ts#L7)).
+- **Page Size**: `ARTIST_SUMMARY_PAGE_SIZE = 120` ([`src/renderer/src/queries/artists.ts#L7`](../src/renderer/src/queries/artists.ts#L7)).
 - **Query Function**: `window.api.artistsData.getArtistSummaries(sort, filter, 0, 120)`.
 - **Accumulation**: `summariesQuery.data.pages.flatMap((page) => page.data)`. Pages accumulate as the user scrolls (`fetchNextPage()` triggers when `range.endIndex >= artistsData.length - 24`).
 - **Artist Detail Page** (`/main-player/artists/$artistId`):
@@ -509,12 +509,12 @@ The Artists tab mirrors the Albums architecture using **Infinite Query Page Accu
 
 ### Architecture Summary
 
-The Genres tab uses **Infinite Query Page Accumulation** ([`src/renderer/src/routes/main-player/genres/index.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/genres/index.tsx)).
+The Genres tab uses **Infinite Query Page Accumulation** ([`src/renderer/src/routes/main-player/genres/index.tsx`](../src/renderer/src/routes/main-player/genres/index.tsx)).
 
-- **Page Size**: `GENRE_SUMMARY_PAGE_SIZE = 120` ([`src/renderer/src/queries/genres.ts#L7`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/queries/genres.ts#L7)).
+- **Page Size**: `GENRE_SUMMARY_PAGE_SIZE = 120` ([`src/renderer/src/queries/genres.ts#L7`](../src/renderer/src/queries/genres.ts#L7)).
 - **Query Function**: `window.api.genresData.getGenreSummaries(sort, 0, 120)`.
 - **Genre Detail Page** (`/main-player/genres/$genreId`):
-  - Executes `songQuery.allSongInfo({ songIds: genreData.songs.map((s) => s.songId) })` ([`src/renderer/src/routes/main-player/genres/$genreId.tsx#L70-L76`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/genres/$genreId.tsx#L70-L76)).
+  - Executes `songQuery.allSongInfo({ songIds: genreData.songs.map((s) => s.songId) })` ([`src/renderer/src/routes/main-player/genres/$genreId.tsx#L70-L76`](../src/renderer/src/routes/main-player/genres/$genreId.tsx#L70-L76)).
   - Hydrates **ALL songs** of that genre into memory simultaneously. Rows are virtualized in the DOM via `VirtualizedList`.
 
 ---
@@ -523,16 +523,16 @@ The Genres tab uses **Infinite Query Page Accumulation** ([`src/renderer/src/rou
 
 ### Architecture Summary
 
-Playlists use a **Two-Tier Eager Architecture** ([`src/renderer/src/routes/main-player/playlists/index.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/playlists/index.tsx) and [`$playlistId.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/playlists/$playlistId.tsx)).
+Playlists use a **Two-Tier Eager Architecture** ([`src/renderer/src/routes/main-player/playlists/index.tsx`](../src/renderer/src/routes/main-player/playlists/index.tsx) and [`$playlistId.tsx`](../src/renderer/src/routes/main-player/playlists/$playlistId.tsx)).
 
 1. **Root Playlists Tab**:
-   - Executes `useSuspenseQuery(rootCollectionsOptions(sortingOrder))` ([Line 81](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/playlists/index.tsx#L81)).
+   - Executes `useSuspenseQuery(rootCollectionsOptions(sortingOrder))` ([Line 81](../src/renderer/src/routes/main-player/playlists/index.tsx#L81)).
    - Loads **ALL playlist metadata records at once**. No pagination or windowing.
 2. **Playlist Detail Page** (`$playlistId.tsx`):
    - Loads all collection entries: `collectionEntriesOptions(playlistId)`.
-   - Executes `songQuery.allSongInfo({ songIds: collectionEntries.map((e) => e.songId) })` ([Lines 328-335](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L328-L335)).
+   - Executes `songQuery.allSongInfo({ songIds: collectionEntries.map((e) => e.songId) })` ([Lines 328-335](../src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L328-L335)).
    - **Eager Hydration**: Hydrates **EVERY song in the playlist into memory simultaneously**.
-   - **Client-Side Filtering & Search**: Filtering by keyword or language is done via `useMemo` in the renderer ([Lines 406-439](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L406-L439)). It does **not** re-query SQLite.
+   - **Client-Side Filtering & Search**: Filtering by keyword or language is done via `useMemo` in the renderer ([Lines 406-439](../src/renderer/src/routes/main-player/playlists/$playlistId.tsx#L406-L439)). It does **not** re-query SQLite.
    - **Virtualization**: Rendered via `<VirtualizedList data={filteredSongs} />`. DOM nodes are bounded, but JavaScript memory retains all hydrated songs for that playlist.
 
 ---
@@ -541,7 +541,7 @@ Playlists use a **Two-Tier Eager Architecture** ([`src/renderer/src/routes/main-
 
 ### Architecture Summary
 
-The Queue tab **shares the exact same ID-First Window Hydration architecture as the Songs tab** ([`src/renderer/src/routes/main-player/queue/index.tsx`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/queue/index.tsx)).
+The Queue tab **shares the exact same ID-First Window Hydration architecture as the Songs tab** ([`src/renderer/src/routes/main-player/queue/index.tsx`](../src/renderer/src/routes/main-player/queue/index.tsx)).
 
 - **Source State**: `store.state.localStorage.queue.queues[viewingQueueIndex].songIds` (array of numeric song IDs).
 - **Hydration Hook**:
@@ -558,7 +558,7 @@ The Queue tab **shares the exact same ID-First Window Hydration architecture as 
   ```
 - **Windowing Parameters**: Window size is 200 songs (`keyPrefix: 'queue'`).
 - **Durations**:
-  - `durationsQuery`: Queries durations for the full queue via `window.api.audioLibraryControls.getSongDurations(currentQueue)` ([Line 126](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/routes/main-player/queue/index.tsx#L126)) to compute remaining playback time, but does **not** hydrate full song metadata.
+  - `durationsQuery`: Queries durations for the full queue via `window.api.audioLibraryControls.getSongDurations(currentQueue)` ([Line 126](../src/renderer/src/routes/main-player/queue/index.tsx#L126)) to compute remaining playback time, but does **not** hydrate full song metadata.
   - Metadata rows are hydrated on-demand in 200-song windows as the queue list is scrolled.
 
 ---
@@ -626,7 +626,7 @@ MediaWorkerBridge.parseTrackBatchStream (UtilityProcess)
 
 ### Job Scheduler (`jobScheduler.ts`)
 
-- **Location**: Main process ([`src/main/workers/jobScheduler.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/workers/jobScheduler.ts)).
+- **Location**: Main process ([`src/main/workers/jobScheduler.ts`](../src/main/workers/jobScheduler.ts)).
 - **Priority Queues**:
   - `interactive` (concurrency: 4) — On-demand lyrics or user-triggered requests.
   - `background` (concurrency: 2) — Waveforms, replay gain, album artwork generation.
@@ -638,14 +638,14 @@ MediaWorkerBridge.parseTrackBatchStream (UtilityProcess)
 ## 19. Database Data Flow
 
 - **Engine**: Node.js built-in `node:sqlite` (`DatabaseSync`).
-- **ORM / Query Interface**: `drizzle-orm/sqlite-proxy` wrapping synchronous statements with asynchronous transaction serialization ([`src/main/db/sqlite/engine.ts#L93-L100`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/sqlite/engine.ts#L93-L100)).
+- **ORM / Query Interface**: `drizzle-orm/sqlite-proxy` wrapping synchronous statements with asynchronous transaction serialization ([`src/main/db/sqlite/engine.ts#L93-L100`](../src/main/db/sqlite/engine.ts#L93-L100)).
 - **Pragmas**:
   - `PRAGMA journal_mode = WAL;` (Concurrent reads while writing).
   - `PRAGMA synchronous = NORMAL;` (Ensures durability without per-commit fsync stalls).
   - `PRAGMA busy_timeout = 5000;` (Prevents lock timeouts).
   - `PRAGMA cache_size = -4000;` (Limits SQLite internal page cache to 4 MB).
 - **Fast Raw SQL Projections**:
-  - Song window queries bypass Drizzle relational overhead and invoke `engine.all(sqlText, chunk)` directly ([`src/main/db/queries/songs.ts#L355`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/db/queries/songs.ts#L355)).
+  - Song window queries bypass Drizzle relational overhead and invoke `engine.all(sqlText, chunk)` directly ([`src/main/db/queries/songs.ts#L355`](../src/main/db/queries/songs.ts#L355)).
   - Uses SQLite `json_group_array()` and `json_object()` to assemble joined artist and album entities directly inside the SQLite C engine in sub-15ms.
 
 ---
@@ -656,8 +656,8 @@ MediaWorkerBridge.parseTrackBatchStream (UtilityProcess)
 - **Artwork Handling**:
   - Dual Artwork Strategy: The scanner pre-generates **50×50 WebP thumbnails** (~1 KB each). Virtualized rows request optimized thumbnails exclusively.
   - Content-Addressed Caching: WebP thumbnails are stored under their SHA-256 hash (`song_covers/<sha256>-optimized.webp`).
-  - Cache Headers: Served with `Cache-Control: public, max-age=31536000, immutable` ([`src/main/handleFileProtocol.ts#L33`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/main/handleFileProtocol.ts#L33)). Chromium caches bytes on disk and **never revalidates** during scroll events.
-  - Deterministic Artwork Slot Paint: Rows paint an immediate background color via pure hash function `artSlotColor(songId)` ([`src/renderer/src/components/SongsPage/artSlotColor.ts`](file:///c:/Users/VINAY/intellije-workspace/Nora/src/renderer/src/components/SongsPage/artSlotColor.ts)), preventing blank visual gaps while images decode.
+  - Cache Headers: Served with `Cache-Control: public, max-age=31536000, immutable` ([`src/main/handleFileProtocol.ts#L33`](../src/main/handleFileProtocol.ts#L33)). Chromium caches bytes on disk and **never revalidates** during scroll events.
+  - Deterministic Artwork Slot Paint: Rows paint an immediate background color via pure hash function `artSlotColor(songId)` ([`src/renderer/src/components/SongsPage/artSlotColor.ts`](../src/renderer/src/components/SongsPage/artSlotColor.ts)), preventing blank visual gaps while images decode.
 
 ---
 
