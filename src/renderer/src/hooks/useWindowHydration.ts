@@ -266,7 +266,7 @@ export function useWindowHydration(
 
   const windows = useMemo<WindowRange[]>(() => {
     if (!enabled || ids.length === 0 || !idsVersion) {
-      return [{ startIndex: 0, endIndex: Math.min(SONG_WINDOW_SIZE, ids.length) }];
+      return [];
     }
 
     const list: WindowRange[] = [];
@@ -328,7 +328,7 @@ export function useWindowHydration(
       staleTime: SONG_WINDOW_STALE_TIME,
       gcTime: SONG_WINDOW_GC_TIME,
       retry: false,
-      enabled
+      enabled: Boolean(enabled && ids.length > 0 && Boolean(idsVersion))
     }))
   });
 

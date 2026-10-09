@@ -3,7 +3,7 @@
 import { AppUpdateContext, type AppUpdateContextType } from '@renderer/contexts/AppUpdateContext';
 import { Route } from '@renderer/routes/main-player/folders/$folderPath';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import React, { Suspense } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -137,8 +137,9 @@ describe('Folder Route - ID-First Windowed Wiring Test', () => {
     );
 
     // 3. Verifies VirtualizedList was mounted and fed the exact ID array
-    expect(screen.getByTestId('virtualized-list')).toBeDefined();
-    expect(lastVirtualizedProps).not.toBeNull();
-    expect(lastVirtualizedProps.data).toEqual([301, 302]);
+    await waitFor(() => {
+      expect(screen.getByTestId('virtualized-list')).toBeDefined();
+      expect(lastVirtualizedProps?.data).toEqual([301, 302]);
+    });
   });
 });

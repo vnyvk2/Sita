@@ -472,6 +472,7 @@ function SongsPage() {
   const fixedItemHeight = getSongRowHeight(songViewMode);
 
   const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
+    enabled: filteredSongIds.length > 0,
     listIdentity,
     initialIndex: initialScrollIndex,
     isCompactView: isCompactSongView,

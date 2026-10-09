@@ -969,7 +969,14 @@ export const getFilteredSongLibraryIds = async (
 
   const filters: SQL[] = [];
 
-  if (restrictToIds && restrictToIds.length > 0) {
+  if (restrictToIds !== undefined) {
+    if (restrictToIds.length === 0) {
+      return {
+        ids: [],
+        total: 0,
+        blacklistedIds: []
+      };
+    }
     const CHUNK = 500;
     const idClauses: SQL[] = [];
     for (let i = 0; i < restrictToIds.length; i += CHUNK) {

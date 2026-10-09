@@ -3,7 +3,7 @@
 import { AppUpdateContext, type AppUpdateContextType } from '@renderer/contexts/AppUpdateContext';
 import { Route } from '@renderer/routes/main-player/genres/$genreId';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import React, { Suspense } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -141,8 +141,9 @@ describe('Genre Route - ID-First Windowed Wiring Test', () => {
     );
 
     // 2. Verifies VirtualizedList was mounted and fed the exact ID array
+    await waitFor(() => {
+      expect(lastVirtualizedProps?.data).toEqual([201, 202]);
+    });
     expect(screen.getByTestId('virtualized-list')).toBeDefined();
-    expect(lastVirtualizedProps).not.toBeNull();
-    expect(lastVirtualizedProps.data).toEqual([201, 202]);
   });
 });

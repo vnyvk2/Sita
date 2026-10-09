@@ -126,6 +126,7 @@ function FavoritesPlaylistInfoPage() {
   );
 
   const { getItem, onRangeChange } = useWindowHydration(filteredSongIds, idsVersion, {
+    enabled: filteredSongIds.length > 0,
     listIdentity,
     isCompactView: preferences.isCompactSongView,
     rowHeight: 60

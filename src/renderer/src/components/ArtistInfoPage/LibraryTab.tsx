@@ -96,7 +96,7 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
     enabled: rawArtistSongIds.length > 0
   });
 
-  const sortedSongIds = idsQuery.data?.ids ?? rawArtistSongIds;
+  const sortedSongIds = idsQuery.data?.ids ?? [];
   const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
   const listIdentity = useMemo(() => getSongListIdentity(songIdsParams), [songIdsParams]);
 
@@ -111,6 +111,7 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
   );
 
   const { getItem, onRangeChange } = useWindowHydration(sortedSongIds, idsVersion, {
+    enabled: Boolean(idsQuery.data && sortedSongIds.length > 0),
     listIdentity,
     isCompactView: preferences?.isCompactSongView,
     rowHeight: 60

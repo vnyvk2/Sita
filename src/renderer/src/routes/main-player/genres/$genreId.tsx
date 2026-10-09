@@ -30,7 +30,11 @@ import { useTranslation } from 'react-i18next';
 export const Route = createFileRoute('/main-player/genres/$genreId')({
   validateSearch: songSearchSchema,
   component: GenreInfoPage,
-  loader: async ({ params }) => {
+  loaderDeps: ({ search }) => ({
+    sortingOrder: search.sortingOrder,
+    filteringOrder: search.filteringOrder
+  }),
+  loader: async ({ params, deps }) => {
     if (typeof window === 'undefined') return;
     const genre = await queryClient.ensureQueryData(
       genreQuery.single({ genreId: Number(params.genreId) })
@@ -45,10 +49,11 @@ export const Route = createFileRoute('/main-player/genres/$genreId')({
       const sortingState = storage.sortingStates.getSortingStates('genreDetailPage');
       const idsParams: SongIdsParams = {
         restrictToIds: genreItem.songs.map((s) => s.songId),
-        sortType: sortingState ?? 'aToZ',
-        filterType: 'notSelected'
+        sortType: deps?.sortingOrder ?? sortingState ?? 'aToZ',
+        filterType: deps?.filteringOrder ?? 'notSelected'
       };
       const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
+      if (idsData.ids.length === 0) return;
       const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
       const version = songIdsVersionFromState(state?.dataUpdatedAt);
       const listIdentity = getSongListIdentity(idsParams);
@@ -122,7 +127,7 @@ function GenreInfoPage() {
     enabled: genreSongIds.length > 0
   });
 
-  const sortedSongIds = idsQuery.data?.ids ?? genreSongIds;
+  const sortedSongIds = idsQuery.data?.ids ?? [];
   const idsVersion = songIdsVersionFromState(idsQuery.dataUpdatedAt);
   const listIdentity = useMemo(() => getSongListIdentity(songIdsParams), [songIdsParams]);
 
@@ -137,6 +142,7 @@ function GenreInfoPage() {
   );
 
   const { getItem, onRangeChange } = useWindowHydration(sortedSongIds, idsVersion, {
+    enabled: Boolean(idsQuery.data && sortedSongIds.length > 0),
     listIdentity,
     isCompactView: preferences?.isCompactSongView,
     rowHeight: 60

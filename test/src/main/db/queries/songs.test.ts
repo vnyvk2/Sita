@@ -504,4 +504,11 @@ describe('getFilteredSongLibraryIds Filter Composition & Extensions', () => {
     expect(resAll.ids).toContain(s400d.id);
     expect(resAll.total).toBe(7);
   });
+
+  it('returns empty result when restrictToIds is explicitly empty array', async () => {
+    const res = await getFilteredSongLibraryIds({ restrictToIds: [] });
+    expect(res.ids).toEqual([]);
+    expect(res.total).toBe(0);
+    expect(res.blacklistedIds).toEqual([]);
+  });
 });

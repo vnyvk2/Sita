@@ -32,17 +32,23 @@ import { useTranslation } from 'react-i18next';
 
 export const Route = createFileRoute('/main-player/folders/$folderPath')({
   validateSearch: songSearchSchema,
-  loader: async ({ params }) => {
+  loaderDeps: ({ search }) => ({
+    sortingOrder: search.sortingOrder,
+    filteringOrder: search.filteringOrder
+  }),
+  loader: async ({ params, deps }) => {
     if (typeof window === 'undefined' || !window.api?.folderData) return;
     if (params.folderPath) {
       const res = await window.api.folderData.getFolderData([params.folderPath]);
       if (res && res.length > 0 && res[0].songIds.length > 0) {
+        const sortingState = storage.sortingStates.getSortingStates('musicFolderSortDropdown');
         const idsParams: SongIdsParams = {
           restrictToIds: res[0].songIds,
-          sortType: 'aToZ',
-          filterType: 'notSelected'
+          sortType: deps?.sortingOrder ?? sortingState ?? 'aToZ',
+          filterType: deps?.filteringOrder ?? 'notSelected'
         };
         const idsData = await queryClient.fetchQuery(songQuery.ids(idsParams));
+        if (idsData.ids.length === 0) return;
         const state = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
         const version = songIdsVersionFromState(state?.dataUpdatedAt);
         const listIdentity = getSongListIdentity(idsParams);
@@ -144,6 +150,7 @@ function MusicFolderInfoPage() {
   );
 
   const { getItem, onRangeChange } = useWindowHydration(filteredFolderSongIds, idsVersion, {
+    enabled: Boolean(idsQuery.data && filteredFolderSongIds.length > 0),
     listIdentity,
     isCompactView: preferences.isCompactSongView,
     rowHeight: 60

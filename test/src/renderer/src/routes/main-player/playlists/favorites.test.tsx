@@ -1,12 +1,12 @@
 import { AppUpdateContext, type AppUpdateContextType } from '@renderer/contexts/AppUpdateContext';
-import { applyFavoriteToCaches } from '@renderer/components/SongsPage/useSongFavoriteToggle';
+import { applyFavoriteToCaches, useSongFavoriteToggle } from '@renderer/components/SongsPage/useSongFavoriteToggle';
 import { songQuery } from '@renderer/queries/songs';
 import { Route } from '@renderer/routes/main-player/playlists/favorites';
 import { invalidateTarget } from '@renderer/hooks/useDataSync';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, renderHook, screen } from '@testing-library/react';
 import React, { Suspense } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -117,6 +117,14 @@ describe('Favorites Route - ID-First Windowed Hydration & Invalidation Parity', 
       },
       collections: {
         import: vi.fn().mockResolvedValue(true)
+      },
+      messages: {
+        getMessageFromMain: vi.fn(),
+        removeMessageListener: vi.fn(),
+        removeMessageToRendererEventListener: vi.fn()
+      },
+      playerControls: {
+        toggleLikeSongs: vi.fn().mockResolvedValue({ likes: [], dislikes: [101] })
       }
     };
   });
@@ -221,5 +229,47 @@ describe('Favorites Route - ID-First Windowed Hydration & Invalidation Parity', 
     expect((queryClient.getQueryData(songWindowKey) as any)[0].isAFavorite).toBe(false);
     expect((queryClient.getQueryData(queueWindowKey) as any)[0].isAFavorite).toBe(false);
     expect((queryClient.getQueryData(genreWindowKey) as any)[0].isAFavorite).toBe(false);
+  });
+
+  it('MANDATORY: useSongFavoriteToggle invalidates like-sensitive queries upon successful toggle', async () => {
+    const idsParams = {
+      sortType: 'addedOrder' as const,
+      filterType: 'favorites' as const
+    };
+
+    // 1. Prime the favorites query
+    await queryClient.fetchQuery(songQuery.ids(idsParams));
+    const stateBefore = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
+    expect(stateBefore?.status).toBe('success');
+    expect(stateBefore?.isInvalidated).toBe(false);
+
+    // 2. Render hook and trigger unfavorite
+    const mockContext: AppUpdateContextType = {
+      addNewNotifications: vi.fn(),
+      updateQueueData: vi.fn(),
+      changePromptMenuData: vi.fn(),
+      createQueue: vi.fn(),
+      playSong: vi.fn(),
+      updateContextMenuData: vi.fn()
+    };
+
+    const { result } = renderHook(
+      () => useSongFavoriteToggle({ songId: 101, isAFavorite: true }),
+      {
+        wrapper: ({ children }) => (
+          <AppUpdateContext.Provider value={mockContext}>
+            <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+          </AppUpdateContext.Provider>
+        )
+      }
+    );
+
+    await act(async () => {
+      result.current.toggleFavorite();
+    });
+
+    // 3. Verify that the favorites ID query is marked invalidated directly by the hook on success
+    const stateAfter = queryClient.getQueryState(songQuery.ids(idsParams).queryKey);
+    expect(stateAfter?.isInvalidated).toBe(true);
   });
 });
