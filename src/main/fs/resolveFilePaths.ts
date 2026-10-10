@@ -144,11 +144,14 @@ export const parseArtistArtworks = (
 
   const FILE_URL = sendRealPath ? '' : DEFAULT_FILE_URL;
   const timestampStr = sendRealPath ? '' : `?ts=${timestamps.artistArtworks}`;
-  const isArtworkAvailable = artworks.length > 0;
+  const localArtworks = artworks.filter((artwork) => artwork.source !== 'REMOTE');
+  const isArtworkAvailable = localArtworks.length > 0;
 
   if (isArtworkAvailable) {
-    const highResImage = artworks.find((artwork) => !artwork.isOptimized) || artworks[0];
-    const optimizedImage = artworks.find((artwork) => artwork.isOptimized) || artworks[0];
+    const highResImage =
+      localArtworks.find((artwork) => !artwork.isOptimized) || localArtworks[0];
+    const optimizedImage =
+      localArtworks.find((artwork) => artwork.isOptimized) || localArtworks[0];
 
     return {
       isDefaultArtwork: false,

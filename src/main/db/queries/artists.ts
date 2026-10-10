@@ -3,6 +3,7 @@ import { albumsArtists, artists, artistsSongs } from '@db/schema';
 import { and, asc, count, desc, eq, inArray, type SQL, sql } from 'drizzle-orm';
 
 import { parseArtistArtworks, parseArtistOnlineArtworks } from '../../fs/resolveFilePaths';
+import { resolvePreferredArtistArtworks } from '../../utils/convert';
 
 export const isArtistWithNameAvailable = async (name: string, trx: DB | DBTransaction = db) => {
   const data = await trx.select({}).from(artists).where(eq(artists.name, name)).limit(1);
@@ -23,7 +24,17 @@ export const getArtistById = async (id: number, trx: DB | DBTransaction = db) =>
   const data = await trx.query.artists.findFirst({
     where: (a) => eq(a.id, id),
     with: {
-      songs: { with: { song: { columns: { id: true, title: true, duration: true } } } },
+      songs: {
+        with: {
+          song: {
+            columns: { id: true, title: true, duration: true },
+            with: {
+              artworks: { with: { artwork: {} } },
+              artists: { columns: { artistId: true } }
+            }
+          }
+        }
+      },
       artworks: {
         with: {
           artwork: {
@@ -44,6 +55,10 @@ export const getArtistById = async (id: number, trx: DB | DBTransaction = db) =>
             columns: {
               title: true,
               id: true
+            },
+            with: {
+              artworks: { with: { artwork: {} } },
+              artists: { columns: { artistId: true } }
             }
           }
         }
@@ -168,7 +183,17 @@ export const getAllArtists = async (
       return and(...filters);
     },
     with: {
-      songs: { with: { song: { columns: { id: true, title: true } } } },
+      songs: {
+        with: {
+          song: {
+            columns: { id: true, title: true },
+            with: {
+              artworks: { with: { artwork: {} } },
+              artists: { columns: { artistId: true } }
+            }
+          }
+        }
+      },
       artworks: {
         with: {
           artwork: {
@@ -189,6 +214,10 @@ export const getAllArtists = async (
             columns: {
               title: true,
               id: true
+            },
+            with: {
+              artworks: { with: { artwork: {} } },
+              artists: { columns: { artistId: true } }
             }
           }
         }
@@ -252,6 +281,28 @@ export const getArtistSummaries = async (
         with: {
           artwork: {}
         }
+      },
+      albums: {
+        with: {
+          album: {
+            columns: { id: true },
+            with: {
+              artworks: { with: { artwork: {} } },
+              artists: { columns: { artistId: true } }
+            }
+          }
+        }
+      },
+      songs: {
+        with: {
+          song: {
+            columns: { id: true },
+            with: {
+              artworks: { with: { artwork: {} } },
+              artists: { columns: { artistId: true } }
+            }
+          }
+        }
       }
     },
     limit,
@@ -278,13 +329,13 @@ export const getArtistSummaries = async (
   }
 
   const data: ArtistSummary[] = page.map((artist) => {
-    const artworks = artist.artworks.map((entry) => entry.artwork);
+    const artworks = resolvePreferredArtistArtworks(artist);
     return {
       artistId: artist.id,
       name: artist.name,
       isAFavorite: artist.isFavorite ?? false,
-      artworkPaths: parseArtistArtworks(artworks),
-      onlineArtworkPaths: parseArtistOnlineArtworks(artworks),
+      artworkPaths: parseArtistArtworks(artworks as never),
+      onlineArtworkPaths: parseArtistOnlineArtworks(artworks as never),
       songCount: countMap.get(artist.id) ?? 0
     };
   });

@@ -68,13 +68,92 @@ export const convertToSongData = (
   } satisfies SongData;
 };
 
+export const resolvePreferredArtistArtworks = <
+  TArtwork extends {
+    id: number;
+    path: string;
+    source: string;
+    isOptimized?: boolean;
+    width: number;
+    height: number;
+  }
+>(artist: {
+  artworks?: { artwork: TArtwork }[];
+  albums?: {
+    album: {
+      artworks?: { artwork: TArtwork }[];
+      artists?: { artistId: number }[];
+    };
+  }[];
+  songs?: {
+    song: {
+      artworks?: { artwork: TArtwork }[];
+      artists?: { artistId: number }[];
+    };
+  }[];
+}): TArtwork[] => {
+  const directArtworks = (artist.artworks ?? []).map((entry) => entry.artwork).filter(Boolean);
+  const remoteArtworks = directArtworks.filter((artwork) => artwork.source === 'REMOTE');
+  const directLocalArtworks = directArtworks.filter((artwork) => artwork.source !== 'REMOTE');
+
+  // Tier 1: Solo album artwork (album where this artist is the sole Album Artist)
+  for (const albumEntry of artist.albums ?? []) {
+    const album = albumEntry?.album;
+    const albumArtworks = (album?.artworks ?? [])
+      .map((a) => a.artwork)
+      .filter((a) => a && a.source !== 'REMOTE');
+    const albumArtistCount = album?.artists?.length ?? 0;
+    if (albumArtworks.length > 0 && albumArtistCount === 1) {
+      return [...remoteArtworks, ...albumArtworks];
+    }
+  }
+
+  // Tier 2: Any album artwork linked to this artist in albums_artists
+  for (const albumEntry of artist.albums ?? []) {
+    const albumArtworks = (albumEntry?.album?.artworks ?? [])
+      .map((a) => a.artwork)
+      .filter((a) => a && a.source !== 'REMOTE');
+    if (albumArtworks.length > 0) {
+      return [...remoteArtworks, ...albumArtworks];
+    }
+  }
+
+  // Tier 3: Solo song artwork (song where this artist is the sole Song Artist)
+  for (const songEntry of artist.songs ?? []) {
+    const song = songEntry?.song;
+    const songArtworks = (song?.artworks ?? [])
+      .map((a) => a.artwork)
+      .filter((a) => a && a.source !== 'REMOTE');
+    const songArtistCount = song?.artists?.length ?? 0;
+    if (songArtworks.length > 0 && songArtistCount === 1) {
+      return [...remoteArtworks, ...songArtworks];
+    }
+  }
+
+  // Tier 4: Direct artists_artworks fallback (or any song artwork if direct is empty)
+  if (directLocalArtworks.length > 0) {
+    return [...remoteArtworks, ...directLocalArtworks];
+  }
+
+  for (const songEntry of artist.songs ?? []) {
+    const songArtworks = (songEntry?.song?.artworks ?? [])
+      .map((a) => a.artwork)
+      .filter((a) => a && a.source !== 'REMOTE');
+    if (songArtworks.length > 0) {
+      return [...remoteArtworks, ...songArtworks];
+    }
+  }
+
+  return remoteArtworks;
+};
+
 export const convertToArtist = (artist: GetAllArtistsReturnType[number]) => {
-  const artworks = artist.artworks.map((a) => a.artwork);
+  const artworks = resolvePreferredArtistArtworks(artist);
 
   return {
     artistId: artist.id,
     name: artist.name,
-    artworkPaths: parseArtistArtworks(artworks),
+    artworkPaths: parseArtistArtworks(artworks as never),
     songs: artist.songs.map((s) => ({
       title: s.song.title,
       songId: s.song.id
@@ -84,7 +163,7 @@ export const convertToArtist = (artist: GetAllArtistsReturnType[number]) => {
         title: a.album.title,
         albumId: a.album.id
       })) ?? [],
-    onlineArtworkPaths: parseArtistOnlineArtworks(artworks),
+    onlineArtworkPaths: parseArtistOnlineArtworks(artworks as never),
     isAFavorite: artist.isFavorite
   } satisfies Artist;
 };

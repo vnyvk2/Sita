@@ -237,4 +237,82 @@ describe('ArtistProfileService', () => {
     expect(profile.similarArtists.unAvailableArtists).toHaveLength(0);
     expect(profile.externalLinks.length).toBeGreaterThan(0);
   });
+
+  it('prioritizes solo album and solo song artworks over collaboration song artworks in resolvePreferredArtistArtworks', async () => {
+    const { resolvePreferredArtistArtworks } = await import('@main/utils/convert');
+
+    const collabArt = {
+      id: 1,
+      path: 'positions-ariana.webp',
+      source: 'LOCAL',
+      width: 500,
+      height: 500
+    };
+    const soloAlbumArt = {
+      id: 2,
+      path: 'hot-pink-doja.webp',
+      source: 'LOCAL',
+      width: 500,
+      height: 500
+    };
+    const soloSongArt = {
+      id: 3,
+      path: 'woman-doja.webp',
+      source: 'LOCAL',
+      width: 500,
+      height: 500
+    };
+    const remotePortrait = {
+      id: 4,
+      path: 'https://deezer.com/doja-xl.jpg',
+      source: 'REMOTE',
+      width: 1000,
+      height: 1000
+    };
+
+    // Case 1: Artist has collab artwork in direct artworks, but owns a solo album (Hot Pink)
+    const resolvedWithSoloAlbum = resolvePreferredArtistArtworks({
+      artworks: [{ artwork: collabArt }, { artwork: remotePortrait }],
+      albums: [
+        {
+          album: {
+            artworks: [{ artwork: soloAlbumArt }],
+            artists: [{ artistId: 58 }]
+          }
+        }
+      ],
+      songs: [
+        {
+          song: {
+            artworks: [{ artwork: collabArt }],
+            artists: [{ artistId: 10 }, { artistId: 58 }, { artistId: 99 }]
+          }
+        }
+      ]
+    });
+
+    expect(resolvedWithSoloAlbum).toEqual([remotePortrait, soloAlbumArt]);
+
+    // Case 2: No albums, but artist has a solo song vs a 3-artist collaboration song
+    const resolvedWithSoloSong = resolvePreferredArtistArtworks({
+      artworks: [{ artwork: collabArt }],
+      albums: [],
+      songs: [
+        {
+          song: {
+            artworks: [{ artwork: collabArt }],
+            artists: [{ artistId: 10 }, { artistId: 58 }]
+          }
+        },
+        {
+          song: {
+            artworks: [{ artwork: soloSongArt }],
+            artists: [{ artistId: 58 }]
+          }
+        }
+      ]
+    });
+
+    expect(resolvedWithSoloSong).toEqual([soloSongArt]);
+  });
 });

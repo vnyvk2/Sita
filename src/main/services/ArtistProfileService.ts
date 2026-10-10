@@ -159,6 +159,34 @@ export class ArtistProfileService {
         itunesTracks
       );
 
+      // Persist resolved Deezer artist portrait to SQLite if the artist does not yet have cached onlineArtworkPaths
+      const cachedPortrait = this.extractLocalArtwork(localArtist);
+      const deezerMedium =
+        deezerArtist?.picture_medium || deezerArtist?.picture_big || deezerArtist?.picture_xl;
+      const deezerXl = deezerArtist?.picture_xl || deezerArtist?.picture_big || deezerMedium;
+      const deezerSmall = deezerArtist?.picture_small || deezerMedium;
+      if (
+        !cachedPortrait &&
+        deezerMedium &&
+        !deezerMedium.includes('placeholder') &&
+        deezerSmall &&
+        !deezerSmall.includes('placeholder')
+      ) {
+        void import('@main/core/getArtistInfoFromNet')
+          .then(async ({ saveArtistOnlineArtworks }) => {
+            await saveArtistOnlineArtworks(artistId, {
+              picture_small: deezerSmall,
+              picture_medium: deezerMedium,
+              picture_xl: deezerXl
+            });
+            const { dataUpdateEvent } = await import('@main/main');
+            dataUpdateEvent('artists/artworks');
+          })
+          .catch(() => {
+            // Non-fatal in test or offline environments
+          });
+      }
+
       // 3. Resolve Top Tracks with strict ranking & deduplication
       let deezerTopTracks: any[] = [];
       if (lastFmTracks.length === 0 && deezerArtist?.id) {
@@ -292,16 +320,14 @@ export class ArtistProfileService {
         localArtist.onlineArtworkPaths.picture_xl || localArtist.onlineArtworkPaths.picture_medium
       );
     }
-    if (localArtist.artworkPaths?.artworkPath) {
+    if (localArtist.artworkPaths?.artworkPath && !localArtist.artworkPaths?.isDefaultArtwork) {
       return localArtist.artworkPaths.artworkPath;
     }
     if (Array.isArray(localArtist.artworks)) {
       try {
         const converted = convertToArtist(localArtist);
         return (
-          converted.onlineArtworkPaths?.picture_xl ||
-          converted.onlineArtworkPaths?.picture_medium ||
-          converted.artworkPaths?.artworkPath
+          converted.onlineArtworkPaths?.picture_xl || converted.onlineArtworkPaths?.picture_medium
         );
       } catch {
         return undefined;
@@ -310,14 +336,27 @@ export class ArtistProfileService {
     return undefined;
   }
 
-  /** Resolves the featured image prioritizing Local -> Deezer -> Wikipedia -> iTunes. */
+  private extractFallbackLocalCover(localArtist: any): string | undefined {
+    if (!localArtist || !Array.isArray(localArtist.artworks)) return undefined;
+    try {
+      const converted = convertToArtist(localArtist);
+      if (converted.artworkPaths?.artworkPath && !converted.artworkPaths.isDefaultArtwork) {
+        return converted.artworkPaths.artworkPath;
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
+  }
+
+  /** Resolves the featured image prioritizing cached portrait -> Deezer -> Wikipedia -> Local cover -> iTunes. */
   private resolveFeaturedImage(
     localArtist: any,
     deezerArtist: any,
     wikiBio: any,
     itunesTracks: any[]
   ): ArtistFeaturedImage | undefined {
-    // 1. Local artwork (cached or embedded)
+    // 1. Cached online artist portrait (or explicit non-default local override)
     const localArt = this.extractLocalArtwork(localArtist);
     if (localArt) {
       return {
@@ -345,7 +384,16 @@ export class ArtistProfileService {
       };
     }
 
-    // 4. iTunes collection artwork from top track
+    // 4. Local album/song cover fallback (when offline or no portrait on Deezer/Wikipedia)
+    const fallbackLocalCover = this.extractFallbackLocalCover(localArtist);
+    if (fallbackLocalCover) {
+      return {
+        url: fallbackLocalCover,
+        source: 'Local'
+      };
+    }
+
+    // 5. iTunes collection artwork from top track
     const itunesArt = itunesTracks.find((t) => t.artworkUrl600 || t.artworkUrl100);
     if (itunesArt) {
       return {

@@ -17,20 +17,22 @@ const manageArtistsOfParsedSong = async (
   if (songArtists && songArtists.length > 0) {
     const uniqueArtists = Array.from(new Set(songArtists.map((a) => a.trim()))).filter(Boolean);
 
-    for (const newArtistName of uniqueArtists) {
+    for (let artistIndex = 0; artistIndex < uniqueArtists.length; artistIndex += 1) {
+      const newArtistName = uniqueArtists[artistIndex];
+      const isPrimaryOrSoloArtist = artistIndex === 0;
       const availableArtist = await getArtistWithName(newArtistName, trx);
 
       if (availableArtist) {
-        // const linkedSongArtist = await getLinkedSongArtist(availableArtist.id, songId, trx);
-        // if (linkedSongArtist) continue;
-
+        if (isPrimaryOrSoloArtist && artworkId) {
+          await linkArtworksToArtist([{ artistId: availableArtist.id, artworkId }], trx);
+        }
         await linkSongToArtist(availableArtist.id, songId, trx);
         relevantArtists.push(availableArtist);
       } else {
         const artist = await createArtist({ name: newArtistName }, trx);
 
-        if (artworkId) {
-          await linkArtworksToArtist([{ artistId: artist.id, artworkId: artworkId }], trx);
+        if (isPrimaryOrSoloArtist && artworkId) {
+          await linkArtworksToArtist([{ artistId: artist.id, artworkId }], trx);
         }
         await linkSongToArtist(artist.id, songId, trx);
 

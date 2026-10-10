@@ -144,7 +144,10 @@ const getSimilarArtistsFromArtistInfo = async (data: ArtistInfoPayload) => {
   return { availableArtists, unAvailableArtists };
 };
 
-const saveArtistOnlineArtworks = async (artistId: number, artistArtworks: OnlineArtistArtworks) => {
+export const saveArtistOnlineArtworks = async (
+  artistId: number,
+  artistArtworks: OnlineArtistArtworks
+) => {
   const artworks: { path: string; width: number; height: number }[] = [];
 
   if (artistArtworks.picture_small) {
@@ -170,6 +173,8 @@ const saveArtistOnlineArtworks = async (artistId: number, artistArtworks: Online
       height: 1000
     });
   }
+
+  if (artworks.length === 0) return;
 
   await db.transaction(async (trx) => {
     const savedArtworks = await saveArtworks(
@@ -203,25 +208,32 @@ const getArtistInfoFromNet = async (artistId: number): Promise<ArtistInfoFromNet
 
   const artist = convertToArtist(artistData);
 
-  const [artistArtworks, artistInfo] = await Promise.all([
+  const [artistArtworksRes, artistInfoRes] = await Promise.allSettled([
     getArtistArtworksFromNet(artist),
     getArtistInfoFromLastFM(artist.name)
   ]);
 
-  if (artistArtworks && artistInfo) {
-    const artistPalette = await generatePalette(artistArtworks.picture_medium);
-    const similarArtists = await getSimilarArtistsFromArtistInfo(artistInfo);
+  const artistArtworks =
+    artistArtworksRes.status === 'fulfilled' ? artistArtworksRes.value : undefined;
+  const artistInfo = artistInfoRes.status === 'fulfilled' ? artistInfoRes.value : undefined;
 
+  if (artistArtworks) {
     if (!artist.onlineArtworkPaths) {
       await saveArtistOnlineArtworks(artistId, artistArtworks);
       dataUpdateEvent('artists/artworks');
     }
+
+    const artistPalette = await generatePalette(artistArtworks.picture_medium);
+    const similarArtists = artistInfo
+      ? await getSimilarArtistsFromArtistInfo(artistInfo)
+      : { availableArtists: [], unAvailableArtists: [] };
+
     return {
       artistArtworks,
-      artistBio: artistInfo.artist.bio.summary,
+      artistBio: artistInfo?.artist?.bio?.summary || '',
       artistPalette,
       similarArtists,
-      tags: artistInfo.artist?.tags?.tag || []
+      tags: artistInfo?.artist?.tags?.tag || []
     };
   }
 

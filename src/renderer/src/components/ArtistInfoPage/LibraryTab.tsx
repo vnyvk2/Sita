@@ -125,6 +125,25 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
     select: (data) => data.data
   });
 
+  const { data: onlineArtInfo } = useQuery({
+    ...artistQuery.fetchOnlineInfo({ artistId: artistData.artistId }),
+    enabled: Boolean(
+      artistData?.artistId &&
+        !artistData?.onlineArtworkPaths?.picture_medium &&
+        window.api?.artistsData?.getArtistArtworks
+    ),
+    staleTime: 1000 * 60 * 60 * 24,
+    retry: false
+  });
+
+  const resolvedOnlineArtworkMedium =
+    artistData?.onlineArtworkPaths?.picture_medium ||
+    onlineArtInfo?.artistArtworks?.picture_medium;
+  const resolvedOnlineArtworkXl =
+    artistData?.onlineArtworkPaths?.picture_xl ||
+    onlineArtInfo?.artistArtworks?.picture_xl ||
+    resolvedOnlineArtworkMedium;
+
   const { mutate: toggleLike } = useMutation({
     mutationFn: () =>
       window.api.artistsData.toggleLikeArtists([artistData.artistId], !artistData.isAFavorite),
@@ -264,14 +283,13 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
       <div className="artist-img-and-info-container relative mb-12 flex flex-row items-center pl-8 *:z-10">
         <div className="artist-img-container relative mr-10 flex max-h-60 items-center justify-center lg:hidden">
           <Img
-            src={artistData?.onlineArtworkPaths?.picture_medium}
+            src={resolvedOnlineArtworkMedium}
             fallbackSrc={artistData?.artworkPaths?.artworkPath}
             className="aspect-square! h-60 w-60 rounded-full object-cover shadow-lg"
             loading="eager"
             alt="Artist Cover"
             onContextMenu={(e) =>
-              (artistData?.onlineArtworkPaths?.picture_xl ||
-                artistData?.onlineArtworkPaths?.picture_medium) &&
+              (resolvedOnlineArtworkXl || resolvedOnlineArtworkMedium) &&
               updateContextMenuData(
                 true,
                 [
@@ -281,9 +299,7 @@ export function LibraryTab({ artistData, sortingOrder, onSortingOrderChange }: L
                     iconName: 'image',
                     iconClassName: 'material-icons-round-outlined',
                     handlerFunction: () => {
-                      const artworkPath =
-                        artistData?.onlineArtworkPaths?.picture_xl ||
-                        artistData?.onlineArtworkPaths?.picture_medium;
+                      const artworkPath = resolvedOnlineArtworkXl || resolvedOnlineArtworkMedium;
 
                       if (artworkPath)
                         window.api.songUpdates.saveArtworkToSystem(artworkPath, artistData.name);
