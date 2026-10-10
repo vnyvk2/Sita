@@ -1194,8 +1194,22 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
       }
     });
 
+    let isMiniPlayerContextMenuOpen = false;
     ipcMain.handle('app/showMiniPlayerContextMenu', (event, template: any[]) => {
+      if (isMiniPlayerContextMenuOpen) {
+        return Promise.resolve(null);
+      }
+      isMiniPlayerContextMenuOpen = true;
+
       return new Promise((resolve) => {
+        let settled = false;
+        const finish = (value: string | null) => {
+          if (settled) return;
+          settled = true;
+          isMiniPlayerContextMenuOpen = false;
+          resolve(value);
+        };
+
         const buildMenu = (items: any[]): any[] =>
           items.map((item) => {
             const newItem = { ...item };
@@ -1203,17 +1217,23 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
               newItem.submenu = buildMenu(newItem.submenu);
             }
             if (newItem.id && !newItem.submenu && newItem.type !== 'separator') {
-              newItem.click = () => resolve(newItem.id);
+              newItem.click = () => finish(newItem.id);
             }
             return newItem;
           });
 
-        const menu = Menu.buildFromTemplate(buildMenu(template));
-        const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
-        menu.popup({
-          window: win ?? undefined,
-          callback: () => resolve(null)
-        });
+        try {
+          const menu = Menu.buildFromTemplate(buildMenu(template));
+          const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+          menu.popup({
+            window: win ?? undefined,
+            callback: () => {
+              setTimeout(() => finish(null), 0);
+            }
+          });
+        } catch {
+          finish(null);
+        }
       });
     });
 

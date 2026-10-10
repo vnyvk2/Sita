@@ -182,4 +182,29 @@ describe('CompactMiniPlayer (Single-Tier Progressive Strip)', () => {
 
     expect(toggleShufflingMock).toHaveBeenCalledWith(true);
   });
+
+  it('keeps .compact-artwork unified with the left-half drag region so two-finger taps do not split across HTCLIENT/HTCAPTION seams', () => {
+    const { container } = render(
+      <CompactMiniPlayer
+        isQueueVisible={false}
+        isLyricsVisible={false}
+        onToggleQueue={vi.fn()}
+        onToggleLyrics={vi.fn()}
+        pinnedControls={['love']}
+      />
+    );
+
+    const artwork = container.querySelector('.compact-artwork');
+    const meta = container.querySelector('.compact-meta');
+    const controlsDeck = container.querySelector('.compact-controls-deck');
+
+    expect(artwork).not.toBeNull();
+    expect(meta).not.toBeNull();
+    expect(controlsDeck).not.toBeNull();
+
+    expect(artwork!.className).not.toContain('[-webkit-app-region:no-drag]');
+    expect(meta!.className).toContain('[-webkit-app-region:drag]');
+    expect(controlsDeck!.className).toContain('[-webkit-app-region:no-drag]');
+  });
 });
+

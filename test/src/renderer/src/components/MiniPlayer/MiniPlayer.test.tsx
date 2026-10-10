@@ -844,4 +844,111 @@ describe('MiniPlayer Spatial Layout & Hierarchy', () => {
 
     expect(toggleSongPlaybackMock).toHaveBeenCalledTimes(1);
   });
+
+  it('does not leak duplicate SHOW_MINI_PLAYER_CONTEXT_MENU listeners across state and mode transitions under contextBridge proxy semantics', async () => {
+    const activeListeners = new Set<(...args: any[]) => void>();
+
+    window.api = {
+      ...window.api,
+      messages: {
+        // Simulate Electron contextBridge: each call wraps the callback in a new proxy function
+        getMessageFromMain: vi.fn((cb) => {
+          const bridgedProxy = (...args: any[]) => cb(...args);
+          activeListeners.add(bridgedProxy);
+          return () => {
+            activeListeners.delete(bridgedProxy);
+          };
+        }),
+        removeMessageToRendererEventListener: vi.fn((cb) => {
+          const bridgedProxyOnRemove = (...args: any[]) => cb(...args);
+          activeListeners.delete(bridgedProxyOnRemove);
+        })
+      }
+    } as any;
+
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['play', 'artwork', 'title'],
+      isMiniPlayerAlwaysOnTop: false,
+      miniPlayerMode: 'standard'
+    });
+
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    // Transition to compact mode and update pinned controls (triggers handleContextMenu recreation)
+    queryClient.setQueryData(['settings'], {
+      miniPlayerPinnedControls: ['play', 'artwork', 'title', 'love'],
+      isMiniPlayerAlwaysOnTop: true,
+      miniPlayerMode: 'compact'
+    });
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    // Emit SHOW_MINI_PLAYER_CONTEXT_MENU from main process across all active IPC listeners
+    for (const listener of activeListeners) {
+      listener(null, 'SHOW_MINI_PLAYER_CONTEXT_MENU');
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(activeListeners.size).toBe(1);
+    expect(showContextMenuMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates concurrent or back-to-back context menu triggers so menu.popup() is not cancelled by a racing second invocation', async () => {
+    let resolveMenu!: (val: string | null) => void;
+    showContextMenuMock.mockImplementation(
+      () =>
+        new Promise<string | null>((resolve) => {
+          resolveMenu = resolve;
+        })
+    );
+
+    let messageCallback: ((_: unknown, code: string) => void) | undefined;
+    window.api = {
+      ...window.api,
+      messages: {
+        getMessageFromMain: vi.fn((cb) => {
+          messageCallback = cb;
+          return () => {
+            messageCallback = undefined;
+          };
+        }),
+        removeMessageToRendererEventListener: vi.fn()
+      }
+    } as any;
+
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <MiniPlayer />
+        </Suspense>
+      </QueryClientProvider>
+    );
+
+    const miniPlayerElement = container.querySelector('.mini-player')!;
+
+    // Trigger 1: DOM contextmenu (e.g. from synthetic touchEnd or boundary tap)
+    miniPlayerElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    // Trigger 2: Simultaneous system-context-menu / native gesture contextmenu while menu is open
+    messageCallback?.(null, 'SHOW_MINI_PLAYER_CONTEXT_MENU');
+    miniPlayerElement.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+
+    expect(showContextMenuMock).toHaveBeenCalledTimes(1);
+
+    resolveMenu(null);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
 });
+

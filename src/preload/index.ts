@@ -410,13 +410,36 @@ const lyrics = {
 };
 
 // $ APP MESSAGES
+const messageListenerMap = new WeakMap<
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (...args: any[]) => void,
+  (event: unknown, messageCode: MessageCodes, data: Record<string, unknown>) => void
+>();
 const messages = {
   getMessageFromMain: (
     callback: (event: unknown, messageCode: MessageCodes, data: Record<string, unknown>) => void
-  ) => ipcRenderer.on('app/sendMessageToRendererEvent', callback),
+  ) => {
+    const subscription = (
+      event: unknown,
+      messageCode: MessageCodes,
+      data: Record<string, unknown>
+    ) => callback(event, messageCode, data);
+    messageListenerMap.set(callback, subscription);
+    ipcRenderer.on('app/sendMessageToRendererEvent', subscription);
+    return () => {
+      ipcRenderer.removeListener('app/sendMessageToRendererEvent', subscription);
+    };
+  },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  removeMessageToRendererEventListener: (callback: (...args: any[]) => void) =>
-    ipcRenderer.removeListener('app/sendMessageToRendererEvent', callback)
+  removeMessageToRendererEventListener: (callback: (...args: any[]) => void) => {
+    const subscription = messageListenerMap.get(callback);
+    if (subscription) {
+      ipcRenderer.removeListener('app/sendMessageToRendererEvent', subscription);
+      messageListenerMap.delete(callback);
+    } else {
+      ipcRenderer.removeListener('app/sendMessageToRendererEvent', callback);
+    }
+  }
 };
 
 // $ APP DATA UPDATE EVENTS

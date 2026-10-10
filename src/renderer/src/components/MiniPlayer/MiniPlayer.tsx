@@ -479,12 +479,23 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     [pinnedControls]
   );
 
+  const isContextMenuOpenRef = useRef(false);
+  const lastContextMenuTriggerAtRef = useRef(0);
+
   const handleContextMenu = useCallback(
     async (e?: React.MouseEvent) => {
       if (e) {
         e.preventDefault();
         e.stopPropagation();
       }
+
+      const now = Date.now();
+      if (isContextMenuOpenRef.current || now - lastContextMenuTriggerAtRef.current < 120) {
+        return;
+      }
+      isContextMenuOpenRef.current = true;
+      lastContextMenuTriggerAtRef.current = now;
+
       const template = [
         {
           id: 'compactMode',
@@ -624,7 +635,12 @@ export default function MiniPlayer(props: MiniPlayerProps) {
         }
       ];
 
-      const chosenId = await window.api.miniPlayer.showContextMenu(template);
+      let chosenId: string | null = null;
+      try {
+        chosenId = await window.api.miniPlayer.showContextMenu(template);
+      } finally {
+        isContextMenuOpenRef.current = false;
+      }
       if (!chosenId) return;
 
       switch (chosenId) {
@@ -735,21 +751,28 @@ export default function MiniPlayer(props: MiniPlayerProps) {
     ]
   );
 
+  const handleContextMenuRef = useRef(handleContextMenu);
+  handleContextMenuRef.current = handleContextMenu;
+
   // Listen for native system context menu triggers (e.g. right-clicks on draggable regions on Windows)
   useEffect(() => {
     const handleMainMessage = (_: unknown, messageCode: MessageCodes) => {
       if (messageCode === 'SHOW_MINI_PLAYER_CONTEXT_MENU') {
-        handleContextMenu();
+        void handleContextMenuRef.current();
       }
     };
     if (window.api?.messages?.getMessageFromMain) {
-      window.api.messages.getMessageFromMain(handleMainMessage);
+      const unsubscribe = window.api.messages.getMessageFromMain(handleMainMessage);
       return () => {
-        window.api.messages.removeMessageToRendererEventListener?.(handleMainMessage);
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        } else {
+          window.api.messages.removeMessageToRendererEventListener?.(handleMainMessage);
+        }
       };
     }
     return undefined;
-  }, [handleContextMenu]);
+  }, []);
 
   // Controls and UI chrome are visible when: hovered, focused, or paused
   const showControls = !isCurrentSongPlaying;

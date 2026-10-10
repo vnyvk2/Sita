@@ -261,7 +261,7 @@ const CompactMiniPlayer = (props: Props) => {
         {/* ── Left: Artwork Thumbnail ── */}
         <div
           ref={artworkRef}
-          className="compact-artwork relative h-8 w-8 shrink-0 overflow-hidden rounded shadow-xs [-webkit-app-region:no-drag]"
+          className="compact-artwork relative h-8 w-8 shrink-0 overflow-hidden rounded shadow-xs"
         >
           <Img
             thumbnail
