@@ -74,6 +74,7 @@ export function renderLyricsLines(
           key={index}
           index={index}
           isActive={activeLineIndex === index}
+          activeLineIndex={activeLineIndex}
           lyric={originalText}
           translatedLyricLines={lyric.translatedTexts}
           syncedStart={start}
@@ -96,6 +97,7 @@ export function renderLyricsLines(
         key="..."
         index={-1}
         isActive={activeLineIndex === -1}
+        activeLineIndex={activeLineIndex}
         lyric="•••"
         syncedStart={0}
         syncedEnd={(parsedLyrics[0]?.start || 0) + offset}

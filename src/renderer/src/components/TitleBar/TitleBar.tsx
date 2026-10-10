@@ -33,27 +33,34 @@ const TitleBar = memo(() => {
       id="title-bar"
       className={`text-font-color-black dark:text-font-color-white relative top-0 z-40 grid h-10 w-full items-center justify-between overflow-hidden bg-transparent transition-opacity ${
         bodyBackgroundImage &&
+        !isFullScreenPlayer &&
         'bg-background-color-1/50 text-font-color-white! dark:bg-dark-background-color-1/70 backdrop-blur-md'
-      } ${isDarwin ? 'grid-cols-[clamp(10rem,30%,17rem)_1fr_auto] pl-24' : 'grid-cols-[clamp(10rem,30%,18rem)_1fr_auto]'}`}
+      } ${isFullScreenPlayer ? 'text-font-color-white!' : ''} ${isDarwin ? 'grid-cols-[clamp(10rem,30%,17rem)_1fr_auto] pl-24' : 'grid-cols-[clamp(10rem,30%,18rem)_1fr_auto]'}`}
     >
       <div
         className={`logo-and-app-name-and-navigation-controls-container flex h-full w-full items-center justify-between`}
       >
-        <div className="logo-and-app-name-container flex items-center">
-          <span className="logo-container">
-            <Img
-              className={`mr-2 aspect-square h-7 w-7 rounded-md p-1 shadow-md`}
-              src={LightModeLogo}
-              alt="Nora Logo"
-            />
-          </span>
-          <span className="app-name-container" title="Nora">
-            <span className="font-medium tracking-wide">Sita</span>
-          </span>
-        </div>
-        {!isFullScreenPlayer ? <NavigationControlsContainer /> : <div />}
+        {!isFullScreenPlayer ? (
+          <>
+            <div className="logo-and-app-name-container flex items-center">
+              <span className="logo-container">
+                <Img
+                  className={`mr-2 aspect-square h-7 w-7 rounded-md p-1 shadow-md`}
+                  src={LightModeLogo}
+                  alt="Nora Logo"
+                />
+              </span>
+              <span className="app-name-container" title="Nora">
+                <span className="font-medium tracking-wide">Sita</span>
+              </span>
+            </div>
+            <NavigationControlsContainer />
+          </>
+        ) : (
+          <div />
+        )}
       </div>
-      {window.api.properties.isInDevelopment && devLocationHref ? (
+      {!isFullScreenPlayer && window.api.properties.isInDevelopment && devLocationHref ? (
         <CurrentLocationContainer href={devLocationHref} className={`${isDarwin ? 'pl-4' : ''}`} />
       ) : (
         <div />
@@ -65,13 +72,15 @@ const TitleBar = memo(() => {
               <LazyWorkspaceToolbarRestoreBtn />
             </Suspense>
           )}
-          <div className="indicators-container flex flex-row">
-            {/* <ThrottlingIndicator /> */}
-            <NewUpdateIndicator />
-            <NetworkIndicator />
-          </div>
+          {!isFullScreenPlayer && (
+            <div className="indicators-container flex flex-row">
+              {/* <ThrottlingIndicator /> */}
+              <NewUpdateIndicator />
+              <NetworkIndicator />
+            </div>
+          )}
           <div className="special-controls-container flex flex-row">
-            {window.api.properties.isInDevelopment && <ChangeThemeBtn />}
+            {!isFullScreenPlayer && window.api.properties.isInDevelopment && <ChangeThemeBtn />}
             {isFullScreenPlayer && <GoToMainPlayerBtn />}
           </div>
         </div>

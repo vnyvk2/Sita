@@ -214,8 +214,11 @@ const QueueContainer = (props: Props) => {
   const manager = getQueuesManager();
 
   const currentQueue = queue.queues[viewingQueueIndex];
-  const songIds = currentQueue?.songIds ?? EMPTY_SONG_IDS;
   const viewingQueue = manager?.queues?.[viewingQueueIndex];
+  const songIds =
+    currentQueue?.songIds && currentQueue.songIds.length > 0
+      ? currentQueue.songIds
+      : (viewingQueue?.songIds ?? EMPTY_SONG_IDS);
   const queueId = currentQueue?.id ?? viewingQueue?.id ?? 'active';
 
   const queueVersion = useMemo(() => {
@@ -305,7 +308,7 @@ const QueueContainer = (props: Props) => {
   return (
     <div
       data-testid="queue-container"
-      className="mini-player-queue-container relative z-20 flex flex-1 flex-col overflow-hidden border-t border-white/5 bg-[rgba(33,34,38,0.5)] backdrop-blur-md [-webkit-app-region:no-drag]"
+      className="mini-player-queue-container relative z-20 flex h-full flex-1 flex-col overflow-hidden border-t border-white/5 bg-[rgba(33,34,38,0.5)] backdrop-blur-md [-webkit-app-region:no-drag]"
     >
       {/* Header */}
       <div className="shrink-0 px-4 py-3 [-webkit-app-region:no-drag]">
