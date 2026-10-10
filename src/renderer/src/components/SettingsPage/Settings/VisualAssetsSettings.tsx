@@ -53,6 +53,7 @@ const VisualAssetsSettings = () => {
   const { data: userSettings } = useQuery(settingsQuery.all);
   const [brandTarget, setBrandTarget] = useState<BrandTargetMode>('both');
   const [showSlotMatrix, setShowSlotMatrix] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error';
@@ -281,8 +282,8 @@ const VisualAssetsSettings = () => {
       id="setting-appearance-visual-assets"
       className="secondary-container custom-visual-assets my-6"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="max-w-xl">
           <div className="description font-medium">Custom App Icons &amp; Visual Assets</div>
           <p className="text-font-color-dimmed dark:text-dark-font-color-dimmed mt-0.5 text-xs">
             Personalize Nora&apos;s app logo, running window/tray icon, sidebar navigation icons,
@@ -290,27 +291,75 @@ const VisualAssetsSettings = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {!isExpanded && (
+            <div className="bg-background-color-2/60 dark:bg-dark-background-color-2/60 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs">
+              <img
+                src={nativeIconPreviewUrl}
+                alt="Active Icon"
+                className={`h-5 w-5 rounded ${
+                  isDynamicActive ? 'object-cover' : 'object-contain'
+                }`}
+              />
+              {isDynamicActive ? (
+                <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                  Now-Playing
+                </span>
+              ) : customizedSlotCount > 0 ? (
+                <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-[11px]">
+                  {customizedSlotCount} customized
+                </span>
+              ) : (
+                <span className="text-font-color-dimmed dark:text-dark-font-color-dimmed text-[11px]">
+                  Default
+                </span>
+              )}
+            </div>
+          )}
+
+          {isExpanded && (
+            <>
+              <button
+                type="button"
+                disabled={isBusy}
+                onClick={handleImportCustomAsset}
+                className="bg-font-color-highlight text-font-color-black dark:bg-dark-font-color-highlight flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:opacity-50"
+              >
+                <span className="material-icons-round text-base leading-none">upload_file</span>
+                <span>Import SVG / Image</span>
+              </button>
+              {customizedSlotCount > 0 && (
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={handleResetAllSlots}
+                  className="bg-background-color-2 hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3 cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                >
+                  Restore Defaults ({customizedSlotCount})
+                </button>
+              )}
+            </>
+          )}
+
           <button
             type="button"
-            disabled={isBusy}
-            onClick={handleImportCustomAsset}
-            className="bg-font-color-highlight text-font-color-black dark:bg-dark-font-color-highlight flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:opacity-50"
+            onClick={() => setIsExpanded((prev) => !prev)}
+            aria-expanded={isExpanded}
+            className="bg-background-color-2 hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3 flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors"
           >
-            <span className="material-icons-round text-base leading-none">upload_file</span>
-            <span>Import SVG / Image</span>
-          </button>
-          {customizedSlotCount > 0 && (
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={handleResetAllSlots}
-              className="bg-background-color-2 hover:bg-background-color-3 dark:bg-dark-background-color-2 dark:hover:bg-dark-background-color-3 cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+            <span>{isExpanded ? 'Hide Controls' : 'Customize Icons'}</span>
+            <span
+              className={`material-icons-round text-base leading-none transition-transform duration-200 ${
+                isExpanded ? 'rotate-180' : 'rotate-0'
+              }`}
             >
-              Restore Defaults ({customizedSlotCount})
-            </button>
-          )}
+              expand_more
+            </span>
+          </button>
         </div>
       </div>
+
+      {isExpanded && (
+        <div className="animate-in fade-in slide-in-from-top-2 mt-4 duration-200">
 
       {statusMessage && (
         <div
@@ -754,7 +803,9 @@ const VisualAssetsSettings = () => {
           </div>
         )}
       </div>
-    </li>
+    </div>
+  )}
+</li>
   );
 };
 
