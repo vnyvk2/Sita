@@ -103,6 +103,28 @@ impl Daemon {
             }
         }
     }
+
+    fn wait_for_event(
+        &self,
+        event_name: &str,
+        timeout: Duration,
+        other_events: &mut Vec<serde_json::Value>,
+    ) -> serde_json::Value {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            assert!(
+                !remaining.is_zero(),
+                "timed out waiting for event '{event_name}'; seen events: {other_events:?}"
+            );
+            let line = self.next_line(remaining);
+            let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+            if v.get("event").and_then(|e| e.as_str()) == Some(event_name) {
+                return v;
+            }
+            other_events.push(v);
+        }
+    }
 }
 
 impl Drop for Daemon {
@@ -503,4 +525,125 @@ fn daemon_stdio_cold_load_slot_b_plays_cleanly() {
     daemon.send(3, r#"{"cmd":"stop"}"#);
     assert_ok(&daemon.wait_response(3, Duration::from_secs(5), &mut events));
 }
+
+#[test]
+fn daemon_stdio_single_track_after_preload_emits_track_end_not_transition() {
+    let mut daemon = Daemon::spawn();
+    let _ready = daemon.next_line(Duration::from_secs(10));
+
+    let mut events = Vec::new();
+    let path_track1 = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+    let path_track2 = fixture("ref_440hz_3s_44100.wav").replace('\\', "\\\\");
+    let path_single_album = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+
+    // 1. Load Track 1 into Slot A, play, and preload Track 2 into standby Slot B.
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"a","path":"{path_track1}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+    daemon.send(2, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(2, Duration::from_secs(5), &mut events));
+    daemon.send(3, &format!(r#"{{"cmd":"preload","path":"{path_track2}"}}"#));
+    assert_ok(&daemon.wait_response(3, Duration::from_secs(10), &mut events));
+
+    // 2. Replace foreground playback with a 1-song album in Slot A (no preload for a next track).
+    daemon.send(4, &format!(r#"{{"cmd":"load","slot":"a","path":"{path_single_album}"}}"#));
+    assert_ok(&daemon.wait_response(4, Duration::from_secs(10), &mut events));
+    daemon.send(5, r#"{"cmd":"seek","position_secs":2.7}"#);
+    assert_ok(&daemon.wait_response(5, Duration::from_secs(5), &mut events));
+    daemon.send(6, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(6, Duration::from_secs(5), &mut events));
+
+    // 3. Wait for the natural end of the 1-song album.
+    let track_end = daemon.wait_for_event("track_end", Duration::from_secs(5), &mut events);
+    assert_eq!(track_end.get("slot").and_then(|s| s.as_str()), Some("a"));
+
+    // 4. Assert that NO transition_complete was emitted into the stale Slot B.
+    for ev in &events {
+        assert_ne!(
+            ev.get("event").and_then(|e| e.as_str()),
+            Some("transition_complete"),
+            "Single-track album must emit track_end and NEVER auto-splice into stale standby: {ev}"
+        );
+    }
+
+    daemon.send(7, r#"{"cmd":"stop"}"#);
+    assert_ok(&daemon.wait_response(7, Duration::from_secs(5), &mut events));
+
+    daemon.send(8, r#"{"cmd":"get_state"}"#);
+    let state = daemon.wait_response(8, Duration::from_secs(5), &mut events);
+    assert_ok(&state);
+    assert_eq!(state["data"]["state"].as_str(), Some("stopped"));
+    assert_eq!(state["data"]["active_slot"].as_str(), Some("a"));
+}
+
+#[test]
+fn daemon_stdio_empty_preload_disarms_standby_before_eos() {
+    let mut daemon = Daemon::spawn();
+    let _ready = daemon.next_line(Duration::from_secs(10));
+
+    let mut events = Vec::new();
+    let path_track1 = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+    let path_track2 = fixture("ref_440hz_3s_44100.wav").replace('\\', "\\\\");
+
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"a","path":"{path_track1}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+    daemon.send(2, r#"{"cmd":"seek","position_secs":2.5}"#);
+    assert_ok(&daemon.wait_response(2, Duration::from_secs(5), &mut events));
+    daemon.send(3, &format!(r#"{{"cmd":"preload","path":"{path_track2}"}}"#));
+    assert_ok(&daemon.wait_response(3, Duration::from_secs(10), &mut events));
+
+    // Renderer disarms standby via empty preload (e.g. queue truncated or repeat-one enabled).
+    daemon.send(4, r#"{"cmd":"preload","path":""}"#);
+    assert_ok(&daemon.wait_response(4, Duration::from_secs(5), &mut events));
+
+    daemon.send(5, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(5, Duration::from_secs(5), &mut events));
+
+    let track_end = daemon.wait_for_event("track_end", Duration::from_secs(5), &mut events);
+    assert_eq!(track_end.get("slot").and_then(|s| s.as_str()), Some("a"));
+    for ev in &events {
+        assert_ne!(
+            ev.get("event").and_then(|e| e.as_str()),
+            Some("transition_complete"),
+            "Disarmed standby must not auto-splice at EOS: {ev}"
+        );
+    }
+}
+
+#[test]
+fn daemon_stdio_rapid_play_pause_toggling_is_stable() {
+    let mut daemon = Daemon::spawn();
+    let _ready = daemon.next_line(Duration::from_secs(10));
+
+    let mut events = Vec::new();
+    let path = fixture("ref_440hz_3s.wav").replace('\\', "\\\\");
+
+    daemon.send(1, &format!(r#"{{"cmd":"load","slot":"a","path":"{path}"}}"#));
+    assert_ok(&daemon.wait_response(1, Duration::from_secs(10), &mut events));
+
+    // Rapidly toggle play and pause 20 times in sequence
+    let mut req_id = 2u64;
+    for _ in 0..10 {
+        daemon.send(req_id, r#"{"cmd":"play"}"#);
+        assert_ok(&daemon.wait_response(req_id, Duration::from_secs(5), &mut events));
+        req_id += 1;
+
+        daemon.send(req_id, r#"{"cmd":"pause"}"#);
+        assert_ok(&daemon.wait_response(req_id, Duration::from_secs(5), &mut events));
+        req_id += 1;
+    }
+
+    // Finally resume play, confirm state is playing
+    daemon.send(req_id, r#"{"cmd":"play"}"#);
+    assert_ok(&daemon.wait_response(req_id, Duration::from_secs(5), &mut events));
+    req_id += 1;
+
+    daemon.send(req_id, r#"{"cmd":"get_state"}"#);
+    let state = daemon.wait_response(req_id, Duration::from_secs(5), &mut events);
+    assert_ok(&state);
+    assert_eq!(state["data"]["state"].as_str(), Some("playing"));
+
+    daemon.send(req_id + 1, r#"{"cmd":"stop"}"#);
+    assert_ok(&daemon.wait_response(req_id + 1, Duration::from_secs(5), &mut events));
+}
+
 

@@ -172,4 +172,35 @@ describe('T2-6 fallback latch and re-init hygiene', () => {
     const cmds = send.mock.calls.map((c: any[]) => c[0]?.cmd);
     expect(cmds).toContain('stop');
   });
+
+  it('rapid continuous toggling between native and web audio remains stable without leaking or corrupting state', async () => {
+    (player as any).currentSongData = makeSong(1);
+    const send = (window.api as any).audioEngine.send as any;
+    send.mockResolvedValue({ status: 'ok', data: {} });
+
+    for (let i = 0; i < 5; i++) {
+      // Toggle to Native
+      storage.playback.setPlaybackOptions('useNativeAudioEngine', true);
+      dispatch({ type: 'UPDATE_VOLUME_VALUE', data: 50 + i } as any);
+      // Toggle to Web Audio
+      storage.playback.setPlaybackOptions('useNativeAudioEngine', false);
+      dispatch({ type: 'UPDATE_VOLUME_VALUE', data: 60 + i } as any);
+    }
+
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Final state should be cleanly on Web Audio
+    expect((player as any).isNativeEngineActive).toBe(false);
+    expect((player as any).nativeBackend).toBeNull();
+
+    // Toggle once more to Native and let it settle
+    storage.playback.setPlaybackOptions('useNativeAudioEngine', true);
+    dispatch({ type: 'UPDATE_VOLUME_VALUE', data: 70 } as any);
+    await Promise.resolve();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect((player as any).isNativeEngineActive).toBe(true);
+    expect((player as any).nativeBackend).toBeDefined();
+  });
 });

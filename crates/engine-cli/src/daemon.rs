@@ -56,6 +56,11 @@ impl Default for EngineDaemon {
 impl EngineDaemon {
     pub fn new() -> Self {
         let boot_id = generate_boot_id();
+        let mut backend = CpalBackend::new();
+        if !backend.has_device() {
+            let _ = backend.select_device(None);
+        }
+        let initial_rate = backend.default_output_rate().unwrap_or(48000);
         Self {
             boot_id,
             sequence_id: Arc::new(AtomicU64::new(0)),
@@ -67,16 +72,16 @@ impl EngineDaemon {
             volume: Arc::new(AtomicU32::new(1.0f32.to_bits())),
             shared_engine: Arc::new(Mutex::new((
                 DualSlotMixer::new(),
-                DspPipeline::new(48000.0),
+                DspPipeline::new(initial_rate as f32),
             ))),
-            backend: CpalBackend::new(),
+            backend,
             start_time: Instant::now(),
             slot_durations: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
             slot_base_secs: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
             slot_frames_consumed: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
             slot_paths: Arc::new(Mutex::new([None, None])),
             eos_notified: Arc::new((AtomicBool::new(false), AtomicBool::new(false))),
-            output_rate: Arc::new(AtomicU32::new(48000)),
+            output_rate: Arc::new(AtomicU32::new(initial_rate)),
             cb_contention: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -116,8 +121,11 @@ impl EngineDaemon {
         if !self.backend.has_device() {
             let _ = self.backend.select_device(None);
         }
+        let prev_rate = self.output_rate.load(Ordering::Acquire);
         if let Some(rate) = self.backend.default_output_rate() {
-            self.output_rate.store(rate, Ordering::Release);
+            if rate != prev_rate {
+                self.reconcile_slots_for_rate(prev_rate, rate);
+            }
         }
         let target_rate = self.output_rate.load(Ordering::Acquire);
         // Retune rate-sensitive DSP to the render rate exactly once per open.
@@ -205,6 +213,164 @@ impl EngineDaemon {
         self.output_rate.load(Ordering::Acquire).max(8000)
     }
 
+    /// Ensure hardware output device is selected and its default rate is resolved
+    /// before spawning decoders. If the rate changes, reconciles loaded slots.
+    fn resolve_device_output_rate(&mut self) -> u32 {
+        if !self.backend.is_open() {
+            if !self.backend.has_device() {
+                let _ = self.backend.select_device(None);
+            }
+            if let Some(rate) = self.backend.default_output_rate() {
+                let prev_rate = self.output_rate.load(Ordering::Acquire);
+                if prev_rate != rate {
+                    self.reconcile_slots_for_rate(prev_rate, rate);
+                }
+            }
+        }
+        self.output_rate_hz()
+    }
+
+    /// Reconcile loaded slot(s), resamplers, DSP sample rate, and playhead offsets
+    /// when the hardware or requested output rate changes.
+    ///
+    /// Non-recursive: decoder pipelines and transports are prepared outside the engine
+    /// lock, and the lock is acquired only to atomic-swap the consumers, AudioSpec,
+    /// playhead base, and DSP rate.
+    fn reconcile_slots_for_rate(&mut self, prev_rate: u32, new_rate: u32) {
+        if prev_rate == new_rate || new_rate < 8000 {
+            return;
+        }
+
+        let idx = self.active_slot.load(Ordering::Relaxed) as usize;
+        let opp_idx = 1 - idx;
+        let lib_slot = if idx == 0 { LibSlotId::A } else { LibSlotId::B };
+        let opp_lib_slot = lib_slot.opposite();
+
+        // 1. Snapshot paths and current states outside of decoder creation
+        let (active_path, standby_path) = match self.slot_paths.lock() {
+            Ok(p) => (p[idx].clone(), p[opp_idx].clone()),
+            Err(_) => (None, None),
+        };
+
+        let (active_state, standby_state) = match self.shared_engine.lock() {
+            Ok(guard) => (guard.0.slot(lib_slot).state, guard.0.slot(opp_lib_slot).state),
+            Err(_) => (engine_lib::mixer::SlotState::Empty, engine_lib::mixer::SlotState::Empty),
+        };
+
+        // Compute current playhead position in seconds using prev_rate
+        let frames = if idx == 0 {
+            self.slot_frames_consumed.0.load(Ordering::Relaxed)
+        } else {
+            self.slot_frames_consumed.1.load(Ordering::Relaxed)
+        };
+        let base = self.base_secs(idx);
+        let current_pos = base + (frames as f64 / prev_rate as f64);
+        let duration = self.duration_secs(idx);
+        let clamped_pos = if duration > 0.0 {
+            current_pos.clamp(0.0, duration)
+        } else {
+            current_pos.max(0.0)
+        };
+
+        // 2. Prepare replacement active decoder/transport if active slot has audio
+        let new_active_transport = if let Some(path) = active_path {
+            if matches!(
+                active_state,
+                engine_lib::mixer::SlotState::Primed
+                    | engine_lib::mixer::SlotState::Playing
+                    | engine_lib::mixer::SlotState::Paused
+            ) {
+                let spec = AudioSpec::new_f32_stereo(new_rate);
+                let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
+                let stop_signal = Arc::new(AtomicBool::new(false));
+                Self::spawn_decoder_thread(
+                    path,
+                    clamped_pos,
+                    producer,
+                    Arc::clone(&stop_signal),
+                    new_rate,
+                );
+                Some((consumer, spec, stop_signal))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // 3. Prepare replacement standby decoder/transport if standby slot is primed
+        let new_standby_transport = if let Some(path) = standby_path {
+            if standby_state == engine_lib::mixer::SlotState::Primed {
+                let spec = AudioSpec::new_f32_stereo(new_rate);
+                let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
+                let stop_signal = Arc::new(AtomicBool::new(false));
+                Self::spawn_decoder_thread(
+                    path,
+                    0.0,
+                    producer,
+                    Arc::clone(&stop_signal),
+                    new_rate,
+                );
+                Some((consumer, spec, stop_signal))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // 4. Atomic swap under shared_engine lock
+        if let Ok(mut guard) = self.shared_engine.lock() {
+            guard.0.cancel_crossfade(lib_slot);
+            guard.0.pending_transition_complete = None;
+
+            if let Some((consumer, spec, stop_signal)) = new_active_transport {
+                guard.0.slot_mut(lib_slot).prime(consumer, spec, stop_signal);
+                if active_state == engine_lib::mixer::SlotState::Playing {
+                    guard.0.slot_mut(lib_slot).play();
+                } else if active_state == engine_lib::mixer::SlotState::Paused {
+                    guard.0.slot_mut(lib_slot).pause();
+                }
+                self.set_base_secs(idx, clamped_pos);
+                if idx == 0 {
+                    self.slot_frames_consumed.0.store(0, Ordering::Release);
+                } else {
+                    self.slot_frames_consumed.1.store(0, Ordering::Release);
+                }
+            }
+
+            if let Some((consumer, spec, stop_signal)) = new_standby_transport {
+                guard.0.slot_mut(opp_lib_slot).prime(consumer, spec, stop_signal);
+                self.set_base_secs(opp_idx, 0.0);
+                if opp_idx == 0 {
+                    self.slot_frames_consumed.0.store(0, Ordering::Release);
+                } else {
+                    self.slot_frames_consumed.1.store(0, Ordering::Release);
+                }
+            } else if standby_state != engine_lib::mixer::SlotState::Empty {
+                // Clear obsolete standby slot if it cannot be re-primed at new rate
+                guard.0.slot_mut(opp_lib_slot).clear();
+                self.set_base_secs(opp_idx, 0.0);
+                if opp_idx == 0 {
+                    self.slot_durations.0.store(0, Ordering::Release);
+                    self.slot_frames_consumed.0.store(0, Ordering::Release);
+                    self.eos_notified.0.store(false, Ordering::Release);
+                } else {
+                    self.slot_durations.1.store(0, Ordering::Release);
+                    self.slot_frames_consumed.1.store(0, Ordering::Release);
+                    self.eos_notified.1.store(false, Ordering::Release);
+                }
+                if let Ok(mut paths) = self.slot_paths.lock() {
+                    paths[opp_idx] = None;
+                }
+            }
+
+            guard.1.set_sample_rate(new_rate as f32);
+            guard.1.reset_state();
+            self.output_rate.store(new_rate, Ordering::Release);
+        }
+    }
+
     fn slot_idx(slot: SlotId) -> usize {
         match slot {
             SlotId::A => 0,
@@ -254,13 +420,42 @@ impl EngineDaemon {
         })
     }
 
+    fn clear_slot(&mut self, slot: SlotId) {
+        let idx = Self::slot_idx(slot);
+        let lib_slot = match slot {
+            SlotId::A => LibSlotId::A,
+            SlotId::B => LibSlotId::B,
+        };
+        if let Ok(mut paths) = self.slot_paths.lock() {
+            paths[idx] = None;
+        }
+        if let Ok(mut guard) = self.shared_engine.lock() {
+            guard.0.slot_mut(lib_slot).clear();
+            if guard.0.pending_transition_complete == Some(lib_slot) {
+                guard.0.pending_transition_complete = None;
+            }
+            self.set_base_secs(idx, 0.0);
+            if idx == 0 {
+                self.slot_durations.0.store(0, Ordering::Release);
+                self.slot_frames_consumed.0.store(0, Ordering::Release);
+                self.eos_notified.0.store(false, Ordering::Release);
+            } else {
+                self.slot_durations.1.store(0, Ordering::Release);
+                self.slot_frames_consumed.1.store(0, Ordering::Release);
+                self.eos_notified.1.store(false, Ordering::Release);
+            }
+        }
+    }
+
     /// Re-stream the active slot from `target_secs` through the same decode
     /// path as Load: new ring pair, decoder seeks first, prime() retires the
     /// old decoder (no orphan) and resets frames_consumed. Shared by Seek and
     /// by Play-on-Eos (replay after natural end).
     fn respawn_active_at(&mut self, target_secs: f64) -> Result<(), String> {
         let idx = self.active_slot.load(Ordering::Relaxed) as usize;
+        let opp_idx = 1 - idx;
         let lib_slot = if idx == 0 { LibSlotId::A } else { LibSlotId::B };
+        let opposite = lib_slot.opposite();
         let target = target_secs.max(0.0);
         let duration = self.duration_secs(idx);
         let clamped = if duration > 0.0 {
@@ -273,10 +468,13 @@ impl EngineDaemon {
             .slot_paths
             .lock()
             .ok()
-            .and_then(|p| p[idx].clone())
+            .and_then(|mut p| {
+                p[opp_idx] = None;
+                p[idx].clone()
+            })
             .ok_or_else(|| "No track loaded in active slot".to_string())?;
 
-        let target_rate = self.output_rate_hz();
+        let target_rate = self.resolve_device_output_rate();
         let spec = AudioSpec::new_f32_stereo(target_rate);
         let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
         let stop_signal = Arc::new(AtomicBool::new(false));
@@ -290,6 +488,8 @@ impl EngineDaemon {
 
         if let Ok(mut guard) = self.shared_engine.lock() {
             guard.0.cancel_crossfade(lib_slot);
+            guard.0.slot_mut(opposite).clear();
+            guard.0.pending_transition_complete = None;
             guard
                 .0
                 .slot_mut(lib_slot)
@@ -299,14 +499,21 @@ impl EngineDaemon {
                 guard.0.slot_mut(lib_slot).play();
             }
             guard.1.reset_state();
-        }
-        self.set_base_secs(idx, clamped);
-        if idx == 0 {
-            self.slot_frames_consumed.0.store(0, Ordering::Release);
-            self.eos_notified.0.store(false, Ordering::Release);
-        } else {
-            self.slot_frames_consumed.1.store(0, Ordering::Release);
-            self.eos_notified.1.store(false, Ordering::Release);
+            self.set_base_secs(idx, clamped);
+            self.set_base_secs(opp_idx, 0.0);
+            if idx == 0 {
+                self.slot_frames_consumed.0.store(0, Ordering::Release);
+                self.eos_notified.0.store(false, Ordering::Release);
+                self.slot_durations.1.store(0, Ordering::Release);
+                self.slot_frames_consumed.1.store(0, Ordering::Release);
+                self.eos_notified.1.store(false, Ordering::Release);
+            } else {
+                self.slot_frames_consumed.1.store(0, Ordering::Release);
+                self.eos_notified.1.store(false, Ordering::Release);
+                self.slot_durations.0.store(0, Ordering::Release);
+                self.slot_frames_consumed.0.store(0, Ordering::Release);
+                self.eos_notified.0.store(false, Ordering::Release);
+            }
         }
         Ok(())
     }
@@ -387,10 +594,13 @@ impl EngineDaemon {
     }
 
     fn load_slot(&mut self, slot: SlotId, path: String, is_preload: bool) -> DaemonResult {
+        let idx = Self::slot_idx(slot);
+        let opp_idx = 1 - idx;
         let lib_slot = match slot {
             SlotId::A => LibSlotId::A,
             SlotId::B => LibSlotId::B,
         };
+        let opposite = lib_slot.opposite();
 
         let probed = match engine_lib::decoder::probe_file(&path) {
             Ok(p) => p,
@@ -409,28 +619,7 @@ impl EngineDaemon {
         let channels = probed.spec.channels;
         let codec = probed.codec.clone();
 
-        match slot {
-            SlotId::A => self
-                .slot_durations
-                .0
-                .store(duration_secs.to_bits(), Ordering::Release),
-            SlotId::B => self
-                .slot_durations
-                .1
-                .store(duration_secs.to_bits(), Ordering::Release),
-        }
-        // Fresh per-slot playhead: base 0, no stale TrackEnd.
-        self.set_base_secs(Self::slot_idx(slot), 0.0);
-        if Self::slot_idx(slot) == 0 {
-            self.eos_notified.0.store(false, Ordering::Release);
-        } else {
-            self.eos_notified.1.store(false, Ordering::Release);
-        }
-        if let Ok(mut paths) = self.slot_paths.lock() {
-            paths[Self::slot_idx(slot)] = Some(path.clone());
-        }
-
-        let target_rate = self.output_rate_hz();
+        let target_rate = self.resolve_device_output_rate();
         let spec = AudioSpec::new_f32_stereo(target_rate);
         let (producer, consumer) = BoundedAudioTransport::create(&spec, 3.0);
         let stop_signal = Arc::new(AtomicBool::new(false));
@@ -444,6 +633,8 @@ impl EngineDaemon {
             target_rate,
         );
 
+        let mut cleared_opposite = false;
+
         // prime() signals any previous decoder on this slot to exit
         // before dropping its consumer (no orphaned threads).
         if let Ok(mut guard) = self.shared_engine.lock() {
@@ -454,33 +645,76 @@ impl EngineDaemon {
             } else {
                 LibSlotId::B
             };
-            let current_active_empty =
-                guard.0.slot(current_active_lib).state == engine_lib::mixer::SlotState::Empty;
-            let current_active_eos =
-                guard.0.slot(current_active_lib).state == engine_lib::mixer::SlotState::Eos;
+            let current_active_state = guard.0.slot(current_active_lib).state;
             let target_is_active = current_active_lib == lib_slot;
 
+            // Preserve cold dual-slot initialization (`Load(A)` followed by `Load(B)` while
+            // stopped before `Play`, where `current_active_state == SlotState::Primed` and
+            // `target_is_active == false`). In all other foreground loads (`!is_preload`),
+            // activate `lib_slot` and invalidate any stale standby audio on `opposite`.
             let should_activate = !is_preload
                 && (was_crossfading
-                    || current_active_empty
-                    || current_active_eos
-                    || target_is_active);
+                    || target_is_active
+                    || matches!(
+                        current_active_state,
+                        engine_lib::mixer::SlotState::Empty
+                            | engine_lib::mixer::SlotState::Playing
+                            | engine_lib::mixer::SlotState::Paused
+                            | engine_lib::mixer::SlotState::Eos
+                    ));
 
-            if should_activate {
-                guard.0.set_active_slot(lib_slot);
-                self.active_slot
-                    .store(Self::slot_idx(slot) as u8, Ordering::Release);
-            }
             guard
                 .0
                 .slot_mut(lib_slot)
                 .prime(consumer, spec, stop_signal);
+
+            if should_activate {
+                guard.0.set_active_slot(lib_slot);
+                guard.0.slot_mut(opposite).clear();
+                guard.0.pending_transition_complete = None;
+                cleared_opposite = true;
+                if self.is_playing.load(Ordering::Relaxed) {
+                    guard.0.slot_mut(lib_slot).play();
+                }
+                self.active_slot.store(idx as u8, Ordering::Release);
+            }
+
+            // Update per-slot playhead and duration atomics while holding shared_engine
+            // so the 4Hz heartbeat and audio callback never observe torn state.
+            self.set_base_secs(idx, 0.0);
+            if idx == 0 {
+                self.slot_durations
+                    .0
+                    .store(duration_secs.to_bits(), Ordering::Release);
+                self.slot_frames_consumed.0.store(0, Ordering::Release);
+                self.eos_notified.0.store(false, Ordering::Release);
+            } else {
+                self.slot_durations
+                    .1
+                    .store(duration_secs.to_bits(), Ordering::Release);
+                self.slot_frames_consumed.1.store(0, Ordering::Release);
+                self.eos_notified.1.store(false, Ordering::Release);
+            }
+
+            if cleared_opposite {
+                self.set_base_secs(opp_idx, 0.0);
+                if opp_idx == 0 {
+                    self.slot_durations.0.store(0, Ordering::Release);
+                    self.slot_frames_consumed.0.store(0, Ordering::Release);
+                    self.eos_notified.0.store(false, Ordering::Release);
+                } else {
+                    self.slot_durations.1.store(0, Ordering::Release);
+                    self.slot_frames_consumed.1.store(0, Ordering::Release);
+                    self.eos_notified.1.store(false, Ordering::Release);
+                }
+            }
         }
 
-        if lib_slot == LibSlotId::A {
-            self.slot_frames_consumed.0.store(0, Ordering::Release);
-        } else {
-            self.slot_frames_consumed.1.store(0, Ordering::Release);
+        if let Ok(mut paths) = self.slot_paths.lock() {
+            paths[idx] = Some(path.clone());
+            if cleared_opposite {
+                paths[opp_idx] = None;
+            }
         }
 
         DaemonResult::Ok {
@@ -506,7 +740,12 @@ impl EngineDaemon {
                 } else {
                     SlotId::A
                 };
-                self.load_slot(standby, path, true)
+                if path.trim().is_empty() {
+                    self.clear_slot(standby);
+                    DaemonResult::Ok { data: None }
+                } else {
+                    self.load_slot(standby, path, true)
+                }
             }
             DaemonCommand::Play => {
                 let mut active_id = if self.active_slot.load(Ordering::Relaxed) == 0 {
@@ -626,6 +865,7 @@ impl EngineDaemon {
                 rg_db,
                 karaoke,
                 limiter,
+                ..
             } => {
                 if let Ok(mut guard) = self.shared_engine.lock() {
                     let current_gains = guard.1.config().eq_gains;
@@ -666,11 +906,33 @@ impl EngineDaemon {
                 }
             }
             DaemonCommand::SetDevice { device_id } => {
+                let was_open = self.backend.is_open();
+                let was_playing = self.is_playing.load(Ordering::Relaxed);
                 if let Err(e) = self.backend.select_device(Some(&device_id)) {
                     DaemonResult::Error {
                         message: e.to_string(),
                     }
                 } else {
+                    if was_open {
+                        let _ = self.backend.stop();
+                    }
+                    let new_rate = self.backend.default_output_rate().unwrap_or(48000);
+                    let prev_rate = self.output_rate_hz();
+                    if new_rate != prev_rate {
+                        self.reconcile_slots_for_rate(prev_rate, new_rate);
+                    }
+                    if was_open {
+                        if let Err(e) = self.ensure_backend_open() {
+                            return DaemonResult::Error {
+                                message: format!("Failed to reopen audio on new device: {}", e),
+                            };
+                        }
+                        if was_playing {
+                            let _ = self.backend.start();
+                        } else {
+                            let _ = self.backend.pause();
+                        }
+                    }
                     DaemonResult::Ok { data: None }
                 }
             }
@@ -798,7 +1060,9 @@ impl EngineDaemon {
                             // otherwise emit a spurious TrackEnd for a track
                             // that continues seamlessly: if the standby is
                             // buffered, the next render splices — wait for it.
-                            let splice_imminent = is_eos && g.0.slot(standby).has_audio();
+                            let splice_imminent = is_eos
+                                && g.0.slot(standby).state == engine_lib::mixer::SlotState::Primed
+                                && g.0.slot(standby).has_audio();
                             let transition = g.0.pending_transition_complete.take();
                             (pos, is_eos && !splice_imminent, transition)
                         })
@@ -964,5 +1228,133 @@ impl EngineDaemon {
             guard.0.pause();
         }
         let _ = self.backend.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use engine_lib::mixer::SlotState;
+
+    fn workspace_root() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("..")
+    }
+
+    fn fixture(name: &str) -> String {
+        let p = workspace_root().join("target").join("test_fixtures").join(name);
+        assert!(
+            p.exists(),
+            "required audio fixture missing: {} (no silent skips)",
+            p.display()
+        );
+        p.to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn test_daemon_initializes_with_valid_output_rate_and_dsp() {
+        let daemon = EngineDaemon::new();
+        let rate = daemon.output_rate_hz();
+        assert!(rate >= 8000, "output rate must be at least 8000 Hz, got {}", rate);
+    }
+
+    #[test]
+    fn test_reconcile_slots_for_rate_updates_slot_spec_and_preserves_position() {
+        let mut daemon = EngineDaemon::new();
+        daemon.output_rate.store(48000, Ordering::Release);
+
+        let path = fixture("ref_440hz_3s.wav");
+        let res = daemon.load_slot(SlotId::A, path, false);
+        assert!(matches!(res, DaemonResult::Ok { .. }));
+
+        let initial_spec = {
+            let guard = daemon.shared_engine.lock().unwrap();
+            guard.0.slot(LibSlotId::A).spec.expect("slot A spec")
+        };
+        let initial_rate = daemon.output_rate_hz();
+        assert_eq!(initial_spec.sample_rate, initial_rate);
+
+        // Simulate advancing the playhead by 1.0 second:
+        // base = 0.5s, consumed frames = initial_rate frames (1.0s) -> total = 1.5s
+        daemon.set_base_secs(0, 0.5);
+        daemon.slot_frames_consumed.0.store(initial_rate as u64, Ordering::Release);
+        let pos_before = daemon.current_position_secs();
+        assert!((pos_before - 1.5).abs() < 1e-4, "pos before: {}", pos_before);
+
+        // Reconcile to a new rate, e.g. 44100
+        let new_rate = if initial_rate == 48000 { 44100 } else { 48000 };
+        daemon.reconcile_slots_for_rate(initial_rate, new_rate);
+
+        assert_eq!(daemon.output_rate_hz(), new_rate);
+
+        // Verify slot A spec was updated to new rate
+        let reconciled_spec = {
+            let guard = daemon.shared_engine.lock().unwrap();
+            guard.0.slot(LibSlotId::A).spec.expect("slot A spec")
+        };
+        assert_eq!(reconciled_spec.sample_rate, new_rate);
+
+        // Verify playhead position remained continuous at 1.5s
+        let pos_after = daemon.current_position_secs();
+        assert!(
+            (pos_after - 1.5).abs() < 1e-3,
+            "playhead discontinuous after rate reconcile: expected 1.5, got {}",
+            pos_after
+        );
+    }
+
+    #[test]
+    fn test_reconcile_slots_for_rate_reprimes_standby_at_new_rate() {
+        let mut daemon = EngineDaemon::new();
+        daemon.output_rate.store(48000, Ordering::Release);
+
+        let path_a = fixture("ref_440hz_3s.wav");
+        let path_b = fixture("ref_440hz_3s_44100.wav");
+
+        let res_a = daemon.load_slot(SlotId::A, path_a, false);
+        assert!(matches!(res_a, DaemonResult::Ok { .. }));
+        let res_b = daemon.load_slot(SlotId::B, path_b, true);
+        assert!(matches!(res_b, DaemonResult::Ok { .. }));
+
+        let (slot_a_state, slot_b_state) = {
+            let guard = daemon.shared_engine.lock().unwrap();
+            (guard.0.slot(LibSlotId::A).state, guard.0.slot(LibSlotId::B).state)
+        };
+        assert_eq!(slot_a_state, SlotState::Primed);
+        assert_eq!(slot_b_state, SlotState::Primed);
+
+        let initial_rate = daemon.output_rate_hz();
+        let target_rate = if initial_rate == 48000 { 44100 } else { 48000 };
+
+        daemon.reconcile_slots_for_rate(initial_rate, target_rate);
+
+        assert_eq!(daemon.output_rate_hz(), target_rate);
+
+        let guard = daemon.shared_engine.lock().unwrap();
+        let spec_a = guard.0.slot(LibSlotId::A).spec.expect("slot A spec");
+        let spec_b = guard.0.slot(LibSlotId::B).spec.expect("slot B spec");
+
+        assert_eq!(spec_a.sample_rate, target_rate);
+        assert_eq!(spec_b.sample_rate, target_rate);
+        assert_eq!(guard.0.slot(LibSlotId::A).state, SlotState::Primed);
+        assert_eq!(guard.0.slot(LibSlotId::B).state, SlotState::Primed);
+    }
+
+    #[test]
+    fn test_reconcile_slots_for_rate_leaves_empty_standby_empty() {
+        let mut daemon = EngineDaemon::new();
+        let path = fixture("ref_440hz_3s.wav");
+        let res = daemon.load_slot(SlotId::A, path, false);
+        assert!(matches!(res, DaemonResult::Ok { .. }));
+
+        let initial_rate = daemon.output_rate_hz();
+        let target_rate = if initial_rate == 48000 { 44100 } else { 48000 };
+
+        daemon.reconcile_slots_for_rate(initial_rate, target_rate);
+
+        let guard = daemon.shared_engine.lock().unwrap();
+        assert_eq!(guard.0.slot(LibSlotId::B).state, SlotState::Empty);
+        assert!(guard.0.slot(LibSlotId::B).consumer.is_none());
     }
 }

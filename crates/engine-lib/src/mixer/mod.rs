@@ -81,7 +81,9 @@ impl DualSlotMixer {
     /// Initiate an equal-power crossfade transition to the standby slot.
     pub fn start_crossfade(&mut self, duration_frames: usize) -> Result<(), &'static str> {
         let standby = self.active_slot.opposite();
-        if !self.slot(standby).has_audio() && self.slot(standby).state != SlotState::Primed {
+        if self.slot(standby).state != SlotState::Primed
+            && !(self.slot(standby).state == SlotState::Paused && self.slot(standby).has_audio())
+        {
             return Err("Standby slot has no primed audio to crossfade into");
         }
 
@@ -188,8 +190,12 @@ impl AudioSource for DualSlotMixer {
                 // Finalize crossfade transition. The retired slot is marked
                 // Eos (NOT cleared): dropping its ring buffer here would free
                 // ~1 MB on the real-time thread, and the Eos marker is what
-                // the heartbeat uses to emit TrackEnd. The empty consumer is
-                // released later on the command thread by the next prime().
+                // the heartbeat uses to emit TrackEnd. Signal stop_signal so
+                // the retired decoder thread exits immediately, and release
+                // the consumer later on the command thread.
+                if let Some(stop) = &self.slot(from_slot_id).stop_signal {
+                    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+                }
                 self.slot_mut(from_slot_id).state = SlotState::Eos;
                 self.slot_mut(to_slot_id).state = SlotState::Playing;
                 self.active_slot = to_slot_id;
@@ -222,10 +228,15 @@ impl AudioSource for DualSlotMixer {
                 }
                 written += chunk_read;
             } else {
-                // Active slot produced 0 samples. Auto-splice only if active slot is genuinely at Eos.
+                // Active slot produced 0 samples. Auto-splice only if active slot is genuinely at Eos
+                // and the standby slot is explicitly Primed with buffered audio.
                 let standby_id = self.active_slot.opposite();
 
-                if self.auto_splice && self.slot(active_id).state == SlotState::Eos && self.slot(standby_id).has_audio() {
+                if self.auto_splice
+                    && self.slot(active_id).state == SlotState::Eos
+                    && self.slot(standby_id).state == SlotState::Primed
+                    && self.slot(standby_id).has_audio()
+                {
                     // Seamless Gapless Splice: mark the exhausted slot Eos
                     // (NOT cleared — clearing would free the ring buffer on
                     // the real-time thread, and Eos is the TrackEnd signal;
@@ -301,5 +312,77 @@ mod tests {
         assert_eq!(mixer.active_slot, SlotId::B, "Auto-splice must trigger when Slot A reaches genuine EOS");
         assert_eq!(out3, [0.5, 0.5, 0.5, 0.5], "Slot B audio must play seamlessly upon EOS");
         assert_eq!(mixer.pending_transition_complete, Some(SlotId::B));
+    }
+
+    #[test]
+    fn test_retired_crossfade_slot_does_not_reverse_splice_on_next_eos() {
+        let spec = AudioSpec::new_f32_stereo(44100);
+        let mut mixer = DualSlotMixer::new();
+
+        // Slot A has extra tail samples beyond the crossfade window.
+        let (mut prod_a, cons_a) = BoundedAudioTransport::create(&spec, 1.0);
+        let stop_a = Arc::new(AtomicBool::new(false));
+        prod_a.try_push(&[0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8]);
+        mixer.slot_mut(SlotId::A).prime(cons_a, spec, Arc::clone(&stop_a));
+        mixer.play();
+
+        // Slot B is primed as the incoming crossfade track.
+        let (mut prod_b, cons_b) = BoundedAudioTransport::create(&spec, 1.0);
+        let stop_b = Arc::new(AtomicBool::new(false));
+        prod_b.try_push(&[0.4, 0.4, 0.4, 0.4]);
+        mixer.slot_mut(SlotId::B).prime(cons_b, spec, Arc::clone(&stop_b));
+
+        // Crossfade over 1 stereo frame (2 samples).
+        assert!(mixer.start_crossfade(1).is_ok());
+        let mut fade_out = [0.0f32; 2];
+        mixer.render(&mut fade_out);
+
+        assert_eq!(mixer.active_slot, SlotId::B);
+        assert_eq!(mixer.slot(SlotId::A).state, SlotState::Eos);
+        assert!(
+            stop_a.load(Ordering::Relaxed),
+            "Retired outgoing crossfade slot must signal its decoder to stop"
+        );
+        assert!(
+            mixer.slot(SlotId::A).has_audio(),
+            "Slot A still has unconsumed tail samples in its ring buffer"
+        );
+        assert_eq!(mixer.pending_transition_complete.take(), Some(SlotId::B));
+
+        // Drain remaining samples of Slot B and mark its decoder EOF.
+        stop_b.store(true, Ordering::Release);
+        let mut b_tail = [0.0f32; 2];
+        mixer.render(&mut b_tail);
+
+        // Next render hits EOS on Slot B; it must NOT reverse-splice back into retired Slot A.
+        let mut after_eos = [1.0f32; 4];
+        mixer.render(&mut after_eos);
+        assert_eq!(mixer.active_slot, SlotId::B, "Mixer must not reverse-splice into retired Slot A");
+        assert_eq!(mixer.slot(SlotId::B).state, SlotState::Eos);
+        assert_eq!(mixer.pending_transition_complete, None);
+        assert_eq!(after_eos, [0.0, 0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_start_crossfade_rejects_non_primed_target_slot() {
+        let spec = AudioSpec::new_f32_stereo(44100);
+        let mut mixer = DualSlotMixer::new();
+
+        let (mut prod_a, cons_a) = BoundedAudioTransport::create(&spec, 1.0);
+        let stop_a = Arc::new(AtomicBool::new(false));
+        prod_a.try_push(&[0.5, 0.5, 0.5, 0.5]);
+        mixer.slot_mut(SlotId::A).prime(cons_a, spec, stop_a);
+        mixer.play();
+
+        // Slot B is Empty -> crossfade rejected.
+        assert!(mixer.start_crossfade(10).is_err());
+
+        // Slot B has leftover samples but is Eos -> crossfade still rejected.
+        let (mut prod_b, cons_b) = BoundedAudioTransport::create(&spec, 1.0);
+        let stop_b = Arc::new(AtomicBool::new(true));
+        prod_b.try_push(&[0.3, 0.3, 0.3, 0.3]);
+        mixer.slot_mut(SlotId::B).prime(cons_b, spec, stop_b);
+        mixer.slot_mut(SlotId::B).state = SlotState::Eos;
+        assert!(mixer.start_crossfade(10).is_err());
     }
 }

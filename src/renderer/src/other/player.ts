@@ -163,6 +163,9 @@ class AudioPlayer {
   private nativeLoadedSongId: number | null = null;
   private lastNativeRgDb: number = 0;
   private nativePreloadInFlight: boolean = false;
+  private nativePreloadRequestId: number = 0;
+  private daemonStandbyArmed: boolean = false;
+  private nativeSeekInFlight: boolean = false;
   private registeredAudioElements: HTMLAudioElement[] = [];
   private webAudioWatchdogId: ReturnType<typeof setInterval> | null = null;
 
@@ -375,13 +378,23 @@ class AudioPlayer {
         },
         onTransitionComplete: (activeSlot) => {
           if (!this.isNativeEngineActive || this.destroyed) return;
-          // Tier-1: stale daemon completion (superseded by fallback/destroy/
-          // seek/Next or a newer transaction) must cause zero playback mutations.
+          // If a crossfade is currently owned by startFade, activeSlot and metadata
+          // were already committed when the fade started.
+          if (this.isCrossfading) {
+            this.activeSlot = activeSlot;
+            return;
+          }
+          // Tier-1: stale daemon completion (superseded by an in-flight foreground
+          // load or seek) must cause zero playback or slot mutations.
+          if (this.inFlightLoad !== null || this.nativeSeekInFlight) {
+            return;
+          }
           // Auto-splice adoption (gapless-at-0 path): the daemon already
           // switched to the preloaded standby. Adopt its metadata WITHOUT
           // reloading — a reload would restart the track audibly. TrackEnd
           // never fires for spliced transitions (daemon suppresses it while
           // the standby is buffered), so this is the only advance signal.
+          const previousSlot = this.activeSlot;
           this.activeSlot = activeSlot;
           const preloaded = this.preloadedSongData;
           if (
@@ -389,8 +402,20 @@ class AudioPlayer {
             this.isGenerationCurrent(this.standbyPreloadGeneration) &&
             preloaded.songId === this.peekNextTrackId()
           ) {
+            this.daemonStandbyArmed = false;
             this.adoptPreloadedStandby(preloaded);
             this.emit('songChange', this.currentSongData);
+          } else if (previousSlot !== activeSlot) {
+            // Fail closed on an unexpected/unauthorized daemon transition so
+            // audio never continues into a stale slot while UI metadata stays on
+            // the previous track.
+            this.preloadedSongData = null;
+            this.standbyPreloadGeneration = 0;
+            this.daemonStandbyArmed = false;
+            this.nativeIsPlaying = false;
+            this.nativeBackend?.stop().catch(() => {});
+            this.crossfadeScheduler.cancel();
+            void this.handleSongEnd();
           }
         },
         onStateChange: (state) => {
@@ -587,19 +612,31 @@ class AudioPlayer {
     const nextId = this.peekNextTrackId();
     if (nextId === null || this.preloadedSongData?.songId === nextId) return;
     if (this.nativePreloadInFlight) return;
+    const reqId = ++this.nativePreloadRequestId;
     this.nativePreloadInFlight = true;
     const mySong = this.currentSongData.songId;
     void window.api.audioLibraryControls
       .getSong(nextId, false)
       .then((songData) => {
         if (!songData) return undefined;
-        // Drop stale completions: user skipped again while fetching.
-        if (!this.isNativeEngineActive || this.currentSongData?.songId !== mySong) {
+        // Drop stale completions: user skipped or invalidated standby while fetching.
+        if (
+          !this.isNativeEngineActive ||
+          reqId !== this.nativePreloadRequestId ||
+          this.currentSongData?.songId !== mySong ||
+          this.peekNextTrackId() !== nextId
+        ) {
           return undefined;
         }
         if (this.preloadedSongData?.songId === nextId) return undefined;
+        this.daemonStandbyArmed = true;
         return this.nativeBackend?.preload(songData.path).then(() => {
-          if (this.isNativeEngineActive && this.currentSongData?.songId === mySong) {
+          if (
+            this.isNativeEngineActive &&
+            reqId === this.nativePreloadRequestId &&
+            this.currentSongData?.songId === mySong &&
+            this.peekNextTrackId() === nextId
+          ) {
             this.preloadedSongData = songData;
             this.standbyPreloadGeneration = this.playbackGeneration;
           }
@@ -608,7 +645,9 @@ class AudioPlayer {
       })
       .catch((err) => logPlayer('[AudioPlayer.nativePreload] failed', { nextId, err }))
       .finally(() => {
-        this.nativePreloadInFlight = false;
+        if (reqId === this.nativePreloadRequestId) {
+          this.nativePreloadInFlight = false;
+        }
       });
   }
 
@@ -628,6 +667,7 @@ class AudioPlayer {
     this.nativeIsPlaying = true;
     this.preloadedSongData = null;
     this.standbyPreloadGeneration = 0;
+    this.daemonStandbyArmed = false;
     this.clearAbLoop('TRACK_LOAD');
     dispatch({ type: 'CURRENT_SONG_DATA_CHANGE', data: preloaded });
     storage.playback.setCurrentSongOptions('songId', preloaded.songId);
@@ -645,29 +685,49 @@ class AudioPlayer {
   }
 
   /**
-   * Standby staleness guard: after a manual (non-adopted) load, a previously preloaded standby
-   * names the wrong track and would auto-splice into it at the next EOS. Refresh it fire-and-forget
-   * toward the true next track.
+   * Standby staleness guard: after a manual (non-adopted) load, queue mutation, seek, or repeat-mode
+   * change, a previously preloaded standby may name the wrong track and would auto-splice into it at
+   * the next EOS. Refresh it fire-and-forget toward the true next track, or disarm it when there is
+   * no next track.
    */
   private refreshNativeStandby(loadedSongId: number): void {
     if (!this.isNativeEngineActive || !this.nativeBackend) return;
     const nextId = this.peekNextTrackId();
     if (nextId === null) {
+      const hadStandby = this.preloadedSongData !== null || this.daemonStandbyArmed;
       this.preloadedSongData = null;
       this.standbyPreloadGeneration = 0;
+      this.nativePreloadRequestId += 1;
+      this.nativePreloadInFlight = false;
+      if (hadStandby) {
+        this.daemonStandbyArmed = false;
+        this.nativeBackend.preload('').catch(() => {});
+      }
       return;
     }
-    if (this.preloadedSongData?.songId === nextId || this.nativePreloadInFlight) return;
+    if (this.preloadedSongData?.songId === nextId) return;
+    const reqId = ++this.nativePreloadRequestId;
     this.nativePreloadInFlight = true;
     void window.api.audioLibraryControls
       .getSong(nextId, false)
       .then((songData) => {
         if (!songData) return undefined;
-        if (!this.isNativeEngineActive || this.currentSongData?.songId !== loadedSongId) {
+        if (
+          !this.isNativeEngineActive ||
+          reqId !== this.nativePreloadRequestId ||
+          this.currentSongData?.songId !== loadedSongId ||
+          this.peekNextTrackId() !== nextId
+        ) {
           return undefined;
         }
+        this.daemonStandbyArmed = true;
         return this.nativeBackend?.preload(songData.path).then(() => {
-          if (this.isNativeEngineActive && this.currentSongData?.songId === loadedSongId) {
+          if (
+            this.isNativeEngineActive &&
+            reqId === this.nativePreloadRequestId &&
+            this.currentSongData?.songId === loadedSongId &&
+            this.peekNextTrackId() === nextId
+          ) {
             this.preloadedSongData = songData;
             this.standbyPreloadGeneration = this.playbackGeneration;
           }
@@ -676,7 +736,9 @@ class AudioPlayer {
       })
       .catch((err) => logPlayer('[AudioPlayer.nativeStandbyRefresh] failed', { nextId, err }))
       .finally(() => {
-        this.nativePreloadInFlight = false;
+        if (reqId === this.nativePreloadRequestId) {
+          this.nativePreloadInFlight = false;
+        }
       });
   }
 
@@ -706,7 +768,10 @@ class AudioPlayer {
     this.crossfadeScheduler.cancel();
     this.preloadedSongData = null;
     this.standbyPreloadGeneration = 0;
+    this.nativePreloadRequestId += 1;
     this.nativePreloadInFlight = false;
+    this.daemonStandbyArmed = false;
+    this.nativeSeekInFlight = false;
     this.isCrossfading = false;
     this.isNativeEngineActive = false;
     this.nativeIsPlaying = false;
@@ -880,18 +945,23 @@ class AudioPlayer {
           // scheduler standby when the true next diverges from the preloaded
           // id, then refresh native standby toward the true next so the
           // daemon cannot auto-splice a stale track at EOS. FADING is owned
-          // and excluded — only PRELOADING/READY arm standby.
+          // and excluded.
           const schedulerState = this.crossfadeScheduler.getState();
-          if (schedulerState === 'PRELOADING' || schedulerState === 'READY') {
+          if (schedulerState !== 'FADING') {
             const trueNext = this.peekNextTrackId();
-            if (trueNext !== this.crossfadeScheduler.getPreloadedTrackId()) {
+            if (
+              (schedulerState === 'PRELOADING' || schedulerState === 'READY') &&
+              trueNext !== this.crossfadeScheduler.getPreloadedTrackId()
+            ) {
               this.crossfadeScheduler.cancel();
-              // Daemon standby overwrite toward the true next (no generation
-              // bump: preload start never supersedes active playback). When
-              // there is no current song there is nothing to refresh toward.
-              if (this.currentSongData) {
-                this.refreshNativeStandby(this.currentSongData.songId);
-              }
+            }
+            if (
+              this.isNativeEngineActive &&
+              this.currentSongData &&
+              ((this.preloadedSongData?.songId ?? null) !== trueNext ||
+                (trueNext === null && this.daemonStandbyArmed))
+            ) {
+              this.refreshNativeStandby(this.currentSongData.songId);
             }
           }
         })
@@ -1213,6 +1283,8 @@ class AudioPlayer {
             // refresh it toward the true next track (async).
             this.preloadedSongData = null;
             this.standbyPreloadGeneration = 0;
+            this.nativePreloadRequestId += 1;
+            this.nativePreloadInFlight = false;
             await this.nativeBackend.load(this.activeSlot, songData.path);
             // Tier-1: abort commit if superseded during native load await.
             if (!this.isGenerationCurrent(loadGeneration)) {
@@ -1243,6 +1315,9 @@ class AudioPlayer {
             this.refreshNativeStandby(songData.songId);
             return songData;
           } catch (nativeLoadErr) {
+            if (!this.isGenerationCurrent(loadGeneration)) {
+              return null;
+            }
             console.warn(
               '[AudioPlayer] Native load failed, falling back to WebAudio:',
               nativeLoadErr
@@ -1425,7 +1500,10 @@ class AudioPlayer {
     // cannot adopt or resurrect playback.
     this.preloadedSongData = null;
     this.standbyPreloadGeneration = 0;
+    this.nativePreloadRequestId += 1;
     this.nativePreloadInFlight = false;
+    this.daemonStandbyArmed = false;
+    this.nativeSeekInFlight = false;
     this.nativeLoadedSongId = null;
     this.nativeCurrentPosition = 0;
     this.isCrossfading = false;
@@ -1901,6 +1979,9 @@ class AudioPlayer {
                   this.nativeLoadedSongId = this.currentSongData!.songId;
                   this.preloadedSongData = null;
                   this.standbyPreloadGeneration = 0;
+                  this.nativePreloadRequestId += 1;
+                  this.nativePreloadInFlight = false;
+                  this.daemonStandbyArmed = false;
                   this.applyReplayGain();
                   this.syncNativeEqualizer();
                   if (currentPos > 0) {
@@ -1914,6 +1995,7 @@ class AudioPlayer {
                   }
                   this.refreshNativeStandby(this.currentSongData!.songId);
                 } catch (err) {
+                  if (!this.isGenerationCurrent(toggleGeneration)) return;
                   console.warn('[AudioPlayer] Failed to load song on native toggle:', err);
                   this.fallbackToWebAudio(shouldPlay);
                 }
@@ -2038,6 +2120,16 @@ class AudioPlayer {
     const newMode = isRepeating === 'repeat-1' ? 'one' : isRepeating === 'repeat' ? 'all' : 'off';
     if (this.repeatMode !== newMode) {
       this.repeatMode = newMode;
+      if (newMode === 'one' && this.crossfadeScheduler.getState() !== 'IDLE') {
+        this.crossfadeScheduler.cancel();
+      }
+      if (
+        this.isNativeEngineActive &&
+        this.currentSongData &&
+        this.crossfadeScheduler.getState() !== 'FADING'
+      ) {
+        this.refreshNativeStandby(this.currentSongData.songId);
+      }
     }
   }
 
@@ -2076,12 +2168,14 @@ class AudioPlayer {
 
           if (this.isNativeEngineActive && this.nativeBackend) {
             try {
+              this.daemonStandbyArmed = true;
               await this.nativeBackend.preload(songData.path);
               return true;
             } catch (err) {
               logPlayer('[AudioPlayer.crossfadePreload] Native preload failed', { trackId, err });
               this.preloadedSongData = null;
               this.standbyPreloadGeneration = 0;
+              this.daemonStandbyArmed = false;
               return false;
             }
           }
@@ -2199,6 +2293,7 @@ class AudioPlayer {
             this.currentSongData = this.preloadedSongData;
             this.preloadedSongData = null;
             this.standbyPreloadGeneration = 0;
+            this.daemonStandbyArmed = false;
             // New track starts at 0; without this the old track's tail time
             // lingers until the next heartbeat.
             this.nativeCurrentPosition = 0;
@@ -2501,6 +2596,7 @@ class AudioPlayer {
         this.emit('play');
         return;
       } catch (nativePlayErr) {
+        if (!this.isGenerationCurrent(playGeneration)) return;
         console.warn('[AudioPlayer] Native play failed, falling back to WebAudio:', nativePlayErr);
         this.fallbackToWebAudio(true);
         return;
@@ -2594,6 +2690,9 @@ class AudioPlayer {
     this.crossfadeScheduler.cancel();
     this.preloadedSongData = null;
     this.standbyPreloadGeneration = 0;
+    this.nativePreloadRequestId += 1;
+    this.nativePreloadInFlight = false;
+    this.daemonStandbyArmed = false;
     if (this.abLoopController.isPositionOutside(time)) {
       this.clearAbLoop('SEEK_OUTSIDE');
     }
@@ -2601,15 +2700,20 @@ class AudioPlayer {
       this.nativeCurrentPosition = time;
       this.emit('seeking', time);
       const seekGeneration = this.playbackGeneration;
+      this.nativeSeekInFlight = true;
       this.nativeBackend
         .seek(time)
         .then(() => {
           // Tier-1: stale seek completion must not mutate loop/emit state.
           if (!this.isGenerationCurrent(seekGeneration)) return;
+          this.nativeSeekInFlight = false;
           // Mirrors the element 'seeked' listener contract (which early-outs
           // in native mode): releases pending loop jumps.
           this.loopJumpPending = false;
           this.emit('seeked', time);
+          if (this.currentSongData) {
+            this.refreshNativeStandby(this.currentSongData.songId);
+          }
         })
         .catch((err) => {
           logPlayer('[AudioPlayer.seek] Native seek failed:', err);
@@ -2617,6 +2721,7 @@ class AudioPlayer {
           // the pending jump, but only for the current transaction so a stale
           // failure cannot clear a newer pending jump.
           if (this.isGenerationCurrent(seekGeneration)) {
+            this.nativeSeekInFlight = false;
             this.loopJumpPending = false;
           }
         });
@@ -2836,7 +2941,20 @@ class AudioPlayer {
    * @param mode - 'off' | 'one' | 'all'
    */
   setRepeatMode(mode: 'off' | 'one' | 'all') {
+    const changed = this.repeatMode !== mode;
     this.repeatMode = mode;
+    if (changed) {
+      if (mode === 'one' && this.crossfadeScheduler.getState() !== 'IDLE') {
+        this.crossfadeScheduler.cancel();
+      }
+      if (
+        this.isNativeEngineActive &&
+        this.currentSongData &&
+        this.crossfadeScheduler.getState() !== 'FADING'
+      ) {
+        this.refreshNativeStandby(this.currentSongData.songId);
+      }
+    }
     this.emit('repeatModeChange', mode);
   }
 
