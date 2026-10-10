@@ -14,6 +14,7 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { rootCollectionsOptions } from '@renderer/hooks/collections/useCollectionQueries';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useVisualSlot } from '@renderer/hooks/useVisualSlot';
 import { queryClient } from '@renderer/queryClient';
 import { store } from '@renderer/store/store';
 import storage from '@renderer/utils/localStorage';
@@ -21,7 +22,16 @@ import { playlistSearchSchema } from '@renderer/utils/zod/playlistSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { Suspense, lazy, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
@@ -58,6 +68,7 @@ const MIN_ITEM_WIDTH = 175;
 const MIN_ITEM_HEIGHT = 220;
 
 function PlaylistsPage() {
+  const customNoPlaylistsSrc = useVisualSlot('empty.noPlaylists');
   const multipleSelectionsData = useStore(store, (state) => state.multipleSelectionsData);
   const playlistsPageSortingState = useStore(
     store,
@@ -420,7 +431,9 @@ function PlaylistsPage() {
                   changePromptMenuData(
                     true,
                     <Suspense fallback={null}>
-                      <MissingSongsCheckerPrompt onClose={() => changePromptMenuData(false, <></>)} />
+                      <MissingSongsCheckerPrompt
+                        onClose={() => changePromptMenuData(false, <></>)}
+                      />
                     </Suspense>
                   )
                 }
@@ -437,7 +450,9 @@ function PlaylistsPage() {
                   changePromptMenuData(
                     true,
                     <Suspense fallback={null}>
-                      <SpotifyToM3uConverterPrompt onClose={() => changePromptMenuData(false, <></>)} />
+                      <SpotifyToM3uConverterPrompt
+                        onClose={() => changePromptMenuData(false, <></>)}
+                      />
                     </Suspense>
                   )
                 }
@@ -535,7 +550,12 @@ function PlaylistsPage() {
         )}
         {playlists.length === 0 && (
           <div className="no-playlists-container text-font-color-black dark:text-font-color-white my-[10%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
-            <Img src={NoPlaylistsImage} alt="" className="mb-8 w-60" />
+            <Img
+              src={customNoPlaylistsSrc || NoPlaylistsImage}
+              fallbackSrc={NoPlaylistsImage}
+              alt=""
+              className="mb-8 w-60 object-contain"
+            />
             <span>{t('playlistsPage.empty')}</span>
           </div>
         )}

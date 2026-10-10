@@ -16,7 +16,6 @@ let migratePglite: any;
 import { openSqliteEngine, getEngine as _unused } from '@main/db/sqlite/engine';
 void _unused;
 import { exportDatabase, importDatabase, db as singletonDb, getEngine } from '@main/db/db';
-import { rawAll, rawGet, rawRun } from '@main/db/sqlite/raw';
 import * as schema from '@main/db/schema';
 import {
   artists,
@@ -30,6 +29,7 @@ import {
   songs
 } from '@main/db/schema';
 import { seedDatabase } from '@main/db/seed';
+import { rawAll, rawGet, rawRun } from '@main/db/sqlite/raw';
 import { getTableConfig } from 'drizzle-orm/sqlite-core';
 
 vi.mock('electron', async (importOriginal) => {
@@ -84,7 +84,7 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
     }
 
     // spot column parity for the core tables (drizzle -> sqlite)
-    for (const table of [songs, albums, artists, genres, playlists]) {
+    for (const table of [songs, albums, artists, genres, playlists, schema.userSettings]) {
       const cfg = getTableConfig(table);
       const cols = (engine.all(`PRAGMA table_xinfo(${cfg.name})`) as { name: string }[]).map(
         (c) => c.name
@@ -405,10 +405,10 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
     rawDb.exec('PRAGMA user_version = 3;');
     rawDb.close();
 
-    // Open via openSqliteEngine -> should trigger v3 -> v4 migration
+    // Open via openSqliteEngine -> should trigger v3 -> v4 -> v5 migration
     const engineV4 = openSqliteEngine(v3DbPath);
     const versionRow = engineV4.get('PRAGMA user_version') as { user_version: number };
-    expect(versionRow.user_version).toBe(4);
+    expect(versionRow.user_version).toBe(5);
 
     // Verify index exists
     const idx = engineV4.get(
@@ -430,7 +430,7 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
     const favDetail = planFav.map((p) => p.detail).join(' ');
     expect(favDetail).toContain('idx_songs_favorite_title');
 
-    // Test self-heal: drop index, reset user_version to 4, re-open
+    // Test self-heal: drop index, reset user_version to 5, re-open
     engineV4.exec('DROP INDEX idx_songs_title_covering;');
     await engineV4.close();
 
@@ -442,6 +442,41 @@ describe('SQLite engine — schema/DDL consistency, export/import, PGlite migrat
 
     await repairedEngine.close();
     fs.rmSync(v3Tmp, { recursive: true, force: true });
+  });
+
+  it('migrates from v4 to v5, adding visual_assets_config to user_settings with default JSON', async () => {
+    const v4Tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nora-v4-migration-'));
+    const v4DbPath = path.join(v4Tmp, 'v4-test.db');
+
+    const { DatabaseSync } = await import('node:sqlite');
+    const rawDb = new DatabaseSync(v4DbPath);
+    const { BASELINE_TABLE_DDL } = await import('@main/db/sqlite/ddl');
+    // Simulate a v4 database before visual_assets_config existed on user_settings
+    const legacyV4Ddl = BASELINE_TABLE_DDL.replace(
+      /,\s*visual_assets_config TEXT NOT NULL DEFAULT '\{"slots":\{\},"customAssets":\[\]\}'/,
+      ''
+    );
+    rawDb.exec(legacyV4Ddl);
+    rawDb.exec('INSERT INTO user_settings (id) VALUES (1);');
+    rawDb.exec('PRAGMA user_version = 4;');
+    rawDb.close();
+
+    const migratedEngine = openSqliteEngine(v4DbPath);
+    const versionRow = migratedEngine.get('PRAGMA user_version') as { user_version: number };
+    expect(versionRow.user_version).toBe(5);
+
+    const cols = (migratedEngine.all('PRAGMA table_info(user_settings)') as { name: string }[]).map(
+      (c) => c.name
+    );
+    expect(cols).toContain('visual_assets_config');
+
+    const row = migratedEngine.get(
+      'SELECT visual_assets_config FROM user_settings WHERE id = 1'
+    ) as { visual_assets_config: string } | undefined;
+    expect(row?.visual_assets_config).toBe('{"slots":{},"customAssets":[]}');
+
+    await migratedEngine.close();
+    fs.rmSync(v4Tmp, { recursive: true, force: true });
   });
 
   describe('Fix 1: raw helpers through the tx lock', () => {

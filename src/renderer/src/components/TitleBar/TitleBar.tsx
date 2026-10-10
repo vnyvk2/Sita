@@ -3,6 +3,8 @@ import { useStore } from '@tanstack/react-store';
 import { lazy, memo, Suspense } from 'react';
 
 import LightModeLogo from '../../assets/images/webp/logo_light_mode.webp';
+import { dynamicIconStore } from '../../hooks/useDynamicAppIcon';
+import { useVisualSlot } from '../../hooks/useVisualSlot';
 import { store } from '../../store/store';
 import Img from '../Img';
 import CurrentLocationContainer from './CurrentLocationContainer';
@@ -22,6 +24,10 @@ const TitleBar = memo(() => {
     store,
     (state) => state.localStorage.preferences?.isExperimentalWorkspaceEnabled ?? false
   );
+  const customLogoSrc = useVisualSlot('brand.appLogo');
+  const dynamicArtworkSrc = useStore(dynamicIconStore, (s) => s.activeDynamicArtworkUrl);
+  const effectiveLogoSrc = dynamicArtworkSrc || customLogoSrc || LightModeLogo;
+  const staticFallbackLogo = customLogoSrc || LightModeLogo;
 
   const devLocationHref = useLocation({
     select: (loc) => (window.api.properties.isInDevelopment ? loc.href : undefined)
@@ -45,8 +51,15 @@ const TitleBar = memo(() => {
             <div className="logo-and-app-name-container flex items-center">
               <span className="logo-container">
                 <Img
-                  className={`mr-2 aspect-square h-7 w-7 rounded-md p-1 shadow-md`}
-                  src={LightModeLogo}
+                  className={`mr-2 aspect-square h-7 w-7 rounded-md ${
+                    dynamicArtworkSrc
+                      ? 'object-cover'
+                      : customLogoSrc
+                        ? 'object-contain p-0.5'
+                        : 'p-1'
+                  } shadow-md`}
+                  src={effectiveLogoSrc}
+                  fallbackSrc={staticFallbackLogo}
                   alt="Sita Logo"
                 />
               </span>

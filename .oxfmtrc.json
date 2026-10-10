@@ -15,7 +15,8 @@
     "tsconfig.json",
     "tsconfig.*.json",
     "**/thunder-tests",
-    "routeTree.gen.ts"
+    "routeTree.gen.ts",
+    "test_semver.js"
   ],
   "insertFinalNewline": true,
   "jsdoc": true

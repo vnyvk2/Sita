@@ -2,6 +2,7 @@ import {
   COMPACT_LYRICS_EXTENSION_HEIGHT,
   MINI_PLAYER_SEARCH_EXTENSION_HEIGHT
 } from '@common/miniPlayerConstants';
+import type { VisualSlotAssignment, VisualSlotId } from '@common/visualSlots';
 import { inArray } from 'drizzle-orm';
 import { app, BrowserWindow, ipcMain, powerMonitor, shell, Menu } from 'electron';
 
@@ -62,6 +63,16 @@ import toggleLikeAlbums from './core/toggleLikeAlbums';
 import toggleLikeArtists from './core/toggleLikeArtists';
 import toggleLikeSongs from './core/toggleLikeSongs';
 import updateSongListeningData from './core/updateSongListeningData';
+import {
+  assignVisualSlot,
+  deleteCustomVisualAsset,
+  getCustomAssetsFilesDir,
+  promptAndImportVisualAsset,
+  reconcileVisualAssets,
+  resetVisualSlots,
+  setVisualAssetsDynamicMode,
+  validateAndImportVisualAssetFile
+} from './core/visualAssetsService';
 import { db } from './db/db';
 import { getAlbumSummaries, getAlbumSongIds } from './db/queries/albums';
 import {
@@ -115,7 +126,10 @@ import {
   setFloatingLyricsIgnoreMouse,
   toggleFloatingLyricsLock
 } from './floatingLyricsWindow';
-import { removeDefaultAppProtocolFromFilePath } from './fs/resolveFilePaths';
+import {
+  addDefaultAppProtocolToFilePath,
+  removeDefaultAppProtocolFromFilePath
+} from './fs/resolveFilePaths';
 import { registerMembershipIPCHandlers } from './ipc/membershipIPC';
 import { registerMetadataHandlers } from './ipc/MetadataHandlers';
 import libraryChangeTracker from './library/LibraryChangeTracker';
@@ -126,6 +140,8 @@ import libraryScanner, { type ScanOptions } from './library/LibraryScanner';
 import logger, { logFilePath } from './logger';
 import {
   allowScreenSleeping,
+  applyCurrentDynamicNowPlayingNativeIcon,
+  applyCurrentVisualAssetsNativeIcon,
   changePlayerType,
   expandMiniPlayer,
   getFolderLocation,
@@ -407,7 +423,7 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     //   saveUserData(dataType, data)
     // );
     ipcMain.handle('app/saveUserSettings', async (_, settings: Partial<UserSettings>) => {
-      const { lastScanTime, ...rest } = settings;
+      const { lastScanTime, customAssetsProtocolBaseUrl: _base, ...rest } = settings;
       const parsedLastScanTime =
         typeof lastScanTime === 'string' ? new Date(lastScanTime) : lastScanTime;
       const result = await saveUserSettings({
@@ -482,8 +498,95 @@ export function initializeIPC(mainWindow: BrowserWindow, abortSignal: AbortSigna
     ipcMain.handle('app/getStorageUsage', () => getStorageUsage());
     ipcMain.handle('app/getDatabaseMetrics', () => getDatabaseMetrics());
 
-    ipcMain.handle('app/getUserData', async () => await getUserSettings());
-    ipcMain.handle('app/getUserSettings', async () => await getUserSettings());
+    const getEnrichedUserSettings = async () => {
+      const settings = await getUserSettings();
+      return {
+        ...settings,
+        customAssetsProtocolBaseUrl: addDefaultAppProtocolToFilePath(getCustomAssetsFilesDir())
+      };
+    };
+
+    ipcMain.handle('app/getUserData', getEnrichedUserSettings);
+    ipcMain.handle('app/getUserSettings', getEnrichedUserSettings);
+
+    ipcMain.handle('app/visualAssets/getState', async () => {
+      const settings = await getUserSettings();
+      const config = await reconcileVisualAssets(settings.visualAssetsConfig);
+      return {
+        config,
+        customAssetsProtocolBaseUrl: addDefaultAppProtocolToFilePath(getCustomAssetsFilesDir())
+      };
+    });
+
+    ipcMain.handle(
+      'app/visualAssets/importAsset',
+      async (_, options?: { filePath?: string; name?: string }) => {
+        const result = options?.filePath
+          ? await validateAndImportVisualAssetFile(options.filePath, { name: options.name })
+          : await promptAndImportVisualAsset(mainWindow);
+        if (result.success && !result.canceled) {
+          dataUpdateEvent('userData');
+        }
+        return result;
+      }
+    );
+
+    ipcMain.handle(
+      'app/visualAssets/assignSlot',
+      async (_, slotId: VisualSlotId, assignment: VisualSlotAssignment) => {
+        const result = await assignVisualSlot(slotId, assignment);
+        if (result.success) {
+          if (slotId === 'brand.nativeIcon') {
+            await applyCurrentVisualAssetsNativeIcon(result.config);
+          }
+          dataUpdateEvent('userData');
+        }
+        return result;
+      }
+    );
+
+    ipcMain.handle('app/visualAssets/deleteAsset', async (_, assetId: string) => {
+      const result = await deleteCustomVisualAsset(assetId);
+      if (result.success) {
+        if (!result.config.dynamicNowPlayingIcon && result.unassignedSlots.includes('brand.nativeIcon')) {
+          await applyCurrentVisualAssetsNativeIcon(result.config);
+        }
+        dataUpdateEvent('userData');
+      }
+      return result;
+    });
+
+    ipcMain.handle(
+      'app/visualAssets/resetSlots',
+      async (_, category?: 'brand' | 'nav' | 'empty') => {
+        const result = await resetVisualSlots(category);
+        if (result.success) {
+          if (!result.config.dynamicNowPlayingIcon || !category || category === 'brand') {
+            await applyCurrentVisualAssetsNativeIcon(result.config);
+          }
+          dataUpdateEvent('userData');
+        }
+        return result;
+      }
+    );
+
+    ipcMain.handle(
+      'app/visualAssets/setDynamicNowPlayingIcon',
+      async (_, artworkPath: string | null) => {
+        return applyCurrentDynamicNowPlayingNativeIcon(artworkPath);
+      }
+    );
+
+    ipcMain.handle('app/visualAssets/setDynamicMode', async (_, enabled: boolean) => {
+      const result = await setVisualAssetsDynamicMode(enabled);
+      if (result.success) {
+        if (!enabled) {
+          await applyCurrentVisualAssetsNativeIcon(result.config);
+        }
+        dataUpdateEvent('userData');
+      }
+      return result;
+    });
 
     ipcMain.handle('app/search/query', (_, options: SearchCoordinatorOptions) =>
       SearchCoordinator.query(options)

@@ -9,19 +9,19 @@ import DuplicateSongsCleanupPrompt from '@renderer/components/DuplicateSongsClea
 import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import PageSearchInput from '@renderer/components/PageSearchInput';
+import { artSlotColor } from '@renderer/components/SongsPage/artSlotColor';
 import { CompactListHeader } from '@renderer/components/SongsPage/CompactListHeader';
+import { getSongRowSizeContextMenuItem } from '@renderer/components/SongsPage/getSongRowSizeContextMenu';
 import Song from '@renderer/components/SongsPage/Song';
 import { songFilterOptions, songSortOptions } from '@renderer/components/SongsPage/SongOptions';
 import SongRowSkeleton from '@renderer/components/SongsPage/SongRowSkeleton';
-import { artSlotColor } from '@renderer/components/SongsPage/artSlotColor';
 import { SubFilterToolbar } from '@renderer/components/SongsPage/SubFilterToolbar/SubFilterToolbar';
 import { useSongListContextMenuDelegation } from '@renderer/components/SongsPage/useSongListContextMenuDelegation';
-import VirtualizedList, {
-  DEFAULT_SCROLL_SEEK_CONFIG
-} from '@renderer/components/VirtualizedList';
+import VirtualizedList, { DEFAULT_SCROLL_SEEK_CONFIG } from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import { usePageSearch } from '@renderer/hooks/usePageSearch';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useVisualSlot } from '@renderer/hooks/useVisualSlot';
 import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getLibraryVersion } from '@renderer/other/libraryVersion';
 import { getQueuesManager } from '@renderer/other/queuesManager';
@@ -45,7 +45,6 @@ import {
   setSongViewMode,
   type SongViewMode
 } from '@renderer/utils/songViewMode';
-import { getSongRowSizeContextMenuItem } from '@renderer/components/SongsPage/getSongRowSizeContextMenu';
 import { songSearchSchema } from '@renderer/utils/zod/songSchema';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
@@ -110,6 +109,7 @@ const AddMusicFoldersPrompt = lazy(
 );
 
 function SongsPage() {
+  const customNoSongsSrc = useVisualSlot('empty.noSongs');
   const songsPageSortingState = useStore(
     store,
     (state) => state.localStorage.sortingStates.songsPage
@@ -943,7 +943,12 @@ function SongsPage() {
         </div>
       ) : isLibraryEmpty ? (
         <div className="no-songs-container text-font-color-black dark:text-font-color-white my-[8%] flex h-full w-full flex-col items-center justify-center text-center text-xl">
-          <Img src={NoSongsImage} alt="" className="mb-8 w-60" />
+          <Img
+            src={customNoSongsSrc || NoSongsImage}
+            fallbackSrc={NoSongsImage}
+            alt=""
+            className="mb-8 w-60 object-contain"
+          />
           <span>{t('songsPage.empty')}</span>
           <div className="flex items-center justify-between">
             <Button

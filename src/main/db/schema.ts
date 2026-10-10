@@ -15,6 +15,7 @@ import {
   DEFAULT_METADATA_PREFERENCES,
   type MetadataProviderPreferences
 } from '../../common/metadata/preferences';
+import { DEFAULT_VISUAL_ASSETS_CONFIG, type VisualAssetsConfig } from '../../common/visualSlots';
 import type { CollectionContextData } from '../collections/context/types';
 import type { OperationInverseInput, OperationType } from '../collections/operations/types';
 import type {
@@ -605,6 +606,9 @@ export const userSettings = sqliteTable(
     metadataPreferences: jsonText<MetadataProviderPreferences>('metadata_preferences')
       .notNull()
       .default(DEFAULT_METADATA_PREFERENCES),
+    visualAssetsConfig: jsonText<VisualAssetsConfig>('visual_assets_config')
+      .notNull()
+      .default(DEFAULT_VISUAL_ASSETS_CONFIG),
     createdAt: tsDefaultNow('created_at'),
     updatedAt: tsDefaultNow('updated_at')
   },

@@ -522,6 +522,8 @@ declare global {
     listenBrainzUserToken: string | null;
     libraryScanMode?: LibraryScanMode;
     lastScanTime?: string | Date | null;
+    visualAssetsConfig?: import('../common/visualSlots').VisualAssetsConfig;
+    customAssetsProtocolBaseUrl?: string;
   }
 
   type LibraryScanMode = 'automatic' | 'startup' | 'manual';

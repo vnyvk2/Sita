@@ -7,12 +7,12 @@ import type { OpenDialogOptions } from 'electron';
 import logger from '../logger';
 import { restartApp, sendMessageToRenderer, showOpenDialog } from '../main';
 import copyDir from '../utils/copyDir';
-import { songCoversFolderPath } from './exportAppData';
+import { customAssetsFolderPath, songCoversFolderPath } from './exportAppData';
 import { type ExportedUserPreferences, importUserPreferences } from './userPreferencesExportImport';
 
 const requiredItemsForImport = ['nora.pglite.db.sql', 'song_covers'];
 
-const optionalItemsForImport = ['local_storage.json', 'user_preferences.json'];
+const optionalItemsForImport = ['local_storage.json', 'user_preferences.json', 'custom_assets'];
 
 const DEFAULT_EXPORT_DIALOG_OPTIONS: OpenDialogOptions = {
   title: `Select a Destination where you saved Nora's Exported App Data`,
@@ -64,6 +64,11 @@ const importOptionalData = async (
         }
       );
       result.userPreferences = JSON.parse(userPreferencesString);
+    }
+
+    // CUSTOM VISUAL ASSETS
+    if (entries.includes('custom_assets')) {
+      await copyDir(path.join(importDir, 'custom_assets'), customAssetsFolderPath);
     }
 
     return result;

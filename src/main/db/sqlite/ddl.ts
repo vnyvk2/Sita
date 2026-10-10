@@ -374,6 +374,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
   library_scan_mode TEXT NOT NULL DEFAULT 'automatic',
   last_scan_time INTEGER,
   metadata_preferences TEXT,
+  visual_assets_config TEXT NOT NULL DEFAULT '{"slots":{},"customAssets":[]}',
   created_at INTEGER NOT NULL DEFAULT (${NOW_MS}),
   updated_at INTEGER NOT NULL DEFAULT (${NOW_MS})
 );
@@ -578,5 +579,5 @@ END;`;
   .join('\n');
 
 export const BASELINE_DDL = BASELINE_TABLE_DDL + '\n' + ftsDDL;
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 void searchable;

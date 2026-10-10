@@ -10,6 +10,7 @@ import GithubDarkIcon from '../../../assets/images/svg/github.svg';
 import AppIcon from '../../../assets/images/webp/logo_light_mode.webp';
 import { AppUpdateContext } from '../../../contexts/AppUpdateContext';
 import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
+import { useVisualSlot } from '../../../hooks/useVisualSlot';
 import calculateElapsedTime from '../../../utils/calculateElapsedTime';
 import storage from '../../../utils/localStorage';
 import { parseChangelog } from '../../../utils/parseChangelog';
@@ -30,6 +31,7 @@ const AboutSettings = () => {
   const { isDark: isDarkMode } = useEffectiveAppearance();
   const { changePromptMenuData, addNewNotifications } = useContext(AppUpdateContext);
   const { t } = useTranslation();
+  const customLogoSrc = useVisualSlot('brand.appLogo');
 
   const currentVersionReleasedDate = useMemo(() => {
     const { versions } = parseChangelog(rawChangelog);
@@ -58,9 +60,17 @@ const AboutSettings = () => {
       className="about-container"
     >
       <div className="pl-2">
-        <div id="setting-about-app-version" className="mb-2 flex items-center justify-between p-2 text-lg">
+        <div
+          id="setting-about-app-version"
+          className="mb-2 flex items-center justify-between p-2 text-lg"
+        >
           <div className="flex items-center">
-            <Img src={AppIcon} className="aspect-square max-h-12 rounded-md shadow-md" alt="" />
+            <Img
+              src={customLogoSrc || AppIcon}
+              fallbackSrc={AppIcon}
+              className="aspect-square max-h-12 rounded-md object-contain shadow-md"
+              alt=""
+            />
             <div className="ml-4 flex flex-col">
               <span className="block">Sita</span>
               <span className="text-sm font-light">
@@ -285,7 +295,9 @@ const AboutSettings = () => {
                                 {
                                   id: 'songHistoryCleared',
                                   duration: 5000,
-                                  content: <span>{t('settingsPage.songHistoryDeletionSuccess')}</span>
+                                  content: (
+                                    <span>{t('settingsPage.songHistoryDeletionSuccess')}</span>
+                                  )
                                 }
                               ]);
                             }

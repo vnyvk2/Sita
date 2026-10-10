@@ -3,6 +3,7 @@ import LibrarySchedulerStatus from '@renderer/components/Sidebar/LibrarySchedule
 import SideBarItem from '@renderer/components/Sidebar/SideBarItem';
 import SidebarPlaylistsSection from '@renderer/components/Sidebar/SidebarPlaylistsSection';
 import SidebarResizer from '@renderer/components/Sidebar/SidebarResizer';
+import { useNavVisualSlots } from '@renderer/hooks/useVisualSlot';
 import type { AppReducer } from '@renderer/other/appReducer';
 import { store } from '@renderer/store/store';
 import { linkOptions, useLocation } from '@tanstack/react-router';
@@ -13,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import type { PanelProps } from '../../registry';
 
 export const NavigationPanel: FC<PanelProps> = memo(() => {
+  const { getNavCustomIcon } = useNavVisualSlots();
   const visibleSideTabs = useStore(
     store,
     (state: AppReducer) => state.localStorage.preferences?.visibleSideTabs
@@ -193,6 +195,7 @@ export const NavigationPanel: FC<PanelProps> = memo(() => {
                 key={link.id}
                 parentClassName={link.parentClassName}
                 icon={link.icon}
+                customIcon={getNavCustomIcon(link.id, link.icon)}
                 content={link.content}
               />
             ))}
@@ -218,6 +221,7 @@ export const NavigationPanel: FC<PanelProps> = memo(() => {
               key={link.id}
               parentClassName={link.parentClassName}
               icon={link.icon}
+              customIcon={getNavCustomIcon(link.id, link.icon)}
               content={link.content}
             />
           ))}

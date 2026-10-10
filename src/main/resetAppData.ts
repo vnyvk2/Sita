@@ -6,7 +6,7 @@ import { app } from 'electron';
 
 import logger from './logger';
 
-const resourcePaths = ['listening_data.json', 'song_covers'];
+const resourcePaths = ['listening_data.json', 'song_covers', 'custom_assets'];
 const userDataPath = app.getPath('userData');
 
 const manageErrors = (error: Error) => {

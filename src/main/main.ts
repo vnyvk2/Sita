@@ -69,40 +69,47 @@ import {
   MINI_PLAYER_MIN_SIZE_X,
   MINI_PLAYER_MIN_SIZE_Y
 } from '@common/miniPlayerConstants';
+import type { VisualAssetsConfig } from '@common/visualSlots';
 
 import { version, appPreferences } from '../../package.json';
 import noraAppIcon from '../../resources/logo_light_mode.png?asset';
 import roundTo from '../common/roundTo';
 import manageLastFmAuth from './auth/manageLastFmAuth';
+import { smartPlaylistScheduler } from './collections/engine/SmartPlaylistScheduler';
 import changeAppTheme from './core/changeAppTheme';
 import checkForStartUpSongs from './core/checkForStartUpSongs';
 import manageTaskbarPlaybackButtonControls from './core/manageTaskbarPlaybackButtonControls';
 import { recoverLibraryAssets } from './core/recovery';
+import {
+  applyDynamicNowPlayingIconToSurfaces,
+  applyNativeAppIconToSurfaces,
+  createNativeIconImages,
+  reconcileVisualAssets
+} from './core/visualAssetsService';
 // import { fileURLToPath, pathToFileURL } from 'url';
 import { closeDatabaseInstance, isDatabaseStubbed } from './db/db';
 import { getUserSettings, saveUserSettings } from './db/queries/settings';
+import { libraryEventBus } from './events/LibraryEventBus';
+import { registerFloatingLyricsGlobalShortcut } from './floatingLyricsWindow';
 import { closeAllAbortControllers, saveAbortController } from './fs/controlAbortControllers';
 import { handleFileProtocol } from './handleFileProtocol';
 import { initializeIPC } from './ipc';
 import libraryLifecycleController from './library/LibraryLifecycleController';
-import { cleanThumbnailCache } from './thumbnails/thumbnailService';
 import { attachRendererRecovery } from './lifecycle/rendererRecovery';
 import ShutdownCoordinator from './lifecycle/ShutdownCoordinator';
 import ShutdownLogger from './lifecycle/ShutdownLogger';
 import logger from './logger';
-import { smartPlaylistScheduler } from './collections/engine/SmartPlaylistScheduler';
-import { libraryEventBus } from './events/LibraryEventBus';
 import { flushScrobbleQueue } from './other/lastFm/flushScrobbleQueue';
 import resetAppData from './resetAppData';
 import { savePendingSongLyrics } from './saveLyricsToSong';
-import { registerFloatingLyricsGlobalShortcut } from './floatingLyricsWindow';
+import { cleanThumbnailCache } from './thumbnails/thumbnailService';
 import checkForUpdates from './update';
 import { savePendingMetadataUpdates } from './updateSong/updateSongId3Tags';
-import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
 import { initEventLoopMonitor, stopEventLoopMonitor } from './utils/eventLoopMonitor';
+import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
 import memProfiler from './utils/memProfiler';
-import safeOpenExternal from './utils/safeOpenExternal';
 import { isAllowedAppNavigation } from './utils/safeNavigation';
+import safeOpenExternal from './utils/safeOpenExternal';
 import { isRectOnAnyDisplay, isValidPersistedPosition } from './utils/windowPosition';
 
 // / / / / / / / CONSTANTS / / / / / / / / /
@@ -398,7 +405,19 @@ const getPreloadPath = (): string => {
   return candidates[0];
 };
 
-const createWindow = async () => {
+export const applyCurrentVisualAssetsNativeIcon = (config?: VisualAssetsConfig | null) => {
+  applyNativeAppIconToSurfaces(config, { mainWindow, tray });
+};
+
+export const applyCurrentDynamicNowPlayingNativeIcon = async (
+  artworkPath: string | null | undefined
+) => {
+  return applyDynamicNowPlayingIconToSurfaces(artworkPath, { mainWindow, tray });
+};
+
+export const getTrayInstance = () => tray;
+
+const createWindow = async (initialWindowIcon?: Electron.NativeImage) => {
   // React DevTools hooks the renderer and mirrors the component tree, inflating
   // renderer WS and Chromium's DOM-node metric; benchmarks set NORA_NO_DEVTOOLS=1
   // to measure the application alone.
@@ -420,7 +439,7 @@ const createWindow = async () => {
     roundedCorners: true,
     frame: false,
     backgroundColor: await getBackgroundColor(),
-    icon: appIcon,
+    icon: initialWindowIcon ?? appIcon,
     titleBarStyle: 'hidden',
     show: false
   });
@@ -528,13 +547,21 @@ app
     memProfiler.stage('when-ready');
     memProfiler.startSampling(1500);
 
-    const { windowState, zoomFactor } = isDatabaseStubbed
-      ? { windowState: 'normal' as const, zoomFactor: null }
+    const startupSettings = isDatabaseStubbed
+      ? { windowState: 'normal' as const, zoomFactor: null, visualAssetsConfig: null }
       : await getUserSettings();
+    const { windowState, zoomFactor } = startupSettings;
+    const reconciledVisualAssets = isDatabaseStubbed
+      ? null
+      : await reconcileVisualAssets(startupSettings.visualAssetsConfig);
+    const { windowIcon, trayIcon } = createNativeIconImages(reconciledVisualAssets);
 
     currentWindowZoomFactor = normalizeZoomFactor(zoomFactor);
 
-    if (BrowserWindow.getAllWindows().length === 0) await createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) await createWindow(windowIcon);
+    if (process.platform === 'darwin' && app?.dock?.setIcon) {
+      app.dock.setIcon(windowIcon);
+    }
     memProfiler.stage('window-created-and-loaded');
     registerFloatingLyricsGlobalShortcut(mainWindow);
 
@@ -561,7 +588,7 @@ app
     protocol.handle('nora', handleFileProtocol);
     void cleanThumbnailCache();
 
-    tray = new Tray(appIcon);
+    tray = new Tray(trayIcon);
     const trayContextMenu = Menu.buildFromTemplate([
       {
         label: 'Show/Hide Sita',
@@ -584,7 +611,11 @@ app
 
     powerMonitor.addListener('shutdown', () => {
       logger.info('OS shutdown signal received via powerMonitor; triggering ShutdownCoordinator.');
-      void ShutdownCoordinator.shutdown('main.ts:powerMonitor.shutdown', mainWindow, currentSongPath);
+      void ShutdownCoordinator.shutdown(
+        'main.ts:powerMonitor.shutdown',
+        mainWindow,
+        currentSongPath
+      );
     });
 
     app.on('before-quit', handleBeforeQuit);
@@ -806,7 +837,6 @@ export function sendProgressToRenderer(channel: string, ...args: any[]) {
     mainWindow.webContents.send(channel, ...args);
   }
 }
-
 
 let dataUpdateEventTimeOutId: NodeJS.Timeout;
 let dataEventsCache: DataUpdateEvent[] = [];

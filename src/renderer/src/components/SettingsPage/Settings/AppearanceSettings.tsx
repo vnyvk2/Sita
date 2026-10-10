@@ -17,9 +17,10 @@ import { useEffectiveAppearance } from '../../../hooks/useEffectiveAppearance';
 import storage from '../../../utils/localStorage';
 import Checkbox from '../../Checkbox';
 import Img from '../../Img';
+import CollapsibleSettingsSection from './CollapsibleSettingsSection';
 import DynamicThemeSettings from './DynamicThemeSettings';
 import ThemePreviewGrid from './ThemePreviewGrid';
-import CollapsibleSettingsSection from './CollapsibleSettingsSection';
+import VisualAssetsSettings from './VisualAssetsSettings';
 
 const ThemeSettings = () => {
   const [showThemeGrid, setShowThemeGrid] = useState(false);
@@ -187,7 +188,10 @@ const ThemeSettings = () => {
             </label>
           </div>
         </li>
-        <li id="setting-appearance-theme-preset" className="secondary-container change-theme-preset my-4">
+        <li
+          id="setting-appearance-theme-preset"
+          className="secondary-container change-theme-preset my-4"
+        >
           <div className="description">{t('settingsPage.themePresetDescription')}</div>
           <div className="mt-4 flex w-full flex-col">
             <div className="mb-2 flex items-center justify-between">
@@ -221,7 +225,10 @@ const ThemeSettings = () => {
           </div>
         </li>
 
-        <li id="setting-appearance-image-dynamic-theme" className="secondary-container enable-image-based-dynamic-themes mb-4">
+        <li
+          id="setting-appearance-image-dynamic-theme"
+          className="secondary-container enable-image-based-dynamic-themes mb-4"
+        >
           <div className="description">
             {t('settingsPage.enableImageBasedDynamicThemesDescription')}
           </div>
@@ -238,7 +245,10 @@ const ThemeSettings = () => {
           )}
         </li>
 
-        <li id="setting-appearance-dynamic-artwork-card" className="secondary-container enable-song-card-dynamic-artwork-background mb-4">
+        <li
+          id="setting-appearance-dynamic-artwork-card"
+          className="secondary-container enable-song-card-dynamic-artwork-background mb-4"
+        >
           <div className="description">
             {t('settingsPage.enableSongCardDynamicArtworkBackgroundDescription')}
           </div>
@@ -252,7 +262,10 @@ const ThemeSettings = () => {
           />
         </li>
 
-        <li id="setting-appearance-ambient-particles" className="secondary-container enable-ambient-particles mb-4">
+        <li
+          id="setting-appearance-ambient-particles"
+          className="secondary-container enable-ambient-particles mb-4"
+        >
           <div className="description">{t('settingsPage.ambientParticlesDescription')}</div>
           <Checkbox
             id="toggleAmbientParticles"
@@ -263,6 +276,8 @@ const ThemeSettings = () => {
             labelContent={t('settingsPage.ambientParticles')}
           />
         </li>
+
+        <VisualAssetsSettings />
       </ul>
     </CollapsibleSettingsSection>
   ) : null;

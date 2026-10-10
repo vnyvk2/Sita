@@ -20,6 +20,7 @@ import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useContextMenu } from './hooks/useContextMenu';
 import { useDataSync } from './hooks/useDataSync';
 import { useDiscordRpc } from './hooks/useDiscordRpc';
+import { useDynamicAppIcon } from './hooks/useDynamicAppIcon';
 import { useDynamicTheme } from './hooks/useDynamicTheme';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useListeningData } from './hooks/useListeningData';
@@ -35,7 +36,6 @@ import { usePlayerNavigation } from './hooks/usePlayerNavigation';
 import { usePlaylistBatchImport } from './hooks/usePlaylistBatchImport';
 import { usePromptMenu } from './hooks/usePromptMenu';
 import { useQueueManagement } from './hooks/useQueueManagement';
-
 import { useUserPreferences } from './hooks/useUserPreferences';
 import { useWindowManagement } from './hooks/useWindowManagement';
 import { initializeQueuesManager } from './other/queuesManager';
@@ -107,7 +107,6 @@ export default function App() {
   // Notifications hook handles adding/updating notifications and IPC messages from main
   const { addNewNotifications, updateNotifications } = useNotifications();
   usePlaylistBatchImport();
-
 
   // ? INITIALIZE DYNAMIC THEME
   // Dynamic theme hook handles theme generation from song palettes and background images
@@ -336,6 +335,10 @@ export default function App() {
   // ? INITIALIZE DISCORD RPC
   // Discord RPC hook handles Discord Rich Presence integration
   useDiscordRpc(player);
+
+  // ? INITIALIZE DYNAMIC NOW-PLAYING APP ICON
+  // Tracks now-playing artwork with initial sync and 3.5s transition debounce
+  useDynamicAppIcon();
 
   // Set up keyboard shortcuts with all required dependencies
   useKeyboardShortcuts({

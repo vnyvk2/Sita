@@ -231,43 +231,42 @@ function openSqliteEngineInternal(dbPath: string): SqliteEngine {
   const db = new DatabaseSync(dbPath);
   const openMs = performance.now() - tOpen;
   try {
+    const tPragma = performance.now();
+    for (const p of SQLITE_PRAGMAS) db.exec(p);
+    const pragmaMs = performance.now() - tPragma;
 
-  const tPragma = performance.now();
-  for (const p of SQLITE_PRAGMAS) db.exec(p);
-  const pragmaMs = performance.now() - tPragma;
-
-  // Baseline schema & migrations: stamped via user_version.
-  let ddlMs = 0;
-  const version = (db.prepare('PRAGMA user_version').get() as { user_version: number })
-    .user_version;
-  const tablesCount = (
-    db
-      .prepare(
-        "SELECT count(*) as cnt FROM sqlite_master WHERE type='table' AND name='user_settings'"
-      )
-      .get() as { cnt: number }
-  ).cnt;
-  const isFreshDb = tablesCount === 0;
-
-  if (isFreshDb) {
-    const tDdl = performance.now();
-    db.exec(BASELINE_DDL);
-    db.prepare(`PRAGMA user_version = ${SCHEMA_VERSION}`).run();
-    ddlMs = performance.now() - tDdl;
-    logger.info(`SQLite baseline schema applied (v${SCHEMA_VERSION}) in ${Math.round(ddlMs)}ms`);
-  } else {
-    // Existing database: run migrations if needed
-    let currentVersion = version === 0 ? 1 : version;
-    const tDdl = performance.now();
-
-    if (currentVersion === 1) {
-      const cols = new Set(
-        (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
-          (c) => c.name
+    // Baseline schema & migrations: stamped via user_version.
+    let ddlMs = 0;
+    const version = (db.prepare('PRAGMA user_version').get() as { user_version: number })
+      .user_version;
+    const tablesCount = (
+      db
+        .prepare(
+          "SELECT count(*) as cnt FROM sqlite_master WHERE type='table' AND name='user_settings'"
         )
-      );
-      if (!cols.has('send_song_scrobbling_data_to_listenbrainz')) {
-        db.exec(`
+        .get() as { cnt: number }
+    ).cnt;
+    const isFreshDb = tablesCount === 0;
+
+    if (isFreshDb) {
+      const tDdl = performance.now();
+      db.exec(BASELINE_DDL);
+      db.prepare(`PRAGMA user_version = ${SCHEMA_VERSION}`).run();
+      ddlMs = performance.now() - tDdl;
+      logger.info(`SQLite baseline schema applied (v${SCHEMA_VERSION}) in ${Math.round(ddlMs)}ms`);
+    } else {
+      // Existing database: run migrations if needed
+      let currentVersion = version === 0 ? 1 : version;
+      const tDdl = performance.now();
+
+      if (currentVersion === 1) {
+        const cols = new Set(
+          (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
+            (c) => c.name
+          )
+        );
+        if (!cols.has('send_song_scrobbling_data_to_listenbrainz')) {
+          db.exec(`
           BEGIN IMMEDIATE;
           ALTER TABLE user_settings ADD COLUMN send_song_scrobbling_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_scrobbling_data_to_listenbrainz IN (0,1));
           ALTER TABLE user_settings ADD COLUMN send_song_favorites_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_favorites_data_to_listenbrainz IN (0,1));
@@ -277,59 +276,83 @@ function openSqliteEngineInternal(dbPath: string): SqliteEngine {
           PRAGMA user_version = 2;
           COMMIT;
         `);
-      } else {
-        db.exec(`PRAGMA user_version = 2;`);
+        } else {
+          db.exec(`PRAGMA user_version = 2;`);
+        }
+        currentVersion = 2;
+        logger.info(
+          `SQLite incremental schema migration applied (v1 -> v2) in ${Math.round(performance.now() - tDdl)}ms`
+        );
       }
-      currentVersion = 2;
-      logger.info(
-        `SQLite incremental schema migration applied (v1 -> v2) in ${Math.round(performance.now() - tDdl)}ms`
-      );
-    }
 
-    if (currentVersion === 2) {
-      const cols = new Set(
-        (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
-          (c) => c.name
-        )
-      );
-      if (!cols.has('is_mini_player_taskbar_hidden')) {
-        db.exec(`
+      if (currentVersion === 2) {
+        const cols = new Set(
+          (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
+            (c) => c.name
+          )
+        );
+        if (!cols.has('is_mini_player_taskbar_hidden')) {
+          db.exec(`
           BEGIN IMMEDIATE;
           ALTER TABLE user_settings ADD COLUMN is_mini_player_taskbar_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_taskbar_hidden IN (0,1));
           PRAGMA user_version = 3;
           COMMIT;
         `);
-      } else {
-        db.exec(`PRAGMA user_version = 3;`);
+        } else {
+          db.exec(`PRAGMA user_version = 3;`);
+        }
+        currentVersion = 3;
+        logger.info(
+          `SQLite incremental schema migration applied (v2 -> v3) in ${Math.round(performance.now() - tDdl)}ms`
+        );
       }
-      currentVersion = 3;
-      logger.info(
-        `SQLite incremental schema migration applied (v2 -> v3) in ${Math.round(performance.now() - tDdl)}ms`
-      );
-    }
 
-    if (currentVersion === 3) {
-      db.exec(`
+      if (currentVersion === 3) {
+        db.exec(`
         BEGIN IMMEDIATE;
         CREATE INDEX IF NOT EXISTS idx_songs_title_covering ON songs (title, id, is_blacklisted);
         PRAGMA user_version = 4;
         COMMIT;
       `);
-      currentVersion = 4;
-      logger.info(
-        `SQLite incremental schema migration applied (v3 -> v4) in ${Math.round(performance.now() - tDdl)}ms`
-      );
-    }
+        currentVersion = 4;
+        logger.info(
+          `SQLite incremental schema migration applied (v3 -> v4) in ${Math.round(performance.now() - tDdl)}ms`
+        );
+      }
 
-    // Defensive check: ensure all required v2 and v3 columns exist on user_settings
-    const userSettingsCols = new Set(
-      (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
-        (c) => c.name
-      )
-    );
-    if (!userSettingsCols.has('send_song_scrobbling_data_to_listenbrainz')) {
-      logger.warn('Detected missing ListenBrainz columns on user_settings; applying schema repair');
-      db.exec(`
+      if (currentVersion === 4) {
+        const cols = new Set(
+          (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
+            (c) => c.name
+          )
+        );
+        if (!cols.has('visual_assets_config')) {
+          db.exec(`
+          BEGIN IMMEDIATE;
+          ALTER TABLE user_settings ADD COLUMN visual_assets_config TEXT NOT NULL DEFAULT '{"slots":{},"customAssets":[]}';
+          PRAGMA user_version = 5;
+          COMMIT;
+        `);
+        } else {
+          db.exec(`PRAGMA user_version = 5;`);
+        }
+        currentVersion = 5;
+        logger.info(
+          `SQLite incremental schema migration applied (v4 -> v5) in ${Math.round(performance.now() - tDdl)}ms`
+        );
+      }
+
+      // Defensive check: ensure all required v2, v3, and v5 columns exist on user_settings
+      const userSettingsCols = new Set(
+        (db.prepare('PRAGMA table_info(user_settings)').all() as { name: string }[]).map(
+          (c) => c.name
+        )
+      );
+      if (!userSettingsCols.has('send_song_scrobbling_data_to_listenbrainz')) {
+        logger.warn(
+          'Detected missing ListenBrainz columns on user_settings; applying schema repair'
+        );
+        db.exec(`
         BEGIN IMMEDIATE;
         ALTER TABLE user_settings ADD COLUMN send_song_scrobbling_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_scrobbling_data_to_listenbrainz IN (0,1));
         ALTER TABLE user_settings ADD COLUMN send_song_favorites_data_to_listenbrainz INTEGER NOT NULL DEFAULT 0 CHECK (send_song_favorites_data_to_listenbrainz IN (0,1));
@@ -338,109 +361,123 @@ function openSqliteEngineInternal(dbPath: string): SqliteEngine {
         ALTER TABLE user_settings ADD COLUMN listenbrainz_user_token TEXT;
         COMMIT;
       `);
-    }
-    if (!userSettingsCols.has('is_mini_player_taskbar_hidden')) {
-      logger.warn('Detected missing is_mini_player_taskbar_hidden column on user_settings; applying schema repair');
-      db.exec(`
+      }
+      if (!userSettingsCols.has('is_mini_player_taskbar_hidden')) {
+        logger.warn(
+          'Detected missing is_mini_player_taskbar_hidden column on user_settings; applying schema repair'
+        );
+        db.exec(`
         BEGIN IMMEDIATE;
         ALTER TABLE user_settings ADD COLUMN is_mini_player_taskbar_hidden INTEGER NOT NULL DEFAULT 0 CHECK (is_mini_player_taskbar_hidden IN (0,1));
         COMMIT;
       `);
-    }
+      }
+      if (!userSettingsCols.has('visual_assets_config')) {
+        logger.warn(
+          'Detected missing visual_assets_config column on user_settings; applying schema repair'
+        );
+        db.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE user_settings ADD COLUMN visual_assets_config TEXT NOT NULL DEFAULT '{"slots":{},"customAssets":[]}';
+        COMMIT;
+      `);
+      }
 
-    // Defensive self-heal check for C13 covering index
-    const songsCols = new Set(
-      (db.prepare('PRAGMA table_info(songs)').all() as { name: string }[]).map((c) => c.name)
-    );
-    const songsIndexes = new Set(
-      (
-        db
-          .prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='songs'")
-          .all() as { name: string }[]
-      ).map((i) => i.name)
-    );
-    if (
-      songsCols.has('title') &&
-      songsCols.has('id') &&
-      songsCols.has('is_blacklisted') &&
-      !songsIndexes.has('idx_songs_title_covering')
-    ) {
-      logger.warn('Detected missing idx_songs_title_covering index on songs; applying schema repair');
-      db.exec(`
+      // Defensive self-heal check for C13 covering index
+      const songsCols = new Set(
+        (db.prepare('PRAGMA table_info(songs)').all() as { name: string }[]).map((c) => c.name)
+      );
+      const songsIndexes = new Set(
+        (
+          db
+            .prepare("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='songs'")
+            .all() as { name: string }[]
+        ).map((i) => i.name)
+      );
+      if (
+        songsCols.has('title') &&
+        songsCols.has('id') &&
+        songsCols.has('is_blacklisted') &&
+        !songsIndexes.has('idx_songs_title_covering')
+      ) {
+        logger.warn(
+          'Detected missing idx_songs_title_covering index on songs; applying schema repair'
+        );
+        db.exec(`
         BEGIN IMMEDIATE;
         CREATE INDEX IF NOT EXISTS idx_songs_title_covering ON songs (title, id, is_blacklisted);
         COMMIT;
       `);
+      }
+
+      // Ensure user_version is at least SCHEMA_VERSION (never downgraded)
+      const finalVersion = (db.prepare('PRAGMA user_version').get() as { user_version: number })
+        .user_version;
+      if (finalVersion < SCHEMA_VERSION) {
+        db.prepare(`PRAGMA user_version = ${SCHEMA_VERSION}`).run();
+      }
+
+      ddlMs = performance.now() - tDdl;
     }
 
-    // Ensure user_version is at least SCHEMA_VERSION (never downgraded)
-    const finalVersion = (db.prepare('PRAGMA user_version').get() as { user_version: number })
-      .user_version;
-    if (finalVersion < SCHEMA_VERSION) {
-      db.prepare(`PRAGMA user_version = ${SCHEMA_VERSION}`).run();
-    }
+    const { orm, preparedObj, withTxLock, clearCaches, getActiveTxLock } = buildDrizzle(db);
 
-    ddlMs = performance.now() - tDdl;
-  }
-
-  const { orm, preparedObj, withTxLock, clearCaches, getActiveTxLock } = buildDrizzle(db);
-
-  const engine: SqliteEngine = {
-    kind: 'sqlite',
-    dbPath,
-    raw: db,
-    orm,
-    initMs: { open: openMs, pragma: pragmaMs, ddl: ddlMs },
-    exec: (sql) => db.exec(sql),
-    run: (sql, params = []) =>
-      preparedObj(sql).run(...(params as never[])) as {
-        changes: number | bigint;
-        lastInsertRowid: number | bigint;
-      },
-    all: (sql, params = []) =>
-      preparedObj(sql).all(...(params as never[])) as Record<string, unknown>[],
-    get: (sql, params = []) =>
-      preparedObj(sql).get(...(params as never[])) as Record<string, unknown> | undefined,
-    withTxLock,
-    close: async () => {
-      const t = performance.now();
-      const activeLock = getActiveTxLock();
-      let timedOut = false;
-      if (activeLock) {
+    const engine: SqliteEngine = {
+      kind: 'sqlite',
+      dbPath,
+      raw: db,
+      orm,
+      initMs: { open: openMs, pragma: pragmaMs, ddl: ddlMs },
+      exec: (sql) => db.exec(sql),
+      run: (sql, params = []) =>
+        preparedObj(sql).run(...(params as never[])) as {
+          changes: number | bigint;
+          lastInsertRowid: number | bigint;
+        },
+      all: (sql, params = []) =>
+        preparedObj(sql).all(...(params as never[])) as Record<string, unknown>[],
+      get: (sql, params = []) =>
+        preparedObj(sql).get(...(params as never[])) as Record<string, unknown> | undefined,
+      withTxLock,
+      close: async () => {
+        const t = performance.now();
+        const activeLock = getActiveTxLock();
+        let timedOut = false;
+        if (activeLock) {
+          try {
+            await Promise.race([
+              activeLock,
+              new Promise<void>((_resolve, reject) =>
+                setTimeout(() => reject(new Error('Timed out waiting for txLock on close')), 5000)
+              )
+            ]);
+          } catch (error) {
+            timedOut = true;
+            logger.warn('[db] active transaction did not complete before close timeout', { error });
+          }
+        }
+        if (timedOut) {
+          try {
+            db.exec('ROLLBACK;');
+          } catch {
+            /* no open transaction or already rolled back */
+          }
+        }
+        clearCaches();
         try {
-          await Promise.race([
-            activeLock,
-            new Promise<void>((_resolve, reject) =>
-              setTimeout(() => reject(new Error('Timed out waiting for txLock on close')), 5000)
-            )
-          ]);
+          db.exec('PRAGMA optimize;');
         } catch (error) {
-          timedOut = true;
-          logger.warn('[db] active transaction did not complete before close timeout', { error });
+          logger.warn('[db] optimize skipped on close', { error });
         }
-      }
-      if (timedOut) {
         try {
-          db.exec('ROLLBACK;');
+          db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
         } catch {
-          /* no open transaction or already rolled back */
+          /* another connection may hold the db; checkpoint is best-effort on close */
         }
+        db.close();
+        return performance.now() - t;
       }
-      clearCaches();
-      try {
-        db.exec('PRAGMA optimize;');
-      } catch (error) {
-        logger.warn('[db] optimize skipped on close', { error });
-      }
-      try {
-        db.exec('PRAGMA wal_checkpoint(TRUNCATE);');
-      } catch {
-        /* another connection may hold the db; checkpoint is best-effort on close */
-      }
-      db.close();
-      return performance.now() - t;
-    }
-  };
+    };
 
     (orm as any)._engine = engine;
 
@@ -456,9 +493,9 @@ function openSqliteEngineInternal(dbPath: string): SqliteEngine {
 }
 
 /**
- * Opens SQLite engine with automatic corruption recovery (DAT-01).
- * If the database file is corrupted or unreadable, backs it up to .corrupt.<ts>
- * and creates a clean database instead of crashing Nora.
+ * Opens SQLite engine with automatic corruption recovery (DAT-01). If the database file is
+ * corrupted or unreadable, backs it up to .corrupt.<ts> and creates a clean database instead of
+ * crashing Nora.
  */
 export function openSqliteEngine(dbPath: string): SqliteEngine {
   try {
@@ -482,23 +519,36 @@ export function openSqliteEngine(dbPath: string): SqliteEngine {
           fs.renameSync(`${dbPath}-shm`, `${corruptPath}-shm`);
         }
       } catch (backupError) {
-        logger.error('[db] Failed to rename corrupt database files due to lock; preserving original and attempting non-destructive copy', { backupError });
+        logger.error(
+          '[db] Failed to rename corrupt database files due to lock; preserving original and attempting non-destructive copy',
+          { backupError }
+        );
         try {
           fs.copyFileSync(dbPath, corruptPath);
-          if (fs.existsSync(`${dbPath}-wal`)) fs.copyFileSync(`${dbPath}-wal`, `${corruptPath}-wal`);
-          if (fs.existsSync(`${dbPath}-shm`)) fs.copyFileSync(`${dbPath}-shm`, `${corruptPath}-shm`);
+          if (fs.existsSync(`${dbPath}-wal`))
+            fs.copyFileSync(`${dbPath}-wal`, `${corruptPath}-wal`);
+          if (fs.existsSync(`${dbPath}-shm`))
+            fs.copyFileSync(`${dbPath}-shm`, `${corruptPath}-shm`);
         } catch (copyError) {
-          logger.warn('[db] Non-destructive copy also locked; original files preserved intact for quarantine', { copyError });
+          logger.warn(
+            '[db] Non-destructive copy also locked; original files preserved intact for quarantine',
+            { copyError }
+          );
         }
       }
 
       if (fs.existsSync(dbPath)) {
         // If the corrupt file is still locked and present at dbPath, redirect to a fallback path to prevent crash loops
         targetPath = `${dbPath}.recovered.${ts}`;
-        logger.warn('[db] Original database path remains locked. Diverting fresh database to recovered path.', { targetPath });
+        logger.warn(
+          '[db] Original database path remains locked. Diverting fresh database to recovered path.',
+          { targetPath }
+        );
       }
 
-      logger.info('[db] Initializing clean SQLite database after corruption recovery', { targetPath });
+      logger.info('[db] Initializing clean SQLite database after corruption recovery', {
+        targetPath
+      });
       return openSqliteEngineInternal(targetPath);
     }
     throw error;

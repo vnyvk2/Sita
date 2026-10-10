@@ -5,7 +5,6 @@ import type {
   ListeningAnalyticsData,
   LibraryAudioStatsData
 } from '../common/analytics';
-import type { HistorySongIdsParams, HistorySongIdsResult } from '../main/db/queries/history';
 import type { DaemonCommand, DaemonPushEvent, DaemonResponse } from '../common/audioEngineProtocol';
 import type {
   PlaylistDto as CollectionDto,
@@ -48,6 +47,13 @@ import type {
   BatchImportSummaryResult
 } from '../common/collections/types';
 import type { MetadataProviderPreferences, MetadataSearchOptions } from '../common/metadata';
+import type {
+  CustomVisualAssetMeta,
+  VisualAssetsConfig,
+  VisualSlotAssignment,
+  VisualSlotId
+} from '../common/visualSlots';
+import type { HistorySongIdsParams, HistorySongIdsResult } from '../main/db/queries/history';
 import type {
   ArtistDiscographyPayload,
   ArtistOnlineProfilePayload,
@@ -1194,6 +1200,55 @@ export const api = {
     validateAndSaveToken: (token: string): Promise<{ success: boolean; userName: string }> =>
       ipcRenderer.invoke('app/validateAndSaveListenBrainzToken', token),
     disconnect: (): Promise<boolean> => ipcRenderer.invoke('app/disconnectListenBrainz')
+  },
+  visualAssets: {
+    getState: (): Promise<{
+      config: VisualAssetsConfig;
+      customAssetsProtocolBaseUrl: string;
+    }> => ipcRenderer.invoke('app/visualAssets/getState'),
+    importAsset: (options?: {
+      filePath?: string;
+      name?: string;
+    }): Promise<{
+      success: boolean;
+      canceled?: boolean;
+      asset?: CustomVisualAssetMeta;
+      config?: VisualAssetsConfig;
+      error?: string;
+    }> => ipcRenderer.invoke('app/visualAssets/importAsset', options),
+    assignSlot: (
+      slotId: VisualSlotId,
+      assignment: VisualSlotAssignment
+    ): Promise<{
+      success: boolean;
+      config: VisualAssetsConfig;
+      error?: string;
+    }> => ipcRenderer.invoke('app/visualAssets/assignSlot', slotId, assignment),
+    deleteAsset: (
+      assetId: string
+    ): Promise<{
+      success: boolean;
+      config: VisualAssetsConfig;
+      unassignedSlots: VisualSlotId[];
+      error?: string;
+    }> => ipcRenderer.invoke('app/visualAssets/deleteAsset', assetId),
+    resetSlots: (
+      category?: 'brand' | 'nav' | 'empty'
+    ): Promise<{
+      success: boolean;
+      config: VisualAssetsConfig;
+    }> => ipcRenderer.invoke('app/visualAssets/resetSlots', category),
+    setDynamicNowPlayingIcon: (
+      artworkPath: string | null
+    ): Promise<{ applied: boolean; requestId: number; reason?: string }> =>
+      ipcRenderer.invoke('app/visualAssets/setDynamicNowPlayingIcon', artworkPath),
+    setDynamicMode: (
+      enabled: boolean
+    ): Promise<{
+      success: boolean;
+      config: VisualAssetsConfig;
+      error?: string;
+    }> => ipcRenderer.invoke('app/visualAssets/setDynamicMode', enabled)
   },
   audioEngine: {
     isAvailable: (): Promise<boolean> => ipcRenderer.invoke('audioEngine/isAvailable'),

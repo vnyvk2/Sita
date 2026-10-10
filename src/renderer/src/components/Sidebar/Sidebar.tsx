@@ -1,3 +1,4 @@
+import { useNavVisualSlots } from '@renderer/hooks/useVisualSlot';
 import { store } from '@renderer/store/store';
 import { dndStore, workspaceActions } from '@renderer/workspace/store';
 import { linkOptions, useLocation } from '@tanstack/react-router';
@@ -13,6 +14,7 @@ import SidebarPlaylistsSection from './SidebarPlaylistsSection';
 import SidebarResizer from './SidebarResizer';
 
 const Sidebar = memo(() => {
+  const { getNavCustomIcon } = useNavVisualSlots();
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
   const visibleSideTabs = useStore(
     store,
@@ -115,10 +117,7 @@ const Sidebar = memo(() => {
       const s = dndStore.state;
       if (s.isDragging || isResizingRef.current) return;
       const ctx = store.state;
-      if (
-        (ctx.contextMenuData?.isVisible ?? false) ||
-        (ctx.promptMenuData?.isVisible ?? false)
-      )
+      if ((ctx.contextMenuData?.isVisible ?? false) || (ctx.promptMenuData?.isVisible ?? false))
         return;
       if (!dndStore.state.isSidebarPinned && dndStore.state.isSidebarPeeking) {
         workspaceActions.setSidebarPeeking(false);
@@ -301,11 +300,14 @@ const Sidebar = memo(() => {
           key={link.id}
           parentClassName={link.parentClassName}
           icon={link.icon}
-          customIcon={'customIcon' in link ? (link.customIcon as React.ReactNode) : undefined}
+          customIcon={
+            getNavCustomIcon(link.id, link.icon) ??
+            ('customIcon' in link ? (link.customIcon as React.ReactNode) : undefined)
+          }
           content={link.content}
         />
       )),
-    [filteredLinkData]
+    [filteredLinkData, getNavCustomIcon]
   );
 
   const bgClass = bodyBackgroundImage

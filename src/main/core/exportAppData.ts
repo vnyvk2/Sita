@@ -18,6 +18,7 @@ const DEFAULT_EXPORT_DIALOG_OPTIONS: OpenDialogOptions = {
 
 const userDataPath = app.getPath('userData');
 export const songCoversFolderPath = path.join(userDataPath, 'song_covers');
+export const customAssetsFolderPath = path.join(userDataPath, 'custom_assets');
 
 const warningMessage = `***** IMPORTANT *****
 
@@ -36,6 +37,10 @@ const exportAppData = async (localStorageData: string) => {
   const destinations = await showOpenDialog(DEFAULT_EXPORT_DIALOG_OPTIONS);
   const dbDump = await exportDatabase();
   const userPreferences = await exportUserPreferences();
+  const hasCustomAssets = await fs
+    .stat(customAssetsFolderPath)
+    .then((s) => s.isDirectory())
+    .catch(() => false);
 
   const operations = [
     // SONG DATA
@@ -62,7 +67,15 @@ const exportAppData = async (localStorageData: string) => {
     {
       filename: 'song_covers',
       directory: songCoversFolderPath
-    }
+    },
+    ...(hasCustomAssets
+      ? [
+          {
+            filename: 'custom_assets',
+            directory: customAssetsFolderPath
+          }
+        ]
+      : [])
   ];
 
   try {
@@ -81,7 +94,7 @@ const exportAppData = async (localStorageData: string) => {
         const operation = operations[i];
 
         if (operation?.directory) {
-          await copyDir(operation.directory, path.join(destination, 'song_covers'));
+          await copyDir(operation.directory, path.join(destination, operation.filename));
         } else if (operation?.dataString) {
           await fs.writeFile(path.join(destination, operation.filename), operation.dataString);
         } else throw new Error('Invalid operation');

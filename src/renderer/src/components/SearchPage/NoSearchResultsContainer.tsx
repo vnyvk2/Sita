@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import NoResultsImage from '../../assets/images/svg/Sad face_Monochromatic.svg';
+import { useVisualSlot } from '../../hooks/useVisualSlot';
 import Img from '../Img';
 import RecentSearchResult from './RecentSearchResult';
 
@@ -14,6 +15,7 @@ type Props = {
 
 const NoSearchResultsContainer = (props: Props) => {
   const { t } = useTranslation();
+  const customEmptySrc = useVisualSlot('empty.noSearchResults');
 
   const { searchInput, searchResults, updateSearchInput } = props;
   const { albums, artists, genres, playlists, songs } = searchResults;
@@ -44,7 +46,8 @@ const NoSearchResultsContainer = (props: Props) => {
         searchInput.trim() !== '' && (
           <div className="no-search-results-container active appear-from-bottom relative mt-16 flex w-full flex-col items-center justify-center text-center">
             <Img
-              src={NoResultsImage}
+              src={customEmptySrc || NoResultsImage}
+              fallbackSrc={NoResultsImage}
               className={
                 songs.length === 0 &&
                 artists.length === 0 &&
@@ -52,7 +55,7 @@ const NoSearchResultsContainer = (props: Props) => {
                 playlists.length === 0 &&
                 genres.length === 0 &&
                 searchInput !== ''
-                  ? 'mb-4 w-60 max-w-full'
+                  ? 'mb-4 max-h-60 w-60 max-w-full object-contain'
                   : ''
               }
               alt="Flying kite"

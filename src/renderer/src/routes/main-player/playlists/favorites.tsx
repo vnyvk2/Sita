@@ -1,4 +1,5 @@
 import { type DropdownOption } from '@renderer/components/Dropdown';
+import Img from '@renderer/components/Img';
 import MainContainer from '@renderer/components/MainContainer';
 import PlaylistInfoAndImgContainer from '@renderer/components/PlaylistsInfoPage/PlaylistInfoAndImgContainer';
 import Song from '@renderer/components/SongsPage/Song';
@@ -8,6 +9,7 @@ import TitleContainer from '@renderer/components/TitleContainer';
 import VirtualizedList from '@renderer/components/VirtualizedList';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSelectAllHandler from '@renderer/hooks/useSelectAllHandler';
+import { useVisualSlot } from '@renderer/hooks/useVisualSlot';
 import { useWindowHydration } from '@renderer/hooks/useWindowHydration';
 import { getQueuesManager } from '@renderer/other/queuesManager';
 import {
@@ -29,6 +31,7 @@ import { useCallback, useContext, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { SpecialPlaylists } from '../../../../../common/playlists.enum';
+import HeartFaceImage from '../../../assets/images/svg/Heart face _Monochromatic.svg';
 import favoritesPlaylistCoverImage from '../../../assets/images/webp/favorites-playlist-icon.webp';
 
 export const Route = createFileRoute('/main-player/playlists/favorites')({
@@ -83,6 +86,7 @@ const playlistData: Playlist = {
  * management, import, and sorting using ID-first windowed hydration.
  */
 function FavoritesPlaylistInfoPage() {
+  const customNoFavoritesSrc = useVisualSlot('empty.noFavorites');
   const favoritesSortingState = useStore(
     store,
     (state) => state.localStorage.sortingStates?.favoritesPage || 'addedOrder'
@@ -154,7 +158,14 @@ function FavoritesPlaylistInfoPage() {
 
   const handleSongPlayBtnClick = useCallback(
     (currSongId: number) => {
-      createQueue(playableSongIds, 'favorites', false, '', false, t('common.favorites', 'Favorites'));
+      createQueue(
+        playableSongIds,
+        'favorites',
+        false,
+        '',
+        false,
+        t('common.favorites', 'Favorites')
+      );
       updateQueueData(playableSongIds.indexOf(currSongId), undefined, false, true);
     },
     [createQueue, updateQueueData, t, playableSongIds]
@@ -175,14 +186,7 @@ function FavoritesPlaylistInfoPage() {
 
   const shuffleAndPlaySongs = useCallback(
     () =>
-      createQueue(
-        playableSongIds,
-        'favorites',
-        true,
-        '',
-        true,
-        t('common.favorites', 'Favorites')
-      ),
+      createQueue(playableSongIds, 'favorites', true, '', true, t('common.favorites', 'Favorites')),
     [createQueue, playableSongIds, t]
   );
 
@@ -334,7 +338,16 @@ function FavoritesPlaylistInfoPage() {
       />
       {filteredSongIds.length === 0 && (
         <div className="no-songs-container appear-from-bottom text-font-color-black dark:text-font-color-white relative flex h-full grow flex-col items-center justify-center text-center text-lg font-light opacity-80!">
-          <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
+          {customNoFavoritesSrc ? (
+            <Img
+              src={customNoFavoritesSrc}
+              fallbackSrc={HeartFaceImage}
+              alt=""
+              className="mb-4 max-h-48 w-48 object-contain"
+            />
+          ) : (
+            <span className="material-icons-round-outlined mb-4 text-5xl">brightness_empty</span>
+          )}
           {t('playlist.empty')}
         </div>
       )}
