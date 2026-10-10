@@ -9,6 +9,8 @@ import { CloseIcon, MaximizeIcon, MinimizeIcon } from '../Icons/WindowIcons';
 
 const WindowControlsContainer = () => {
   const bodyBackgroundImage = useStore(store, (state) => state.bodyBackgroundImage);
+  const isFullScreenPlayer = useStore(store, (state) => state.playerType === 'full');
+  const useLightText = Boolean(bodyBackgroundImage || isFullScreenPlayer);
   const {
     data: { hideWindowOnClose }
   } = useSuspenseQuery({
@@ -28,13 +30,17 @@ const WindowControlsContainer = () => {
 
   return (
     <div
-      className="window-controls-container bg-background-color-2/70 dark:bg-dark-background-color-2/80 flex h-full items-center justify-end [-webkit-app-region:no-drag]"
+      className={`window-controls-container flex h-full items-center justify-end [-webkit-app-region:no-drag] ${
+        isFullScreenPlayer
+          ? 'bg-transparent'
+          : 'bg-background-color-2/70 dark:bg-dark-background-color-2/80'
+      }`}
       id="window-controls-container"
     >
       <button
         type="button"
         className={`minimize-btn text-font-color-black/80 hover:bg-background-color-3/60 hover:text-font-color-black dark:text-font-color-white/80 dark:hover:bg-dark-background-color-3/60 dark:hover:text-font-color-white m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent transition-colors ease-in-out focus-visible:outline-hidden ${
-          bodyBackgroundImage && 'text-font-color-white!'
+          useLightText && 'text-font-color-white!'
         }`}
         onClick={minimize}
         title={t('titleBar.minimize')}
@@ -44,7 +50,7 @@ const WindowControlsContainer = () => {
       <button
         type="button"
         className={`maximize-btn text-font-color-black/80 hover:bg-background-color-3/60 hover:text-font-color-black dark:text-font-color-white/80 dark:hover:bg-dark-background-color-3/60 dark:hover:text-font-color-white m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent transition-colors ease-in-out focus-visible:outline-hidden ${
-          bodyBackgroundImage && 'text-font-color-white!'
+          useLightText && 'text-font-color-white!'
         }`}
         onClick={maximize}
         title={t('titleBar.maximize')}
@@ -54,7 +60,7 @@ const WindowControlsContainer = () => {
       <button
         type="button"
         className={`close-btn text-font-color-black/80 dark:text-font-color-white/80 m-0 flex h-full w-10 cursor-pointer items-center justify-center rounded-none border-0 bg-transparent transition-colors ease-in-out hover:bg-[#e81123] hover:text-white focus-visible:outline-hidden dark:hover:bg-[#e81123] dark:hover:text-white ${
-          bodyBackgroundImage && 'text-font-color-white!'
+          useLightText && 'text-font-color-white!'
         }`}
         onClick={close}
         title={t('titleBar.close')}

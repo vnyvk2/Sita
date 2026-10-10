@@ -25,7 +25,7 @@ export const FullScreenQueueDrawer = memo(({ isOpen, onClose }: FullScreenQueueD
           aria-label={t('common.close', 'Close')}
           tabIndex={-1}
           onClick={onClose}
-          className="fixed inset-0 z-30 cursor-default border-0 bg-black/50 backdrop-blur-xs transition-opacity duration-300"
+          className="fixed inset-0 z-40 cursor-default border-0 bg-black/50 backdrop-blur-xs transition-opacity duration-300 [-webkit-app-region:no-drag]"
         />
       )}
 
@@ -35,12 +35,12 @@ export const FullScreenQueueDrawer = memo(({ isOpen, onClose }: FullScreenQueueD
         role="dialog"
         aria-modal="true"
         aria-label={t('player.currentQueue', 'Queue')}
-        className={`fixed top-0 right-0 z-40 flex h-full w-[420px] max-w-[92vw] flex-col border-l border-white/10 bg-zinc-950/90 p-4 shadow-2xl backdrop-blur-2xl transition-transform duration-300 ease-out select-none ${
+        className={`fixed top-0 right-0 z-50 flex h-full w-[420px] max-w-[92vw] flex-col border-l border-white/10 bg-zinc-950/90 p-4 shadow-2xl backdrop-blur-2xl transition-transform duration-300 ease-out select-none [-webkit-app-region:no-drag] ${
           isOpen ? 'translate-x-0' : 'pointer-events-none translate-x-full'
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
             <span className="material-icons-round text-xl text-white/80">queue_music</span>
             <h2 className="text-base font-semibold text-white">
@@ -59,7 +59,7 @@ export const FullScreenQueueDrawer = memo(({ isOpen, onClose }: FullScreenQueueD
         </div>
 
         {/* Virtualized Queue List Container */}
-        <div className="min-h-0 flex-1 pt-2">
+        <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden pt-2">
           <QueueContainer isQueueVisible={isOpen} />
         </div>
       </aside>

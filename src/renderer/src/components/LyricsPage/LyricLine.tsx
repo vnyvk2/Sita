@@ -18,6 +18,7 @@ interface LyricProp {
   convertedLyric?: string | SyncedLyricsLineWord[];
   index: number;
   isActive?: boolean;
+  activeLineIndex?: number | null;
   syncedStart?: number;
   syncedEnd?: number;
   prevLineEnd?: number;
@@ -51,6 +52,7 @@ const LyricLine = (props: LyricProp) => {
     isInAbLoop = false,
     isLoopStart = false,
     isActive = false,
+    activeLineIndex = null,
     isAutoScrolling = true,
     playerType = 'normal'
   } = props;
@@ -66,6 +68,25 @@ const LyricLine = (props: LyricProp) => {
   const [activeWordIndex, setActiveWordIndex] = useState<number | null>(null);
 
   const isSynced = syncedStart !== undefined && syncedEnd !== undefined;
+  const isInterludeLine =
+    isSynced && typeof lyric === 'string' && (lyric.trim() === '•••' || lyric.trim() === '...');
+
+  const fullScreenDepthClass = useMemo(() => {
+    if (playerType !== 'full' || !isSynced) return '';
+    if (isActive) {
+      return 'text-font-color-highlight! dark:text-dark-font-color-highlight! scale-100! blur-none! drop-shadow-[0_0_24px_rgba(255,255,255,0.18)]';
+    }
+    if (isInAbLoop) {
+      return 'text-white/75! scale-90! blur-none!';
+    }
+    if (activeLineIndex === null || activeLineIndex === undefined) {
+      return 'text-white/25! scale-[0.82]! blur-[1px]!';
+    }
+    const distance = Math.abs(index - activeLineIndex);
+    if (distance === 1) return 'text-white/55! scale-[0.88]! blur-[0.5px]!';
+    if (distance === 2) return 'text-white/35! scale-[0.80]! blur-[1.5px]!';
+    return 'text-white/18! scale-75! blur-[2.5px]!';
+  }, [playerType, isSynced, isActive, isInAbLoop, activeLineIndex, index]);
 
   // Auto-scroll when this line becomes active, OR when auto-scroll is re-enabled while active.
   useEffect(() => {
@@ -120,6 +141,30 @@ const LyricLine = (props: LyricProp) => {
   }, [isActive, lyric, translatedLyricLines, convertedLyric]);
 
   const lyricString = useMemo(() => {
+    if (isInterludeLine) {
+      return (
+        <span
+          data-testid="lyrics-interlude-orbs"
+          aria-label="Instrumental interlude"
+          className="inline-flex items-center gap-3 py-2"
+        >
+          {[0, 1, 2].map((orbIdx) => (
+            <span
+              key={orbIdx}
+              style={{ animationDelay: `${orbIdx * 220}ms` }}
+              className={`inline-block rounded-full transition-all duration-300 ${
+                playerType === 'full' ? 'h-4 w-4' : 'h-3 w-3'
+              } ${
+                isActive
+                  ? 'bg-font-color-highlight dark:bg-dark-font-color-highlight animate-pulse shadow-[0_0_14px_currentColor]'
+                  : 'bg-white/25'
+              }`}
+            />
+          ))}
+        </span>
+      );
+    }
+
     if (typeof lyric === 'string') return getLyricText(lyric);
 
     return lyric.map((extendedText, i) => (
@@ -133,7 +178,7 @@ const LyricLine = (props: LyricProp) => {
         delay={0}
       />
     ));
-  }, [isActive, activeWordIndex, lyric]);
+  }, [isInterludeLine, playerType, isActive, activeWordIndex, lyric]);
 
   const translatedLyricString = useMemo(() => {
     if (translatedLyricLines.length === 0) return undefined;
@@ -177,6 +222,7 @@ const LyricLine = (props: LyricProp) => {
 
   return (
     <div
+      data-lyric-line="true"
       style={{
         animationDelay: `${100 + 20 * (index + 1)}ms`
       }}
@@ -188,7 +234,7 @@ const LyricLine = (props: LyricProp) => {
             })
           : undefined
       }
-      className={`highlight text-font-color-black/20 dark:text-font-color-white/20 z-0 mb-5 flex w-fit flex-col items-center justify-center text-center text-5xl font-medium text-balance transition-[transform,translate,scale,color,filter] duration-250 select-none first:mt-8 last:mb-4 empty:mb-16 ${
+      className={`highlight text-font-color-black/20 dark:text-font-color-white/20 z-0 mb-5 flex w-fit flex-col items-center justify-center text-center text-5xl font-medium text-balance transition-[transform,translate,scale,color,filter,opacity] duration-300 ease-out select-none first:mt-8 last:mb-4 empty:mb-16 ${
         isSynced
           ? `cursor-pointer blur-[1px] ${
               isActive
@@ -206,7 +252,7 @@ const LyricLine = (props: LyricProp) => {
         'mb-4! w-full! items-center! justify-center! text-center! text-2xl! leading-snug'
       } ${
         playerType === 'full' &&
-        'text-font-color-white/20! mb-6! origin-left items-start! justify-start! text-left! text-7xl!'
+        `mb-6! origin-left items-start! justify-start! text-left! text-6xl! xl:text-7xl! ${fullScreenDepthClass}`
       }`}
       ref={lyricsRef}
       onClick={(e) => {

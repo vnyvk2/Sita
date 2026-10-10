@@ -1,4 +1,4 @@
-import { store } from '@renderer/store/store';
+import { dispatch, store } from '@renderer/store/store';
 import { useStore } from '@tanstack/react-store';
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,21 +8,45 @@ import { AppUpdateContext } from '../../contexts/AppUpdateContext';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import useMouseActiveState from '../../hooks/useMouseActiveState';
 import { useLyricsQuery } from '../../queries/lyrics';
-import AuroraBackground from '../fx/AuroraBackground';
 import BorderBeam from '../fx/BorderBeam';
-import ParticlesLayer from '../fx/ParticlesLayer';
 import Img from '../Img';
 import TitleBar from '../TitleBar/TitleBar';
 import FullScreenAudioBadge from './components/FullScreenAudioBadge';
 import FullScreenControls from './components/FullScreenControls';
+import FullScreenLinerNotesStage from './components/FullScreenLinerNotesStage';
+import FullScreenLiquidBackdrop from './components/FullScreenLiquidBackdrop';
 import FullScreenQueueDrawer from './components/FullScreenQueueDrawer';
 import FullScreenSeekbar from './components/FullScreenSeekbar';
+import FullScreenStageSwitcher, {
+  type FullScreenStageMode
+} from './components/FullScreenStageSwitcher';
+import FullScreenVinylStage from './components/FullScreenVinylStage';
+import FullScreenZenClock from './components/FullScreenZenClock';
 import LyricsContainer from './containers/LyricsContainer';
 
 const isInteractiveShortcutTarget = (target: EventTarget | null): boolean => {
   if (!(target instanceof Element)) return false;
   return Boolean(target.closest('input, textarea, select, [contenteditable]'));
 };
+
+const REPEAT_GUARDED_KEYS = new Set([
+  ' ',
+  'l',
+  'L',
+  'q',
+  'Q',
+  'v',
+  'V',
+  'i',
+  'I',
+  'c',
+  'C',
+  'k',
+  'K',
+  '1',
+  '2',
+  '3'
+]);
 
 const FullScreenPlayer = () => {
   const isCurrentSongPlaying = useStore(store, (state) => state.player.isCurrentSongPlaying);
@@ -36,13 +60,16 @@ const FullScreenPlayer = () => {
 
   const [isLyricsVisible, setIsLyricsVisible] = useState(false);
   const [isQueueVisible, setIsQueueVisible] = useState(false);
+  const [stageMode, setStageMode] = useState<FullScreenStageMode>('showcase');
+  const [isZenClockEnabled, setIsZenClockEnabled] = useState(true);
 
   const { data: lyrics, isPending: isLyricsPending } = useLyricsQuery({
     enabled: isLyricsVisible
   });
   const isLyricsAvailable = Boolean(lyrics?.lyrics);
   // Hold split layout during fetch to avoid Showcase -> Split snap on late resolve
-  const isSplitLayout = isLyricsVisible && (isLyricsAvailable || isLyricsPending);
+  const isLyricsSplit = isLyricsVisible && (isLyricsAvailable || isLyricsPending);
+  const isSplitLayout = isLyricsSplit || stageMode === 'linerNotes';
 
   const fullScreenPlayerContainerRef = useRef<HTMLDivElement>(null);
   const { isMouseActive } = useMouseActiveState(fullScreenPlayerContainerRef, {
@@ -79,6 +106,28 @@ const FullScreenPlayer = () => {
     (state) => state.localStorage.preferences?.isReducedMotion ?? false
   );
 
+  const handleSelectStageMode = useCallback((mode: FullScreenStageMode) => {
+    setStageMode(mode);
+    if (mode === 'linerNotes') {
+      setIsLyricsVisible(false);
+    }
+  }, []);
+
+  const handleSetLyricsVisible: React.Dispatch<React.SetStateAction<boolean>> = useCallback(
+    (updater) => {
+      setIsLyricsVisible((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        if (next) {
+          setStageMode((currentStage) =>
+            currentStage === 'linerNotes' ? 'showcase' : currentStage
+          );
+        }
+        return next;
+      });
+    },
+    []
+  );
+
   // Keyboard ergonomics for Cinema/Fullscreen Mode
   // Single owner for Escape when queue is concerned is here; drawer has no own listener
   // to avoid capture/bubble double-handling on window.
@@ -87,8 +136,8 @@ const FullScreenPlayer = () => {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (isInteractiveShortcutTarget(e.target)) return;
-      if (e.repeat && (e.key === ' ' || e.key === 'l' || e.key === 'L' || e.key === 'q' || e.key === 'Q'))
-        return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.repeat && REPEAT_GUARDED_KEYS.has(e.key)) return;
 
       switch (e.key) {
         case 'Escape':
@@ -129,27 +178,66 @@ const FullScreenPlayer = () => {
           break;
         case 'l':
         case 'L':
-          setIsLyricsVisible((prev) => !prev);
+          handleSetLyricsVisible((prev) => !prev);
           break;
         case 'q':
         case 'Q':
           setIsQueueVisible((prev) => !prev);
           break;
+        case 'v':
+        case 'V':
+          setStageMode((prev) => (prev === 'vinyl' ? 'showcase' : 'vinyl'));
+          break;
+        case 'i':
+        case 'I':
+          setStageMode((prev) => {
+            const next = prev === 'linerNotes' ? 'showcase' : 'linerNotes';
+            if (next === 'linerNotes') setIsLyricsVisible(false);
+            return next;
+          });
+          break;
+        case 'c':
+        case 'C':
+          setIsZenClockEnabled((prev) => !prev);
+          break;
+        case 'k':
+        case 'K':
+          dispatch({ type: 'TOGGLE_KARAOKE_MODE' });
+          break;
+        case '1':
+          handleSelectStageMode('showcase');
+          break;
+        case '2':
+          handleSelectStageMode('vinyl');
+          break;
+        case '3':
+          handleSelectStageMode('linerNotes');
+          break;
         default:
           break;
       }
     },
-    [isQueueVisible, player, toggleSongPlayback, updatePlayerType, updateVolume]
+    [
+      handleSelectStageMode,
+      handleSetLyricsVisible,
+      isQueueVisible,
+      player,
+      toggleSongPlayback,
+      updatePlayerType,
+      updateVolume
+    ]
   );
 
   const closeQueueDrawer = useCallback(() => setIsQueueVisible(false), []);
+  const toggleZenClock = useCallback(() => setIsZenClockEnabled((prev) => !prev), []);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  const isControlsVisible = isMouseActive || !isCurrentSongPlaying;
+  // Keep controls and cursor active whenever Queue Drawer is open or playback is paused
+  const isControlsVisible = isMouseActive || !isCurrentSongPlaying || isQueueVisible;
 
   return (
     <div
@@ -164,27 +252,15 @@ const FullScreenPlayer = () => {
         !isControlsVisible ? 'cursor-none' : ''
       }`}
     >
-      {/* Immersive Dynamic Backdrop */}
-      <div className="background-cover-img-container pointer-events-none absolute top-0 left-0 h-full w-full overflow-hidden">
-        <Img
-          src={imgPath}
-          fallbackSrc={DefaultSongCover}
-          loading="eager"
-          alt="Song Cover"
-          className="h-full w-full object-cover shadow-lg blur-[2.5rem]! brightness-[.22]! transition-[filter] delay-100 duration-300 ease-in-out"
-        />
-        {isAmbientParticlesEnabled && (
-          <ParticlesLayer
-            isActive={isCurrentSongPlaying}
-            isSystemPaused={isFxSystemPaused || isReducedMotionPref}
-          />
-        )}
-        <AuroraBackground
-          animated={!preferences?.isReducedMotion}
-          intensity={0.35}
-          colors={['var(--fx-accent)', 'var(--fx-accent-third)', 'var(--fx-accent-alt)']}
-        />
-      </div>
+      {/* Multi-Layer Liquid Artwork Mesh Backdrop */}
+      <FullScreenLiquidBackdrop
+        artworkPath={imgPath}
+        paletteData={currentSongData.paletteData}
+        isPlaying={isCurrentSongPlaying}
+        isReducedMotion={Boolean(isReducedMotionPref)}
+        isSystemPaused={Boolean(isFxSystemPaused)}
+        isAmbientParticlesEnabled={Boolean(isAmbientParticlesEnabled)}
+      />
 
       {/* Top TitleBar (fades gracefully when idle in cinema mode) */}
       <div
@@ -195,29 +271,55 @@ const FullScreenPlayer = () => {
         <TitleBar />
       </div>
 
+      {/* Floating Stage Switcher Toolbar */}
+      <FullScreenStageSwitcher
+        stageMode={stageMode}
+        onSelectStageMode={handleSelectStageMode}
+        isZenClockEnabled={isZenClockEnabled}
+        onToggleZenClock={toggleZenClock}
+        isVisible={isControlsVisible}
+      />
+
+      {/* Zen Desk-Display Clock Overlay */}
+      <FullScreenZenClock isVisible={isZenClockEnabled} isIdle={!isControlsVisible} />
+
       {/* Main Adaptive Stage Area */}
       <main className="relative z-10 flex h-full w-full overflow-hidden">
         {isSplitLayout ? (
-          /* Mode A: Split View (42% Left Hero & Controls, 58% Right Synced Lyrics) */
+          /* Mode A: Split View (44% Left Hero/Vinyl & Controls, 56% Right Synced Lyrics or Liner Notes) */
           <div data-testid="fullscreen-split-layout" className="flex h-full w-full overflow-hidden">
-            {/* Left Column: Cover Art, Metadata, Badges, Seekbar & Controls */}
+            {/* Left Column: Cover Art / Vinyl Platter, Metadata, Badges, Seekbar & Controls */}
             <section className="z-10 flex h-full w-[44%] max-w-xl min-w-[360px] flex-col justify-between overflow-hidden p-8 xl:p-12">
-              {/* Artwork & Metadata */}
+              {/* Artwork / Vinyl & Metadata */}
               <div className="flex flex-col gap-4">
-                <BorderBeam
-                  className="aspect-square w-56 rounded-2xl shadow-2xl xl:w-64"
-                  thickness={1.5}
-                  duration={9}
-                  animated={isCurrentSongPlaying && !preferences?.isReducedMotion}
-                >
-                  <Img
-                    src={currentSongData.artworkPath}
-                    fallbackSrc={DefaultSongCover}
-                    loading="eager"
-                    alt={currentSongData.title || 'Song Cover'}
-                    className="h-full w-full rounded-2xl object-cover shadow-2xl"
-                  />
-                </BorderBeam>
+                {stageMode === 'vinyl' ? (
+                  <div className="self-start">
+                    <FullScreenVinylStage
+                      artworkPath={currentSongData.artworkPath}
+                      title={currentSongData.title}
+                      duration={currentSongData.duration}
+                      isPlaying={isCurrentSongPlaying}
+                      isReducedMotion={Boolean(preferences?.isReducedMotion)}
+                      compact
+                      onTogglePlay={toggleSongPlayback}
+                    />
+                  </div>
+                ) : (
+                  <BorderBeam
+                    className="aspect-square w-56 rounded-2xl shadow-2xl xl:w-64"
+                    thickness={1.5}
+                    duration={9}
+                    animated={isCurrentSongPlaying && !preferences?.isReducedMotion}
+                  >
+                    <Img
+                      src={currentSongData.artworkPath}
+                      fallbackSrc={DefaultSongCover}
+                      loading="eager"
+                      alt={currentSongData.title || 'Song Cover'}
+                      className="h-full w-full rounded-2xl object-cover shadow-2xl"
+                    />
+                  </BorderBeam>
+                )}
 
                 <div className="mt-2 flex max-w-full flex-col gap-1">
                   <h1
@@ -256,50 +358,65 @@ const FullScreenPlayer = () => {
                 <FullScreenSeekbar />
                 <FullScreenControls
                   isLyricsVisible={isLyricsVisible}
-                  setIsLyricsVisible={setIsLyricsVisible}
+                  setIsLyricsVisible={handleSetLyricsVisible}
                   isQueueVisible={isQueueVisible}
                   setIsQueueVisible={setIsQueueVisible}
                 />
               </div>
             </section>
 
-            {/* Right Column: Full-Height Clean Synced Lyrics */}
+            {/* Right Column: Full-Height Synced Lyrics OR Audiophile Liner Notes */}
             <section className="relative z-10 h-full flex-1 overflow-hidden">
-              <LyricsContainer
-                isLyricsVisible={isLyricsVisible}
-                lyricsData={lyrics}
-                lyricsLoading={isLyricsPending}
-                className="relative flex h-full w-full flex-col items-start overflow-y-auto px-8 py-10 select-text"
-              />
+              {stageMode === 'linerNotes' && !isLyricsSplit ? (
+                <FullScreenLinerNotesStage />
+              ) : (
+                <LyricsContainer
+                  isLyricsVisible={isLyricsVisible}
+                  lyricsData={lyrics}
+                  lyricsLoading={isLyricsPending}
+                  className="relative flex h-full w-full flex-col items-start overflow-y-auto px-8 py-10 select-text"
+                />
+              )}
             </section>
           </div>
         ) : (
-          /* Mode B: Centered Hero Showcase (No Lyrics / Lyrics Inactive) */
+          /* Mode B: Centered Hero Showcase or Full Vinyl Turntable (No Lyrics / Lyrics Inactive) */
           <div
             data-testid="fullscreen-showcase-layout"
             className="z-10 flex h-full w-full items-center justify-center p-6"
           >
             <div className="flex h-full max-h-[85vh] w-full max-w-2xl flex-col items-center justify-center">
-              {/* Hero Album Art with Ambient Backlight Reflection */}
-              <div className="group relative flex items-center justify-center">
-                {/* Backlight reflection */}
-                <div className="pointer-events-none absolute inset-0 aspect-square w-72 scale-105 rounded-3xl bg-black/50 opacity-40 blur-3xl sm:w-80 md:w-96" />
+              {stageMode === 'vinyl' ? (
+                <FullScreenVinylStage
+                  artworkPath={currentSongData.artworkPath}
+                  title={currentSongData.title}
+                  duration={currentSongData.duration}
+                  isPlaying={isCurrentSongPlaying}
+                  isReducedMotion={Boolean(preferences?.isReducedMotion)}
+                  onTogglePlay={toggleSongPlayback}
+                />
+              ) : (
+                /* Hero Album Art with Ambient Backlight Reflection */
+                <div className="group relative flex items-center justify-center">
+                  {/* Backlight reflection */}
+                  <div className="pointer-events-none absolute inset-0 aspect-square w-72 scale-105 rounded-3xl bg-black/50 opacity-40 blur-3xl sm:w-80 md:w-96" />
 
-                <BorderBeam
-                  className="relative aspect-square w-72 rounded-3xl shadow-2xl sm:w-80 md:w-96"
-                  thickness={2}
-                  duration={10}
-                  animated={isCurrentSongPlaying && !preferences?.isReducedMotion}
-                >
-                  <Img
-                    src={currentSongData.artworkPath}
-                    fallbackSrc={DefaultSongCover}
-                    loading="eager"
-                    alt={currentSongData.title || 'Song Cover'}
-                    className="h-full w-full rounded-3xl object-cover shadow-2xl"
-                  />
-                </BorderBeam>
-              </div>
+                  <BorderBeam
+                    className="relative aspect-square w-72 rounded-3xl shadow-2xl sm:w-80 md:w-96"
+                    thickness={2}
+                    duration={10}
+                    animated={isCurrentSongPlaying && !preferences?.isReducedMotion}
+                  >
+                    <Img
+                      src={currentSongData.artworkPath}
+                      fallbackSrc={DefaultSongCover}
+                      loading="eager"
+                      alt={currentSongData.title || 'Song Cover'}
+                      className="h-full w-full rounded-3xl object-cover shadow-2xl"
+                    />
+                  </BorderBeam>
+                </div>
+              )}
 
               {/* Track Metadata */}
               <div className="mt-6 flex max-w-full flex-col items-center px-4 text-center">
@@ -338,7 +455,7 @@ const FullScreenPlayer = () => {
                 <FullScreenSeekbar />
                 <FullScreenControls
                   isLyricsVisible={isLyricsVisible}
-                  setIsLyricsVisible={setIsLyricsVisible}
+                  setIsLyricsVisible={handleSetLyricsVisible}
                   isQueueVisible={isQueueVisible}
                   setIsQueueVisible={setIsQueueVisible}
                 />
