@@ -40,6 +40,17 @@ const resolveUserDataDir = () => {
   if (override) {
     return override;
   }
+  if (!isTest && typeof app?.getPath === 'function') {
+    try {
+      const legacyUserData = path.join(app.getPath('appData'), 'nora');
+      if (existsSync(path.join(legacyUserData, DB_NAME))) {
+        app.setPath?.('userData', legacyUserData);
+        return legacyUserData;
+      }
+    } catch {
+      // Fallback to default userData
+    }
+  }
   return app.getPath('userData');
 };
 

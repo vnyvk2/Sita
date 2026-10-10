@@ -211,9 +211,9 @@ export function useWindowManagement(
       }`;
   }, []);
 
-  /** Resets the browser/window title bar to the default "Nora" title. */
+  /** Resets the browser/window title bar to the default "Sita" title. */
   const resetTitleBarInfo = useCallback(() => {
-    document.title = `Nora`;
+    document.title = `Sita`;
   }, []);
 
   /**

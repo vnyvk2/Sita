@@ -410,7 +410,7 @@ const createWindow = async () => {
     height: 700,
     minHeight: 500,
     minWidth: 700,
-    title: 'Nora',
+    title: 'Sita',
     webPreferences: {
       zoomFactor: currentWindowZoomFactor,
       preload: getPreloadPath(),
@@ -564,7 +564,7 @@ app
     tray = new Tray(appIcon);
     const trayContextMenu = Menu.buildFromTemplate([
       {
-        label: 'Show/Hide Nora',
+        label: 'Show/Hide Sita',
         type: 'normal',
         click: () => (mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show()),
         role: 'hide'
@@ -574,7 +574,7 @@ app
     ]);
 
     tray.setContextMenu(trayContextMenu);
-    tray.setToolTip('Nora');
+    tray.setToolTip('Sita');
 
     tray.addListener('click', () => tray.popUpContextMenu(trayContextMenu));
     tray.addListener('double-click', () => {
@@ -1852,7 +1852,7 @@ export async function toggleAutoLaunch(autoLaunchState: boolean) {
 
   app.setLoginItemSettings({
     openAtLogin: autoLaunchState,
-    name: 'Nora',
+    name: 'Sita',
     openAsHidden: openWindowAsHiddenOnSystemStart
   });
 

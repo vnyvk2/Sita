@@ -1,13 +1,13 @@
 appId: com.sandakannipunajith.nora
-productName: Nora
-executableName: Nora
+productName: Sita
+executableName: Sita
 copyright: Copyright © 2024 Sandakan Nipunajith
 icon: ./build/icon.ico
 artifactName: '${productName} v${version}-${os}-${arch}.${ext}'
 afterPack: ./scripts/afterPack.cjs
 
 extraMetadata:
-  description: Nora
+  description: Sita
 
 directories:
   buildResources: build
@@ -75,7 +75,7 @@ fileAssociations:
     role: Editor
 
 win:
-  executableName: Nora
+  executableName: Sita
   target:
     - target: nsis
       arch:

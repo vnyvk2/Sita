@@ -47,10 +47,10 @@ const TitleBar = memo(() => {
                 <Img
                   className={`mr-2 aspect-square h-7 w-7 rounded-md p-1 shadow-md`}
                   src={LightModeLogo}
-                  alt="Nora Logo"
+                  alt="Sita Logo"
                 />
               </span>
-              <span className="app-name-container" title="Nora">
+              <span className="app-name-container" title="Sita">
                 <span className="font-medium tracking-wide">Sita</span>
               </span>
             </div>
