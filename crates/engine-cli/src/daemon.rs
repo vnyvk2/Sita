@@ -56,11 +56,6 @@ impl Default for EngineDaemon {
 impl EngineDaemon {
     pub fn new() -> Self {
         let boot_id = generate_boot_id();
-        let mut backend = CpalBackend::new();
-        if !backend.has_device() {
-            let _ = backend.select_device(None);
-        }
-        let initial_rate = backend.default_output_rate().unwrap_or(48000);
         Self {
             boot_id,
             sequence_id: Arc::new(AtomicU64::new(0)),
@@ -72,16 +67,16 @@ impl EngineDaemon {
             volume: Arc::new(AtomicU32::new(1.0f32.to_bits())),
             shared_engine: Arc::new(Mutex::new((
                 DualSlotMixer::new(),
-                DspPipeline::new(initial_rate as f32),
+                DspPipeline::new(48000.0),
             ))),
-            backend,
+            backend: CpalBackend::new(),
             start_time: Instant::now(),
             slot_durations: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
             slot_base_secs: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
             slot_frames_consumed: Arc::new((AtomicU64::new(0), AtomicU64::new(0))),
             slot_paths: Arc::new(Mutex::new([None, None])),
             eos_notified: Arc::new((AtomicBool::new(false), AtomicBool::new(false))),
-            output_rate: Arc::new(AtomicU32::new(initial_rate)),
+            output_rate: Arc::new(AtomicU32::new(48000)),
             cb_contention: Arc::new(AtomicU64::new(0)),
         }
     }
