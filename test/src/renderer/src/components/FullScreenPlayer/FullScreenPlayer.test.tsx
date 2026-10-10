@@ -54,6 +54,7 @@ vi.mock('@renderer/queries/lyrics', () => ({
 
 const mockGetSongInfo = vi.fn();
 const mockGetSongListeningData = vi.fn();
+const mockGetArtistOnlineProfile = vi.fn();
 
 (window as any).api = {
   appControls: {
@@ -63,6 +64,9 @@ const mockGetSongListeningData = vi.fn();
   audioLibraryControls: {
     getSongInfo: mockGetSongInfo,
     getSongListeningData: mockGetSongListeningData
+  },
+  artistsData: {
+    getArtistOnlineProfile: mockGetArtistOnlineProfile
   },
   properties: {
     isInDevelopment: false,
@@ -108,6 +112,20 @@ describe('FullScreenPlayer Stages, Shortcuts, Sing Mode & Queue Drawer', () => {
         seekEvents: []
       }
     ]);
+
+    mockGetArtistOnlineProfile.mockResolvedValue({
+      bioSource: 'Wikipedia',
+      bioSummary: 'Muse are an English rock band from Teignmouth, Devon, formed in 1994.',
+      bioParagraphs: ['Muse are an English rock band from Teignmouth, Devon, formed in 1994.'],
+      tags: [{ name: 'Progressive Rock', url: '' }],
+      availableBiographies: [
+        {
+          source: 'Wikipedia',
+          summary: 'Muse are an English rock band from Teignmouth, Devon, formed in 1994.',
+          paragraphs: ['Muse are an English rock band from Teignmouth, Devon, formed in 1994.']
+        }
+      ]
+    });
 
     const queue = new PlayerQueue([42], 0, undefined, undefined, 'fs-main-queue');
     const manager = new QueuesManager();
@@ -204,16 +222,34 @@ describe('FullScreenPlayer Stages, Shortcuts, Sing Mode & Queue Drawer', () => {
     expect(screen.queryByTestId('fullscreen-vinyl-stage')).toBeNull();
   });
 
-  it('switches to Liner Notes Stage on I key and displays Audiophile Signal Path & Telemetry', async () => {
+  it('switches to Roon-Style Liner Notes Carousel on I key and cycles through Artist Bio, Signal Path, and Stats slides', async () => {
     renderFullScreen();
 
     fireEvent.keyDown(window, { key: 'i' });
     expect(screen.getByTestId('fullscreen-split-layout')).toBeDefined();
     expect(screen.getByTestId('fullscreen-liner-notes-stage')).toBeDefined();
+    expect(screen.getByTestId('liner-notes-artist-bio')).toBeDefined();
     expect(screen.getByTestId('liner-notes-signal-path')).toBeDefined();
     expect(screen.getByTestId('liner-notes-telemetry')).toBeDefined();
     expect(screen.getByTestId('liner-notes-release')).toBeDefined();
 
+    // Slide 1 (default): Artist Bio
+    expect(screen.getByTestId('liner-notes-carousel-track').getAttribute('data-active-slide')).toBe(
+      'bio'
+    );
+    await screen.findByText(/Muse are an English rock band/i);
+
+    // Click Next Slide -> Slide 2: Signal Path
+    fireEvent.click(screen.getByTestId('liner-notes-next-btn'));
+    expect(screen.getByTestId('liner-notes-carousel-track').getAttribute('data-active-slide')).toBe(
+      'signal'
+    );
+
+    // Click Next Slide -> Slide 3: Play History & Credits
+    fireEvent.click(screen.getByTestId('liner-notes-next-btn'));
+    expect(screen.getByTestId('liner-notes-carousel-track').getAttribute('data-active-slide')).toBe(
+      'stats'
+    );
     await screen.findByText('Alternative Rock');
     expect(screen.getByText('2006')).toBeDefined();
   });
