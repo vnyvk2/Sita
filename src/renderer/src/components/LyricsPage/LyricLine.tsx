@@ -27,13 +27,6 @@ interface LyricProp {
   isLoopStart?: boolean;
   isAutoScrolling?: boolean;
   playerType?: PlayerTypes | 'drawer';
-  /**
-   * When false, this line never scrolls itself into view. Used by surfaces
-   * where the scroll container owns auto-follow (container-scoped scrolling
-   * that cannot leak into ancestor scrollers). Legacy surfaces that rely on
-   * per-line scrollIntoView keep the default true.
-   */
-  selfScroll?: boolean;
 }
 
 const getLyricText = (lyrics: string) => {
@@ -59,8 +52,7 @@ const LyricLine = (props: LyricProp) => {
     isLoopStart = false,
     isActive = false,
     isAutoScrolling = true,
-    playerType = 'normal',
-    selfScroll = true
+    playerType = 'normal'
   } = props;
 
   const { updateSongPosition, updateContextMenuData, addNewNotifications } =
@@ -76,13 +68,12 @@ const LyricLine = (props: LyricProp) => {
   const isSynced = syncedStart !== undefined && syncedEnd !== undefined;
 
   // Auto-scroll when this line becomes active, OR when auto-scroll is re-enabled while active.
-  // Skipped when the owning scroll container drives auto-follow itself (selfScroll=false).
   useEffect(() => {
     const becameActive = isActive && !prevIsActiveRef.current;
     const autoScrollEnabledWhileActive =
       isActive && isAutoScrolling && !prevIsAutoScrollingRef.current;
 
-    if ((becameActive || autoScrollEnabledWhileActive) && selfScroll) {
+    if (becameActive || autoScrollEnabledWhileActive) {
       if (isAutoScrolling && lyricsRef.current?.scrollIntoView) {
         lyricsRef.current.scrollIntoView({
           behavior: getLyricScrollBehavior(),
@@ -92,7 +83,7 @@ const LyricLine = (props: LyricProp) => {
     }
     prevIsActiveRef.current = isActive;
     prevIsAutoScrollingRef.current = isAutoScrolling;
-  }, [isActive, isAutoScrolling, selfScroll]);
+  }, [isActive, isAutoScrolling]);
 
   // Word-level active tracking: ONLY when this line is active AND has word-level timestamps
   useEffect(() => {
@@ -186,9 +177,6 @@ const LyricLine = (props: LyricProp) => {
 
   return (
     <div
-      data-lyric-line="true"
-      data-line-index={index}
-      data-active-line={isActive ? 'true' : undefined}
       style={{
         animationDelay: `${100 + 20 * (index + 1)}ms`
       }}

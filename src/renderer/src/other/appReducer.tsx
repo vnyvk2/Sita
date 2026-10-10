@@ -527,6 +527,7 @@ export const LOCAL_STORAGE_DEFAULT_TEMPLATE: LocalStorage = {
     },
     themePreset: 'default',
     lyricsBackground: 'default',
+    lyricsScrollMode: 'auto' as const,
     lyricsArtworkBlur: 40,
     lyricsArtworkDarkness: 50,
     lyricsArtworkAnimation: true,

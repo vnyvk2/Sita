@@ -3,18 +3,17 @@ import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useSkipLyricsLines from '@renderer/hooks/useSkipLyricsLines';
 import { useLyricsQuery } from '@renderer/queries/lyrics';
 import { store } from '@renderer/store/store';
+import storage from '@renderer/utils/localStorage';
 import { useLocation, useNavigate, useRouter } from '@tanstack/react-router';
 import { useStore } from '@tanstack/react-store';
-import { useContext, useMemo, useRef } from 'react';
+import { useCallback, useContext, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import FloatingLyricsSnapBackBtn from './FloatingLyricsSnapBackBtn';
 import LyricsAmbientBackground from './LyricsAmbientBackground';
 import LyricsMetadata from './LyricsMetadata';
 import { renderLyricsLines } from './lyricsUtils';
 import NoLyrics from './NoLyrics';
 import { useActiveLyricIndex } from './useActiveLyricIndex';
-import { useLyricsScrollSync } from './useLyricsScrollSync';
 
 const LyricsDrawer = () => {
   const isLyricsDrawerOpen = useStore(store, (state) => state.isLyricsDrawerOpen);
@@ -27,8 +26,6 @@ const LyricsDrawer = () => {
   const navigate = useNavigate();
   const router = useRouter();
 
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
   const isLyricsPage = useLocation({
     select: (loc) => loc.pathname.startsWith('/main-player/lyrics')
   });
@@ -39,24 +36,12 @@ const LyricsDrawer = () => {
 
   useSkipLyricsLines(lyrics);
 
-  const isSynced = Boolean(lyrics?.lyrics?.isSynced);
   const activeLineIndex = useActiveLyricIndex(isLyricsDrawerOpen ? lyrics : null);
+  const isAutoScrolling = (preferences?.lyricsScrollMode ?? 'auto') === 'auto';
 
-  const {
-    scrollMode,
-    isAutoScrolling,
-    direction,
-    showSnapBack,
-    handleSnapBack,
-    handleToggleScrollMode
-  } = useLyricsScrollSync({
-    containerRef: scrollContainerRef,
-    activeLineIndex,
-    isSynced,
-    songId: currentSongData.songId,
-    parsedLyrics: lyrics?.lyrics?.parsedLyrics ?? null,
-    offset: lyrics?.lyrics?.offset ?? 0
-  });
+  const handleToggleAutoScrolling = useCallback(() => {
+    storage.preferences.setPreferences('lyricsScrollMode', isAutoScrolling ? 'manual' : 'auto');
+  }, [isAutoScrolling]);
 
   const lyricsComponents = useMemo(() => {
     return renderLyricsLines(
@@ -65,8 +50,7 @@ const LyricsDrawer = () => {
       isAutoScrolling,
       'drawer',
       activeLineIndex,
-      abLoop,
-      false
+      abLoop
     );
   }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex, abLoop]);
 
@@ -116,23 +100,17 @@ const LyricsDrawer = () => {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Scroll Mode Toggle */}
+          {/* Auto-Scroll Toggle */}
           {lyrics?.lyrics?.isSynced && (
             <Button
               className="scroll-mode-btn hover:bg-background-color-2 dark:hover:bg-dark-background-color-2 m-0! flex h-8 w-8 items-center justify-center rounded-md! border-0! bg-transparent p-0!"
-              iconName={scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
-              ariaPressed={scrollMode === 'auto'}
-              iconClassName={`material-icons-round text-lg ${
-                scrollMode === 'auto'
-                  ? 'text-accent opacity-90'
-                  : 'text-font-color-black dark:text-font-color-white opacity-70 hover:opacity-100'
-              }`}
-              tooltipLabel={
-                scrollMode === 'auto'
-                  ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
-                  : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
-              }
-              clickHandler={handleToggleScrollMode}
+              iconName={isAutoScrolling ? 'flash_off' : 'flash_on'}
+              ariaPressed={isAutoScrolling}
+              iconClassName="material-icons-round text-lg text-font-color-black dark:text-font-color-white opacity-70 hover:opacity-100"
+              tooltipLabel={t(
+                `currentQueuePage.${isAutoScrolling ? 'disableAutoScrolling' : 'enableAutoScrolling'}`
+              )}
+              clickHandler={handleToggleAutoScrolling}
             />
           )}
           <Button
@@ -153,10 +131,7 @@ const LyricsDrawer = () => {
       </div>
 
       {/* Lyrics Stream */}
-      <div
-        ref={scrollContainerRef}
-        className="lyrics-lines-container relative z-10 flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto px-6 py-8 [overflow-anchor:none]!"
-      >
+      <div className="lyrics-lines-container relative z-10 flex min-h-0 w-full flex-1 flex-col items-center overflow-y-auto px-6 py-8 [overflow-anchor:none]!">
         {isLoadingLyrics && (
           <div className="flex h-full w-full items-center justify-center">
             <div className="border-font-color-highlight dark:border-dark-font-color-highlight h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" />
@@ -188,15 +163,6 @@ const LyricsDrawer = () => {
           />
         )}
       </div>
-
-      {/* Floating bidirectional snap-back button */}
-      {showSnapBack && direction && (
-        <FloatingLyricsSnapBackBtn
-          direction={direction}
-          onClick={handleSnapBack}
-          className={direction === 'up' ? 'top-16' : 'bottom-6'}
-        />
-      )}
     </aside>
   );
 };

@@ -28,11 +28,10 @@ const TitleBarContainer = (props: Props) => {
 
   const { isLyricsVisible } = props;
   const preferences = useStore(store, (state) => state.localStorage.preferences);
-  const scrollMode = preferences?.lyricsScrollMode ?? 'auto';
+  const isAutoScrolling = (preferences?.lyricsScrollMode ?? 'auto') === 'auto';
 
-  const handleToggleScrollMode = () => {
-    const next = scrollMode === 'auto' ? 'manual' : 'auto';
-    storage.preferences.setPreferences('lyricsScrollMode', next);
+  const handleToggleAutoScrolling = () => {
+    storage.preferences.setPreferences('lyricsScrollMode', isAutoScrolling ? 'manual' : 'auto');
   };
 
   return (
@@ -54,17 +53,13 @@ const TitleBarContainer = (props: Props) => {
         {isLyricsVisible && (
           <Button
             className="lyrics-scroll-mode-btn text-font-color-white dark:text-font-color-white mr-1! rounded-md! border-0! bg-transparent! p-1.5! outline-offset-1 [-webkit-app-region:no-drag] focus-visible:outline!"
-            ariaPressed={scrollMode === 'auto'}
-            tooltipLabel={
-              scrollMode === 'auto'
-                ? t('lyricsPage.switchToManualScroll', 'Switch to manual scroll')
-                : t('lyricsPage.switchToAutoScroll', 'Switch to auto-scroll')
-            }
-            iconName={scrollMode === 'auto' ? 'swap_vert' : 'swipe_up'}
-            iconClassName={`material-icons-round text-lg! ${
-              scrollMode === 'auto' ? 'text-accent' : 'opacity-80'
-            }`}
-            clickHandler={handleToggleScrollMode}
+            ariaPressed={isAutoScrolling}
+            tooltipLabel={t(
+              `currentQueuePage.${isAutoScrolling ? 'disableAutoScrolling' : 'enableAutoScrolling'}`
+            )}
+            iconName={isAutoScrolling ? 'flash_off' : 'flash_on'}
+            iconClassName="material-icons-round text-lg! opacity-80"
+            clickHandler={handleToggleAutoScrolling}
             removeFocusOnClick
           />
         )}

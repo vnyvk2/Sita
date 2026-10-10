@@ -28,10 +28,7 @@ export function renderLyricsLines(
   isAutoScrolling = true,
   playerType: 'normal' | 'full' | 'mini' | 'drawer' = 'normal',
   activeLineIndex: number | null = null,
-  abLoop?: AbLoopState | null,
-  // When false, lines never scroll themselves (container-owned auto-follow
-  // drives scrolling instead, keeping ancestor scrollers untouched).
-  selfScroll = true
+  abLoop?: AbLoopState | null
 ): ReactNode[] {
   if (!lyrics?.lyrics) return [];
   const { isSynced, parsedLyrics, offset = 0 } = lyrics.lyrics;
@@ -85,7 +82,6 @@ export function renderLyricsLines(
           isLoopStart={isLoopStart}
           isAutoScrolling={isAutoScrolling}
           convertedLyric={lyric.romanizedText}
-          selfScroll={selfScroll}
         />
       );
     });
@@ -100,7 +96,6 @@ export function renderLyricsLines(
         syncedStart={0}
         syncedEnd={(parsedLyrics[0]?.start || 0) + offset}
         isAutoScrolling={isAutoScrolling}
-        selfScroll={selfScroll}
       />
     );
 
@@ -120,7 +115,6 @@ export function renderLyricsLines(
           translatedLyricLines={line.translatedTexts}
           isAutoScrolling={isAutoScrolling}
           convertedLyric={line.romanizedText}
-          selfScroll={selfScroll}
         />
       );
     });

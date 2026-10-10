@@ -1,13 +1,11 @@
 import { isLyricsEnhancedSynced } from '@common/isLyricsSynced';
 import Button from '@renderer/components/Button';
-import FloatingLyricsSnapBackBtn from '@renderer/components/LyricsPage/FloatingLyricsSnapBackBtn';
 import LyricsAmbientBackground from '@renderer/components/LyricsPage/LyricsAmbientBackground';
 import LyricsMetadata from '@renderer/components/LyricsPage/LyricsMetadata';
 import { renderLyricsLines } from '@renderer/components/LyricsPage/lyricsUtils';
 import NoLyrics from '@renderer/components/LyricsPage/NoLyrics';
 import TheatreLyricsView from '@renderer/components/LyricsPage/TheatreLyricsView';
 import { useActiveLyricIndex } from '@renderer/components/LyricsPage/useActiveLyricIndex';
-import { useLyricsScrollSync } from '@renderer/components/LyricsPage/useLyricsScrollSync';
 import MainContainer from '@renderer/components/MainContainer';
 import { AppUpdateContext } from '@renderer/contexts/AppUpdateContext';
 import useNetworkConnectivity from '@renderer/hooks/useNetworkConnectivity';
@@ -16,6 +14,7 @@ import { lyricsQuery, useLyricsQuery } from '@renderer/queries/lyrics';
 import { queryClient } from '@renderer/queryClient';
 import { updateRouteState } from '@renderer/store/routeStateStore';
 import { store } from '@renderer/store/store';
+import storage from '@renderer/utils/localStorage';
 import { lyricsSchema } from '@renderer/utils/zod/lyricsSchema';
 import { useMutation } from '@tanstack/react-query';
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router';
@@ -139,24 +138,11 @@ function LyricsPage() {
   // ]);
 
   const activeLineIndex = useActiveLyricIndex(lyrics);
+  const isAutoScrolling = (preferences?.lyricsScrollMode ?? 'auto') === 'auto';
 
-  const isSynced = Boolean(lyrics?.lyrics?.isSynced);
-
-  const {
-    scrollMode,
-    isAutoScrolling,
-    direction,
-    showSnapBack,
-    handleSnapBack,
-    handleToggleScrollMode
-  } = useLyricsScrollSync({
-    containerRef: lyricsLinesContainerRef,
-    activeLineIndex,
-    isSynced,
-    songId: currentSongData.songId,
-    parsedLyrics: lyrics?.lyrics?.parsedLyrics ?? null,
-    offset: lyrics?.lyrics?.offset ?? 0
-  });
+  const handleToggleAutoScrolling = useCallback(() => {
+    storage.preferences.setPreferences('lyricsScrollMode', isAutoScrolling ? 'manual' : 'auto');
+  }, [isAutoScrolling]);
 
   const lyricsComponents = useMemo(() => {
     return renderLyricsLines(
@@ -165,8 +151,7 @@ function LyricsPage() {
       isAutoScrolling,
       'normal',
       activeLineIndex,
-      abLoop,
-      false
+      abLoop
     );
   }, [currentSongData.duration, isAutoScrolling, lyrics, activeLineIndex, abLoop]);
 
@@ -390,7 +375,8 @@ function LyricsPage() {
           lyrics={lyrics}
           lyricsComponents={lyricsComponents}
           copyright={copyright}
-          activeLineIndex={activeLineIndex}
+          isAutoScrolling={isAutoScrolling}
+          onToggleAutoScrolling={handleToggleAutoScrolling}
           onEditLyrics={goToLyricsEditor}
           onResetLyrics={() => resetLyrics()}
           onClose={() => setIsTheatreMode(false)}
@@ -433,13 +419,13 @@ function LyricsPage() {
                     <Button
                       key={5}
                       tooltipLabel={t(
-                        `currentQueuePage.${scrollMode === 'auto' ? 'disableAutoScrolling' : 'enableAutoScrolling'}`
+                        `currentQueuePage.${isAutoScrolling ? 'disableAutoScrolling' : 'enableAutoScrolling'}`
                       )}
                       pendingAnimationOnDisabled
                       className="show-online-lyrics-btn text-sm! md:text-lg md:[&>.button-label-text]:hidden md:[&>.icon]:mr-0"
-                      iconName={scrollMode === 'auto' ? 'flash_off' : 'flash_on'}
-                      ariaPressed={scrollMode === 'auto'}
-                      clickHandler={handleToggleScrollMode}
+                      iconName={isAutoScrolling ? 'flash_off' : 'flash_on'}
+                      ariaPressed={isAutoScrolling}
+                      clickHandler={handleToggleAutoScrolling}
                     />
                   )}
                   {/* {lyrics && !lyrics.lyrics.isTranslated && (
@@ -613,14 +599,6 @@ function LyricsPage() {
                   isTranslated={lyrics.lyrics.isTranslated}
                 />
               </div>
-              {/* Floating bidirectional snap-back button */}
-              {showSnapBack && direction && (
-                <FloatingLyricsSnapBackBtn
-                  direction={direction}
-                  onClick={handleSnapBack}
-                  className={direction === 'up' ? 'top-16' : 'bottom-6'}
-                />
-              )}
             </>
           ) : (
             <NoLyrics
