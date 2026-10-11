@@ -81,6 +81,11 @@ vi.mock('@renderer/components/Sidebar/SidebarResizer', () => ({
   default: () => <div data-testid="sidebar-resizer" />
 }));
 
+vi.mock('@renderer/hooks/useVisualSlot', () => ({
+  useVisualSlot: () => undefined,
+  useNavVisualSlots: () => ({ getNavCustomIcon: () => undefined })
+}));
+
 describe('NavigationPanel SidebarPlaylistsSection Gating', () => {
   beforeEach(() => {
     currentPathname = '/main-player/home';

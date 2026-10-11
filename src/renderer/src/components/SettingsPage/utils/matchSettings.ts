@@ -48,7 +48,7 @@ export const normalizePunctuation = (text: string): string => {
 export const matchSettings = (
   query: string,
   catalog: SettingCatalogEntry[],
-  t: (key: string, options?: Record<string, unknown>) => unknown
+  t: (key: any, options?: any) => any
 ): SettingSearchResult[] => {
   const rawQuery = query.trim();
   const normQuery = normalizeText(rawQuery);

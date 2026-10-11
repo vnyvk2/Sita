@@ -1,32 +1,13 @@
-import { db } from '@db/db';
+import { db, type DB, type DBTransaction } from '@db/db';
 import { and, asc, desc, eq, gte, sql, type SQL } from 'drizzle-orm';
 
 import logger from '../../logger';
 import { rawAll } from '@db/sqlite/raw';
 import { albums, albumsSongs, artists, artistsSongs, metadataOverrides, playHistory, songs } from '../schema';
 import { getAllSongs } from './songs';
+import type { HistorySongIdsParams, HistorySongIdsResult } from '../../../common/historyTypes';
 
-export type { HistoryQueryOptions, HistoryPeriod };
-
-export interface HistorySongIdsParams {
-  sortType?: SongSortTypes;
-  period?: HistoryPeriod;
-  limit?: number;
-  language?: string;
-}
-
-export interface HistorySongIdsResult {
-  entries: Array<{
-    songId: number;
-    playedAt?: number;
-    playCount?: number;
-  }>;
-  ids: number[];
-  total: number;
-  totalDuration?: number;
-  blacklistedIds: number[];
-  languages: string[];
-}
+export type { HistoryQueryOptions, HistoryPeriod, HistorySongIdsParams, HistorySongIdsResult };
 
 export const getCutoffDate = (period?: HistoryPeriod): Date | undefined => {
   if (!period || period === 'all') return undefined;

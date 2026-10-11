@@ -19,13 +19,14 @@ export const FullScreenAudioBadge = memo(() => {
         : '';
 
     const isLossless = ['FLAC', 'WAV', 'ALAC', 'AIFF', 'DSD', 'APE'].includes(extension || '');
-    const sampleRateKHz = currentSongData.sampleRate
-      ? Math.round((currentSongData.sampleRate / 1000) * 10) / 10
+    const audioData = currentSongData as AudioPlayerData & { sampleRate?: number; bitrate?: number };
+    const sampleRateKHz = audioData.sampleRate
+      ? Math.round((audioData.sampleRate / 1000) * 10) / 10
       : undefined;
-    const isHiRes = isLossless && (currentSongData.sampleRate ?? 0) > 48000;
+    const isHiRes = isLossless && (audioData.sampleRate ?? 0) > 48000;
 
-    const bitrateKbps = currentSongData.bitrate
-      ? Math.round(currentSongData.bitrate / 1000)
+    const bitrateKbps = audioData.bitrate
+      ? Math.round(audioData.bitrate / 1000)
       : undefined;
 
     if (!extension && !bitrateKbps && !sampleRateKHz) return null;

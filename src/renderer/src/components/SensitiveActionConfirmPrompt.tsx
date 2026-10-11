@@ -26,7 +26,7 @@ const SensitiveActionConfirmPrompt = (props: SensitiveActionConfrimPromptProp) =
           className={`remove-song-from-library-btn danger-btn bg-font-color-crimson! text-font-color-white hover:border-font-color-crimson dark:bg-font-color-crimson! dark:text-font-color-white dark:hover:border-font-color-crimson float-right mt-8 h-10 w-48 cursor-pointer rounded-lg outline-hidden ease-in-out ${confirmButton.className}`}
           clickHandler={(e, setIsDisabled, setIsPending) => {
             if (closePromptOnButtonClick) changePromptMenuData(false);
-            return confirmButton.clickHandler(e, setIsDisabled, setIsPending);
+            return confirmButton.clickHandler?.(e, setIsDisabled, setIsPending);
           }}
         />
       </div>

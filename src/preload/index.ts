@@ -53,7 +53,7 @@ import type {
   VisualSlotAssignment,
   VisualSlotId
 } from '../common/visualSlots';
-import type { HistorySongIdsParams, HistorySongIdsResult } from '../main/db/queries/history';
+import type { HistorySongIdsParams, HistorySongIdsResult } from '../common/historyTypes';
 import type {
   ArtistDiscographyPayload,
   ArtistOnlineProfilePayload,
@@ -1237,6 +1237,7 @@ export const api = {
     ): Promise<{
       success: boolean;
       config: VisualAssetsConfig;
+      error?: string;
     }> => ipcRenderer.invoke('app/visualAssets/resetSlots', category),
     setDynamicNowPlayingIcon: (
       artworkPath: string | null

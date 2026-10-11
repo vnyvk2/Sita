@@ -50,7 +50,7 @@ export const SECTION_METADATA: Record<SettingsSectionKey, SectionMeta> = {
 
 export const getSectionDisplayName = (
   sectionKey: SettingsSectionKey,
-  t: (key: string, options?: Record<string, unknown>) => unknown
+  t: (key: any, options?: any) => any
 ): string => {
   const meta = SECTION_METADATA[sectionKey];
   if (!meta) return sectionKey;

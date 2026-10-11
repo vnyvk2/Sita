@@ -37,6 +37,11 @@ vi.mock('@renderer/components/TitleBar/WindowControlsContainer', () => ({
   default: () => <div data-testid="window-controls-container" />
 }));
 
+vi.mock('@renderer/hooks/useVisualSlot', () => ({
+  useVisualSlot: () => undefined,
+  useNavVisualSlots: () => ({})
+}));
+
 describe('TitleBar', () => {
   beforeEach(() => {
     Object.defineProperty(window, 'api', {

@@ -124,13 +124,14 @@ export const FullScreenLinerNotesStage = memo(() => {
         : 'AUDIO';
 
     const isLossless = ['FLAC', 'WAV', 'ALAC', 'AIFF', 'DSD', 'APE'].includes(extension);
-    const sampleRateKHz = currentSongData.sampleRate
-      ? `${Math.round((currentSongData.sampleRate / 1000) * 10) / 10} kHz`
+    const audioData = currentSongData as AudioPlayerData & { sampleRate?: number; bitrate?: number };
+    const sampleRateKHz = audioData.sampleRate
+      ? `${Math.round((audioData.sampleRate / 1000) * 10) / 10} kHz`
       : '44.1 kHz';
-    const bitrateKbps = currentSongData.bitrate
-      ? `${Math.round(currentSongData.bitrate / 1000)} kbps`
+    const bitrateKbps = audioData.bitrate
+      ? `${Math.round(audioData.bitrate / 1000)} kbps`
       : undefined;
-    const isHiRes = isLossless && (currentSongData.sampleRate ?? 0) > 48000;
+    const isHiRes = isLossless && (audioData.sampleRate ?? 0) > 48000;
 
     return {
       extension,
@@ -139,7 +140,7 @@ export const FullScreenLinerNotesStage = memo(() => {
       sampleRateKHz,
       bitrateKbps
     };
-  }, [currentSongData.path, currentSongData.sampleRate, currentSongData.bitrate]);
+  }, [currentSongData]);
 
   const stats = useMemo(() => {
     const playEvents = listeningData?.playEvents ?? [];
@@ -176,7 +177,7 @@ export const FullScreenLinerNotesStage = memo(() => {
     if (playback?.isNightMode) {
       activeNodes.push('Night Mode Dynamics');
     }
-    if (playback?.isReverb) {
+    if ((playback?.audioFx?.reverbWet ?? 0) > 0 || (playback as unknown as { isReverb?: boolean })?.isReverb) {
       activeNodes.push('Convolver Reverb');
     }
     if (activeNodes.length === 0) {

@@ -137,7 +137,7 @@ const Notification = (props: AppNotification) => {
                 className={`text-background-color-3 dark:border-background-color-2 dark:text-background-color-2 mt-2 mr-0 mb-1 ml-4 border-2 px-2 py-1 font-medium ${button.className}`}
                 clickHandler={(e, setIsDisabled, setIsPending) => {
                   removeNotification();
-                  button.clickHandler(e, setIsDisabled, setIsPending);
+                  button.clickHandler?.(e, setIsDisabled, setIsPending);
                 }}
               />
             ))}

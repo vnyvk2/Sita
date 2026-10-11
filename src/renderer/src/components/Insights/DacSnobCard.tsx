@@ -8,7 +8,7 @@ interface DacSnobCardProps {
   stats?: LibraryAudioStatsData;
 }
 
-export const DacSnobCard = memo(({ metrics, stats }: DacSnobCardProps) => {
+export const DacSnobCard = memo(({ metrics }: DacSnobCardProps) => {
   const losslessPct = metrics?.losslessPercentage ?? 0;
   const pcmGb = metrics?.rawPcmGigabytes ?? 0;
   const tier = metrics?.resolutionTier ?? 'Standard Lossless';

@@ -167,7 +167,7 @@ export const FullScreenControls = ({
         <button
           type="button"
           data-testid="fullscreen-play-pause-btn"
-          aria-label={isCurrentSongPlaying ? t('player.pause') : t('player.play')}
+          aria-label={t('player.playPause')}
           onClick={toggleSongPlayback}
           className="relative flex h-14 w-14 cursor-pointer items-center justify-center rounded-full border-0 bg-white text-zinc-950 shadow-xl transition-all duration-150 hover:scale-105 hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-white active:scale-95"
         >
@@ -201,7 +201,7 @@ export const FullScreenControls = ({
               ? 'text-font-color-highlight dark:text-dark-font-color-highlight scale-105 opacity-100'
               : 'opacity-70 hover:opacity-100'
           }`}
-          clickHandler={toggleRepeat}
+          clickHandler={() => toggleRepeat()}
         />
       </div>
 
