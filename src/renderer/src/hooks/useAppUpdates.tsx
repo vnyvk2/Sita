@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 
-import { releaseNotes, version } from '../../../../package.json';
+import { releaseNotes } from '../../../../package.json';
 import { store } from '../store/store';
-import isLatestVersion from '../utils/isLatestVersion';
-import log from '../utils/log';
 import { parseChangelog } from '../utils/parseChangelog';
 
 /** Dependencies required by the useAppUpdates hook. */
@@ -102,20 +100,9 @@ export function useAppUpdates(dependencies: AppUpdatesDependencies) {
           throw new Error('response status is not 200');
         })
         .then((resText) => {
-          const res = parseChangelog(resText);
-          const isThereAnAppUpdate = !isLatestVersion(res.latestVersion.version, version);
-
-          updateAppUpdatesState(isThereAnAppUpdate ? 'OLD' : 'LATEST');
-
-          if (isThereAnAppUpdate) {
-            log('client has new updates', {
-              isThereAnAppUpdate,
-              latestVersion: res.latestVersion.version
-            });
-          } else {
-            console.log('client is up-to-date.');
-          }
-
+          parseChangelog(resText);
+          // Sita is standalone; never mark as OLD or prompt for upstream Nora updates
+          updateAppUpdatesState('LATEST');
           return undefined;
         })
         .catch((err) => {

@@ -103,7 +103,6 @@ import { flushScrobbleQueue } from './other/lastFm/flushScrobbleQueue';
 import resetAppData from './resetAppData';
 import { savePendingSongLyrics } from './saveLyricsToSong';
 import { cleanThumbnailCache } from './thumbnails/thumbnailService';
-import checkForUpdates from './update';
 import { savePendingMetadataUpdates } from './updateSong/updateSongId3Tags';
 import { initEventLoopMonitor, stopEventLoopMonitor } from './utils/eventLoopMonitor';
 import { flushPendingWritesBeforeExit } from './utils/flushPendingWritesBeforeExit';
@@ -683,7 +682,7 @@ app
       if (process.env.NORA_SCENARIO !== '0') {
         void memProfiler.runBootScenario(mainWindow);
       }
-      checkForUpdates();
+      // checkForUpdates(); // Disabled upstream check for custom Sita build
       //  / / / / / / / / / / / GLOBAL SHORTCUTS / / / / / / / / / / / / / /
       // globalShortcut.register('F5', () => {
       //   const isFocused = mainWindow.isFocused();
